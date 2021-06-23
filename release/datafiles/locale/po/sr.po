@@ -1,7 +1,7 @@
 
 msgid ""
 msgstr ""
-"Project-Id-Version: Blender 2.93.0 Beta (b'3c7b80ae2ca6')\n"
+"Project-Id-Version: Blender 3.0.0 Alpha (b'748475b9431c')\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2020-01-01 00:00:00\n"
 "PO-Revision-Date: 2012-09-07 22:32+0100\n"
@@ -511,7 +511,7 @@ msgid "Face"
 msgstr "Страница"
 
 
-msgid "Curve"
+msgid "Spline"
 msgstr "Крива"
 
 
@@ -1861,6 +1861,10 @@ msgstr "Простор боја улаза"
 
 msgid "Color Space"
 msgstr "Простор боја"
+
+
+msgid "Curve"
+msgstr "Крива"
 
 
 msgid "Exposure"
@@ -4397,6 +4401,10 @@ msgid "Show image files"
 msgstr "Прикажи датотеке слика"
 
 
+msgid "Link"
+msgstr "Веза"
+
+
 msgid "Additional"
 msgstr "Додатно"
 
@@ -5850,10 +5858,6 @@ msgid "Bevel Depth"
 msgstr "Дубина искошавање"
 
 
-msgid "Spline"
-msgstr "Крива"
-
-
 msgid "Round"
 msgstr "Закриврено"
 
@@ -5902,15 +5906,7 @@ msgid "Texture Space Location"
 msgstr "Локација простора текстуре"
 
 
-msgid "Texture space location"
-msgstr "Локација простора текстуре"
-
-
 msgid "Texture Space Size"
-msgstr "Величина простора текстуре"
-
-
-msgid "Texture space size"
 msgstr "Величина простора текстуре"
 
 
@@ -6706,6 +6702,14 @@ msgid "Texture Space Mesh"
 msgstr "Текстурни простор меша"
 
 
+msgid "Texture space location"
+msgstr "Локација простора текстуре"
+
+
+msgid "Texture space size"
+msgstr "Величина простора текстуре"
+
+
 msgid "Texture Mesh"
 msgstr "Меш текстуре"
 
@@ -6948,6 +6952,10 @@ msgstr "Низак"
 
 msgid "Low quality"
 msgstr "Низак квалитет"
+
+
+msgid "Tiled"
+msgstr "Поплочано"
 
 
 msgid "Render Quality"
@@ -9259,10 +9267,6 @@ msgstr "Фактор мешања"
 
 msgid "Material slot in an object"
 msgstr "Слот материјала у објекту"
-
-
-msgid "Link"
-msgstr "Веза"
 
 
 msgid "Material slot name"
@@ -11854,6 +11858,10 @@ msgid "Equal"
 msgstr "Једнако"
 
 
+msgid "Z Axis"
+msgstr "Z оса"
+
+
 msgid "Original"
 msgstr "Оригинал"
 
@@ -12128,10 +12136,6 @@ msgstr "Доња половина текстуре је за врхове пот
 
 msgid "UV coordinates to be used for mapping"
 msgstr "UV координате за мапирање"
-
-
-msgid "Z Axis"
-msgstr "Z оса"
 
 
 msgid "Vector Transform"
@@ -14596,18 +14600,8 @@ msgid "Highlight selected file(s)"
 msgstr "Означава изабране датотеке"
 
 
-msgctxt "Operator"
-msgid "Make All Paths Absolute"
-msgstr "Претвори све путање у апсолутне"
-
-
 msgid "Make all paths to external files absolute"
 msgstr "Стандардна акција за средњи тастер миша"
-
-
-msgctxt "Operator"
-msgid "Make All Paths Relative"
-msgstr "Претвори све путање у релативне"
 
 
 msgid "Make all paths to external files relative to current .blend"
@@ -14621,24 +14615,6 @@ msgstr "Следећи директоријум"
 
 msgid "Move to next folder"
 msgstr "Премести на следећи директоријум"
-
-
-msgctxt "Operator"
-msgid "Pack All Into .blend"
-msgstr "Запакуј све у .blend"
-
-
-msgid "Pack all used external files into the .blend"
-msgstr "Запакуј све спољне датотеке у .blend датотеци"
-
-
-msgctxt "Operator"
-msgid "Pack Blender Libraries"
-msgstr "Запаку Blender библиотеке"
-
-
-msgid "Pack all used Blender library files into the current .blend"
-msgstr "Запакуј све коришћене датотеке Blender библитеке у текућој .blend датотеци"
 
 
 msgctxt "Operator"
@@ -14717,11 +14693,6 @@ msgid "Smooth Scroll"
 msgstr "Глатко клизање"
 
 
-msgctxt "Operator"
-msgid "Unpack All Into Files"
-msgstr "Распакуј све у датотеке"
-
-
 msgid "Unpack all files packed into this .blend to external ones"
 msgstr "Распакуј све датотеке запаковане у овој .blend датотеци као спољне датотеке"
 
@@ -14737,10 +14708,6 @@ msgstr "Уклони пакет"
 msgctxt "Operator"
 msgid "Unpack Item"
 msgstr "Распакуј слику"
-
-
-msgid "Unpack all used Blender library files from this .blend file"
-msgstr "Распакуј све коришћене датотеке Blender библиотеке из ове .blend датотеке"
 
 
 msgid "Case"
@@ -15072,6 +15039,10 @@ msgid "Make a copy of the active Grease Pencil layer"
 msgstr "Дуплира активни слој скице"
 
 
+msgid "Only Active"
+msgstr "Само активне"
+
+
 msgctxt "Operator"
 msgid "Remove Mask Layer"
 msgstr "Уклони маску слоја"
@@ -15261,10 +15232,6 @@ msgid "Add F-Curve Modifier"
 msgstr "Додај модификатор Ф-криве"
 
 
-msgid "Only Active"
-msgstr "Само активне"
-
-
 msgid "Include Handles"
 msgstr "Укључи ручке"
 
@@ -15325,10 +15292,6 @@ msgstr "Текућа боја испуне"
 
 msgid "Image height"
 msgstr "Висина слику"
-
-
-msgid "Tiled"
-msgstr "Поплочано"
 
 
 msgid "Image width"
@@ -17133,10 +17096,6 @@ msgid "Add named object"
 msgstr "Додаје овај објекат"
 
 
-msgid "Duplicate object but not object data, linking to the original data"
-msgstr "Удвостручи објекат, али не и податке о објекту повезане са изворним подацима"
-
-
 msgid "Object name to add"
 msgstr "Назив објекта за додавање"
 
@@ -17260,6 +17219,10 @@ msgstr "Удвостручи објекте"
 
 msgid "Duplicate selected objects"
 msgstr "Удвостручи изабране објекте"
+
+
+msgid "Duplicate object but not object data, linking to the original data"
+msgstr "Удвостручи објекат, али не и податке о објекту повезане са изворним подацима"
 
 
 msgid "Duplicate selected objects and move them"
@@ -18684,10 +18647,6 @@ msgid "Target Path"
 msgstr "Циљна путања"
 
 
-msgid "User Prefs"
-msgstr "Корисничка подешавања"
-
-
 msgctxt "Operator"
 msgid "Refresh"
 msgstr "Освежи"
@@ -19385,10 +19344,6 @@ msgstr "Додаје траку са видеом у секвенцер"
 msgctxt "Operator"
 msgid "Make Meta Strip"
 msgstr "Направи метатраку"
-
-
-msgid "Group selected strips into a metastrip"
-msgstr "Групиши изабране траке у метатраке"
 
 
 msgctxt "Operator"
@@ -23541,14 +23496,6 @@ msgid "Override the scenes active camera"
 msgstr "Величина текста"
 
 
-msgid "Use Grease Pencil"
-msgstr "Користи скицирање"
-
-
-msgid "Show Grease Pencil strokes in OpenGL previews"
-msgstr "Прикази скицирање у OpenGL прегледу"
-
-
 msgid "Sound Sequence"
 msgstr "Звучна секвенца"
 
@@ -27383,6 +27330,10 @@ msgid "No active frame to delete"
 msgstr "Модификатор вредности F-криве"
 
 
+msgid "Nothing selected"
+msgstr "Ништа није изабрано"
+
+
 msgctxt "Operator"
 msgid "Change Shortcut"
 msgstr "Промени пречицу"
@@ -27829,10 +27780,6 @@ msgid "Mouse path too short"
 msgstr "Путања миша је превише кратка"
 
 
-msgid "Nothing selected"
-msgstr "Ништа није изабрано"
-
-
 msgid "Removed: %d vertices, %d edges, %d faces"
 msgstr "Уклоњено је: %d темена, %d ивица, %d страница"
 
@@ -27853,10 +27800,6 @@ msgstr "Поље"
 
 msgid "Object not found"
 msgstr "Објекат није пронађен"
-
-
-msgid "Object could not be duplicated"
-msgstr "Објекат није могуће дуплирати"
 
 
 msgid "To Active Bone"
@@ -28303,104 +28246,8 @@ msgid "No valid action to add"
 msgstr "Замена улазног ефекта"
 
 
-msgid "Sta"
-msgstr "Звезда"
-
-
-msgid "Label Size"
-msgstr "Величина ознаке"
-
-
-msgid "Frame: %d"
-msgstr "Кадар: %d"
-
-
-msgid "Squash"
-msgstr "Кашасто"
-
-
-msgid "Center:"
-msgstr "Средиште:"
-
-
-msgid "Speed:"
-msgstr "Брзина:"
-
-
-msgid "Inner Edge:"
-msgstr "Унутрашња ивица:"
-
-
-msgid "Limiting Channel:"
-msgstr "NLA канали"
-
-
-msgid "Key Channel:"
-msgstr "Користи канал:"
-
-
-msgid "Path:"
-msgstr "Путања:"
-
-
-msgid "Base Path:"
-msgstr "Путања до складишта"
-
-
-msgid "Add Input"
-msgstr "Улаз"
-
-
-msgid "Format:"
-msgstr "Формат:"
-
-
-msgid "Master"
-msgstr "Налепи"
-
-
-msgid "Highlights"
-msgstr "Истакни линију"
-
-
-msgid "Midtones"
-msgstr "Крај реда"
-
-
-msgid "Undefined Socket Type"
-msgstr "Непозната врста утичнице"
-
-
-msgid "NodeTree"
-msgstr "Дрво чворова"
-
-
-msgid "Mask '%s' not found"
-msgstr "Маскиа '%s' није пронађена"
-
-
 msgid "Sockets"
 msgstr "Утичнице"
-
-
-msgid "Cannot ungroup"
-msgstr "Не могу да разгрушишем"
-
-
-msgid "Cannot separate nodes"
-msgstr "Не могу да раздвојим лворове"
-
-
-msgid "Disconnect"
-msgstr "Раскачи"
-
-
-msgid "Add node to input"
-msgstr "Додај чвор на улаз"
-
-
-msgid "Remove nodes connected to the input"
-msgstr "Уклони чвоер повезан на улаз"
 
 
 msgctxt "Action"
@@ -28935,14 +28782,6 @@ msgid "Transparent Depth"
 msgstr "Дубина провидности"
 
 
-msgid "Color1"
-msgstr "Боја1"
-
-
-msgid "Color2"
-msgstr "Боја2"
-
-
 msgid "Color Fac"
 msgstr "Фактор боје"
 
@@ -28957,6 +28796,14 @@ msgstr "Замућење текстуре"
 
 msgid "BSSRDF"
 msgstr "BSSRDF"
+
+
+msgid "Color1"
+msgstr "Боја1"
+
+
+msgid "Color2"
+msgstr "Боја2"
 
 
 msgid "Mortar"

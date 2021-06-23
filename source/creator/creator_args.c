@@ -676,12 +676,6 @@ static int arg_handle_print_help(int UNUSED(argc), const char **UNUSED(argv), vo
   printf("  $BLENDER_SYSTEM_PYTHON    Directory for system Python libraries.\n");
 #  ifdef WITH_OCIO
   printf("  $OCIO                     Path to override the OpenColorIO config file.\n");
-  printf(
-      "  $OCIO_ACTIVE_DISPLAYS     Overrides the active_displays list from the config file and "
-      "reorders them. Colon-separated list of displays, e.g 'sRGB:P3'.\n");
-  printf(
-      "  $OCIO_ACTIVE_VIEWS        Overrides the active_views list from the config file and "
-      "reorders them. Colon-separated list of view names, e.g 'internal:client:DI'.\n");
 #  endif
 #  ifdef WIN32
   printf("  $TEMP                     Store temporary files here.\n");
@@ -1323,6 +1317,7 @@ static int arg_handle_register_extension(int UNUSED(argc), const char **UNUSED(a
     G.background = 1;
   }
   BLI_windows_register_blend_extension(G.background);
+  TerminateProcess(GetCurrentProcess(), 0);
 #  else
   (void)data; /* unused */
 #  endif
@@ -1965,7 +1960,9 @@ static int arg_handle_load_file(int UNUSED(argc), const char **argv, void *data)
   }
 
   BLI_strncpy(filename, argv[0], sizeof(filename));
+  BLI_path_slash_native(filename);
   BLI_path_abs_from_cwd(filename, sizeof(filename));
+  BLI_path_normalize(NULL, filename);
 
   /* load the file */
   BKE_reports_init(&reports, RPT_PRINT);

@@ -96,6 +96,9 @@
 
 #include "gpencil_intern.h"
 
+#include "UI_interface.h" /*bfa - needed for the icons*/
+#include "UI_resources.h" /*bfa - needed for the icons*/
+
 /* -------------------------------------------------------------------- */
 /** \name Stroke Edit Mode Management
  * \{ */
@@ -863,7 +866,7 @@ static void gpencil_duplicate_points(bGPdata *gpd,
         start_idx = i;
       }
     }
-    else {
+    if ((start_idx != -1) || (start_idx == gps->totpoints - 1)) {
       size_t len = 0;
 
       /* is this the end of current island yet?
@@ -2783,7 +2786,7 @@ void GPENCIL_OT_dissolve(wmOperatorType *ot)
 
 /* Poll callback for snap operators */
 /* NOTE: For now, we only allow these in the 3D view, as other editors do not
- *       define a cursor or gridstep which can be used
+ *       define a cursor or grid-step which can be used.
  */
 static bool gpencil_snap_poll(bContext *C)
 {
@@ -3448,7 +3451,7 @@ void GPENCIL_OT_stroke_caps_set(wmOperatorType *ot)
       {GP_STROKE_CAPS_TOGGLE_START, "START", ICON_TOGGLECAPS_START, "Start", ""},
       {GP_STROKE_CAPS_TOGGLE_END, "END", ICON_TOGGLECAPS_END, "End", ""},
       {GP_STROKE_CAPS_TOGGLE_DEFAULT,
-       "TOGGLE",
+       "DEFAULT",
        ICON_TOGGLECAPS_DEFAULT,
        "Default",
        "Set as default rounded"},
@@ -4629,6 +4632,7 @@ static int gpencil_stroke_separate_exec(bContext *C, wmOperator *op)
               /* add layer if not created before */
               if (gpl_dst == NULL) {
                 gpl_dst = BKE_gpencil_layer_addnew(gpd_dst, gpl->info, false, false);
+                BKE_gpencil_layer_copy_settings(gpl, gpl_dst);
               }
 
               /* add frame if not created before */
@@ -4764,17 +4768,17 @@ void GPENCIL_OT_stroke_separate(wmOperatorType *ot)
   static const EnumPropertyItem separate_type[] = {
       {GP_SEPARATE_POINT,
        "POINT",
-       ICON_SEPARATE,
+       ICON_SEPARATE_GP_POINTS,
        "Selected Points",
        "Separate the selected points"},
       {GP_SEPARATE_STROKE,
        "STROKE",
-       ICON_SEPARATE,
+       ICON_SEPARATE_GP_STROKES,
        "Selected Strokes",
        "Separate the selected strokes"},
       {GP_SEPARATE_LAYER,
        "LAYER",
-       ICON_SEPARATE,
+       ICON_SEPARATE_GP_LAYER,
        "Active Layer",
        "Separate the strokes of the current layer"},
       {0, NULL, 0, NULL, NULL},
@@ -5369,4 +5373,182 @@ void GPENCIL_OT_stroke_merge_by_distance(wmOperatorType *ot)
       ot->srna, "use_unselected", 0, "Unselected", "Use whole stroke, not only selected points");
   RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 }
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Stroke Normalize Operator
+ * \{ */
+
+typedef enum eGP_NormalizeMode {
+  GP_NORMALIZE_THICKNESS = 0,
+  GP_NORMALIZE_OPACITY,
+} eGP_NormalizeMode;
+
+static bool gpencil_stroke_normalize_poll(bContext *C)
+{
+  Object *ob = CTX_data_active_object(C);
+  if ((ob == NULL) || (ob->type != OB_GPENCIL)) {
+    return false;
+  }
+  bGPdata *gpd = (bGPdata *)ob->data;
+  if (gpd == NULL) {
+    return false;
+  }
+
+  bGPDlayer *gpl = BKE_gpencil_layer_active_get(gpd);
+
+  return ((gpl != NULL) && (ob->mode == OB_MODE_EDIT_GPENCIL));
+}
+
+static void gpencil_stroke_normalize_ui(bContext *UNUSED(C), wmOperator *op)
+{
+  uiLayout *layout = op->layout;
+  uiLayout *row;
+
+  const eGP_NormalizeMode mode = RNA_enum_get(op->ptr, "mode");
+
+  uiLayoutSetPropSep(layout, true);
+  uiLayoutSetPropDecorate(layout, false);
+  row = uiLayoutRow(layout, true);
+  uiItemR(row, op->ptr, "mode", 0, NULL, ICON_NONE);
+
+  if (mode == GP_NORMALIZE_THICKNESS) {
+    row = uiLayoutRow(layout, true);
+    uiItemR(row, op->ptr, "value", 0, NULL, ICON_NONE);
+  }
+  else if (mode == GP_NORMALIZE_OPACITY) {
+    row = uiLayoutRow(layout, true);
+    uiItemR(row, op->ptr, "factor", 0, NULL, ICON_NONE);
+  }
+}
+
+static int gpencil_stroke_normalize_exec(bContext *C, wmOperator *op)
+{
+  bGPdata *gpd = ED_gpencil_data_get_active(C);
+
+  /* Sanity checks. */
+  if (ELEM(NULL, gpd)) {
+    return OPERATOR_CANCELLED;
+  }
+
+  const eGP_NormalizeMode mode = RNA_enum_get(op->ptr, "mode");
+  const int value = RNA_int_get(op->ptr, "value");
+  const float factor = RNA_float_get(op->ptr, "factor");
+
+  /* Go through each editable + selected stroke. */
+  const bool is_multiedit = (bool)GPENCIL_MULTIEDIT_SESSIONS_ON(gpd);
+  const bool is_curve_edit = (bool)GPENCIL_CURVE_EDIT_SESSIONS_ON(gpd);
+
+  CTX_DATA_BEGIN (C, bGPDlayer *, gpl, editable_gpencil_layers) {
+    bGPDframe *init_gpf = (is_multiedit) ? gpl->frames.first : gpl->actframe;
+
+    for (bGPDframe *gpf = init_gpf; gpf; gpf = gpf->next) {
+      if ((gpf == gpl->actframe) || ((gpf->flag & GP_FRAME_SELECT) && (is_multiedit))) {
+
+        if (gpf == NULL) {
+          continue;
+        }
+
+        LISTBASE_FOREACH (bGPDstroke *, gps, &gpf->strokes) {
+
+          /* Skip strokes that are invalid for current view. */
+          if (ED_gpencil_stroke_can_use(C, gps) == false) {
+            continue;
+          }
+
+          bool selected = (is_curve_edit) ? gps->editcurve->flag |= GP_CURVE_SELECT :
+                                            (gps->flag & GP_STROKE_SELECT);
+          if (!selected) {
+            continue;
+          }
+
+          float stroke_thickness_inv = 1.0f / max_ii(gps->thickness, 1);
+          /* Fill opacity need to be managed before. */
+          if (mode == GP_NORMALIZE_OPACITY) {
+            gps->fill_opacity_fac = factor;
+            CLAMP(gps->fill_opacity_fac, 0.0f, 1.0f);
+          }
+
+          /* Loop all Polyline points. */
+          if (!is_curve_edit) {
+            for (int i = 0; i < gps->totpoints; i++) {
+              bGPDspoint *pt = &gps->points[i];
+              if (mode == GP_NORMALIZE_THICKNESS) {
+                pt->pressure = max_ff((float)value * stroke_thickness_inv, 0.0f);
+              }
+              else if (mode == GP_NORMALIZE_OPACITY) {
+                pt->strength = factor;
+                CLAMP(pt->strength, 0.0f, 1.0f);
+              }
+            }
+          }
+          else {
+            /* Loop all Bezier points. */
+            for (int i = 0; i < gps->editcurve->tot_curve_points; i++) {
+              bGPDcurve_point *gpc_pt = &gps->editcurve->curve_points[i];
+              if (mode == GP_NORMALIZE_THICKNESS) {
+                gpc_pt->pressure = max_ff((float)value * stroke_thickness_inv, 0.0f);
+              }
+              else if (mode == GP_NORMALIZE_OPACITY) {
+                gpc_pt->strength = factor;
+                CLAMP(gpc_pt->strength, 0.0f, 1.0f);
+              }
+            }
+
+            gps->flag |= GP_STROKE_NEEDS_CURVE_UPDATE;
+            BKE_gpencil_stroke_geometry_update(gpd, gps);
+          }
+        }
+        /* If not multiedit, exit loop. */
+        if (!is_multiedit) {
+          break;
+        }
+      }
+    }
+  }
+  CTX_DATA_END;
+
+  /* notifiers */
+  DEG_id_tag_update(&gpd->id, ID_RECALC_TRANSFORM | ID_RECALC_GEOMETRY);
+  WM_event_add_notifier(C, NC_GPENCIL | ND_DATA | NA_EDITED, NULL);
+
+  return OPERATOR_FINISHED;
+}
+
+void GPENCIL_OT_stroke_normalize(wmOperatorType *ot)
+{
+  static const EnumPropertyItem prop_gpencil_normalize_modes[] = {
+      {GP_NORMALIZE_THICKNESS,
+       "THICKNESS",
+       0,
+       "Thickness",
+       "Normalizes the stroke thickness by making all points use the same thickness value"},
+      {GP_NORMALIZE_OPACITY,
+       "OPACITY",
+       0,
+       "Opacity",
+       "Normalizes the stroke opacity by making all points use the same opacity value"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  /* identifiers */
+  ot->name = "Normalize Stroke";
+  ot->idname = "GPENCIL_OT_stroke_normalize";
+  ot->description = "Normalize stroke attributes";
+
+  /* api callbacks */
+  ot->exec = gpencil_stroke_normalize_exec;
+  ot->poll = gpencil_stroke_normalize_poll;
+  ot->ui = gpencil_stroke_normalize_ui;
+
+  /* flags */
+  ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+  /* props */
+  ot->prop = RNA_def_enum(
+      ot->srna, "mode", prop_gpencil_normalize_modes, 0, "Mode", "Attribute to be normalized");
+  RNA_def_float(ot->srna, "factor", 1.0f, 0.0f, 1.0f, "Factor", "", 0.0f, 1.0f);
+  RNA_def_int(ot->srna, "value", 10, 0, 1000, "Value", "Value", 0, 1000);
+}
+
 /** \} */

@@ -81,14 +81,15 @@ class GreasePencilSculptOptionsPanel:
         tool = brush.gpencil_sculpt_tool
 
         if tool in {'SMOOTH', 'RANDOMIZE'}:
-            layout.prop(gp_settings, "use_edit_position", text="Affect Position")
-            layout.prop(gp_settings, "use_edit_strength", text="Affect Strength")
-            layout.prop(gp_settings, "use_edit_thickness", text="Affect Thickness")
+            col = layout.column(align = True)
+            col.prop(gp_settings, "use_edit_position", text="Affect Position")
+            col.prop(gp_settings, "use_edit_strength", text="Affect Strength")
+            col.prop(gp_settings, "use_edit_thickness", text="Affect Thickness")
 
             if tool == 'SMOOTH':
-                layout.prop(gp_settings, "use_edit_pressure")
+                col.prop(gp_settings, "use_edit_pressure")
 
-            layout.prop(gp_settings, "use_edit_uv", text="Affect UV")
+            col.prop(gp_settings, "use_edit_uv", text="Affect UV")
 
 
 # GP Object Tool Settings
@@ -179,21 +180,6 @@ class GreasePencilDisplayPanel:
 class GreasePencilBrushFalloff:
     bl_label = "Falloff"
     bl_options = {'DEFAULT_CLOSED'}
-
-    @classmethod
-    def poll(cls, context):
-        ts = context.tool_settings
-        settings = None
-        if context.mode == 'PAINT_GPENCIL':
-            settings = ts.gpencil_paint
-        if context.mode == 'SCULPT_GPENCIL':
-            settings = ts.gpencil_sculpt_paint
-        elif context.mode == 'WEIGHT_GPENCIL':
-            settings = ts.gpencil_weight_paint
-        elif context.mode == 'VERTEX_GPENCIL':
-            settings = ts.gpencil_vertex_paint
-
-        return (settings and settings.brush and settings.brush.curve)
 
     def draw(self, context):
         layout = self.layout
@@ -365,7 +351,7 @@ class GPENCIL_MT_cleanup(Menu):
         layout = self.layout
 
         layout.operator("gpencil.frame_clean_fill", text="Boundary Strokes", icon = "CLEAN_CHANNELS").mode = 'ACTIVE'
-        layout.operator("gpencil.frame_clean_fill", text="Boundary Strokes all Frames", icon = "CLEAN_CHANNELS").mode = 'ALL'
+        layout.operator("gpencil.frame_clean_fill", text="Boundary Strokes all Frames", icon = "CLEAN_CHANNELS_FRAMES").mode = 'ALL'
 
         layout.separator()
 

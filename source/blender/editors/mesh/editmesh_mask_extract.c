@@ -231,7 +231,7 @@ static int geometry_extract_apply(bContext *C,
   /* Remove the mask from the new object so it can be sculpted directly after extracting. */
   CustomData_free_layers(&new_ob_mesh->vdata, CD_PAINT_MASK, new_ob_mesh->totvert);
 
-  BKE_mesh_copy_settings(new_ob_mesh, mesh);
+  BKE_mesh_copy_parameters_for_eval(new_ob_mesh, mesh);
 
   if (params->apply_shrinkwrap) {
     BKE_shrinkwrap_mesh_nearest_surface_deform(C, new_ob, ob);
@@ -569,7 +569,7 @@ static int paint_mask_slice_exec(bContext *C, wmOperator *op)
 
     BKE_mesh_nomain_to_mesh(new_ob_mesh, new_ob->data, new_ob, &CD_MASK_MESH, true);
     BKE_mesh_calc_normals(new_ob->data);
-    BKE_mesh_copy_settings(new_ob->data, mesh);
+    BKE_mesh_copy_parameters_for_eval(new_ob->data, mesh);
     WM_event_add_notifier(C, NC_OBJECT | ND_MODIFIER, new_ob);
     BKE_mesh_batch_cache_dirty_tag(new_ob->data, BKE_MESH_BATCH_DIRTY_ALL);
     DEG_relations_tag_update(bmain);
@@ -597,6 +597,30 @@ static int paint_mask_slice_exec(bContext *C, wmOperator *op)
 
   return OPERATOR_FINISHED;
 }
+
+  /*bfa - tool name*/
+static const char *wm_paint_mask_slide_get_name(wmOperatorType *ot, PointerRNA *ptr)
+{
+  const bool fill_holes = RNA_boolean_get(ptr, "fill_holes");
+  const bool new_object = RNA_boolean_get(ptr, "new_object");
+
+  /*Mask Slice*/
+  if (!fill_holes && !new_object) {
+    return CTX_IFACE_(ot->translation_context, "Mask Slice");
+  }
+  /*Mask Slice and Fill Holes*/
+  else if (fill_holes && !new_object) {
+    return CTX_IFACE_(ot->translation_context, "Mask Slice and Fill Holes");
+  }
+  /*Mask Slice to New Object*/
+  else if (new_object) {
+    return CTX_IFACE_(ot->translation_context, "Mask Slice to New Object");
+  }
+  return NULL;
+}
+
+
+
 /*bfa - descriptions*/
 static char *wm_paint_mask_slide_get_description(bContext *UNUSED(C),
                                                  wmOperatorType *UNUSED(ot),
@@ -631,6 +655,7 @@ void MESH_OT_paint_mask_slice(wmOperatorType *ot)
   /* api callbacks */
   ot->poll = geometry_extract_poll;
   ot->exec = paint_mask_slice_exec;
+  ot->get_name = wm_paint_mask_slide_get_name;               /*bfa - tool name*/
   ot->get_description = wm_paint_mask_slide_get_description; /*bfa - descriptions*/
 
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;

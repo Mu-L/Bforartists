@@ -1863,6 +1863,10 @@ class NODES_PT_Modify_filter(bpy.types.Panel):
 
             col = layout.column(align=True)
             col.scale_y = 1.5
+            
+            props = col.operator("node.add_node", text=" Bilateral Blur    ", icon = "ANTIALIASED")
+            props.use_transform = True
+            props.type = "CompositorNodeAntiAliasing"
 
             props = col.operator("node.add_node", text=" Bilateral Blur    ", icon = "NODE_BILATERAL_BLUR")
             props.use_transform = True
@@ -1875,13 +1879,13 @@ class NODES_PT_Modify_filter(bpy.types.Panel):
             props = col.operator("node.add_node", text=" Bokeh Blur       ", icon = "NODE_BOKEH_BLUR")
             props.use_transform = True
             props.type = "CompositorNodeBokehBlur"
+            
+            col = layout.column(align=True)
+            col.scale_y = 1.5
 
             props = col.operator("node.add_node", text=" Directional Blur ", icon = "NODE_DIRECITONALBLUR")
             props.use_transform = True
             props.type = "CompositorNodeDBlur"
-
-            col = layout.column(align=True)
-            col.scale_y = 1.5
 
             props = col.operator("node.add_node", text=" Vector Blur       ", icon = "NODE_VECTOR_BLUR")
             props.use_transform = True
@@ -1894,13 +1898,13 @@ class NODES_PT_Modify_filter(bpy.types.Panel):
             props = col.operator("node.add_node", text=" Despeckle         ", icon = "NODE_DESPECKLE")
             props.use_transform = True
             props.type = "CompositorNodeDespeckle"
+            
+            col = layout.column(align=True)
+            col.scale_y = 1.5
 
             props = col.operator("node.add_node", text=" Dilate / Erode    ", icon = "NODE_ERODE")
             props.use_transform = True
             props.type = "CompositorNodeDilateErode"
-
-            col = layout.column(align=True)
-            col.scale_y = 1.5
 
             props = col.operator("node.add_node", text=" Filter                ", icon = "FILTER")
             props.use_transform = True
@@ -1910,19 +1914,16 @@ class NODES_PT_Modify_filter(bpy.types.Panel):
             props.use_transform = True
             props.type = "CompositorNodeGlare"
 
-            row = col.row(align=True)
-            col.scale_y = 1.5
-
             props = col.operator("node.add_node", text=" Inpaint              ", icon = "NODE_IMPAINT")
             props.use_transform = True
             props.type = "CompositorNodeInpaint"
+            
+            col = layout.column(align=True)
+            col.scale_y = 1.5
 
             props = col.operator("node.add_node", text=" Pixelate            ", icon = "NODE_PIXELATED")
             props.use_transform = True
             props.type = "CompositorNodePixelate"
-
-            col = layout.column(align=True)
-            col.scale_y = 1.5
 
             props = col.operator("node.add_node", text=" Sunbeams        ", icon = "NODE_SUNBEAMS")
             props.use_transform = True
@@ -1939,6 +1940,10 @@ class NODES_PT_Modify_filter(bpy.types.Panel):
             flow = layout.grid_flow(row_major=True, columns=0, even_columns=True, even_rows=True, align=True)
             flow.scale_x = 1.5
             flow.scale_y = 1.5
+            
+            props = flow.operator("node.add_node", text = "", icon = "ANTIALIASED")
+            props.use_transform = True
+            props.type = "CompositorNodeAntiAliasing"
 
             props = flow.operator("node.add_node", text = "", icon = "NODE_BILATERAL_BLUR")
             props.use_transform = True
@@ -3519,7 +3524,7 @@ class NODES_PT_geom_add_color(bpy.types.Panel):
             props = col.operator("node.add_node", text=" Combine RGB       ", icon = "NODE_COMBINERGB")
             props.use_transform = True
             props.type = "ShaderNodeCombineRGB"
-            
+
             props = col.operator("node.add_node", text=" RGB Curves       ", icon = "NODE_RGBCURVE")
             props.use_transform = True
             props.type = "ShaderNodeRGBCurve"
@@ -3544,7 +3549,7 @@ class NODES_PT_geom_add_color(bpy.types.Panel):
             props = flow.operator("node.add_node", text = "", icon = "NODE_COMBINERGB")
             props.use_transform = True
             props.type = "ShaderNodeCombineRGB"
-            
+
             props = flow.operator("node.add_node", text = "", icon = "NODE_RGBCURVE")
             props.use_transform = True
             props.type = "ShaderNodeRGBCurve"
@@ -3584,11 +3589,27 @@ class NODES_PT_geom_add_curve(bpy.types.Panel):
             col = layout.column(align=True)
             col.scale_y = 1.5
 
-            props = col.operator("node.add_node", text=" Curve to Mesh          ", icon = "OUTLINER_OB_MESH")
+            props = col.operator("node.add_node", text=" Curve Length              ", icon = "PARTICLEBRUSH_LENGTH")
+            props.use_transform = True
+            props.type = "GeometryNodeCurveLength"
+            
+            props = col.operator("node.add_node", text=" Curve Reverse            ", icon = "SWITCH_DIRECTION")
+            props.use_transform = True
+            props.type = "GeometryNodeCurveReverse"
+            
+            props = col.operator("node.add_node", text=" Curve Subdivide         ", icon = "SUBDIVIDE_EDGES")
+            props.use_transform = True
+            props.type = "GeometryNodeCurveSubdivide"
+
+            props = col.operator("node.add_node", text=" Curve to Mesh            ", icon = "OUTLINER_OB_MESH")
             props.use_transform = True
             props.type = "GeometryNodeCurveToMesh"
             
-            props = col.operator("node.add_node", text=" Mesh to Curve          ", icon = "OUTLINER_OB_CURVE")
+            props = col.operator("node.add_node", text=" Curve to Points          ", icon = "POINTCLOUD_DATA")
+            props.use_transform = True
+            props.type = "GeometryNodeCurveToPoints"
+
+            props = col.operator("node.add_node", text=" Mesh to Curve            ", icon = "OUTLINER_OB_CURVE")
             props.use_transform = True
             props.type = "GeometryNodeMeshToCurve"
 
@@ -3605,10 +3626,26 @@ class NODES_PT_geom_add_curve(bpy.types.Panel):
             flow.scale_x = 1.5
             flow.scale_y = 1.5
 
+            props = flow.operator("node.add_node", text = "", icon = "PARTICLEBRUSH_LENGTH")
+            props.use_transform = True
+            props.type = "GeometryNodeCurveLength"
+            
+            props = flow.operator("node.add_node", text = "", icon = "SWITCH_DIRECTION")
+            props.use_transform = True
+            props.type = "GeometryNodeCurveReverse"
+            
+            props = flow.operator("node.add_node", text = "", icon = "SUBDIVIDE_EDGES")
+            props.use_transform = True
+            props.type = "GeometryNodeCurveSubdivide"
+
             props = flow.operator("node.add_node", text = "", icon = "OUTLINER_OB_MESH")
             props.use_transform = True
             props.type = "GeometryNodeCurveToMesh"
             
+            props = flow.operator("node.add_node", text="", icon = "POINTCLOUD_DATA")
+            props.use_transform = True
+            props.type = "GeometryNodeCurveToPoints"
+
             props = flow.operator("node.add_node", text = "", icon = "OUTLINER_OB_CURVE")
             props.use_transform = True
             props.type = "GeometryNodeMeshToCurve"
@@ -3648,15 +3685,31 @@ class NODES_PT_geom_add_geometry(bpy.types.Panel):
             col = layout.column(align=True)
             col.scale_y = 1.5
 
-            props = col.operator("node.add_node", text=" Bounding Box     ", icon = "PIVOT_BOUNDBOX")
+            props = col.operator("node.add_node", text=" Bounding Box       ", icon = "PIVOT_BOUNDBOX")
             props.use_transform = True
             props.type = "GeometryNodeBoundBox"
+            
+            props = col.operator("node.add_node", text=" Convex Hull        ", icon = "CONVEXHULL")
+            props.use_transform = True
+            props.type = "GeometryNodeConvexHull"
 
-            props = col.operator("node.add_node", text=" Join                    ", icon = "JOIN")
+            props = col.operator("node.add_node", text=" Delete Geometry ", icon = "DELETE")
+            props.use_transform = True
+            props.type = "GeometryNodeDeleteGeometry"
+
+            props = col.operator("node.add_node", text=" Join Geometry     ", icon = "JOIN")
             props.use_transform = True
             props.type = "GeometryNodeJoinGeometry"
+            
+            props = col.operator("node.add_node", text=" Raycast                ", icon = "RAYCAST")
+            props.use_transform = True
+            props.type = "GeometryNodeRaycast"
+            
+            props = col.operator("node.add_node", text=" Separate Components", icon = "SEPARATE")
+            props.use_transform = True
+            props.type = "GeometryNodeSeparateComponents"
 
-            props = col.operator("node.add_node", text=" Transform           ", icon = "NODE_TRANSFORM")
+            props = col.operator("node.add_node", text=" Transform             ", icon = "NODE_TRANSFORM")
             props.use_transform = True
             props.type = "GeometryNodeTransform"
 
@@ -3672,14 +3725,31 @@ class NODES_PT_geom_add_geometry(bpy.types.Panel):
             props = flow.operator("node.add_node", text = "", icon = "PIVOT_BOUNDBOX")
             props.use_transform = True
             props.type = "GeometryNodeBoundBox"
+            
+            props = flow.operator("node.add_node", text = "", icon = "CONVEXHULL")
+            props.use_transform = True
+            props.type = "GeometryNodeConvexHull"
+
+            props = flow.operator("node.add_node", text = "", icon = "DELETE")
+            props.use_transform = True
+            props.type = "GeometryNodeDeleteGeometry"
 
             props = flow.operator("node.add_node", text = "", icon = "JOIN")
             props.use_transform = True
             props.type = "GeometryNodeJoinGeometry"
+            
+            props = flow.operator("node.add_node", text = "", icon = "RAYCAST")
+            props.use_transform = True
+            props.type = "GeometryNodeRaycast"
+            
+            props = flow.operator("node.add_node", text = "", icon = "SEPARATE")
+            props.use_transform = True
+            props.type = "GeometryNodeSeparateComponents"
 
             props = flow.operator("node.add_node", text = "", icon = "NODE_TRANSFORM")
             props.use_transform = True
             props.type = "GeometryNodeTransform"
+
 
 
 #add input panel
@@ -3824,6 +3894,10 @@ class NODES_PT_geom_add_material(bpy.types.Panel):
             props = col.operator("node.add_node", text=" Material Replace      ", icon = "MATERIAL_REPLACE")
             props.use_transform = True
             props.type = "GeometryNodeMaterialReplace"
+            
+            props = col.operator("node.add_node", text=" Select by Material     ", icon = "SELECT_BY_MATERIAL")
+            props.use_transform = True
+            props.type = "GeometryNodeSelectByMaterial"
 
         #### Icon Buttons
 
@@ -3840,6 +3914,10 @@ class NODES_PT_geom_add_material(bpy.types.Panel):
             props = flow.operator("node.add_node", text = "", icon = "MATERIAL_REPLACE")
             props.use_transform = True
             props.type = "GeometryNodeMaterialReplace"
+            
+            props = flow.operator("node.add_node", text = "", icon = "SELECT_BY_MATERIAL")
+            props.use_transform = True
+            props.type = "GeometryNodeSelectByMaterial"
 
 
 #add mesh panel

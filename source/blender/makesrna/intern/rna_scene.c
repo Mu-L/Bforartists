@@ -1912,10 +1912,9 @@ static void rna_Scene_transform_orientation_slots_begin(CollectionPropertyIterat
       iter, orient_slot, sizeof(*orient_slot), ARRAY_SIZE(scene->orientation_slots), 0, NULL);
 }
 
-static int rna_Scene_transform_orientation_slots_length(PointerRNA *ptr)
+static int rna_Scene_transform_orientation_slots_length(PointerRNA *UNUSED(ptr))
 {
-  Scene *scene = (Scene *)ptr->owner_id;
-  return ARRAY_SIZE(scene->orientation_slots);
+  return ARRAY_SIZE(((Scene *)NULL)->orientation_slots);
 }
 
 static bool rna_Scene_use_audio_get(PointerRNA *ptr)
@@ -6443,27 +6442,12 @@ static void rna_def_scene_render_data(BlenderRNA *brna)
 
   /* sequencer draw options */
 
-#  if 0 /* see R_SEQ_GL_REND comment */
-  prop = RNA_def_property(srna, "use_sequencer_gl_render", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_boolean_sdna(prop, NULL, "seq_flag", R_SEQ_GL_REND);
-  RNA_def_property_ui_text(prop, "Sequencer OpenGL", "");
-#  endif
-
   prop = RNA_def_property(srna, "sequencer_gl_preview", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "seq_prev_type");
   RNA_def_property_enum_items(prop, rna_enum_shading_type_items);
   RNA_def_property_ui_text(
       prop, "Sequencer Preview Shading", "Display method used in the sequencer view");
   RNA_def_property_update(prop, NC_SCENE | ND_SEQUENCER, "rna_SceneSequencer_update");
-
-#  if 0 /* UNUSED, see R_SEQ_GL_REND comment */
-  prop = RNA_def_property(srna, "sequencer_gl_render", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_sdna(prop, NULL, "seq_rend_type");
-  RNA_def_property_enum_items(prop, rna_enum_shading_type_items);
-  /* XXX Label and tooltips are obviously wrong! */
-  RNA_def_property_ui_text(
-      prop, "Sequencer Preview Shading", "Display method used in the sequencer view");
-#  endif
 
   prop = RNA_def_property(srna, "use_sequencer_override_scene_strip", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "seq_flag", R_SEQ_OVERRIDE_SCENE_SETTINGS);
@@ -6938,7 +6922,7 @@ static void rna_def_scene_eevee(BlenderRNA *brna)
   };
 
   static const EnumPropertyItem eevee_volumetric_tile_size_items[] = {
-      {2, "1", 0, "1 px", ""},
+      {1, "1", 0, "1 px", ""}, /*bfa - added one pixel*/
       {2, "2", 0, "2 px", ""},
       {4, "4", 0, "4 px", ""},
       {8, "8", 0, "8 px", ""},

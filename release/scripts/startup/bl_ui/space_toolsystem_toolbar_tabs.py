@@ -440,6 +440,42 @@ class VIEW3D_PT_objecttab_set_origin(toolshelf_calculate, Panel):
                 col.operator("object.origin_set", text = "", icon ='ORIGIN_TO_VOLUME').type='ORIGIN_CENTER_OF_VOLUME'
 
 
+# Workaround to separate the tooltips
+class VIEW3D_MT_object_mirror_global_x(bpy.types.Operator):
+    """Mirror global around X axis"""      # blender will use this as a tooltip for menu items and buttons.
+    bl_idname = "mirror.global_x"        # unique identifier for buttons and menu items to reference.
+    bl_label = "Mirror Global X"         # display name in the interface.
+    bl_options = {'REGISTER', 'UNDO'}  # enable undo for the operator.
+
+    def execute(self, context):        # execute() is called by blender when running the operator.
+        bpy.ops.transform.mirror(orient_type='GLOBAL', constraint_axis=(True, False, False))
+        return {'FINISHED'}
+
+
+# Workaround to separate the tooltips
+class VIEW3D_MT_object_mirror_global_y(bpy.types.Operator):
+    """Mirror global around X axis"""      # blender will use this as a tooltip for menu items and buttons.
+    bl_idname = "mirror.global_y"        # unique identifier for buttons and menu items to reference.
+    bl_label = "Mirror Global X"         # display name in the interface.
+    bl_options = {'REGISTER', 'UNDO'}  # enable undo for the operator.
+
+    def execute(self, context):        # execute() is called by blender when running the operator.
+        bpy.ops.transform.mirror(orient_type='GLOBAL', constraint_axis=(False, True, False))
+        return {'FINISHED'}
+
+
+# Workaround to separate the tooltips
+class VIEW3D_MT_object_mirror_global_z(bpy.types.Operator):
+    """Mirror global around Z axis"""      # blender will use this as a tooltip for menu items and buttons.
+    bl_idname = "mirror.global_z"        # unique identifier for buttons and menu items to reference.
+    bl_label = "Mirror Global Z"         # display name in the interface.
+    bl_options = {'REGISTER', 'UNDO'}  # enable undo for the operator.
+
+    def execute(self, context):        # execute() is called by blender when running the operator.
+        bpy.ops.transform.mirror(orient_type='GLOBAL', constraint_axis=(False, False, True))
+        return {'FINISHED'}
+
+
 class VIEW3D_PT_objecttab_mirror(toolshelf_calculate, Panel):
     bl_label = "Mirror"
     bl_space_type = 'VIEW_3D'
@@ -468,15 +504,9 @@ class VIEW3D_PT_objecttab_mirror(toolshelf_calculate, Panel):
             col.operator("transform.mirror", text="Interactive Mirror", icon='TRANSFORM_MIRROR')
 
             col.operator_context = 'EXEC_REGION_WIN'
-            props = col.operator("transform.mirror", text="X Global", icon = "MIRROR_X")
-            props.constraint_axis = (True, False, False)
-            props.orient_type = 'GLOBAL'
-            props = col.operator("transform.mirror", text="Y Global", icon = "MIRROR_Y")
-            props.constraint_axis = (False, True, False)
-            props.orient_type = 'GLOBAL'
-            props = col.operator("transform.mirror", text="Z Global", icon = "MIRROR_Z")
-            props.constraint_axis = (False, False, True)
-            props.orient_type = 'GLOBAL'
+            col.operator("mirror.global_x", text="X Global", icon='MIRROR_X')
+            col.operator("mirror.global_y", text="Y Global", icon='MIRROR_Y')
+            col.operator("mirror.global_z", text="Z Global", icon='MIRROR_Z')
 
             if _context.edit_object and _context.edit_object.type in {'MESH', 'SURFACE'}:
                 col.operator("object.vertex_group_mirror", icon = "MIRROR_VERTEXGROUP")
@@ -494,16 +524,11 @@ class VIEW3D_PT_objecttab_mirror(toolshelf_calculate, Panel):
                 row.operator("transform.mirror", text="", icon='TRANSFORM_MIRROR')
 
                 row.operator_context = 'EXEC_REGION_WIN'
-                props = row.operator("transform.mirror", text="", icon = "MIRROR_X")
-                props.constraint_axis = (True, False, False)
-                props.orient_type = 'GLOBAL'
-                props = row.operator("transform.mirror", text="", icon = "MIRROR_Y")
-                props.constraint_axis = (False, True, False)
-                props.orient_type = 'GLOBAL'
+                row.operator("mirror.global_x", text="", icon='MIRROR_X')
+                row.operator("mirror.global_y", text="", icon='MIRROR_Y')
+
                 row = col.row(align=True)
-                props = row.operator("transform.mirror", text="", icon = "MIRROR_Z")
-                props.constraint_axis = (False, False, True)
-                props.orient_type = 'GLOBAL'
+                row.operator("mirror.global_z", text="", icon='MIRROR_Z')
 
                 if _context.edit_object and _context.edit_object.type in {'MESH', 'SURFACE'}:
                     row.operator("object.vertex_group_mirror", text="", icon = "MIRROR_VERTEXGROUP")
@@ -514,16 +539,11 @@ class VIEW3D_PT_objecttab_mirror(toolshelf_calculate, Panel):
                 row.operator("transform.mirror", text="", icon='TRANSFORM_MIRROR')
 
                 row.operator_context = 'EXEC_REGION_WIN'
-                props = row.operator("transform.mirror", text="", icon = "MIRROR_X")
-                props.constraint_axis = (True, False, False)
+                row.operator("mirror.global_x", text="", icon='MIRROR_X')
+
                 row = col.row(align=True)
-                props.orient_type = 'GLOBAL'
-                props = row.operator("transform.mirror", text="", icon = "MIRROR_Y")
-                props.constraint_axis = (False, True, False)
-                props.orient_type = 'GLOBAL'
-                props = row.operator("transform.mirror", text="", icon = "MIRROR_Z")
-                props.constraint_axis = (False, False, True)
-                props.orient_type = 'GLOBAL'
+                row.operator("mirror.global_y", text="", icon='MIRROR_Y')
+                row.operator("mirror.global_z", text="", icon='MIRROR_Z')
 
                 if _context.edit_object and _context.edit_object.type in {'MESH', 'SURFACE'}:
                     row = col.row(align=True)
@@ -534,18 +554,48 @@ class VIEW3D_PT_objecttab_mirror(toolshelf_calculate, Panel):
                 col.operator("transform.mirror", text="", icon='TRANSFORM_MIRROR')
 
                 col.operator_context = 'EXEC_REGION_WIN'
-                props = col.operator("transform.mirror", text="", icon = "MIRROR_X")
-                props.constraint_axis = (True, False, False)
-                props.orient_type = 'GLOBAL'
-                props = col.operator("transform.mirror", text="", icon = "MIRROR_Y")
-                props.constraint_axis = (False, True, False)
-                props.orient_type = 'GLOBAL'
-                props = col.operator("transform.mirror", text="", icon = "MIRROR_Z")
-                props.constraint_axis = (False, False, True)
-                props.orient_type = 'GLOBAL'
+                col.operator("mirror.global_x", text="", icon='MIRROR_X')
+                col.operator("mirror.global_y", text="", icon='MIRROR_Y')
+                col.operator("mirror.global_z", text="", icon='MIRROR_Z')
 
                 if _context.edit_object and _context.edit_object.type in {'MESH', 'SURFACE'}:
                     col.operator("object.vertex_group_mirror", text="", icon = "MIRROR_VERTEXGROUP")
+
+
+# Workaround to separate the tooltips
+class VIEW3D_MT_object_mirror_local_x(bpy.types.Operator):
+    """Mirror local around X axis"""      # blender will use this as a tooltip for menu items and buttons.
+    bl_idname = "mirror.local_x"        # unique identifier for buttons and menu items to reference.
+    bl_label = "Mirror Local X"         # display name in the interface.
+    bl_options = {'REGISTER', 'UNDO'}  # enable undo for the operator.
+
+    def execute(self, context):        # execute() is called by blender when running the operator.
+        bpy.ops.transform.mirror(orient_type='LOCAL', constraint_axis=(True, False, False))
+        return {'FINISHED'}
+
+
+# Workaround to separate the tooltips
+class VIEW3D_MT_object_mirror_local_y(bpy.types.Operator):
+    """Mirror local around X axis"""      # blender will use this as a tooltip for menu items and buttons.
+    bl_idname = "mirror.local_y"        # unique identifier for buttons and menu items to reference.
+    bl_label = "Mirror Local X"         # display name in the interface.
+    bl_options = {'REGISTER', 'UNDO'}  # enable undo for the operator.
+
+    def execute(self, context):        # execute() is called by blender when running the operator.
+        bpy.ops.transform.mirror(orient_type='LOCAL', constraint_axis=(False, True, False))
+        return {'FINISHED'}
+
+
+# Workaround to separate the tooltips
+class VIEW3D_MT_object_mirror_local_z(bpy.types.Operator):
+    """Mirror local around Z axis"""      # blender will use this as a tooltip for menu items and buttons.
+    bl_idname = "mirror.local_z"        # unique identifier for buttons and menu items to reference.
+    bl_label = "Mirror Local Z"         # display name in the interface.
+    bl_options = {'REGISTER', 'UNDO'}  # enable undo for the operator.
+
+    def execute(self, context):        # execute() is called by blender when running the operator.
+        bpy.ops.transform.mirror(orient_type='LOCAL', constraint_axis=(False, False, True))
+        return {'FINISHED'}
 
 
 class VIEW3D_PT_objecttab_mirror_local(toolshelf_calculate, Panel):
@@ -574,15 +624,9 @@ class VIEW3D_PT_objecttab_mirror_local(toolshelf_calculate, Panel):
             col.scale_y = 2
 
             col.operator_context = 'EXEC_REGION_WIN'
-            props = col.operator("transform.mirror", text="X Global", icon = "MIRROR_X")
-            props.constraint_axis = (True, False, False)
-            props.orient_type = 'LOCAL'
-            props = col.operator("transform.mirror", text="Y Global", icon = "MIRROR_Y")
-            props.constraint_axis = (False, True, False)
-            props.orient_type = 'LOCAL'
-            props = col.operator("transform.mirror", text="Z Global", icon = "MIRROR_Z")
-            props.constraint_axis = (False, False, True)
-            props.orient_type = 'LOCAL'
+            col.operator("mirror.local_x", text="X Local", icon='MIRROR_X')
+            col.operator("mirror.local_y", text="Y Local", icon='MIRROR_Y')
+            col.operator("mirror.local_z", text="Z Local", icon='MIRROR_Z')
 
         # icon buttons
         else:
@@ -595,44 +639,25 @@ class VIEW3D_PT_objecttab_mirror_local(toolshelf_calculate, Panel):
 
                 row = col.row(align=True)
                 row.operator_context = 'EXEC_REGION_WIN'
-                props = row.operator("transform.mirror", text="", icon = "MIRROR_X")
-                props.constraint_axis = (True, False, False)
-                props.orient_type = 'LOCAL'
-                props = row.operator("transform.mirror", text="", icon = "MIRROR_Y")
-                props.constraint_axis = (False, True, False)
-                props.orient_type = 'LOCAL'
-                props = row.operator("transform.mirror", text="", icon = "MIRROR_Z")
-                props.constraint_axis = (False, False, True)
-                props.orient_type = 'LOCAL'
-
+                row.operator("mirror.local_x", text="", icon='MIRROR_X')
+                row.operator("mirror.local_y", text="", icon='MIRROR_Y')
+                row.operator("mirror.local_z", text="", icon='MIRROR_Z')
 
             elif column_count == 2:
                 row = col.row(align=True)
                 row.operator_context = 'EXEC_REGION_WIN'
-                props = row.operator("transform.mirror", text="", icon = "MIRROR_X")
-                props.constraint_axis = (True, False, False)
-                props.orient_type = 'LOCAL'
-                props = row.operator("transform.mirror", text="", icon = "MIRROR_Y")
-                props.constraint_axis = (False, True, False)
-                props.orient_type = 'LOCAL'
+                row.operator("mirror.local_x", text="", icon='MIRROR_X')
+                row.operator("mirror.local_y", text="", icon='MIRROR_Y')
+
                 row = col.row(align=True)
-                props = row.operator("transform.mirror", text="", icon = "MIRROR_Z")
-                props.constraint_axis = (False, False, True)
-                props.orient_type = 'LOCAL'
+                row.operator("mirror.local_z", text="", icon='MIRROR_Z')
 
             elif column_count == 1:
 
-
                 col.operator_context = 'EXEC_REGION_WIN'
-                props = col.operator("transform.mirror", text="", icon = "MIRROR_X")
-                props.constraint_axis = (True, False, False)
-                props.orient_type = 'LOCAL'
-                props = col.operator("transform.mirror", text="", icon = "MIRROR_Y")
-                props.constraint_axis = (False, True, False)
-                props.orient_type = 'LOCAL'
-                props = col.operator("transform.mirror", text="", icon = "MIRROR_Z")
-                props.constraint_axis = (False, False, True)
-                props.orient_type = 'LOCAL'
+                col.operator("mirror.local_x", text="", icon='MIRROR_X')
+                col.operator("mirror.local_y", text="", icon='MIRROR_Y')
+                col.operator("mirror.local_z", text="", icon='MIRROR_Z')
 
 
 class VIEW3D_PT_objecttab_clear(toolshelf_calculate, Panel):
@@ -733,20 +758,13 @@ class VIEW3D_PT_objecttab_apply(toolshelf_calculate, Panel):
             col = layout.column(align=True)
             col.scale_y = 2
 
-            props = col.operator("object.transform_apply", text="Location", text_ctxt=i18n_contexts.default, icon = "APPLYMOVE")
-            props.location, props.rotation, props.scale = True, False, False
 
-            props = col.operator("object.transform_apply", text="Rotation", text_ctxt=i18n_contexts.default, icon = "APPLYROTATE")
-            props.location, props.rotation, props.scale = False, True, False
-
-            props = col.operator("object.transform_apply", text="Scale", text_ctxt=i18n_contexts.default, icon = "APPLYSCALE")
-            props.location, props.rotation, props.scale = False, False, True
-
-            props = col.operator("object.transform_apply", text="All Transforms", text_ctxt=i18n_contexts.default, icon = "APPLYALL")
-            props.location, props.rotation, props.scale = True, True, True
-
-            props = col.operator("object.transform_apply", text="Rotation & Scale", text_ctxt=i18n_contexts.default, icon = "APPLY_ROTSCALE")
-            props.location, props.rotation, props.scale = False, True, True
+            #bfa - separated tooltips. classes are in space_toolbar.py
+            col.operator("view3d.tb_apply_location", text="Location", icon = "APPLYMOVE")
+            col.operator("view3d.tb_apply_rotate", text="Rotation", icon = "APPLYROTATE")
+            col.operator("view3d.tb_apply_scale", text="Scale", icon = "APPLYSCALE")
+            col.operator("view3d.tb_apply_all", text="All Transforms", icon = "APPLYALL")
+            col.operator("view3d.tb_apply_rotscale", text="Rotation & Scale", icon = "APPLY_ROTSCALE")
 
             col.separator(factor = 0.5)
 
@@ -763,21 +781,13 @@ class VIEW3D_PT_objecttab_apply(toolshelf_calculate, Panel):
             if column_count == 3:
 
                 row = col.row(align=True)
-                props = row.operator("object.transform_apply", text="", text_ctxt=i18n_contexts.default, icon = "APPLYMOVE")
-                props.location, props.rotation, props.scale = True, False, False
-
-                props = row.operator("object.transform_apply", text="", text_ctxt=i18n_contexts.default, icon = "APPLYROTATE")
-                props.location, props.rotation, props.scale = False, True, False
-
-                props = row.operator("object.transform_apply", text="", text_ctxt=i18n_contexts.default, icon = "APPLYSCALE")
-                props.location, props.rotation, props.scale = False, False, True
+                row.operator("view3d.tb_apply_location", text="", icon = "APPLYMOVE")
+                row.operator("view3d.tb_apply_rotate", text="", icon = "APPLYROTATE")
+                row.operator("view3d.tb_apply_scale", text="", icon = "APPLYSCALE")
 
                 row = col.row(align=True)
-                props = row.operator("object.transform_apply", text="", text_ctxt=i18n_contexts.default, icon = "APPLYALL")
-                props.location, props.rotation, props.scale = True, True, True
-
-                props = row.operator("object.transform_apply", text="", text_ctxt=i18n_contexts.default, icon = "APPLY_ROTSCALE")
-                props.location, props.rotation, props.scale = False, True, True
+                row.operator("view3d.tb_apply_all", text="", icon = "APPLYALL")
+                row.operator("view3d.tb_apply_rotscale", text="", icon = "APPLY_ROTSCALE")
 
                 row = col.row(align=True)
                 row.operator("object.visual_transform_apply", text="", text_ctxt=i18n_contexts.default, icon = "VISUALTRANSFORM")
@@ -786,22 +796,15 @@ class VIEW3D_PT_objecttab_apply(toolshelf_calculate, Panel):
             elif column_count == 2:
 
                 row = col.row(align=True)
-                props = row.operator("object.transform_apply", text="", text_ctxt=i18n_contexts.default, icon = "APPLYMOVE")
-                props.location, props.rotation, props.scale = True, False, False
-
-                props = row.operator("object.transform_apply", text="", text_ctxt=i18n_contexts.default, icon = "APPLYROTATE")
-                props.location, props.rotation, props.scale = False, True, False
+                row.operator("view3d.tb_apply_location", text="", icon = "APPLYMOVE")
+                row.operator("view3d.tb_apply_rotate", text="", icon = "APPLYROTATE")
 
                 row = col.row(align=True)
-                props = row.operator("object.transform_apply", text="", text_ctxt=i18n_contexts.default, icon = "APPLYSCALE")
-                props.location, props.rotation, props.scale = False, False, True
-
-                props = row.operator("object.transform_apply", text="", text_ctxt=i18n_contexts.default, icon = "APPLYALL")
-                props.location, props.rotation, props.scale = True, True, True
+                row.operator("view3d.tb_apply_scale", text="", icon = "APPLYSCALE")
+                row.operator("view3d.tb_apply_all", text="", icon = "APPLYALL")
 
                 row = col.row(align=True)
-                props = row.operator("object.transform_apply", text="", text_ctxt=i18n_contexts.default, icon = "APPLY_ROTSCALE")
-                props.location, props.rotation, props.scale = False, True, True
+                row.operator("view3d.tb_apply_rotscale", text="", icon = "APPLY_ROTSCALE")
 
                 row = col.row(align=True)
                 row.operator("object.visual_transform_apply", text="", text_ctxt=i18n_contexts.default, icon = "VISUALTRANSFORM")
@@ -809,20 +812,11 @@ class VIEW3D_PT_objecttab_apply(toolshelf_calculate, Panel):
 
             elif column_count == 1:
 
-                props = col.operator("object.transform_apply", text="", text_ctxt=i18n_contexts.default, icon = "APPLYMOVE")
-                props.location, props.rotation, props.scale = True, False, False
-
-                props = col.operator("object.transform_apply", text="", text_ctxt=i18n_contexts.default, icon = "APPLYROTATE")
-                props.location, props.rotation, props.scale = False, True, False
-
-                props = col.operator("object.transform_apply", text="", text_ctxt=i18n_contexts.default, icon = "APPLYSCALE")
-                props.location, props.rotation, props.scale = False, False, True
-
-                props = col.operator("object.transform_apply", text="", text_ctxt=i18n_contexts.default, icon = "APPLYALL")
-                props.location, props.rotation, props.scale = True, True, True
-
-                props = col.operator("object.transform_apply", text="", text_ctxt=i18n_contexts.default, icon = "APPLY_ROTSCALE")
-                props.location, props.rotation, props.scale = False, True, True
+                col.operator("view3d.tb_apply_location", text="", icon = "APPLYMOVE")
+                col.operator("view3d.tb_apply_rotate", text="", icon = "APPLYROTATE")
+                col.operator("view3d.tb_apply_scale", text="", icon = "APPLYSCALE")
+                col.operator("view3d.tb_apply_all", text="", icon = "APPLYALL")
+                col.operator("view3d.tb_apply_rotscale", text="", icon = "APPLY_ROTSCALE")
 
                 col.separator(factor = 0.5)
 
@@ -850,16 +844,30 @@ class VIEW3D_PT_objecttab_apply_delta(toolshelf_calculate, Panel):
 
         column_count = self.ts_width(layout, _context.region, scale_y= 1.75)
 
+        # bfa - the desctription in myvar.arg comes from release\scripts\startup\bl_operators\object.py
+        # defined in class TransformsToDeltas(Operator): by a string property
+
         #text buttons
         if column_count == 4:
 
             col = layout.column(align=True)
             col.scale_y = 2
 
-            col.operator("object.transforms_to_deltas", text="Location to Deltas", text_ctxt=i18n_contexts.default, icon = "APPLYMOVEDELTA").mode = 'LOC'
-            col.operator("object.transforms_to_deltas", text="Rotation to Deltas", text_ctxt=i18n_contexts.default, icon = "APPLYROTATEDELTA").mode = 'ROT'
-            col.operator("object.transforms_to_deltas", text="Scale to Deltas", text_ctxt=i18n_contexts.default, icon = "APPLYSCALEDELTA").mode = 'SCALE'
-            col.operator("object.transforms_to_deltas", text="All Transforms to Deltas", text_ctxt=i18n_contexts.default, icon = "APPLYALLDELTA").mode = 'ALL'
+            myvar = col.operator("object.transforms_to_deltas", text="Location to Deltas", text_ctxt=i18n_contexts.default, icon = "APPLYMOVEDELTA")
+            myvar.mode = 'LOC'
+            myvar.arg = 'Apply Location to Deltas\nConverts normal object transforms to delta transforms\nAny existing delta transform will be included as well'
+
+            myvar = col.operator("object.transforms_to_deltas", text="Rotation to Deltas", text_ctxt=i18n_contexts.default, icon = "APPLYROTATEDELTA")
+            myvar.mode = 'ROT'
+            myvar.arg = 'Apply Rotation to Deltas\nConverts normal object transforms to delta transforms\nAny existing delta transform will be included as well'
+
+            myvar = col.operator("object.transforms_to_deltas", text="Scale to Deltas", text_ctxt=i18n_contexts.default, icon = "APPLYSCALEDELTA")
+            myvar.mode = 'SCALE'
+            myvar.arg = 'Apply Scale to Deltas\nConverts normal object transforms to delta transforms\nAny existing delta transform will be included as well'
+
+            myvar = col.operator("object.transforms_to_deltas", text="All Transforms to Deltas", text_ctxt=i18n_contexts.default, icon = "APPLYALLDELTA")
+            myvar.mode = 'ALL'
+            myvar.arg = 'Apply all Transforms to Deltas\nConverts normal object transforms to delta transforms\nAny existing delta transform will be included as well'
 
             col.separator(factor = 0.5)
 
@@ -875,38 +883,70 @@ class VIEW3D_PT_objecttab_apply_delta(toolshelf_calculate, Panel):
             if column_count == 3:
 
                 row = col.row(align=True)
-                row.operator("object.transforms_to_deltas", text="", text_ctxt=i18n_contexts.default, icon = "APPLYMOVEDELTA").mode = 'LOC'
-                row.operator("object.transforms_to_deltas", text="", text_ctxt=i18n_contexts.default, icon = "APPLYROTATEDELTA").mode = 'ROT'
-                row.operator("object.transforms_to_deltas", text="", text_ctxt=i18n_contexts.default, icon = "APPLYSCALEDELTA").mode = 'SCALE'
+                myvar = row.operator("object.transforms_to_deltas", text="", icon = "APPLYMOVEDELTA")
+                myvar.mode = 'LOC'
+                myvar.arg = 'Apply Location to Deltas\nConvert normal object transforms to delta transforms\nAny existing delta transform will be included as well'
+
+                myvar = row.operator("object.transforms_to_deltas", text="", icon = "APPLYROTATEDELTA")
+                myvar.mode = 'ROT'
+                myvar.arg = 'Apply Rotation to Deltas\nConverts normal object transforms to delta transforms\nAny existing delta transform will be included as well'
+
+                myvar = row.operator("object.transforms_to_deltas", text="All Transforms to Deltas", icon = "APPLYALLDELTA")
+                myvar.mode = 'SCALE'
+                myvar.arg = 'Apply Scale to Deltas\nConverts normal object transforms to delta transforms\nAny existing delta transform will be included as well'
 
                 row = col.row(align=True)
-                row.operator("object.transforms_to_deltas", text="", text_ctxt=i18n_contexts.default, icon = "APPLYALLDELTA").mode = 'ALL'
+                myvar = row.operator("object.transforms_to_deltas", text="All Transforms to Deltas", icon = "APPLYALLDELTA")
+                myvar.mode = 'ALL'
+                myvar.arg = 'Apply All Transforms to Deltas\nConverts normal object transforms to delta transforms\nAny existing delta transform will be included as well'
+
                 row.operator("object.anim_transforms_to_deltas", text="", icon = "APPLYANIDELTA")
 
 
             elif column_count == 2:
 
                 row = col.row(align=True)
-                row.operator("object.transforms_to_deltas", text="", text_ctxt=i18n_contexts.default, icon = "APPLYMOVEDELTA").mode = 'LOC'
-                row.operator("object.transforms_to_deltas", text="", text_ctxt=i18n_contexts.default, icon = "APPLYROTATEDELTA").mode = 'ROT'
+                myvar = row.operator("object.transforms_to_deltas", text="", icon = "APPLYMOVEDELTA")
+                myvar.mode = 'LOC'
+                myvar.arg = 'Apply Location to Deltas\nConvert normal object transforms to delta transforms\nAny existing delta transform will be included as well'
+
+                myvar = row.operator("object.transforms_to_deltas", text="", icon = "APPLYROTATEDELTA")
+                myvar.mode = 'ROT'
+                myvar.arg = 'Apply Rotation to Deltas\nConverts normal object transforms to delta transforms\nAny existing delta transform will be included as well'
 
                 row = col.row(align=True)
-                row.operator("object.transforms_to_deltas", text="", text_ctxt=i18n_contexts.default, icon = "APPLYSCALEDELTA").mode = 'SCALE'
-                row.operator("object.transforms_to_deltas", text="", text_ctxt=i18n_contexts.default, icon = "APPLYALLDELTA").mode = 'ALL'
+                myvar = row.operator("object.transforms_to_deltas", text="", icon = "APPLYALLDELTA")
+                myvar.mode = 'SCALE'
+                myvar.arg = 'Apply Scale to Deltas\nConverts normal object transforms to delta transforms\nAny existing delta transform will be included as well'
+
+                myvar = row.operator("object.transforms_to_deltas", text="", icon = "APPLYALLDELTA")
+                myvar.mode = 'ALL'
+                myvar.arg = 'Apply all Transforms to Deltas\nConverts normal object transforms to delta transforms\nAny existing delta transform will be included as well'
 
                 row = col.row(align=True)
-                row.operator("object.anim_transforms_to_deltas", text = "", icon = "APPLYANIDELTA")
+                row.operator("object.anim_transforms_to_deltas", text="", icon = "APPLYANIDELTA")
 
             elif column_count == 1:
 
-                col.operator("object.transforms_to_deltas", text="", text_ctxt=i18n_contexts.default, icon = "APPLYMOVEDELTA").mode = 'LOC'
-                col.operator("object.transforms_to_deltas", text="", text_ctxt=i18n_contexts.default, icon = "APPLYROTATEDELTA").mode = 'ROT'
-                col.operator("object.transforms_to_deltas", text="", text_ctxt=i18n_contexts.default, icon = "APPLYSCALEDELTA").mode = 'SCALE'
-                col.operator("object.transforms_to_deltas", text="", text_ctxt=i18n_contexts.default, icon = "APPLYALLDELTA").mode = 'ALL'
+                myvar = col.operator("object.transforms_to_deltas", text="", icon = "APPLYMOVEDELTA")
+                myvar.mode = 'LOC'
+                myvar.arg = 'Apply Location to Deltas\nConverts normal object transforms to delta transforms\nAny existing delta transform will be included as well'
+
+                myvar = col.operator("object.transforms_to_deltas", text="", icon = "APPLYROTATEDELTA")
+                myvar.mode = 'ROT'
+                myvar.arg = 'Apply Rotation to Deltas\nConverts normal object transforms to delta transforms\nAny existing delta transform will be included as well'
+
+                myvar = col.operator("object.transforms_to_deltas", text="", icon = "APPLYSCALEDELTA")
+                myvar.mode = 'SCALE'
+                myvar.arg = 'Apply Scale to Deltas\nConverts normal object transforms to delta transforms\nAny existing delta transform will be included as well'
+
+                myvar = col.operator("object.transforms_to_deltas", text="", icon = "APPLYALLDELTA")
+                myvar.mode = 'ALL'
+                myvar.arg = 'Apply all Transforms to Deltas\nConverts normal object transforms to delta transforms\nAny existing delta transform will be included as well'
 
                 col.separator(factor = 0.5)
 
-                col.operator("object.anim_transforms_to_deltas", text="", icon = "APPLYANIDELTA")
+                col.operator("object.anim_transforms_to_deltas", text = "", icon = "APPLYANIDELTA")
 
 
 class VIEW3D_PT_objecttab_snap(toolshelf_calculate, Panel):
@@ -921,7 +961,7 @@ class VIEW3D_PT_objecttab_snap(toolshelf_calculate, Panel):
     def poll(cls, context):
         view = context.space_data
         overlay = view.overlay
-        return overlay.show_toolshelf_tabs == True and context.mode in {'OBJECT', 'EDIT_MESH', 'EDIT_ARMATURE', 'EDIT_SURFACE', 'EDIT_CURVE', 'EDIT_LATTICE', 'EDIT_METABALL', 'EDIT_GPENCIL'}
+        return overlay.show_toolshelf_tabs == True and context.mode in {'OBJECT', 'EDIT_MESH', 'EDIT_ARMATURE', 'EDIT_SURFACE', 'EDIT_CURVE', 'EDIT_LATTICE', 'EDIT_METABALL', 'EDIT_GPENCIL', 'POSE'}
 
     def draw(self, _context):
         layout = self.layout
@@ -2284,6 +2324,42 @@ class VIEW3D_PT_uvtab_uv(toolshelf_calculate, Panel):
                 col.operator("uv.reset", text = "", icon = "RESET")
 
 
+# Workaround to separate the tooltips
+class MASK_MT_flood_fill_invert(bpy.types.Operator):
+    """Inverts the mask"""      # blender will use this as a tooltip for menu items and buttons.
+    bl_idname = "mask.flood_fill_invert"        # unique identifier for buttons and menu items to reference.
+    bl_label = "Invert Mask"         # display name in the interface.
+    bl_options = {'REGISTER', 'UNDO'}  # enable undo for the operator.
+
+    def execute(self, context):        # execute() is called by blender when running the operator.
+        bpy.ops.paint.mask_flood_fill(mode = 'INVERT')
+        return {'FINISHED'}
+
+
+# Workaround to separate the tooltips
+class MASK_MT_flood_fill_fill(bpy.types.Operator):
+    """Fills the mask"""      # blender will use this as a tooltip for menu items and buttons.
+    bl_idname = "mask.flood_fill_fill"        # unique identifier for buttons and menu items to reference.
+    bl_label = "Fill Mask"         # display name in the interface.
+    bl_options = {'REGISTER', 'UNDO'}  # enable undo for the operator.
+
+    def execute(self, context):        # execute() is called by blender when running the operator.
+        bpy.ops.paint.mask_flood_fill(mode = 'VALUE', value = 1)
+        return {'FINISHED'}
+
+
+# Workaround to separate the tooltips
+class MASK_MT_flood_fill_clear(bpy.types.Operator):
+    """Clears the mask"""      # blender will use this as a tooltip for menu items and buttons.
+    bl_idname = "mask.flood_fill_clear"        # unique identifier for buttons and menu items to reference.
+    bl_label = "Clear Mask"         # display name in the interface.
+    bl_options = {'REGISTER', 'UNDO'}  # enable undo for the operator.
+
+    def execute(self, context):        # execute() is called by blender when running the operator.
+        bpy.ops.paint.mask_flood_fill(mode = 'VALUE', value = 0)
+        return {'FINISHED'}
+
+
 class VIEW3D_PT_masktab_mask(toolshelf_calculate, Panel):
     bl_label = "Mask"
     bl_space_type = 'VIEW_3D'
@@ -2310,16 +2386,9 @@ class VIEW3D_PT_masktab_mask(toolshelf_calculate, Panel):
             col = layout.column(align=True)
             col.scale_y = 2
 
-            props = col.operator("paint.mask_flood_fill", text="Invert Mask", icon = "INVERT_MASK")
-            props.mode = 'INVERT'
-
-            props = col.operator("paint.mask_flood_fill", text="Fill Mask", icon = "FILL_MASK")
-            props.mode = 'VALUE'
-            props.value = 1
-
-            props = col.operator("paint.mask_flood_fill", text="Clear Mask", icon = "CLEAR_MASK")
-            props.mode = 'VALUE'
-            props.value = 0
+            col.operator("mask.flood_fill_invert", text="Invert Mask", icon = "INVERT_MASK")
+            col.operator("mask.flood_fill_fill", text="Fill Mask", icon = "FILL_MASK")
+            col.operator("mask.flood_fill_clear", text="Clear Mask", icon = "CLEAR_MASK")
 
             col.separator(factor = 0.5)
 
@@ -2368,9 +2437,9 @@ class VIEW3D_PT_masktab_mask(toolshelf_calculate, Panel):
             props = col.operator("mesh.paint_mask_slice", text="Mask Slice", icon = "MASK_SLICE")
             props.fill_holes = False
             props.new_object = False
-            props = col.operator("mesh.paint_mask_slice", text="Mask Slice and Fill Holes", icon = "MASK_SLICE")
+            props = col.operator("mesh.paint_mask_slice", text="Mask Slice and Fill Holes", icon = "MASK_SLICE_FILL")
             props.new_object = False
-            props = col.operator("mesh.paint_mask_slice", text="Mask Slice to New Object", icon = "MASK_SLICE")
+            props = col.operator("mesh.paint_mask_slice", text="Mask Slice to New Object", icon = "MASK_SLICE_NEW")
 
             col.separator(factor = 0.5)
 
@@ -2387,16 +2456,9 @@ class VIEW3D_PT_masktab_mask(toolshelf_calculate, Panel):
             if column_count == 3:
 
                 row = col.row(align=True)
-                props = row.operator("paint.mask_flood_fill", text="", icon = "INVERT_MASK")
-                props.mode = 'INVERT'
-
-                props = row.operator("paint.mask_flood_fill", text="", icon = "FILL_MASK")
-                props.mode = 'VALUE'
-                props.value = 1
-
-                props = row.operator("paint.mask_flood_fill", text="", icon = "CLEAR_MASK")
-                props.mode = 'VALUE'
-                props.value = 0
+                row.operator("mask.flood_fill_invert", text="", icon = "INVERT_MASK")
+                row.operator("mask.flood_fill_fill", text="", icon = "FILL_MASK")
+                row.operator("mask.flood_fill_clear", text="", icon = "CLEAR_MASK")
 
                 row = col.row(align=True)
                 props = row.operator("sculpt.mask_filter", text='', icon = "PARTICLEBRUSH_SMOOTH")
@@ -2441,9 +2503,9 @@ class VIEW3D_PT_masktab_mask(toolshelf_calculate, Panel):
                 props = row.operator("mesh.paint_mask_slice", text="", icon = "MASK_SLICE")
                 props.fill_holes = False
                 props.new_object = False
-                props = row.operator("mesh.paint_mask_slice", text="", icon = "MASK_SLICE")
+                props = row.operator("mesh.paint_mask_slice", text="", icon = "MASK_SLICE_FILL")
                 props.new_object = False
-                props = row.operator("mesh.paint_mask_slice", text="", icon = "MASK_SLICE")
+                props = row.operator("mesh.paint_mask_slice", text="", icon = "MASK_SLICE_NEW")
 
                 row = col.row(align=True)
                 props = row.operator("sculpt.dirty_mask", text='', icon = "DIRTY_VERTEX")
@@ -2452,17 +2514,11 @@ class VIEW3D_PT_masktab_mask(toolshelf_calculate, Panel):
             elif column_count == 2:
 
                 row = col.row(align=True)
-                props = row.operator("paint.mask_flood_fill", text="", icon = "INVERT_MASK")
-                props.mode = 'INVERT'
-
-                props = row.operator("paint.mask_flood_fill", text="", icon = "FILL_MASK")
-                props.mode = 'VALUE'
-                props.value = 1
+                row.operator("mask.flood_fill_invert", text="", icon = "INVERT_MASK")
+                row.operator("mask.flood_fill_fill", text="", icon = "FILL_MASK")
 
                 row = col.row(align=True)
-                props = row.operator("paint.mask_flood_fill", text="", icon = "CLEAR_MASK")
-                props.mode = 'VALUE'
-                props.value = 0
+                row.operator("mask.flood_fill_clear", text="", icon = "CLEAR_MASK")
 
                 props = row.operator("sculpt.mask_filter", text='', icon = "PARTICLEBRUSH_SMOOTH")
                 props.filter_type = 'SMOOTH'
@@ -2510,9 +2566,9 @@ class VIEW3D_PT_masktab_mask(toolshelf_calculate, Panel):
                 props.new_object = False
 
                 row = col.row(align=True)
-                props = row.operator("mesh.paint_mask_slice", text="", icon = "MASK_SLICE")
+                props = row.operator("mesh.paint_mask_slice", text="", icon = "MASK_SLICE_FILL")
                 props.new_object = False
-                props = row.operator("mesh.paint_mask_slice", text="", icon = "MASK_SLICE")
+                props = row.operator("mesh.paint_mask_slice", text="", icon = "MASK_SLICE_NEW")
 
                 row = col.row(align=True)
                 props = row.operator("sculpt.dirty_mask", text='', icon = "DIRTY_VERTEX")
@@ -2522,16 +2578,9 @@ class VIEW3D_PT_masktab_mask(toolshelf_calculate, Panel):
                 col = layout.column(align=True)
                 col.scale_y = 2
 
-                props = col.operator("paint.mask_flood_fill", text="", icon = "INVERT_MASK")
-                props.mode = 'INVERT'
-
-                props = col.operator("paint.mask_flood_fill", text="", icon = "FILL_MASK")
-                props.mode = 'VALUE'
-                props.value = 1
-
-                props = col.operator("paint.mask_flood_fill", text="", icon = "CLEAR_MASK")
-                props.mode = 'VALUE'
-                props.value = 0
+                col.operator("mask.flood_fill_invert", text="", icon = "INVERT_MASK")
+                col.operator("mask.flood_fill_fill", text="", icon = "FILL_MASK")
+                col.operator("mask.flood_fill_clear", text="", icon = "CLEAR_MASK")
 
                 col.separator(factor = 0.5)
 
@@ -2580,9 +2629,9 @@ class VIEW3D_PT_masktab_mask(toolshelf_calculate, Panel):
                 props = col.operator("mesh.paint_mask_slice", text="", icon = "MASK_SLICE")
                 props.fill_holes = False
                 props.new_object = False
-                props = col.operator("mesh.paint_mask_slice", text="", icon = "MASK_SLICE")
+                props = col.operator("mesh.paint_mask_slice", text="", icon = "MASK_SLICE_FILL")
                 props.new_object = False
-                props = col.operator("mesh.paint_mask_slice", text="", icon = "MASK_SLICE")
+                props = col.operator("mesh.paint_mask_slice", text="", icon = "MASK_SLICE_NEW")
 
                 col.separator(factor = 0.5)
 
@@ -2615,15 +2664,9 @@ class VIEW3D_PT_masktab_random_mask(toolshelf_calculate, Panel):
             col = layout.column(align=True)
             col.scale_y = 2
 
-            op = col.operator("sculpt.mask_init", text='Per Vertex', icon = "SELECT_UNGROUPED_VERTS")
-            op.mode = 'RANDOM_PER_VERTEX'
-
-            op = col.operator("sculpt.mask_init", text='Per Face Set', icon = "FACESEL")
-            op.mode = 'RANDOM_PER_FACE_SET'
-
-            op = col.operator("sculpt.mask_init", text='Per Loose Part', icon = "SELECT_LOOSE")
-            op.mode = 'RANDOM_PER_LOOSE_PART'
-
+            col.operator("sculpt.mask_init", text='Per Vertex', icon = "SELECT_UNGROUPED_VERTS").mode = 'RANDOM_PER_VERTEX'
+            col.operator("sculpt.mask_init", text='Per Face Set', icon = "FACESEL").mode = 'RANDOM_PER_FACE_SET'
+            col.operator("sculpt.mask_init", text='Per Loose Part', icon = "SELECT_LOOSE").mode = 'RANDOM_PER_LOOSE_PART'
 
         # icon buttons
         else:
@@ -2635,27 +2678,18 @@ class VIEW3D_PT_masktab_random_mask(toolshelf_calculate, Panel):
             if column_count == 3:
 
                 row = col.row(align=True)
-                op = row.operator("sculpt.mask_init", text='', icon = "SELECT_UNGROUPED_VERTS")
-                op.mode = 'RANDOM_PER_VERTEX'
-
-                op = row.operator("sculpt.mask_init", text='', icon = "FACESEL")
-                op.mode = 'RANDOM_PER_FACE_SET'
-
-                op = row.operator("sculpt.mask_init", text='', icon = "SELECT_LOOSE")
-                op.mode = 'RANDOM_PER_LOOSE_PART'
+                row.operator("sculpt.mask_init", text='', icon = "SELECT_UNGROUPED_VERTS").mode = 'RANDOM_PER_VERTEX'
+                row.operator("sculpt.mask_init", text='', icon = "FACESEL").mode = 'RANDOM_PER_FACE_SET'
+                row.operator("sculpt.mask_init", text='', icon = "SELECT_LOOSE").mode = 'RANDOM_PER_LOOSE_PART'
 
             elif column_count == 2:
 
                 row = col.row(align=True)
-                op = row.operator("sculpt.mask_init", text='', icon = "SELECT_UNGROUPED_VERTS")
-                op.mode = 'RANDOM_PER_VERTEX'
-
-                op = row.operator("sculpt.mask_init", text='', icon = "FACESEL")
-                op.mode = 'RANDOM_PER_FACE_SET'
+                row.operator("sculpt.mask_init", text='', icon = "SELECT_UNGROUPED_VERTS").mode = 'RANDOM_PER_VERTEX'
+                row.operator("sculpt.mask_init", text='', icon = "FACESEL").mode = 'RANDOM_PER_FACE_SET'
 
                 row = col.row(align=True)
-                op = row.operator("sculpt.mask_init", text='', icon = "SELECT_LOOSE")
-                op.mode = 'RANDOM_PER_LOOSE_PART'
+                row.operator("sculpt.mask_init", text='', icon = "SELECT_LOOSE").mode = 'RANDOM_PER_LOOSE_PART'
 
 
             elif column_count == 1:
@@ -2663,17 +2697,533 @@ class VIEW3D_PT_masktab_random_mask(toolshelf_calculate, Panel):
                 col = layout.column(align=True)
                 col.scale_y = 2
 
-                col = layout.column(align=True)
-                col.scale_y = 2
+                col.operator("sculpt.mask_init", text='', icon = "SELECT_UNGROUPED_VERTS").mode = 'RANDOM_PER_VERTEX'
+                col.operator("sculpt.mask_init", text='', icon = "FACESEL").mode = 'RANDOM_PER_FACE_SET'
+                col.operator("sculpt.mask_init", text='', icon = "SELECT_LOOSE").mode = 'RANDOM_PER_LOOSE_PART'
 
-                op = col.operator("sculpt.mask_init", text='', icon = "SELECT_UNGROUPED_VERTS")
-                op.mode = 'RANDOM_PER_VERTEX'
 
-                op = col.operator("sculpt.mask_init", text='', icon = "FACESEL")
-                op.mode = 'RANDOM_PER_FACE_SET'
+class VIEW3D_PT_facesetstab_facesets(toolshelf_calculate, Panel):
+    bl_label = "Face Sets"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'TOOLS'
+    bl_category = "Face Sets"
+    bl_context = "sculpt_mode"
+    bl_options = {'HIDE_BG'}
 
-                op = col.operator("sculpt.mask_init", text='', icon = "SELECT_LOOSE")
-                op.mode = 'RANDOM_PER_LOOSE_PART'
+    # just show when the toolshelf tabs toggle in the view menu is on.
+    @classmethod
+    def poll(cls, context):
+        view = context.space_data
+        overlay = view.overlay
+        return overlay.show_toolshelf_tabs == True
+
+    def draw(self, _context):
+        layout = self.layout
+
+        column_count = self.ts_width(layout, _context.region, scale_y= 1.75)
+
+        #text buttons
+        if column_count == 4:
+
+            col = layout.column(align=True)
+            col.scale_y = 2
+
+            col.operator("sculpt.face_sets_create", text='Face Set from Masked', icon = "MOD_MASK").mode = 'MASKED'
+            col.operator("sculpt.face_sets_create", text='Face Set from Visible', icon = "FILL_MASK").mode = 'VISIBLE'
+            col.operator("sculpt.face_sets_create", text='Face Set from Edit Mode Selection', icon = "EDITMODE_HLT").mode = 'SELECTION'
+
+            col.separator(factor = 0.5)
+
+            col.operator("sculpt.face_set_edit", text='Grow Face Set', icon = 'SELECTMORE').mode = 'GROW'
+            col.operator("sculpt.face_set_edit", text='Shrink Face Set', icon = 'SELECTLESS').mode = 'SHRINK'
+
+            col.separator(factor = 0.5)
+
+            col.operator("mesh.face_set_extract", text='Extract Face Set', icon = "SEPARATE")
+
+            col.separator(factor = 0.5)
+
+            col.operator("sculpt.face_set_change_visibility", text='Invert Visible Face Sets', icon = "INVERT_MASK").mode = 'INVERT'
+            col.operator("sculpt.face_set_change_visibility", text='Show All Face Sets', icon = "HIDE_OFF").mode = 'SHOW_ALL'
+            col.operator("sculpt.face_set_change_visibility", text='Toggle Visibility', icon = "HIDE_UNSELECTED").mode = 'TOGGLE'
+            col.operator("sculpt.face_set_change_visibility", text='Hide Active Face Sets', icon = "HIDE_ON").mode = 'HIDE_ACTIVE'
+
+            col.separator(factor = 0.5)
+
+            col.operator("sculpt.face_sets_randomize_colors", text='Randomize Colors', icon = "COLOR")
+
+        # icon buttons
+        else:
+
+            col = layout.column(align=True)
+            col.scale_x = 2
+            col.scale_y = 2
+
+            if column_count == 3:
+
+                row = col.row(align=True)
+                row.operator("sculpt.face_sets_create", text='', icon = "MOD_MASK").mode = 'MASKED'
+                row.operator("sculpt.face_sets_create", text='', icon = "FILL_MASK").mode = 'VISIBLE'
+                row.operator("sculpt.face_sets_create", text='', icon = "EDITMODE_HLT").mode = 'SELECTION'
+
+                row = col.row(align=True)
+                row.operator("sculpt.face_set_edit", text='', icon = 'SELECTMORE').mode = 'GROW'
+                row.operator("sculpt.face_set_edit", text='', icon = 'SELECTLESS').mode = 'SHRINK'
+                row.operator("mesh.face_set_extract", text='', icon = "SEPARATE")
+
+                row = col.row(align=True)
+                row.operator("sculpt.face_set_change_visibility", text='', icon = "INVERT_MASK").mode = 'INVERT'
+                row.operator("sculpt.face_set_change_visibility", text='', icon = "HIDE_OFF").mode = 'SHOW_ALL'
+                row.operator("sculpt.face_set_change_visibility", text='T', icon = "HIDE_UNSELECTED").mode = 'TOGGLE'
+
+                row = col.row(align=True)
+                row.operator("sculpt.face_set_change_visibility", text='', icon = "HIDE_ON").mode = 'HIDE_ACTIVE'
+                row.operator("sculpt.face_sets_randomize_colors", text='', icon = "COLOR")
+
+            elif column_count == 2:
+
+                row = col.row(align=True)
+                row.operator("sculpt.face_sets_create", text='', icon = "MOD_MASK").mode = 'MASKED'
+                row.operator("sculpt.face_sets_create", text='', icon = "FILL_MASK").mode = 'VISIBLE'
+
+                row = col.row(align=True)
+                row.operator("sculpt.face_sets_create", text='', icon = "EDITMODE_HLT").mode = 'SELECTION'
+                row.operator("sculpt.face_set_edit", text='', icon = 'SELECTMORE').mode = 'GROW'
+
+                row = col.row(align=True)
+                row.operator("sculpt.face_set_edit", text='', icon = 'SELECTLESS').mode = 'SHRINK'
+                row.operator("mesh.face_set_extract", text='', icon = "SEPARATE")
+
+                row = col.row(align=True)
+                row.operator("sculpt.face_set_change_visibility", text='', icon = "INVERT_MASK").mode = 'INVERT'
+                row.operator("sculpt.face_set_change_visibility", text='', icon = "HIDE_OFF").mode = 'SHOW_ALL'
+
+                row = col.row(align=True)
+                row.operator("sculpt.face_set_change_visibility", text='', icon = "HIDE_UNSELECTED").mode = 'TOGGLE'
+                row.operator("sculpt.face_set_change_visibility", text='', icon = "HIDE_ON").mode = 'HIDE_ACTIVE'
+
+                row = col.row(align=True)
+                row.operator("sculpt.face_sets_randomize_colors", text='', icon = "COLOR")
+
+            elif column_count == 1:
+
+                col.operator("sculpt.face_sets_create", text='', icon = "MOD_MASK").mode = 'MASKED'
+                col.operator("sculpt.face_sets_create", text='', icon = "FILL_MASK").mode = 'VISIBLE'
+                col.operator("sculpt.face_sets_create", text='', icon = "EDITMODE_HLT").mode = 'SELECTION'
+
+                col.separator(factor = 0.5)
+
+                col.operator("sculpt.face_set_edit", text='', icon = 'SELECTMORE').mode = 'GROW'
+                col.operator("sculpt.face_set_edit", text='', icon = 'SELECTLESS').mode = 'SHRINK'
+
+                col.separator(factor = 0.5)
+
+                col.operator("mesh.face_set_extract", text='', icon = "SEPARATE")
+
+                col.separator(factor = 0.5)
+
+                col.operator("sculpt.face_set_change_visibility", text='', icon = "INVERT_MASK").mode = 'INVERT'
+                col.operator("sculpt.face_set_change_visibility", text='', icon = "HIDE_OFF").mode = 'SHOW_ALL'
+                col.operator("sculpt.face_set_change_visibility", text='', icon = "HIDE_UNSELECTED").mode = 'TOGGLE'
+                col.operator("sculpt.face_set_change_visibility", text='', icon = "HIDE_ON").mode = 'HIDE_ACTIVE'
+
+                col.separator(factor = 0.5)
+
+                col.operator("sculpt.face_sets_randomize_colors", text='', icon = "COLOR")
+
+
+class VIEW3D_PT_facesetstab_init_facesets(toolshelf_calculate, Panel):
+    bl_label = "Initialize Face Sets"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'TOOLS'
+    bl_category = "Face Sets"
+    bl_context = "sculpt_mode"
+    bl_options = {'HIDE_BG'}
+
+    # just show when the toolshelf tabs toggle in the view menu is on.
+    @classmethod
+    def poll(cls, context):
+        view = context.space_data
+        overlay = view.overlay
+        return overlay.show_toolshelf_tabs == True
+
+    def draw(self, _context):
+        layout = self.layout
+
+        column_count = self.ts_width(layout, _context.region, scale_y= 1.75)
+
+        #text buttons
+        if column_count == 4:
+
+            col = layout.column(align=True)
+            col.scale_y = 2
+
+            col.operator("sculpt.face_sets_init", text='By Loose Parts', icon = "SELECT_LOOSE").mode = 'LOOSE_PARTS'
+            col.operator("sculpt.face_sets_init", text='By Face Set Boundaries', icon = "SELECT_BOUNDARY").mode = 'FACE_SET_BOUNDARIES'
+            col.operator("sculpt.face_sets_init", text='By Materials', icon = "MATERIAL_DATA").mode = 'MATERIALS'
+            col.operator("sculpt.face_sets_init", text='By Normals', icon = "RECALC_NORMALS").mode = 'NORMALS'
+            col.operator("sculpt.face_sets_init", text='By UV Seams', icon = "MARK_SEAM").mode = 'UV_SEAMS'
+            col.operator("sculpt.face_sets_init", text='By Edge Creases', icon = "CREASE").mode = 'CREASES'
+            col.operator("sculpt.face_sets_init", text='By Edge Bevel Weight', icon = "BEVEL").mode = 'BEVEL_WEIGHT'
+            col.operator("sculpt.face_sets_init", text='By Sharp Edges', icon = "SELECT_SHARPEDGES").mode = 'SHARP_EDGES'
+            col.operator("sculpt.face_sets_init", text='By Face Maps', icon = "FACE_MAPS").mode = 'FACE_MAPS'
+
+        # icon buttons
+        else:
+
+            col = layout.column(align=True)
+            col.scale_x = 2
+            col.scale_y = 2
+
+            if column_count == 3:
+
+                row = col.row(align=True)
+                row.operator("sculpt.face_sets_init", text='', icon = "SELECT_LOOSE").mode = 'LOOSE_PARTS'
+                row.operator("sculpt.face_sets_init", text='', icon = "SELECT_BOUNDARY").mode = 'FACE_SET_BOUNDARIES'
+                row.operator("sculpt.face_sets_init", text='', icon = "MATERIAL_DATA").mode = 'MATERIALS'
+
+                row = col.row(align=True)
+                row.operator("sculpt.face_sets_init", text='', icon = "RECALC_NORMALS").mode = 'NORMALS'
+                row.operator("sculpt.face_sets_init", text='', icon = "MARK_SEAM").mode = 'UV_SEAMS'
+                row.operator("sculpt.face_sets_init", text='', icon = "CREASE").mode = 'CREASES'
+
+                row = col.row(align=True)
+                row.operator("sculpt.face_sets_init", text='', icon = "BEVEL").mode = 'BEVEL_WEIGHT'
+                row.operator("sculpt.face_sets_init", text='', icon = "SELECT_SHARPEDGES").mode = 'SHARP_EDGES'
+                row.operator("sculpt.face_sets_init", text='', icon = "FACE_MAPS").mode = 'FACE_MAPS'
+
+            elif column_count == 2:
+
+                row = col.row(align=True)
+                row.operator("sculpt.face_sets_init", text='', icon = "SELECT_LOOSE").mode = 'LOOSE_PARTS'
+                row.operator("sculpt.face_sets_init", text='', icon = "SELECT_BOUNDARY").mode = 'FACE_SET_BOUNDARIES'
+
+                row = col.row(align=True)
+                row.operator("sculpt.face_sets_init", text='', icon = "MATERIAL_DATA").mode = 'MATERIALS'
+                row.operator("sculpt.face_sets_init", text='', icon = "RECALC_NORMALS").mode = 'NORMALS'
+
+                row = col.row(align=True)
+                row.operator("sculpt.face_sets_init", text='', icon = "MARK_SEAM").mode = 'UV_SEAMS'
+                row.operator("sculpt.face_sets_init", text='', icon = "CREASE").mode = 'CREASES'
+
+                row = col.row(align=True)
+                row.operator("sculpt.face_sets_init", text='', icon = "BEVEL").mode = 'BEVEL_WEIGHT'
+                row.operator("sculpt.face_sets_init", text='', icon = "SELECT_SHARPEDGES").mode = 'SHARP_EDGES'
+
+                row = col.row(align=True)
+                row.operator("sculpt.face_sets_init", text='', icon = "FACE_MAPS").mode = 'FACE_MAPS'
+
+            elif column_count == 1:
+
+                col.operator("sculpt.face_sets_init", text='', icon = "SELECT_LOOSE").mode = 'LOOSE_PARTS'
+                col.operator("sculpt.face_sets_init", text='', icon = "SELECT_BOUNDARY").mode = 'FACE_SET_BOUNDARIES'
+                col.operator("sculpt.face_sets_init", text='', icon = "MATERIAL_DATA").mode = 'MATERIALS'
+                col.operator("sculpt.face_sets_init", text='', icon = "RECALC_NORMALS").mode = 'NORMALS'
+                col.operator("sculpt.face_sets_init", text='', icon = "MARK_SEAM").mode = 'UV_SEAMS'
+                col.operator("sculpt.face_sets_init", text='', icon = "CREASE").mode = 'CREASES'
+                col.operator("sculpt.face_sets_init", text='', icon = "BEVEL").mode = 'BEVEL_WEIGHT'
+                col.operator("sculpt.face_sets_init", text='', icon = "SELECT_SHARPEDGES").mode = 'SHARP_EDGES'
+                col.operator("sculpt.face_sets_init", text='', icon = "FACE_MAPS").mode = 'FACE_MAPS'
+
+
+class VIEW3D_PT_painttab_paint(toolshelf_calculate, Panel):
+    bl_label = "Paint"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'TOOLS'
+    bl_category = "Paint"
+    bl_context = "vertexpaint"
+    bl_options = {'HIDE_BG'}
+
+    # just show when the toolshelf tabs toggle in the view menu is on.
+    @classmethod
+    def poll(cls, context):
+        view = context.space_data
+        overlay = view.overlay
+        return overlay.show_toolshelf_tabs == True
+
+    def draw(self, _context):
+        layout = self.layout
+
+        column_count = self.ts_width(layout, _context.region, scale_y= 1.75)
+
+        #text buttons
+        if column_count == 4:
+
+            col = layout.column(align=True)
+            col.scale_y = 2
+
+            col.operator("paint.vertex_color_set", icon = "COLOR")
+            col.operator("paint.vertex_color_smooth", icon = "PARTICLEBRUSH_SMOOTH")
+            col.operator("paint.vertex_color_dirt", icon = "DIRTY_VERTEX")
+            col.operator("paint.vertex_color_from_weight", icon = "VERTCOLFROMWEIGHT")
+
+            col.separator( factor = 0.5)
+
+            col.operator("paint.vertex_color_invert", text="Invert", icon = "REVERSE_COLORS")
+            col.operator("paint.vertex_color_levels", text="Levels", icon = "LEVELS")
+            col.operator("paint.vertex_color_hsv", text="Hue Saturation Value", icon = "HUESATVAL")
+            col.operator("paint.vertex_color_brightness_contrast", text="Bright/Contrast", icon = "BRIGHTNESS_CONTRAST")
+
+        # icon buttons
+        else:
+
+            col = layout.column(align=True)
+            col.scale_x = 2
+            col.scale_y = 2
+
+            if column_count == 3:
+
+                row = col.row(align=True)
+                row.operator("paint.vertex_color_set", text="", icon = "COLOR")
+                row.operator("paint.vertex_color_smooth", text="", icon = "PARTICLEBRUSH_SMOOTH")
+                row.operator("paint.vertex_color_dirt", text="", icon = "DIRTY_VERTEX")
+
+                row = col.row(align=True)
+                row.operator("paint.vertex_color_from_weight", text="", icon = "VERTCOLFROMWEIGHT")
+                row.operator("paint.vertex_color_invert", text="", icon = "REVERSE_COLORS")
+                row.operator("paint.vertex_color_levels", text="", icon = "LEVELS")
+
+                row = col.row(align=True)
+                row.operator("paint.vertex_color_hsv", text="", icon = "HUESATVAL")
+                row.operator("paint.vertex_color_brightness_contrast", text="", icon = "BRIGHTNESS_CONTRAST")
+
+            elif column_count == 2:
+
+                row = col.row(align=True)
+                row.operator("paint.vertex_color_set", text="", icon = "COLOR")
+                row.operator("paint.vertex_color_smooth", text="", icon = "PARTICLEBRUSH_SMOOTH")
+
+                row = col.row(align=True)
+                row.operator("paint.vertex_color_dirt", text="", icon = "DIRTY_VERTEX")
+                row.operator("paint.vertex_color_from_weight", text="", icon = "VERTCOLFROMWEIGHT")
+
+                row = col.row(align=True)
+                row.operator("paint.vertex_color_invert", text="", icon = "REVERSE_COLORS")
+                row.operator("paint.vertex_color_levels", text="", icon = "LEVELS")
+
+                row = col.row(align=True)
+                row.operator("paint.vertex_color_hsv", text="", icon = "HUESATVAL")
+                row.operator("paint.vertex_color_brightness_contrast", text="", icon = "BRIGHTNESS_CONTRAST")
+
+            elif column_count == 1:
+
+                col.operator("paint.vertex_color_set", text="", icon = "COLOR")
+                col.operator("paint.vertex_color_smooth", text="", icon = "PARTICLEBRUSH_SMOOTH")
+                col.operator("paint.vertex_color_dirt", text="", icon = "DIRTY_VERTEX")
+                col.operator("paint.vertex_color_from_weight", text="", icon = "VERTCOLFROMWEIGHT")
+
+                col.separator( factor = 0.5)
+
+                col.operator("paint.vertex_color_invert", text="", icon = "REVERSE_COLORS")
+                col.operator("paint.vertex_color_levels", text="", icon = "LEVELS")
+                col.operator("paint.vertex_color_hsv", text="", icon = "HUESATVAL")
+                col.operator("paint.vertex_color_brightness_contrast", text="", icon = "BRIGHTNESS_CONTRAST")
+
+
+class VIEW3D_PT_painttab_colorpicker(toolshelf_calculate, Panel):
+    bl_label = "Color Picker"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'TOOLS'
+    bl_category = "Paint"
+    bl_options = {'HIDE_BG'}
+
+    # just show when the toolshelf tabs toggle in the view menu is on.
+    @classmethod
+    def poll(cls, context):
+        view = context.space_data
+        overlay = view.overlay
+        return overlay.show_toolshelf_tabs == True and context.mode in {'PAINT_VERTEX', 'PAINT_TEXTURE'}
+
+    def draw(self, _context):
+        layout = self.layout
+
+        column_count = self.ts_width(layout, _context.region, scale_y= 1.75)
+
+        #text buttons
+        if column_count == 4:
+
+            col = layout.column(align=True)
+            col.scale_y = 2
+
+            col.operator("paint.sample_color", text = "Color Picker", icon='EYEDROPPER')
+
+        # icon buttons
+        else:
+
+            col = layout.column(align=True)
+            col.scale_x = 2
+            col.scale_y = 2
+
+            if column_count == 3:
+
+                row = col.row(align=True)
+                row.operator("paint.sample_color", text = "", icon='EYEDROPPER')
+
+            elif column_count == 2:
+
+                row = col.row(align=True)
+                row.operator("paint.sample_color", text = "", icon='EYEDROPPER')
+
+            elif column_count == 1:
+
+                col.operator("paint.sample_color", text = "", icon='EYEDROPPER')
+
+
+class VIEW3D_PT_weightstab_weights(toolshelf_calculate, Panel):
+    bl_label = "Weights"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'TOOLS'
+    bl_category = "Weights"
+    bl_context = "weightpaint"
+    bl_options = {'HIDE_BG'}
+
+    # just show when the toolshelf tabs toggle in the view menu is on.
+    @classmethod
+    def poll(cls, context):
+        view = context.space_data
+        overlay = view.overlay
+        return overlay.show_toolshelf_tabs == True
+    def draw(self, _context):
+        layout = self.layout
+
+        column_count = self.ts_width(layout, _context.region, scale_y= 1.75)
+
+        #text buttons
+        if column_count == 4:
+
+            col = layout.column(align=True)
+            col.scale_y = 2
+
+            col.operator("paint.weight_from_bones", text = "Assign Automatic from Bones", icon = "BONE_DATA").type = 'AUTOMATIC'
+            col.operator("paint.weight_from_bones", text = "Assign from Bone Envelopes", icon = "ENVELOPE_MODIFIER").type = 'ENVELOPES'
+
+            col.separator(factor = 0.5)
+
+            col.operator("object.vertex_group_normalize_all", text = "Normalize All", icon='WEIGHT_NORMALIZE_ALL')
+            col.operator("object.vertex_group_normalize", text = "Normalize", icon='WEIGHT_NORMALIZE')
+
+            col.separator(factor = 0.5)
+
+            col.operator("object.vertex_group_mirror", text="Mirror", icon='WEIGHT_MIRROR')
+            col.operator("object.vertex_group_invert", text="Invert", icon='WEIGHT_INVERT')
+            col.operator("object.vertex_group_clean", text="Clean", icon='WEIGHT_CLEAN')
+
+            col.separator(factor = 0.5)
+
+            col.operator("object.vertex_group_quantize", text = "Quantize", icon = "WEIGHT_QUANTIZE")
+            col.operator("object.vertex_group_levels", text = "Levels", icon = 'WEIGHT_LEVELS')
+            col.operator("object.vertex_group_smooth", text = "Smooth", icon='WEIGHT_SMOOTH')
+
+            props = col.operator("object.data_transfer", text="Transfer Weights", icon = 'WEIGHT_TRANSFER_WEIGHTS')
+            props.use_reverse_transfer = True
+            props.data_type = 'VGROUP_WEIGHTS'
+
+            col.operator("object.vertex_group_limit_total", text="Limit Total", icon='WEIGHT_LIMIT_TOTAL')
+            col.operator("object.vertex_group_fix", text="Fix Deforms", icon='WEIGHT_FIX_DEFORMS')
+
+            col.separator(factor = 0.5)
+
+            col.operator("paint.weight_set", icon = "MOD_VERTEX_WEIGHT")
+
+        # icon buttons
+        else:
+
+            col = layout.column(align=True)
+            col.scale_x = 2
+            col.scale_y = 2
+
+            if column_count == 3:
+
+                row = col.row(align=True)
+                row.operator("paint.weight_from_bones", text = "", icon = "BONE_DATA").type = 'AUTOMATIC'
+                row.operator("paint.weight_from_bones", text = "", icon = "ENVELOPE_MODIFIER").type = 'ENVELOPES'
+                row.operator("object.vertex_group_normalize_all", text = "", icon='WEIGHT_NORMALIZE_ALL')
+
+                row = col.row(align=True)
+                row.operator("object.vertex_group_normalize", text = "", icon='WEIGHT_NORMALIZE')
+                row.operator("object.vertex_group_mirror", text="", icon='WEIGHT_MIRROR')
+                row.operator("object.vertex_group_invert", text="", icon='WEIGHT_INVERT')
+
+                row = col.row(align=True)
+                row.operator("object.vertex_group_clean", text="", icon='WEIGHT_CLEAN')
+                row.operator("object.vertex_group_quantize", text = "", icon = "WEIGHT_QUANTIZE")
+                row.operator("object.vertex_group_levels", text = "", icon = 'WEIGHT_LEVELS')
+
+                row = col.row(align=True)
+                row.operator("object.vertex_group_smooth", text = "", icon='WEIGHT_SMOOTH')
+                props = row.operator("object.data_transfer", text="", icon = 'WEIGHT_TRANSFER_WEIGHTS')
+                props.use_reverse_transfer = True
+                props.data_type = 'VGROUP_WEIGHTS'
+                row.operator("object.vertex_group_limit_total", text="", icon='WEIGHT_LIMIT_TOTAL')
+
+                row = col.row(align=True)
+                row.operator("object.vertex_group_fix", text="", icon='WEIGHT_FIX_DEFORMS')
+                row.operator("paint.weight_set", text="", icon = "MOD_VERTEX_WEIGHT")
+
+            elif column_count == 2:
+
+                row = col.row(align=True)
+                row.operator("paint.weight_from_bones", text = "", icon = "BONE_DATA").type = 'AUTOMATIC'
+                row.operator("paint.weight_from_bones", text = "", icon = "ENVELOPE_MODIFIER").type = 'ENVELOPES'
+
+                row = col.row(align=True)
+                row.operator("object.vertex_group_normalize_all", text = "", icon='WEIGHT_NORMALIZE_ALL')
+                row.operator("object.vertex_group_normalize", text = "", icon='WEIGHT_NORMALIZE')
+
+                row = col.row(align=True)
+                row.operator("object.vertex_group_mirror", text="", icon='WEIGHT_MIRROR')
+                row.operator("object.vertex_group_invert", text="", icon='WEIGHT_INVERT')
+
+                row = col.row(align=True)
+                row.operator("object.vertex_group_clean", text="", icon='WEIGHT_CLEAN')
+                row.operator("object.vertex_group_quantize", text = "", icon = "WEIGHT_QUANTIZE")
+
+                row = col.row(align=True)
+                row.operator("object.vertex_group_levels", text = "", icon = 'WEIGHT_LEVELS')
+                row.operator("object.vertex_group_smooth", text = "", icon='WEIGHT_SMOOTH')
+
+                row = col.row(align=True)
+                props = row.operator("object.data_transfer", text="", icon = 'WEIGHT_TRANSFER_WEIGHTS')
+                props.use_reverse_transfer = True
+                props.data_type = 'VGROUP_WEIGHTS'
+                row.operator("object.vertex_group_limit_total", text="", icon='WEIGHT_LIMIT_TOTAL')
+
+                row = col.row(align=True)
+                row.operator("object.vertex_group_fix", text="", icon='WEIGHT_FIX_DEFORMS')
+                row.operator("paint.weight_set", text="", icon = "MOD_VERTEX_WEIGHT")
+
+            elif column_count == 1:
+
+                col.operator("paint.weight_from_bones", text = "", icon = "BONE_DATA").type = 'AUTOMATIC'
+                col.operator("paint.weight_from_bones", text = "", icon = "ENVELOPE_MODIFIER").type = 'ENVELOPES'
+
+                col.separator(factor = 0.5)
+
+                col.operator("object.vertex_group_normalize_all", text = "", icon='WEIGHT_NORMALIZE_ALL')
+                col.operator("object.vertex_group_normalize", text = "", icon='WEIGHT_NORMALIZE')
+
+                col.separator(factor = 0.5)
+
+                col.operator("object.vertex_group_mirror", text="", icon='WEIGHT_MIRROR')
+                col.operator("object.vertex_group_invert", text="", icon='WEIGHT_INVERT')
+                col.operator("object.vertex_group_clean", text="", icon='WEIGHT_CLEAN')
+
+                col.separator(factor = 0.5)
+
+                col.operator("object.vertex_group_quantize", text = "", icon = "WEIGHT_QUANTIZE")
+                col.operator("object.vertex_group_levels", text = "", icon = 'WEIGHT_LEVELS')
+                col.operator("object.vertex_group_smooth", text = "", icon='WEIGHT_SMOOTH')
+
+                props = col.operator("object.data_transfer", text="", icon = 'WEIGHT_TRANSFER_WEIGHTS')
+                props.use_reverse_transfer = True
+                props.data_type = 'VGROUP_WEIGHTS'
+
+                col.operator("object.vertex_group_limit_total", text="", icon='WEIGHT_LIMIT_TOTAL')
+                col.operator("object.vertex_group_fix", text="", icon='WEIGHT_FIX_DEFORMS')
+
+                col.separator(factor = 0.5)
+
+                col.operator("paint.weight_set", text="", icon = "MOD_VERTEX_WEIGHT")
 
 
 class VIEW3D_PT_curvetab_curve(toolshelf_calculate, Panel):
@@ -3134,6 +3684,1701 @@ class VIEW3D_PT_segmentstab_segments(toolshelf_calculate, Panel):
                 col.operator("curve.switch_direction", text = "", icon = 'SWITCH_DIRECTION')
 
 
+class VIEW3D_PT_gp_gpenciltab_dissolve(toolshelf_calculate, Panel):
+    bl_label = "Dissolve"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'TOOLS'
+    bl_context = "greasepencil_edit"
+    bl_category = "Gpencil"
+    bl_options = {'HIDE_BG'}
+
+    # just show when the toolshelf tabs toggle in the view menu is on.
+    @classmethod
+    def poll(cls, context):
+        view = context.space_data
+        overlay = view.overlay
+        return overlay.show_toolshelf_tabs == True
+
+    def draw(self, _context):
+        layout = self.layout
+
+        column_count = self.ts_width(layout, _context.region, scale_y= 1.75)
+
+        #text buttons
+        if column_count == 4:
+
+            col = layout.column(align=True)
+            col.scale_y = 2
+
+            col.operator("gpencil.dissolve", text="Dissolve", icon = "DISSOLVE_VERTS").type = 'POINTS'
+            col.operator("gpencil.dissolve", text="Dissolve Between", icon = "DISSOLVE_BETWEEN").type = 'BETWEEN'
+            col.operator("gpencil.dissolve", text="Dissolve Unselected", icon = "DISSOLVE_UNSELECTED").type = 'UNSELECT'
+
+        # icon buttons
+        else:
+
+            col = layout.column(align=True)
+            col.scale_x = 2
+            col.scale_y = 2
+
+            if column_count == 3:
+
+                row = col.row(align=True)
+                row.operator("gpencil.dissolve", text="", icon = "DISSOLVE_VERTS").type = 'POINTS'
+                row.operator("gpencil.dissolve", text="", icon = "DISSOLVE_BETWEEN").type = 'BETWEEN'
+                row.operator("gpencil.dissolve", text="", icon = "DISSOLVE_UNSELECTED").type = 'UNSELECT'
+
+            elif column_count == 2:
+
+                row = col.row(align=True)
+                row.operator("gpencil.dissolve", text="", icon = "DISSOLVE_VERTS").type = 'POINTS'
+                row.operator("gpencil.dissolve", text="", icon = "DISSOLVE_BETWEEN").type = 'BETWEEN'
+
+                row = col.row(align=True)
+                row.operator("gpencil.dissolve", text="", icon = "DISSOLVE_UNSELECTED").type = 'UNSELECT'
+
+            elif column_count == 1:
+
+                col.operator("gpencil.dissolve", text="", icon = "DISSOLVE_VERTS").type = 'POINTS'
+                col.operator("gpencil.dissolve", text="", icon = "DISSOLVE_BETWEEN").type = 'BETWEEN'
+                col.operator("gpencil.dissolve", text="", icon = "DISSOLVE_UNSELECTED").type = 'UNSELECT'
+
+
+class VIEW3D_PT_gp_gpenciltab_cleanup(toolshelf_calculate, Panel):
+    bl_label = "Clean Up"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'TOOLS'
+    bl_context = "greasepencil_edit"
+    bl_category = "Gpencil"
+    bl_options = {'HIDE_BG', 'DEFAULT_CLOSED'}
+
+    # just show when the toolshelf tabs toggle in the view menu is on.
+    @classmethod
+    def poll(cls, context):
+        view = context.space_data
+        overlay = view.overlay
+        return overlay.show_toolshelf_tabs == True
+
+    def draw(self, _context):
+        layout = self.layout
+
+        column_count = self.ts_width(layout, _context.region, scale_y= 1.75)
+
+        #text buttons
+        if column_count == 4:
+
+            col = layout.column(align=True)
+            col.scale_y = 2
+
+            col.operator("gpencil.frame_clean_fill", text="Boundary Strokes", icon = "CLEAN_CHANNELS").mode = 'ACTIVE'
+            col.operator("gpencil.frame_clean_fill", text="Boundary Strokes all Frames", icon = "CLEAN_CHANNELS_FRAMES").mode = 'ALL'
+
+            col.separator(factor = 0.5)
+
+            col.operator("gpencil.frame_clean_loose", text="Delete Loose Points", icon = "DELETE_LOOSE")
+            col.operator("gpencil.stroke_merge_by_distance", text="Merge by Distance", icon = "MERGE")
+
+            col.separator(factor = 0.5)
+
+            col.operator("gpencil.frame_clean_duplicate", text="Delete Duplicated Frames", icon = "DELETE")
+            col.operator("gpencil.recalc_geometry", text="Recalculate Geometry", icon = "FILE_REFRESH")
+            col.operator("gpencil.reproject", icon = "REPROJECT")
+
+        # icon buttons
+        else:
+
+            col = layout.column(align=True)
+            col.scale_x = 2
+            col.scale_y = 2
+
+            if column_count == 3:
+
+                row = col.row(align=True)
+                row.operator("gpencil.frame_clean_fill", text="", icon = "CLEAN_CHANNELS").mode = 'ACTIVE'
+                row.operator("gpencil.frame_clean_fill", text="", icon = "CLEAN_CHANNELS_FRAMES").mode = 'ALL'
+                row.operator("gpencil.frame_clean_loose", text="", icon = "DELETE_LOOSE")
+
+                row = col.row(align=True)
+                row.operator("gpencil.stroke_merge_by_distance", text="", icon = "MERGE")
+                row.operator("gpencil.frame_clean_duplicate", text="", icon = "DELETE")
+                row.operator("gpencil.recalc_geometry", text="", icon = "FILE_REFRESH")
+
+                row = col.row(align=True)
+                row.operator("gpencil.reproject", text = "", icon = "REPROJECT")
+
+            elif column_count == 2:
+
+                row = col.row(align=True)
+                row.operator("gpencil.frame_clean_fill", text="", icon = "CLEAN_CHANNELS").mode = 'ACTIVE'
+                row.operator("gpencil.frame_clean_fill", text="", icon = "CLEAN_CHANNELS_FRAMES").mode = 'ALL'
+
+                row = col.row(align=True)
+                row.operator("gpencil.frame_clean_loose", text="", icon = "DELETE_LOOSE")
+                row.operator("gpencil.stroke_merge_by_distance", text="", icon = "MERGE")
+
+                row = col.row(align=True)
+                row.operator("gpencil.frame_clean_duplicate", text="", icon = "DELETE")
+                row.operator("gpencil.recalc_geometry", text="", icon = "FILE_REFRESH")
+
+                row = col.row(align=True)
+                row.operator("gpencil.reproject", text = "", icon = "REPROJECT")
+
+            elif column_count == 1:
+
+                col.operator("gpencil.frame_clean_fill", text="", icon = "CLEAN_CHANNELS").mode = 'ACTIVE'
+                col.operator("gpencil.frame_clean_fill", text="", icon = "CLEAN_CHANNELS_FRAMES").mode = 'ALL'
+
+                col.separator(factor = 0.5)
+
+                col.operator("gpencil.frame_clean_loose", text="", icon = "DELETE_LOOSE")
+                col.operator("gpencil.stroke_merge_by_distance", text="", icon = "MERGE")
+
+                col.separator(factor = 0.5)
+
+                col.operator("gpencil.frame_clean_duplicate", text="", icon = "DELETE")
+                col.operator("gpencil.recalc_geometry", text="", icon = "FILE_REFRESH")
+                col.operator("gpencil.reproject", text = "", icon = "REPROJECT")
+
+
+class VIEW3D_PT_gp_gpenciltab_separate(toolshelf_calculate, Panel):
+    bl_label = "Separate"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'TOOLS'
+    bl_context = "greasepencil_edit"
+    bl_category = "Gpencil"
+    bl_options = {'HIDE_BG', 'DEFAULT_CLOSED'}
+
+    # just show when the toolshelf tabs toggle in the view menu is on.
+    @classmethod
+    def poll(cls, context):
+        view = context.space_data
+        overlay = view.overlay
+        return overlay.show_toolshelf_tabs == True
+
+    def draw(self, _context):
+        layout = self.layout
+
+        column_count = self.ts_width(layout, _context.region, scale_y= 1.75)
+
+        #text buttons
+        if column_count == 4:
+
+            col = layout.column(align=True)
+            col.scale_y = 2
+
+            col.operator("gpencil.stroke_separate", text="Separate Selected Points", icon = "SEPARATE_GP_POINTS").mode = 'POINT'
+            col.operator("gpencil.stroke_separate", text="Separate Selected Strokes", icon = "SEPARATE_GP_STROKES").mode = 'STROKE'
+            col.operator("gpencil.stroke_separate", text="Separate Active Layer", icon = "SEPARATE_GP_STROKES").mode = 'LAYER'
+
+        # icon buttons
+        else:
+
+            col = layout.column(align=True)
+            col.scale_x = 2
+            col.scale_y = 2
+
+            if column_count == 3:
+
+                row = col.row(align=True)
+                row.operator("gpencil.stroke_separate", text="", icon = "SEPARATE_GP_POINTS").mode = 'POINT'
+                row.operator("gpencil.stroke_separate", text="", icon = "SEPARATE_GP_STROKES").mode = 'STROKE'
+                row.operator("gpencil.stroke_separate", text="", icon = "SEPARATE_GP_LAYER").mode = 'LAYER'
+
+            elif column_count == 2:
+
+                row = col.row(align=True)
+                row.operator("gpencil.stroke_separate", text="", icon = "SEPARATE_GP_POINTS").mode = 'POINT'
+                row.operator("gpencil.stroke_separate", text="", icon = "SEPARATE_GP_STROKES").mode = 'STROKE'
+
+                row = col.row(align=True)
+                row.operator("gpencil.stroke_separate", text="", icon = "SEPARATE_GP_LAYER").mode = 'LAYER'
+
+            elif column_count == 1:
+
+                col.operator("gpencil.stroke_separate", text="", icon = "SEPARATE_GP_POINTS").mode = 'POINT'
+                col.operator("gpencil.stroke_separate", text="", icon = "SEPARATE_GP_STROKES").mode = 'STROKE'
+                col.operator("gpencil.stroke_separate", text="", icon = "SEPARATE_GP_LAYER").mode = 'LAYER'
+
+
+class VIEW3D_PT_gp_stroketab_stroke(toolshelf_calculate, Panel):
+    bl_label = "Stroke"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'TOOLS'
+    bl_context = "greasepencil_edit"
+    bl_category = "Stroke"
+    bl_options = {'HIDE_BG'}
+
+    # just show when the toolshelf tabs toggle in the view menu is on.
+    @classmethod
+    def poll(cls, context):
+        view = context.space_data
+        overlay = view.overlay
+        return overlay.show_toolshelf_tabs == True
+
+    def draw(self, _context):
+        layout = self.layout
+
+        column_count = self.ts_width(layout, _context.region, scale_y= 1.75)
+
+        #text buttons
+        if column_count == 4:
+
+            col = layout.column(align=True)
+            col.scale_y = 2
+
+            col.operator("gpencil.stroke_subdivide", text="Subdivide", icon = "SUBDIVIDE_EDGES").only_selected = False
+            col.operator("gpencil.stroke_trim", text="Trim", icon = "CUT")
+
+            col.separator(factor = 0.5)
+
+            col.operator("gpencil.stroke_join", text="Join", icon = "JOIN").type = 'JOIN'
+            col.operator("gpencil.stroke_join", text="Join and Copy", icon = "JOINCOPY").type = 'JOINCOPY'
+
+            col.separator(factor = 0.5)
+
+            col.operator("gpencil.set_active_material", text="Set as Active Material", icon = "MATERIAL")
+
+            col.separator(factor = 0.5)
+
+            # Convert
+            op = col.operator("gpencil.stroke_cyclical_set", text="Close", icon = 'TOGGLE_CLOSE')
+            op.type = 'CLOSE'
+            op.geometry = True
+            col.operator("gpencil.stroke_cyclical_set", text="Toggle Cyclic", icon = 'TOGGLE_CYCLIC').type = 'TOGGLE'
+            col.operator("gpencil.stroke_flip", text="Switch Direction", icon = "FLIP")
+
+            col.separator(factor = 0.5)
+
+            col.operator("gpencil.stroke_normalize", text="Normalize Thickness", icon = "MOD_THICKNESS").mode = 'THICKNESS'
+            col.operator("gpencil.stroke_normalize", text="Normalize Opacity", icon = "MOD_OPACITY").mode = 'OPACITY'
+
+            col.separator(factor = 0.5)
+
+            col.separator(factor = 0.5)
+            col.operator("gpencil.reset_transform_fill", text="Reset Fill Transform", icon = "RESET")
+
+        # icon buttons
+        else:
+
+            col = layout.column(align=True)
+            col.scale_x = 2
+            col.scale_y = 2
+
+            if column_count == 3:
+
+                row = col.row(align=True)
+                row.operator("gpencil.stroke_subdivide", text="", icon = "SUBDIVIDE_EDGES").only_selected = False
+                row.operator("gpencil.stroke_trim", text="", icon = "CUT")
+                row.operator("gpencil.stroke_join", text="", icon = "JOIN").type = 'JOIN'
+
+                row = col.row(align=True)
+                row.operator("gpencil.stroke_join", text="", icon = "JOINCOPY").type = 'JOINCOPY'
+                row.operator("gpencil.set_active_material", text="", icon = "MATERIAL")
+                # Convert
+                op = row.operator("gpencil.stroke_cyclical_set", text="", icon = 'TOGGLE_CLOSE')
+                op.type = 'CLOSE'
+                op.geometry = True
+
+                row = col.row(align=True)
+                row.operator("gpencil.stroke_cyclical_set", text="", icon = 'TOGGLE_CYCLIC').type = 'TOGGLE'
+                row.operator("gpencil.stroke_flip", text="", icon = "FLIP")
+                row.operator("gpencil.stroke_normalize", text="", icon = "MOD_THICKNESS").mode = 'THICKNESS'
+
+                row = col.row(align=True)
+                row.operator("gpencil.reset_transform_fill", text="", icon = "RESET")
+
+            elif column_count == 2:
+
+                row = col.row(align=True)
+                row.operator("gpencil.stroke_subdivide", text="", icon = "SUBDIVIDE_EDGES").only_selected = False
+                row.operator("gpencil.stroke_trim", text="", icon = "CUT")
+
+                row = col.row(align=True)
+                row.operator("gpencil.stroke_join", text="", icon = "JOIN").type = 'JOIN'
+                row.operator("gpencil.stroke_join", text="", icon = "JOINCOPY").type = 'JOINCOPY'
+
+                row = col.row(align=True)
+                row.operator("gpencil.set_active_material", text="", icon = "MATERIAL")
+                # Convert
+                op = row.operator("gpencil.stroke_cyclical_set", text="", icon = 'TOGGLE_CLOSE')
+                op.type = 'CLOSE'
+                op.geometry = True
+
+                row = col.row(align=True)
+                row.operator("gpencil.stroke_cyclical_set", text="", icon = 'TOGGLE_CYCLIC').type = 'TOGGLE'
+                row.operator("gpencil.stroke_flip", text="", icon = "FLIP")
+
+                row = col.row(align=True)
+                row.operator("gpencil.stroke_normalize", text="", icon = "MOD_THICKNESS").mode = 'THICKNESS'
+                row.operator("gpencil.reset_transform_fill", text="", icon = "RESET")
+
+            elif column_count == 1:
+
+                col.operator("gpencil.stroke_subdivide", text="", icon = "SUBDIVIDE_EDGES").only_selected = False
+                col.operator("gpencil.stroke_trim", text="", icon = "CUT")
+
+                col.separator(factor = 0.5)
+
+                col.operator("gpencil.stroke_join", text="", icon = "JOIN").type = 'JOIN'
+                col.operator("gpencil.stroke_join", text="", icon = "JOINCOPY").type = 'JOINCOPY'
+
+                col.separator(factor = 0.5)
+
+                col.operator("gpencil.set_active_material", text="", icon = "MATERIAL")
+
+                col.separator(factor = 0.5)
+
+                # Convert
+                op = col.operator("gpencil.stroke_cyclical_set", text="", icon = 'TOGGLE_CLOSE')
+                op.type = 'CLOSE'
+                op.geometry = True
+                col.operator("gpencil.stroke_cyclical_set", text="", icon = 'TOGGLE_CYCLIC').type = 'TOGGLE'
+                col.operator("gpencil.stroke_flip", text="", icon = "FLIP")
+
+                col.separator(factor = 0.5)
+
+                col.operator("gpencil.stroke_normalize", text="", icon = "MOD_THICKNESS").mode = 'THICKNESS'
+                col.operator("gpencil.stroke_normalize", text="", icon = "MOD_OPACITY").mode = 'OPACITY'
+
+                col.separator(factor = 0.5)
+
+                col.operator("gpencil.reset_transform_fill", text="", icon = "RESET")
+
+
+class VIEW3D_PT_gp_stroketab_simplify(toolshelf_calculate, Panel):
+    bl_label = "Simplify"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'TOOLS'
+    bl_context = "greasepencil_edit"
+    bl_category = "Stroke"
+    bl_options = {'HIDE_BG', 'DEFAULT_CLOSED'}
+
+    # just show when the toolshelf tabs toggle in the view menu is on.
+    @classmethod
+    def poll(cls, context):
+        view = context.space_data
+        overlay = view.overlay
+        return overlay.show_toolshelf_tabs == True
+
+    def draw(self, _context):
+        layout = self.layout
+
+        column_count = self.ts_width(layout, _context.region, scale_y= 1.75)
+
+        #text buttons
+        if column_count == 4:
+
+            col = layout.column(align=True)
+            col.scale_y = 2
+
+            col.operator("gpencil.stroke_simplify_fixed", text="Fixed", icon = "MOD_SIMPLIFY")
+            col.operator("gpencil.stroke_simplify", text="Adaptative", icon = "SIMPLIFY_ADAPTIVE")
+            col.operator("gpencil.stroke_sample", text="Sample", icon = "SIMPLIFY_SAMPLE")
+
+        # icon buttons
+        else:
+
+            col = layout.column(align=True)
+            col.scale_x = 2
+            col.scale_y = 2
+
+            if column_count == 3:
+
+                row = col.row(align=True)
+                row.operator("gpencil.stroke_simplify_fixed", text="", icon = "MOD_SIMPLIFY")
+                row.operator("gpencil.stroke_simplify", text="", icon = "SIMPLIFY_ADAPTIVE")
+                row.operator("gpencil.stroke_sample", text="", icon = "SIMPLIFY_SAMPLE")
+
+            elif column_count == 2:
+
+                row = col.row(align=True)
+                row.operator("gpencil.stroke_simplify_fixed", text="", icon = "MOD_SIMPLIFY")
+                row.operator("gpencil.stroke_simplify", text="", icon = "SIMPLIFY_ADAPTIVE")
+
+                row = col.row(align=True)
+                row.operator("gpencil.stroke_sample", text="", icon = "SIMPLIFY_SAMPLE")
+
+            elif column_count == 1:
+
+                col.operator("gpencil.stroke_simplify_fixed", text="", icon = "MOD_SIMPLIFY")
+                col.operator("gpencil.stroke_simplify", text="", icon = "SIMPLIFY_ADAPTIVE")
+                col.operator("gpencil.stroke_sample", text="", icon = "SIMPLIFY_SAMPLE")
+
+
+class VIEW3D_PT_gp_stroketab_togglecaps(toolshelf_calculate, Panel):
+    bl_label = "Toggle Caps"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'TOOLS'
+    bl_context = "greasepencil_edit"
+    bl_category = "Stroke"
+    bl_options = {'HIDE_BG', 'DEFAULT_CLOSED'}
+
+    # just show when the toolshelf tabs toggle in the view menu is on.
+    @classmethod
+    def poll(cls, context):
+        view = context.space_data
+        overlay = view.overlay
+        return overlay.show_toolshelf_tabs == True
+
+    def draw(self, _context):
+        layout = self.layout
+
+        column_count = self.ts_width(layout, _context.region, scale_y= 1.75)
+
+        #text buttons
+        if column_count == 4:
+
+            col = layout.column(align=True)
+            col.scale_y = 2
+
+            col.operator("gpencil.stroke_caps_set", text="Both", icon = "TOGGLECAPS_BOTH").type = 'TOGGLE'
+            col.operator("gpencil.stroke_caps_set", text="Start", icon = "TOGGLECAPS_START").type = 'START'
+            col.operator("gpencil.stroke_caps_set", text="End", icon = "TOGGLECAPS_END").type = 'END'
+            col.operator("gpencil.stroke_caps_set", text="Default", icon = "TOGGLECAPS_DEFAULT").type = 'DEFAULT'
+
+        # icon buttons
+        else:
+
+            col = layout.column(align=True)
+            col.scale_x = 2
+            col.scale_y = 2
+
+            if column_count == 3:
+
+                row = col.row(align=True)
+                row.operator("gpencil.stroke_caps_set", text="", icon = "TOGGLECAPS_BOTH").type = 'TOGGLE'
+                row.operator("gpencil.stroke_caps_set", text="", icon = "TOGGLECAPS_START").type = 'START'
+                row.operator("gpencil.stroke_caps_set", text="", icon = "TOGGLECAPS_END").type = 'END'
+
+                row = col.row(align=True)
+                row.operator("gpencil.stroke_caps_set", text="", icon = "TOGGLECAPS_DEFAULT").type = 'DEFAULT'
+
+            elif column_count == 2:
+
+                row = col.row(align=True)
+                row.operator("gpencil.stroke_caps_set", text="", icon = "TOGGLECAPS_BOTH").type = 'TOGGLE'
+                row.operator("gpencil.stroke_caps_set", text="", icon = "TOGGLECAPS_START").type = 'START'
+
+                row = col.row(align=True)
+                row.operator("gpencil.stroke_caps_set", text="", icon = "TOGGLECAPS_END").type = 'END'
+                row.operator("gpencil.stroke_caps_set", text="", icon = "TOGGLECAPS_DEFAULT").type = 'DEFAULT'
+
+            elif column_count == 1:
+
+                col.operator("gpencil.stroke_caps_set", text="", icon = "TOGGLECAPS_BOTH").type = 'TOGGLE'
+                col.operator("gpencil.stroke_caps_set", text="", icon = "TOGGLECAPS_START").type = 'START'
+                col.operator("gpencil.stroke_caps_set", text="", icon = "TOGGLECAPS_END").type = 'END'
+                col.operator("gpencil.stroke_caps_set", text="", icon = "TOGGLECAPS_DEFAULT").type = 'DEFAULT'
+
+
+class VIEW3D_PT_gp_stroketab_reproject(toolshelf_calculate, Panel):
+    bl_label = "Reproject Strokes"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'TOOLS'
+    bl_context = "greasepencil_edit"
+    bl_category = "Stroke"
+    bl_options = {'HIDE_BG', 'DEFAULT_CLOSED'}
+
+    # just show when the toolshelf tabs toggle in the view menu is on.
+    @classmethod
+    def poll(cls, context):
+        view = context.space_data
+        overlay = view.overlay
+        return overlay.show_toolshelf_tabs == True
+
+    def draw(self, _context):
+        layout = self.layout
+
+        column_count = self.ts_width(layout, _context.region, scale_y= 1.75)
+
+        #text buttons
+        if column_count == 4:
+
+            col = layout.column(align=True)
+            col.scale_y = 2
+
+            col.operator("gpencil.reproject", text="Front", icon = "VIEW_FRONT").type = 'FRONT'
+            col.operator("gpencil.reproject", text="Side", icon = "VIEW_LEFT").type = 'SIDE'
+            col.operator("gpencil.reproject", text="Top", icon = "VIEW_TOP").type = 'TOP'
+            col.operator("gpencil.reproject", text="View", icon = "VIEW").type = 'VIEW'
+            col.operator("gpencil.reproject", text="Surface", icon = "REPROJECT").type = 'SURFACE'
+            col.operator("gpencil.reproject", text="Cursor", icon = "CURSOR").type = 'CURSOR'
+
+        # icon buttons
+        else:
+
+            col = layout.column(align=True)
+            col.scale_x = 2
+            col.scale_y = 2
+
+            if column_count == 3:
+
+                row = col.row(align=True)
+                row.operator("gpencil.reproject", text="", icon = "VIEW_FRONT").type = 'FRONT'
+                row.operator("gpencil.reproject", text="", icon = "VIEW_LEFT").type = 'SIDE'
+                row.operator("gpencil.reproject", text="", icon = "VIEW_TOP").type = 'TOP'
+
+                row = col.row(align=True)
+                row.operator("gpencil.reproject", text="", icon = "VIEW").type = 'VIEW'
+                row.operator("gpencil.reproject", text="", icon = "REPROJECT").type = 'SURFACE'
+                row.operator("gpencil.reproject", text="", icon = "CURSOR").type = 'CURSOR'
+
+            elif column_count == 2:
+
+                row = col.row(align=True)
+                row.operator("gpencil.reproject", text="", icon = "VIEW_FRONT").type = 'FRONT'
+                row.operator("gpencil.reproject", text="", icon = "VIEW_LEFT").type = 'SIDE'
+
+                row = col.row(align=True)
+                row.operator("gpencil.reproject", text="", icon = "VIEW_TOP").type = 'TOP'
+                row.operator("gpencil.reproject", text="", icon = "VIEW").type = 'VIEW'
+
+                row = col.row(align=True)
+                row.operator("gpencil.reproject", text="", icon = "REPROJECT").type = 'SURFACE'
+                row.operator("gpencil.reproject", text="", icon = "CURSOR").type = 'CURSOR'
+
+            elif column_count == 1:
+
+                col.operator("gpencil.reproject", text="", icon = "VIEW_FRONT").type = 'FRONT'
+                col.operator("gpencil.reproject", text="", icon = "VIEW_LEFT").type = 'SIDE'
+                col.operator("gpencil.reproject", text="", icon = "VIEW_TOP").type = 'TOP'
+                col.operator("gpencil.reproject", text="", icon = "VIEW").type = 'VIEW'
+                col.operator("gpencil.reproject", text="", icon = "REPROJECT").type = 'SURFACE'
+                col.operator("gpencil.reproject", text="", icon = "CURSOR").type = 'CURSOR'
+
+
+class VIEW3D_PT_gp_pointtab_point(toolshelf_calculate, Panel):
+    bl_label = "Point"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'TOOLS'
+    bl_context = "greasepencil_edit"
+    bl_category = "Point"
+    bl_options = {'HIDE_BG'}
+
+    # just show when the toolshelf tabs toggle in the view menu is on.
+    @classmethod
+    def poll(cls, context):
+        view = context.space_data
+        overlay = view.overlay
+        return overlay.show_toolshelf_tabs == True
+
+    def draw(self, _context):
+        layout = self.layout
+
+        column_count = self.ts_width(layout, _context.region, scale_y= 1.75)
+
+        #text buttons
+        if column_count == 4:
+
+            col = layout.column(align=True)
+            col.scale_y = 2
+
+            col.operator("gpencil.extrude_move", text="Extrude", icon = "EXTRUDE_REGION")
+            col.operator("gpencil.stroke_smooth", text="Smooth", icon = "PARTICLEBRUSH_SMOOTH").only_selected = True
+            col.operator("gpencil.stroke_merge", text="Merge", icon = "MERGE")
+
+        # icon buttons
+        else:
+
+            col = layout.column(align=True)
+            col.scale_x = 2
+            col.scale_y = 2
+
+            if column_count == 3:
+
+                row = col.row(align=True)
+                row.operator("gpencil.extrude_move", text="", icon = "EXTRUDE_REGION")
+                row.operator("gpencil.stroke_smooth", text="", icon = "PARTICLEBRUSH_SMOOTH").only_selected = True
+                row.operator("gpencil.stroke_merge", text="", icon = "MERGE")
+
+            elif column_count == 2:
+
+                row = col.row(align=True)
+                row.operator("gpencil.extrude_move", text="", icon = "EXTRUDE_REGION")
+                row.operator("gpencil.stroke_smooth", text="", icon = "PARTICLEBRUSH_SMOOTH").only_selected = True
+
+                row = col.row(align=True)
+                row.operator("gpencil.stroke_merge", text="", icon = "MERGE")
+
+            elif column_count == 1:
+
+                col.operator("gpencil.extrude_move", text="", icon = "EXTRUDE_REGION")
+                col.operator("gpencil.stroke_smooth", text="", icon = "PARTICLEBRUSH_SMOOTH").only_selected = True
+                col.operator("gpencil.stroke_merge", text="", icon = "MERGE")
+
+
+class VIEW3D_PT_gp_weightstab_weights(toolshelf_calculate, Panel):
+    bl_label = "Weights"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'TOOLS'
+    bl_context = "greasepencil_weight"
+    bl_category = "Weights"
+    bl_options = {'HIDE_BG'}
+
+    # just show when the toolshelf tabs toggle in the view menu is on.
+    @classmethod
+    def poll(cls, context):
+        view = context.space_data
+        overlay = view.overlay
+        return overlay.show_toolshelf_tabs == True
+
+    def draw(self, _context):
+        layout = self.layout
+
+        column_count = self.ts_width(layout, _context.region, scale_y= 1.75)
+
+        #text buttons
+        if column_count == 4:
+
+            col = layout.column(align=True)
+            col.scale_y = 2
+
+            col.operator("gpencil.vertex_group_normalize_all", text="Normalize All", icon = "WEIGHT_NORMALIZE_ALL")
+            col.operator("gpencil.vertex_group_normalize", text="Normalize", icon = "WEIGHT_NORMALIZE")
+
+            col.separator(factor = 0.5)
+
+            col.operator("gpencil.vertex_group_invert", text="Invert", icon='WEIGHT_INVERT')
+            col.operator("gpencil.vertex_group_smooth", text="Smooth", icon='WEIGHT_SMOOTH')
+
+        # icon buttons
+        else:
+
+            col = layout.column(align=True)
+            col.scale_x = 2
+            col.scale_y = 2
+
+            if column_count == 3:
+
+                row = col.row(align=True)
+                row.operator("gpencil.vertex_group_normalize_all", text="", icon = "WEIGHT_NORMALIZE_ALL")
+                row.operator("gpencil.vertex_group_normalize", text="", icon = "WEIGHT_NORMALIZE")
+                row.operator("gpencil.vertex_group_invert", text="", icon='WEIGHT_INVERT')
+
+                row = col.row(align=True)
+                row.operator("gpencil.vertex_group_smooth", text="", icon='WEIGHT_SMOOTH')
+
+            elif column_count == 2:
+
+                row = col.row(align=True)
+                row.operator("gpencil.vertex_group_normalize_all", text="", icon = "WEIGHT_NORMALIZE_ALL")
+                row.operator("gpencil.vertex_group_normalize", text="", icon = "WEIGHT_NORMALIZE")
+
+                row = col.row(align=True)
+                row.operator("gpencil.vertex_group_invert", text="", icon='WEIGHT_INVERT')
+                row.operator("gpencil.vertex_group_smooth", text="", icon='WEIGHT_SMOOTH')
+
+            elif column_count == 1:
+
+                col.operator("gpencil.vertex_group_normalize_all", text="", icon = "WEIGHT_NORMALIZE_ALL")
+                col.operator("gpencil.vertex_group_normalize", text="", icon = "WEIGHT_NORMALIZE")
+
+                col.separator(factor = 0.5)
+
+                col.operator("gpencil.vertex_group_invert", text="", icon='WEIGHT_INVERT')
+                col.operator("gpencil.vertex_group_smooth", text="", icon='WEIGHT_SMOOTH')
+
+
+class VIEW3D_PT_gp_weightstab_generate_weights(toolshelf_calculate, Panel):
+    bl_label = "Generate Weights"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'TOOLS'
+    bl_context = "greasepencil_weight"
+    bl_category = "Weights"
+    bl_options = {'HIDE_BG'}
+
+    # just show when the toolshelf tabs toggle in the view menu is on.
+    @classmethod
+    def poll(cls, context):
+        view = context.space_data
+        overlay = view.overlay
+        return overlay.show_toolshelf_tabs == True
+
+    def draw(self, _context):
+        layout = self.layout
+
+        column_count = self.ts_width(layout, _context.region, scale_y= 1.75)
+
+        #text buttons
+        if column_count == 4:
+
+            col = layout.column(align=True)
+            col.scale_y = 2
+
+            col.operator("gpencil.generate_weights", text="With Empty Groups", icon = "PARTICLEBRUSH_WEIGHT").mode = 'NAME'
+            col.operator("gpencil.generate_weights", text="With Automatic Weights", icon = "PARTICLEBRUSH_WEIGHT").mode = 'AUTO'
+
+
+        # icon buttons
+        else:
+
+            col = layout.column(align=True)
+            col.scale_x = 2
+            col.scale_y = 2
+
+            if column_count == 3:
+
+                row = col.row(align=True)
+                row.operator("gpencil.generate_weights", text="", icon = "PARTICLEBRUSH_WEIGHT").mode = 'NAME'
+                row.operator("gpencil.generate_weights", text="", icon = "PARTICLEBRUSH_WEIGHT").mode = 'AUTO'
+
+            elif column_count == 2:
+
+                row = col.row(align=True)
+                row.operator("gpencil.generate_weights", text="", icon = "PARTICLEBRUSH_WEIGHT").mode = 'NAME'
+                row.operator("gpencil.generate_weights", text="", icon = "PARTICLEBRUSH_WEIGHT").mode = 'AUTO'
+
+            elif column_count == 1:
+
+                col.operator("gpencil.generate_weights", text="", icon = "PARTICLEBRUSH_WEIGHT").mode = 'NAME'
+                col.operator("gpencil.generate_weights", text="", icon = "PARTICLEBRUSH_WEIGHT").mode = 'AUTO'
+
+
+class VIEW3D_PT_gp_painttab_paint(toolshelf_calculate, Panel):
+    bl_label = "Paint"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'TOOLS'
+    bl_context = "greasepencil_vertex"
+    bl_category = "Paint"
+    bl_options = {'HIDE_BG'}
+
+    # just show when the toolshelf tabs toggle in the view menu is on.
+    @classmethod
+    def poll(cls, context):
+        view = context.space_data
+        overlay = view.overlay
+        return overlay.show_toolshelf_tabs == True
+
+    def draw(self, _context):
+        layout = self.layout
+
+        column_count = self.ts_width(layout, _context.region, scale_y= 1.75)
+
+        #text buttons
+        if column_count == 4:
+
+            col = layout.column(align=True)
+            col.scale_y = 2
+
+            col.operator("gpencil.vertex_color_set", text="Set Vertex Colors", icon = "NODE_VERTEX_COLOR")
+            col.operator("gpencil.stroke_reset_vertex_color", icon = "RESET")
+
+            col.separator(factor = 0.5)
+
+            col.operator("gpencil.vertex_color_invert", text="Invert", icon = "NODE_INVERT")
+            col.operator("gpencil.vertex_color_levels", text="Levels", icon = "LEVELS")
+            col.operator("gpencil.vertex_color_hsv", text="Hue Saturation Value", icon = "HUESATVAL")
+            col.operator("gpencil.vertex_color_brightness_contrast", text="Bright/Contrast", icon = "BRIGHTNESS_CONTRAST")
+
+
+        # icon buttons
+        else:
+
+            col = layout.column(align=True)
+            col.scale_x = 2
+            col.scale_y = 2
+
+            if column_count == 3:
+
+                row = col.row(align=True)
+                row.operator("gpencil.vertex_color_set", text="", icon = "NODE_VERTEX_COLOR")
+                row.operator("gpencil.stroke_reset_vertex_color", text="", icon = "RESET")
+                row.operator("gpencil.vertex_color_invert", text="", icon = "NODE_INVERT")
+
+                row = col.row(align=True)
+                row.operator("gpencil.vertex_color_levels", text="", icon = "LEVELS")
+                row.operator("gpencil.vertex_color_hsv", text="", icon = "HUESATVAL")
+                row.operator("gpencil.vertex_color_brightness_contrast", text="", icon = "BRIGHTNESS_CONTRAST")
+
+            elif column_count == 2:
+
+                row = col.row(align=True)
+                row.operator("gpencil.vertex_color_set", text="", icon = "NODE_VERTEX_COLOR")
+                row.operator("gpencil.stroke_reset_vertex_color", text="", icon = "RESET")
+
+                row = col.row(align=True)
+                row.operator("gpencil.vertex_color_invert", text="", icon = "NODE_INVERT")
+                row.operator("gpencil.vertex_color_levels", text="", icon = "LEVELS")
+
+                row = col.row(align=True)
+                row.operator("gpencil.vertex_color_hsv", text="", icon = "HUESATVAL")
+                row.operator("gpencil.vertex_color_brightness_contrast", text="", icon = "BRIGHTNESS_CONTRAST")
+
+            elif column_count == 1:
+
+                col.operator("gpencil.vertex_color_set", text="", icon = "NODE_VERTEX_COLOR")
+                col.operator("gpencil.stroke_reset_vertex_color", text="", icon = "RESET")
+
+                col.separator(factor = 0.5)
+
+                col.operator("gpencil.vertex_color_invert", text="", icon = "NODE_INVERT")
+                col.operator("gpencil.vertex_color_levels", text="", icon = "LEVELS")
+                col.operator("gpencil.vertex_color_hsv", text="", icon = "HUESATVAL")
+                col.operator("gpencil.vertex_color_brightness_contrast", text="", icon = "BRIGHTNESS_CONTRAST")
+
+
+class VIEW3D_PT_gp_armaturetab_armature(toolshelf_calculate, Panel):
+    bl_label = "Armature"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'TOOLS'
+    bl_context = "armature_edit"
+    bl_category = "Armature"
+    bl_options = {'HIDE_BG'}
+
+    # just show when the toolshelf tabs toggle in the view menu is on.
+    @classmethod
+    def poll(cls, context):
+        view = context.space_data
+        overlay = view.overlay
+        return overlay.show_toolshelf_tabs == True
+
+    def draw(self, _context):
+        layout = self.layout
+
+        edit_object = _context.edit_object
+        arm = edit_object.data
+
+        column_count = self.ts_width(layout, _context.region, scale_y= 1.75)
+
+        #text buttons
+        if column_count == 4:
+
+            col = layout.column(align=True)
+            col.scale_y = 2
+
+            col.operator("transform.transform", text="Set Bone Roll", icon = "SET_ROLL").mode = 'BONE_ROLL'
+            col.operator("armature.roll_clear", text="Clear Bone Roll", icon = "CLEAR_ROLL")
+
+            col.separator(factor = 0.5)
+
+            col.operator("armature.extrude_move", icon = 'EXTRUDE_REGION')
+
+            if arm.use_mirror_x:
+                col.operator("armature.extrude_forked", icon = "EXTRUDE_REGION")
+
+            col.operator("armature.duplicate_move", icon = "DUPLICATE")
+            col.operator("armature.fill", icon = "FILLBETWEEN")
+
+            col.separator(factor = 0.5)
+
+            col.operator("armature.split", icon = "SPLIT")
+            col.operator("armature.separate", icon = "SEPARATE")
+            col.operator("armature.symmetrize", icon = "SYMMETRIZE")
+
+            col.separator(factor = 0.5)
+
+            col.operator("armature.subdivide", text="Subdivide", icon = 'SUBDIVIDE_EDGES')
+            col.operator("armature.switch_direction", text="Switch Direction", icon = "SWITCH_DIRECTION")
+
+            col.separator(factor = 0.5)
+
+            col.operator_context = 'INVOKE_REGION_WIN'
+            col.operator("armature.armature_layers", icon = "LAYER")
+            col.operator("armature.bone_layers", icon = "BONE_LAYER")
+
+            col.separator(factor = 0.5)
+
+            col.operator_context = 'EXEC_REGION_WIN'
+            col.operator("armature.parent_set", text="Make Parent", icon='PARENT_SET')
+            col.operator("armature.parent_clear", text="Clear Parent", icon='PARENT_CLEAR')
+
+
+        # icon buttons
+        else:
+
+            col = layout.column(align=True)
+            col.scale_x = 2
+            col.scale_y = 2
+
+            if column_count == 3:
+
+                row = col.row(align=True)
+                row.operator("transform.transform", text="", icon = "SET_ROLL").mode = 'BONE_ROLL'
+                row.operator("armature.roll_clear", text="", icon = "CLEAR_ROLL")
+                row.operator("armature.extrude_move", text="", icon = 'EXTRUDE_REGION')
+
+                row = col.row(align=True)
+                if arm.use_mirror_x:
+                    row.operator("armature.extrude_forked", text="", icon = "EXTRUDE_REGION")
+                row.operator("armature.duplicate_move", text="", icon = "DUPLICATE")
+                row.operator("armature.fill", text="", icon = "FILLBETWEEN")
+
+                row = col.row(align=True)
+                row.operator("armature.split", text="", icon = "SPLIT")
+                row.operator("armature.separate", text="", icon = "SEPARATE")
+                row.operator("armature.symmetrize", text="", icon = "SYMMETRIZE")
+
+                row = col.row(align=True)
+                row.operator("armature.subdivide", text="", icon = 'SUBDIVIDE_EDGES')
+                row.operator("armature.switch_direction", text="", icon = "SWITCH_DIRECTION")
+                row.operator_context = 'INVOKE_REGION_WIN'
+                row.operator("armature.armature_layers", text="", icon = "LAYER")
+
+                row = col.row(align=True)
+                row.operator("armature.bone_layers", text="", icon = "BONE_LAYER")
+                row.operator_context = 'EXEC_REGION_WIN'
+                row.operator("armature.parent_set", text="", icon='PARENT_SET')
+                row.operator("armature.parent_clear", text="", icon='PARENT_CLEAR')
+
+            elif column_count == 2:
+
+                row = col.row(align=True)
+                row.operator("transform.transform", text="", icon = "SET_ROLL").mode = 'BONE_ROLL'
+                row.operator("armature.roll_clear", text="", icon = "CLEAR_ROLL")
+
+                row = col.row(align=True)
+                row.operator("armature.extrude_move", text="", icon = 'EXTRUDE_REGION')
+                if arm.use_mirror_x:
+                    row.operator("armature.extrude_forked", text="", icon = "EXTRUDE_REGION")
+
+                row = col.row(align=True)
+                row.operator("armature.duplicate_move", text="", icon = "DUPLICATE")
+                row.operator("armature.fill", text="", icon = "FILLBETWEEN")
+
+                row = col.row(align=True)
+                row.operator("armature.split", text="", icon = "SPLIT")
+                row.operator("armature.separate", text="", icon = "SEPARATE")
+
+                row = col.row(align=True)
+                row.operator("armature.symmetrize", text="", icon = "SYMMETRIZE")
+                row.operator("armature.subdivide", text="", icon = 'SUBDIVIDE_EDGES')
+
+                row = col.row(align=True)
+                row.operator("armature.switch_direction", text="", icon = "SWITCH_DIRECTION")
+                row.operator_context = 'INVOKE_REGION_WIN'
+                row.operator("armature.armature_layers", text="", icon = "LAYER")
+
+                row = col.row(align=True)
+                row.operator("armature.bone_layers", text="", icon = "BONE_LAYER")
+                row.operator_context = 'EXEC_REGION_WIN'
+                row.operator("armature.parent_set", text="", icon='PARENT_SET')
+
+                row = col.row(align=True)
+                row.operator("armature.parent_clear", text="", icon='PARENT_CLEAR')
+
+            elif column_count == 1:
+
+                col.operator("transform.transform", text="", icon = "SET_ROLL").mode = 'BONE_ROLL'
+                col.operator("armature.roll_clear", text="", icon = "CLEAR_ROLL")
+
+                col.separator(factor = 0.5)
+
+                col.operator("armature.extrude_move", text="", icon = 'EXTRUDE_REGION')
+
+                if arm.use_mirror_x:
+                    col.operator("armature.extrude_forked", text="", icon = "EXTRUDE_REGION")
+
+                col.operator("armature.duplicate_move", text="", icon = "DUPLICATE")
+                col.operator("armature.fill", text="", icon = "FILLBETWEEN")
+
+                col.separator(factor = 0.5)
+
+                col.operator("armature.split", text="", icon = "SPLIT")
+                col.operator("armature.separate", text="", icon = "SEPARATE")
+                col.operator("armature.symmetrize", text="", icon = "SYMMETRIZE")
+
+                col.separator(factor = 0.5)
+
+                col.operator("armature.subdivide", text="", icon = 'SUBDIVIDE_EDGES')
+                col.operator("armature.switch_direction", text="", icon = "SWITCH_DIRECTION")
+
+                col.separator(factor = 0.5)
+
+                col.operator_context = 'INVOKE_REGION_WIN'
+                col.operator("armature.armature_layers", text="", icon = "LAYER")
+                col.operator("armature.bone_layers", text="", icon = "BONE_LAYER")
+
+                col.separator(factor = 0.5)
+
+                col.operator_context = 'EXEC_REGION_WIN'
+                col.operator("armature.parent_set", text="", icon='PARENT_SET')
+                col.operator("armature.parent_clear", text="", icon='PARENT_CLEAR')
+
+
+class VIEW3D_PT_gp_armaturetab_recalcboneroll(toolshelf_calculate, Panel):
+    bl_label = "Recalculate Bone Roll"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'TOOLS'
+    bl_context = "armature_edit"
+    bl_category = "Armature"
+    bl_options = {'HIDE_BG', 'DEFAULT_CLOSED'}
+
+    # just show when the toolshelf tabs toggle in the view menu is on.
+    @classmethod
+    def poll(cls, context):
+        view = context.space_data
+        overlay = view.overlay
+        return overlay.show_toolshelf_tabs == True
+
+    def draw(self, _context):
+        layout = self.layout
+
+        edit_object = _context.edit_object
+        arm = edit_object.data
+
+        column_count = self.ts_width(layout, _context.region, scale_y= 1.75)
+
+        #text buttons
+        if column_count == 4:
+
+            col = layout.column(align=True)
+            col.scale_y = 2
+
+            col.label(text="- Positive: -")
+            col.operator("armature.calculate_roll", text= "Local + X Tangent", icon = "ROLL_X_TANG_POS").type = 'POS_X'
+            col.operator("armature.calculate_roll", text= "Local + Z Tangent", icon = "ROLL_Z_TANG_POS").type = 'POS_Z'
+            col.operator("armature.calculate_roll", text= "Global + X Axis", icon = "ROLL_X_POS").type = 'GLOBAL_POS_X'
+            col.operator("armature.calculate_roll", text= "Global + Y Axis", icon = "ROLL_Y_POS").type = 'GLOBAL_POS_Y'
+            col.operator("armature.calculate_roll", text= "Global + Z Axis", icon = "ROLL_Z_POS").type = 'GLOBAL_POS_Z'
+
+            col.separator(factor = 0.5)
+
+            col.label(text="- Negative: -")
+            col.operator("armature.calculate_roll", text= "Local - X Tangent", icon = "ROLL_X_TANG_NEG").type = 'NEG_X'
+            col.operator("armature.calculate_roll", text= "Local - Z Tangent", icon = "ROLL_Z_TANG_NEG").type = 'NEG_Z'
+            col.operator("armature.calculate_roll", text= "Global - X Axis", icon = "ROLL_X_NEG").type = 'GLOBAL_NEG_X'
+            col.operator("armature.calculate_roll", text= "Global - Y Axis", icon = "ROLL_Y_NEG").type = 'GLOBAL_NEG_Y'
+            col.operator("armature.calculate_roll", text= "Global - Z Axis", icon = "ROLL_Z_NEG").type = 'GLOBAL_NEG_Z'
+
+            col.separator(factor = 0.5)
+
+            col.label(text="- Other: -")
+            col.operator("armature.calculate_roll", text= "Active Bone", icon = "BONE_DATA").type = 'ACTIVE'
+            col.operator("armature.calculate_roll", text= "View Axis", icon = "MANIPUL").type = 'VIEW'
+            col.operator("armature.calculate_roll", text= "Cursor", icon = "CURSOR").type = 'CURSOR'
+
+
+        # icon buttons
+        else:
+
+            col = layout.column(align=True)
+            col.scale_x = 2
+            col.scale_y = 2
+
+            if column_count == 3:
+
+                col.label(text="- Positive: -")
+                row = col.row(align=True)
+                row.operator("armature.calculate_roll", text= "", icon = "ROLL_X_TANG_POS").type = 'POS_X'
+                row.operator("armature.calculate_roll", text= "", icon = "ROLL_Z_TANG_POS").type = 'POS_Z'
+                row.operator("armature.calculate_roll", text= "", icon = "ROLL_X_POS").type = 'GLOBAL_POS_X'
+
+                row = col.row(align=True)
+                row.operator("armature.calculate_roll", text= "", icon = "ROLL_Y_POS").type = 'GLOBAL_POS_Y'
+                row.operator("armature.calculate_roll", text= "", icon = "ROLL_Z_POS").type = 'GLOBAL_POS_Z'
+
+                col = layout.column(align=True)
+                col.scale_x = 2
+                col.scale_y = 2
+
+                col.label(text="- Negative: -")
+                row = col.row(align=True)
+                row.operator("armature.calculate_roll", text= "", icon = "ROLL_X_TANG_NEG").type = 'NEG_X'
+                row.operator("armature.calculate_roll", text= "", icon = "ROLL_Z_TANG_NEG").type = 'NEG_Z'
+                row.operator("armature.calculate_roll", text= "", icon = "ROLL_X_NEG").type = 'GLOBAL_NEG_X'
+
+                row = col.row(align=True)
+                row.operator("armature.calculate_roll", text= "", icon = "ROLL_Y_NEG").type = 'GLOBAL_NEG_Y'
+                row.operator("armature.calculate_roll", text= "", icon = "ROLL_Z_NEG").type = 'GLOBAL_NEG_Z'
+
+                col = layout.column(align=True)
+                col.scale_x = 2
+                col.scale_y = 2
+
+                col.label(text="- Other: -")
+                row = col.row(align=True)
+                row.operator("armature.calculate_roll", text= "", icon = "BONE_DATA").type = 'ACTIVE'
+                row.operator("armature.calculate_roll", text= "", icon = "MANIPUL").type = 'VIEW'
+                row.operator("armature.calculate_roll", text= "", icon = "CURSOR").type = 'CURSOR'
+
+            elif column_count == 2:
+
+                col.label(text="- Positive: -")
+                row = col.row(align=True)
+                row.operator("armature.calculate_roll", text= "", icon = "ROLL_X_TANG_POS").type = 'POS_X'
+                row.operator("armature.calculate_roll", text= "", icon = "ROLL_Z_TANG_POS").type = 'POS_Z'
+
+                row = col.row(align=True)
+                row.operator("armature.calculate_roll", text= "", icon = "ROLL_X_POS").type = 'GLOBAL_POS_X'
+                row.operator("armature.calculate_roll", text= "", icon = "ROLL_Y_POS").type = 'GLOBAL_POS_Y'
+
+                row = col.row(align=True)
+                row.operator("armature.calculate_roll", text= "", icon = "ROLL_Z_POS").type = 'GLOBAL_POS_Z'
+
+                col = layout.column(align=True)
+                col.scale_x = 2
+                col.scale_y = 2
+
+                col.label(text="- Negative: -")
+                row = col.row(align=True)
+                row.operator("armature.calculate_roll", text= "", icon = "ROLL_X_TANG_NEG").type = 'NEG_X'
+                row.operator("armature.calculate_roll", text= "", icon = "ROLL_Z_TANG_NEG").type = 'NEG_Z'
+
+                row = col.row(align=True)
+                row.operator("armature.calculate_roll", text= "", icon = "ROLL_X_NEG").type = 'GLOBAL_NEG_X'
+                row.operator("armature.calculate_roll", text= "", icon = "ROLL_Y_NEG").type = 'GLOBAL_NEG_Y'
+
+                row = col.row(align=True)
+                row.operator("armature.calculate_roll", text= "", icon = "ROLL_Z_NEG").type = 'GLOBAL_NEG_Z'
+
+                col = layout.column(align=True)
+                col.scale_x = 2
+                col.scale_y = 2
+
+                col.label(text="- Other: -")
+                row = col.row(align=True)
+                row.operator("armature.calculate_roll", text= "", icon = "BONE_DATA").type = 'ACTIVE'
+                row.operator("armature.calculate_roll", text= "", icon = "MANIPUL").type = 'VIEW'
+
+                row = col.row(align=True)
+                row.operator("armature.calculate_roll", text= "", icon = "CURSOR").type = 'CURSOR'
+
+            elif column_count == 1:
+
+                col.label(text="- Positive: -")
+                col.operator("armature.calculate_roll", text= "", icon = "ROLL_X_TANG_POS").type = 'POS_X'
+                col.operator("armature.calculate_roll", text= "", icon = "ROLL_Z_TANG_POS").type = 'POS_Z'
+                col.operator("armature.calculate_roll", text= "", icon = "ROLL_X_POS").type = 'GLOBAL_POS_X'
+                col.operator("armature.calculate_roll", text= "", icon = "ROLL_Y_POS").type = 'GLOBAL_POS_Y'
+                col.operator("armature.calculate_roll", text= "", icon = "ROLL_Z_POS").type = 'GLOBAL_POS_Z'
+
+                col.separator(factor = 0.5)
+
+                col.label(text="- Negative: -")
+                col.operator("armature.calculate_roll", text= "", icon = "ROLL_X_TANG_NEG").type = 'NEG_X'
+                col.operator("armature.calculate_roll", text= "", icon = "ROLL_Z_TANG_NEG").type = 'NEG_Z'
+                col.operator("armature.calculate_roll", text= "", icon = "ROLL_X_NEG").type = 'GLOBAL_NEG_X'
+                col.operator("armature.calculate_roll", text= "", icon = "ROLL_Y_NEG").type = 'GLOBAL_NEG_Y'
+                col.operator("armature.calculate_roll", text= "", icon = "ROLL_Z_NEG").type = 'GLOBAL_NEG_Z'
+
+                col.separator(factor = 0.5)
+
+                col.label(text="- Other: -")
+                col.operator("armature.calculate_roll", text= "", icon = "BONE_DATA").type = 'ACTIVE'
+                col.operator("armature.calculate_roll", text= "", icon = "MANIPUL").type = 'VIEW'
+                col.operator("armature.calculate_roll", text= "", icon = "CURSOR").type = 'CURSOR'
+
+
+class VIEW3D_PT_gp_posetab_pose(toolshelf_calculate, Panel):
+    bl_label = "Pose"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'TOOLS'
+    bl_context = "posemode"
+    bl_category = "Pose"
+    bl_options = {'HIDE_BG', 'DEFAULT_CLOSED'}
+
+    # just show when the toolshelf tabs toggle in the view menu is on.
+    @classmethod
+    def poll(cls, context):
+        view = context.space_data
+        overlay = view.overlay
+        return overlay.show_toolshelf_tabs == True
+
+    def draw(self, _context):
+        layout = self.layout
+
+        column_count = self.ts_width(layout, _context.region, scale_y= 1.75)
+
+        #text buttons
+        if column_count == 4:
+
+            col = layout.column(align=True)
+            col.scale_y = 2
+
+            col.operator("pose.quaternions_flip", icon = "FLIP")
+
+            col.separator( factor = 0.5)
+
+            col.operator_context = 'INVOKE_AREA'
+            col.operator("armature.armature_layers", text="Change Armature Layers", icon = "LAYER")
+            col.operator("pose.bone_layers", text="Change Bone Layers", icon = "LAYER")
+
+        # icon buttons
+        else:
+
+            col = layout.column(align=True)
+            col.scale_x = 2
+            col.scale_y = 2
+
+            if column_count == 3:
+
+                row = col.row(align=True)
+                row.operator("pose.quaternions_flip", text="", icon = "FLIP")
+                row.operator_context = 'INVOKE_AREA'
+                row.operator("armature.armature_layers", text="", icon = "LAYER")
+                row.operator("pose.bone_layers", text="", icon = "LAYER")
+
+            elif column_count == 2:
+
+                row = col.row(align=True)
+                row.operator("pose.quaternions_flip", text="", icon = "FLIP")
+                row.operator_context = 'INVOKE_AREA'
+                row.operator("armature.armature_layers", text="", icon = "LAYER")
+
+                row = col.row(align=True)
+                row.operator("pose.bone_layers", text="", icon = "LAYER")
+
+            elif column_count == 1:
+
+                col.operator("pose.quaternions_flip", text="", icon = "FLIP")
+
+                col.separator( factor = 0.5)
+
+                col.operator_context = 'INVOKE_AREA'
+                col.operator("armature.armature_layers", text="", icon = "LAYER")
+                col.operator("pose.bone_layers", text="", icon = "LAYER")
+
+
+class VIEW3D_PT_gp_posetab_cleartransform(toolshelf_calculate, Panel):
+    bl_label = "Clear Transform"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'TOOLS'
+    bl_context = "posemode"
+    bl_category = "Pose"
+    bl_options = {'HIDE_BG', 'DEFAULT_CLOSED'}
+
+    # just show when the toolshelf tabs toggle in the view menu is on.
+    @classmethod
+    def poll(cls, context):
+        view = context.space_data
+        overlay = view.overlay
+        return overlay.show_toolshelf_tabs == True
+
+    def draw(self, _context):
+        layout = self.layout
+
+        column_count = self.ts_width(layout, _context.region, scale_y= 1.75)
+
+        #text buttons
+        if column_count == 4:
+
+            col = layout.column(align=True)
+            col.scale_y = 2
+
+            col.operator("pose.transforms_clear", text="All", icon = "CLEAR")
+            col.operator("pose.user_transforms_clear", icon = "NODE_TRANSFORM_CLEAR")
+
+            col.separator(factor = 0.5)
+
+            col.operator("pose.loc_clear", text="Location", icon = "CLEARMOVE")
+            col.operator("pose.rot_clear", text="Rotation", icon = "CLEARROTATE")
+            col.operator("pose.scale_clear", text="Scale", icon = "CLEARSCALE")
+
+            col.separator(factor = 0.5)
+
+            col.operator("pose.user_transforms_clear", text="Reset Unkeyed", icon = "RESET")
+
+        # icon buttons
+        else:
+
+            col = layout.column(align=True)
+            col.scale_x = 2
+            col.scale_y = 2
+
+            if column_count == 3:
+
+                row = col.row(align=True)
+                row.operator("pose.transforms_clear", text="", icon = "CLEAR")
+                row.operator("pose.user_transforms_clear", text="", icon = "NODE_TRANSFORM_CLEAR")
+                row.operator("pose.loc_clear", text="", icon = "CLEARMOVE")
+
+                row = col.row(align=True)
+                row.operator("pose.rot_clear", text="", icon = "CLEARROTATE")
+                row.operator("pose.scale_clear", text="", icon = "CLEARSCALE")
+                row.operator("pose.user_transforms_clear", text="", icon = "RESET")
+
+            elif column_count == 2:
+
+                row = col.row(align=True)
+                row.operator("pose.transforms_clear", text="", icon = "CLEAR")
+                row.operator("pose.user_transforms_clear", text="", icon = "NODE_TRANSFORM_CLEAR")
+
+                row = col.row(align=True)
+                row.operator("pose.loc_clear", text="", icon = "CLEARMOVE")
+                row.operator("pose.rot_clear", text="", icon = "CLEARROTATE")
+
+                row = col.row(align=True)
+                row.operator("pose.scale_clear", text="", icon = "CLEARSCALE")
+                row.operator("pose.user_transforms_clear", text="", icon = "RESET")
+
+            elif column_count == 1:
+
+                col.operator("pose.transforms_clear", text="", icon = "CLEAR")
+                col.operator("pose.user_transforms_clear", text="", icon = "NODE_TRANSFORM_CLEAR")
+
+                col.separator(factor = 0.5)
+
+                col.operator("pose.loc_clear", text="", icon = "CLEARMOVE")
+                col.operator("pose.rot_clear", text="", icon = "CLEARROTATE")
+                col.operator("pose.scale_clear", text="", icon = "CLEARSCALE")
+
+                col.separator(factor = 0.5)
+
+                col.operator("pose.user_transforms_clear", text="", icon = "RESET")
+
+
+class VIEW3D_PT_gp_posetab_apply(toolshelf_calculate, Panel):
+    bl_label = "Apply"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'TOOLS'
+    bl_context = "posemode"
+    bl_category = "Pose"
+    bl_options = {'HIDE_BG', 'DEFAULT_CLOSED'}
+
+    # just show when the toolshelf tabs toggle in the view menu is on.
+    @classmethod
+    def poll(cls, context):
+        view = context.space_data
+        overlay = view.overlay
+        return overlay.show_toolshelf_tabs == True
+
+    def draw(self, _context):
+        layout = self.layout
+
+        column_count = self.ts_width(layout, _context.region, scale_y= 1.75)
+
+        #text buttons
+        if column_count == 4:
+
+            col = layout.column(align=True)
+            col.scale_y = 2
+
+            col.operator("pose.armature_apply", icon = "MOD_ARMATURE")
+            col.operator("pose.armature_apply", text="Apply Selected as Rest Pose", icon = "MOD_ARMATURE_SELECTED").selected = True
+            col.operator("pose.visual_transform_apply", icon = "APPLYMOVE")
+
+            col.separator( factor = 0.5)
+
+            props = col.operator("object.assign_property_defaults", icon = "ASSIGN")
+            props.process_bones = True
+
+        # icon buttons
+        else:
+
+            col = layout.column(align=True)
+            col.scale_x = 2
+            col.scale_y = 2
+
+            if column_count == 3:
+
+                row = col.row(align=True)
+                row.operator("pose.armature_apply", text="", icon = "MOD_ARMATURE")
+                row.operator("pose.armature_apply", text="", icon = "MOD_ARMATURE_SELECTED").selected = True
+                row.operator("pose.visual_transform_apply", text="", icon = "APPLYMOVE")
+                props = row.operator("object.assign_property_defaults", text="", icon = "ASSIGN")
+                props.process_bones = True
+
+            elif column_count == 2:
+
+                row = col.row(align=True)
+                row.operator("pose.armature_apply", text="", icon = "MOD_ARMATURE")
+                row.operator("pose.armature_apply", text="", icon = "MOD_ARMATURE_SELECTED").selected = True
+
+                row = col.row(align=True)
+                row.operator("pose.visual_transform_apply", text="", icon = "APPLYMOVE")
+                props = row.operator("object.assign_property_defaults", text="", icon = "ASSIGN")
+                props.process_bones = True
+
+            elif column_count == 1:
+
+                col.operator("pose.armature_apply", text="", icon = "MOD_ARMATURE")
+                col.operator("pose.armature_apply", text="", icon = "MOD_ARMATURE_SELECTED").selected = True
+                col.operator("pose.visual_transform_apply", text="", icon = "APPLYMOVE")
+
+                col.separator( factor = 0.5)
+
+                props = col.operator("object.assign_property_defaults", text="", icon = "ASSIGN")
+                props.process_bones = True
+
+
+class VIEW3D_PT_gp_posetab_inbetweens(toolshelf_calculate, Panel):
+    bl_label = "In-Betweens"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'TOOLS'
+    bl_context = "posemode"
+    bl_category = "Pose"
+    bl_options = {'HIDE_BG', 'DEFAULT_CLOSED'}
+
+    # just show when the toolshelf tabs toggle in the view menu is on.
+    @classmethod
+    def poll(cls, context):
+        view = context.space_data
+        overlay = view.overlay
+        return overlay.show_toolshelf_tabs == True
+
+    def draw(self, _context):
+        layout = self.layout
+
+        column_count = self.ts_width(layout, _context.region, scale_y= 1.75)
+
+        #text buttons
+        if column_count == 4:
+
+            col = layout.column(align=True)
+            col.scale_y = 2
+
+            col.operator("pose.push_rest", icon = 'PUSH_POSE')
+            col.operator("pose.relax_rest", icon = 'RELAX_POSE')
+            col.operator("pose.push", icon = 'POSE_FROM_BREAKDOWN')
+            col.operator("pose.relax", icon = 'POSE_RELAX_TO_BREAKDOWN')
+            col.operator("pose.breakdown", icon = 'BREAKDOWNER_POSE')
+
+        # icon buttons
+        else:
+
+            col = layout.column(align=True)
+            col.scale_x = 2
+            col.scale_y = 2
+
+            if column_count == 3:
+
+                row = col.row(align=True)
+                row.operator("pose.push_rest", text = "", icon = 'PUSH_POSE')
+                row.operator("pose.relax_rest", text = "", icon = 'RELAX_POSE')
+                row.operator("pose.push", text = "", icon = 'POSE_FROM_BREAKDOWN')
+
+                row = col.row(align=True)
+                row.operator("pose.relax", text = "", icon = 'POSE_RELAX_TO_BREAKDOWN')
+                row.operator("pose.breakdown", text = "", icon = 'BREAKDOWNER_POSE')
+
+            elif column_count == 2:
+
+                row = col.row(align=True)
+                row.operator("pose.push_rest", text = "", icon = 'PUSH_POSE')
+                row.operator("pose.relax_rest", text = "", icon = 'RELAX_POSE')
+
+                row = col.row(align=True)
+                row.operator("pose.push", text = "", icon = 'POSE_FROM_BREAKDOWN')
+                row.operator("pose.relax", text = "", icon = 'POSE_RELAX_TO_BREAKDOWN')
+
+                row = col.row(align=True)
+                row.operator("pose.breakdown", text = "", icon = 'BREAKDOWNER_POSE')
+
+            elif column_count == 1:
+
+                col.operator("pose.push_rest", text = "", icon = 'PUSH_POSE')
+                col.operator("pose.relax_rest", text = "", icon = 'RELAX_POSE')
+                col.operator("pose.push", text = "", icon = 'POSE_FROM_BREAKDOWN')
+                col.operator("pose.relax", text = "", icon = 'POSE_RELAX_TO_BREAKDOWN')
+                col.operator("pose.breakdown", text = "", icon = 'BREAKDOWNER_POSE')
+
+
+class VIEW3D_PT_gp_posetab_propagate(toolshelf_calculate, Panel):
+    bl_label = "Propagate"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'TOOLS'
+    bl_context = "posemode"
+    bl_category = "Pose"
+    bl_options = {'HIDE_BG', 'DEFAULT_CLOSED'}
+
+    # just show when the toolshelf tabs toggle in the view menu is on.
+    @classmethod
+    def poll(cls, context):
+        view = context.space_data
+        overlay = view.overlay
+        return overlay.show_toolshelf_tabs == True
+
+    def draw(self, _context):
+        layout = self.layout
+
+        column_count = self.ts_width(layout, _context.region, scale_y= 1.75)
+
+        #text buttons
+        if column_count == 4:
+
+            col = layout.column(align=True)
+            col.scale_y = 2
+
+            col.operator("pose.propagate", icon = "PROPAGATE").mode = 'WHILE_HELD'
+
+            col.separator(factor = 0.5)
+
+            col.operator("pose.propagate", text="To Next Keyframe", icon = "PROPAGATE_NEXT").mode = 'NEXT_KEY'
+            col.operator("pose.propagate", text="To Last Keyframe (Make Cyclic)", icon = "PROPAGATE_PREVIOUS").mode = 'LAST_KEY'
+
+            col.separator(factor = 0.5)
+
+            col.operator("pose.propagate", text="On Selected Keyframes", icon = "PROPAGATE_SELECTED").mode = 'SELECTED_KEYS'
+
+            col.separator(factor = 0.5)
+
+            col.operator("pose.propagate", text="On Selected Markers", icon = "PROPAGATE_MARKER").mode = 'SELECTED_MARKERS'
+
+        # icon buttons
+        else:
+
+            col = layout.column(align=True)
+            col.scale_x = 2
+            col.scale_y = 2
+
+            if column_count == 3:
+
+                row = col.row(align=True)
+                row.operator("pose.propagate", text="", icon = "PROPAGATE").mode = 'WHILE_HELD'
+                row.operator("pose.propagate", text="", icon = "PROPAGATE_NEXT").mode = 'NEXT_KEY'
+                row.operator("pose.propagate", text="", icon = "PROPAGATE_PREVIOUS").mode = 'LAST_KEY'
+
+                row = col.row(align=True)
+                row.operator("pose.propagate", text="", icon = "PROPAGATE_SELECTED").mode = 'SELECTED_KEYS'
+                row.operator("pose.propagate", text="", icon = "PROPAGATE_MARKER").mode = 'SELECTED_MARKERS'
+
+            elif column_count == 2:
+
+                row = col.row(align=True)
+                row.operator("pose.propagate", text="", icon = "PROPAGATE").mode = 'WHILE_HELD'
+                row.operator("pose.propagate", text="", icon = "PROPAGATE_NEXT").mode = 'NEXT_KEY'
+
+                row = col.row(align=True)
+                row.operator("pose.propagate", text="", icon = "PROPAGATE_PREVIOUS").mode = 'LAST_KEY'
+                row.operator("pose.propagate", text="", icon = "PROPAGATE_SELECTED").mode = 'SELECTED_KEYS'
+
+                row = col.row(align=True)
+                row.operator("pose.propagate", text="", icon = "PROPAGATE_MARKER").mode = 'SELECTED_MARKERS'
+
+            elif column_count == 1:
+
+                col.operator("pose.propagate", text="", icon = "PROPAGATE").mode = 'WHILE_HELD'
+
+                col.separator(factor = 0.5)
+
+                col.operator("pose.propagate", text="", icon = "PROPAGATE_NEXT").mode = 'NEXT_KEY'
+                col.operator("pose.propagate", text="", icon = "PROPAGATE_PREVIOUS").mode = 'LAST_KEY'
+
+                col.separator(factor = 0.5)
+
+                col.operator("pose.propagate", text="", icon = "PROPAGATE_SELECTED").mode = 'SELECTED_KEYS'
+
+                col.separator(factor = 0.5)
+
+                col.operator("pose.propagate", text="", icon = "PROPAGATE_MARKER").mode = 'SELECTED_MARKERS'
+
+
+class VIEW3D_PT_gp_posetab_poselibrary(toolshelf_calculate, Panel):
+    bl_label = "Pose Library"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'TOOLS'
+    bl_context = "posemode"
+    bl_category = "Pose"
+    bl_options = {'HIDE_BG', 'DEFAULT_CLOSED'}
+
+    # just show when the toolshelf tabs toggle in the view menu is on.
+    @classmethod
+    def poll(cls, context):
+        view = context.space_data
+        overlay = view.overlay
+        return overlay.show_toolshelf_tabs == True
+
+    def draw(self, _context):
+        layout = self.layout
+
+        column_count = self.ts_width(layout, _context.region, scale_y= 1.75)
+
+        #text buttons
+        if column_count == 4:
+
+            col = layout.column(align=True)
+            col.scale_y = 2
+
+            col.operator("poselib.browse_interactive", text="Browse Poses", icon = "FILEBROWSER")
+
+            col.separator(factor = 0.5)
+
+            col.operator("poselib.pose_add", text="Add Pose", icon = "LIBRARY")
+            col.operator("poselib.pose_rename", text="Rename Pose", icon='RENAME')
+            col.operator("poselib.pose_remove", text="Remove Pose", icon = "DELETE")
+
+        # icon buttons
+        else:
+
+            col = layout.column(align=True)
+            col.scale_x = 2
+            col.scale_y = 2
+
+            if column_count == 3:
+
+                row = col.row(align=True)
+                row.operator("poselib.browse_interactive", text="", icon = "FILEBROWSER")
+                row.operator("poselib.pose_add", text="", icon = "LIBRARY")
+                row.operator("poselib.pose_rename", text="", icon='RENAME')
+
+                row = col.row(align=True)
+                row.operator("poselib.pose_remove", text="", icon = "DELETE")
+
+            elif column_count == 2:
+
+                row = col.row(align=True)
+                row.operator("poselib.browse_interactive", text="", icon = "FILEBROWSER")
+                row.operator("poselib.pose_add", text="", icon = "LIBRARY")
+
+                row = col.row(align=True)
+                row.operator("poselib.pose_rename", text="", icon='RENAME')
+                row.operator("poselib.pose_remove", text="", icon = "DELETE")
+
+            elif column_count == 1:
+
+                col.operator("poselib.browse_interactive", text="", icon = "FILEBROWSER")
+
+                col.separator(factor = 0.5)
+
+                col.operator("poselib.pose_add", text="", icon = "LIBRARY")
+                col.operator("poselib.pose_rename", text="", icon='RENAME')
+                col.operator("poselib.pose_remove", text="", icon = "DELETE")
+
+
+class VIEW3D_PT_gp_posetab_motionpaths(toolshelf_calculate, Panel):
+    bl_label = "Motion Paths"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'TOOLS'
+    bl_context = "posemode"
+    bl_category = "Pose"
+    bl_options = {'HIDE_BG', 'DEFAULT_CLOSED'}
+
+    # just show when the toolshelf tabs toggle in the view menu is on.
+    @classmethod
+    def poll(cls, context):
+        view = context.space_data
+        overlay = view.overlay
+        return overlay.show_toolshelf_tabs == True
+
+    def draw(self, _context):
+        layout = self.layout
+
+        column_count = self.ts_width(layout, _context.region, scale_y= 1.75)
+
+        #text buttons
+        if column_count == 4:
+
+            col = layout.column(align=True)
+            col.scale_y = 2
+
+            col.operator("pose.paths_calculate", text="Calculate", icon ='MOTIONPATHS_CALCULATE')
+            col.operator("pose.paths_clear", text="Clear", icon ='MOTIONPATHS_CLEAR')
+
+        # icon buttons
+        else:
+
+            col = layout.column(align=True)
+            col.scale_x = 2
+            col.scale_y = 2
+
+            if column_count == 3:
+
+                row = col.row(align=True)
+                row.operator("pose.paths_calculate", text="", icon ='MOTIONPATHS_CALCULATE')
+                row.operator("pose.paths_clear", text="", icon ='MOTIONPATHS_CLEAR')
+
+            elif column_count == 2:
+
+                row = col.row(align=True)
+                row.operator("pose.paths_calculate", text="", icon ='MOTIONPATHS_CALCULATE')
+                row.operator("pose.paths_clear", text="", icon ='MOTIONPATHS_CLEAR')
+
+            elif column_count == 1:
+
+                col.operator("pose.paths_calculate", text="", icon ='MOTIONPATHS_CALCULATE')
+                col.operator("pose.paths_clear", text="", icon ='MOTIONPATHS_CLEAR')
+
+
 classes = (
 
     #object menu
@@ -3166,6 +5411,15 @@ classes = (
     #mesh sculpt mode
     VIEW3D_PT_masktab_mask,
     VIEW3D_PT_masktab_random_mask,
+    VIEW3D_PT_facesetstab_facesets,
+    VIEW3D_PT_facesetstab_init_facesets,
+
+    #mesh vertex paint mode
+    VIEW3D_PT_painttab_paint,
+    VIEW3D_PT_painttab_colorpicker,
+
+    #mesh weight paint mode
+    VIEW3D_PT_weightstab_weights,
 
     #curve edit mode
     VIEW3D_PT_curvetab_curve,
@@ -3173,6 +5427,47 @@ classes = (
     VIEW3D_PT_surfacetab_surface,
     VIEW3D_PT_curvetab_controlpoints_surface,
     VIEW3D_PT_segmentstab_segments,
+
+    # grease pencil edit mode
+    VIEW3D_PT_gp_gpenciltab_dissolve,
+    VIEW3D_PT_gp_gpenciltab_cleanup,
+    VIEW3D_PT_gp_gpenciltab_separate,
+    VIEW3D_PT_gp_stroketab_stroke,
+    VIEW3D_PT_gp_stroketab_simplify,
+    VIEW3D_PT_gp_stroketab_togglecaps,
+    VIEW3D_PT_gp_stroketab_reproject,
+    VIEW3D_PT_gp_pointtab_point,
+
+    # grease pencil weights mode
+    VIEW3D_PT_gp_weightstab_weights,
+    VIEW3D_PT_gp_weightstab_generate_weights,
+
+    # grease pencil vertex paint
+    VIEW3D_PT_gp_painttab_paint,
+
+    # armature edit mode
+    VIEW3D_PT_gp_armaturetab_armature,
+    VIEW3D_PT_gp_armaturetab_recalcboneroll,
+
+    #armature pose mode
+    VIEW3D_PT_gp_posetab_pose,
+    VIEW3D_PT_gp_posetab_cleartransform,
+    VIEW3D_PT_gp_posetab_apply,
+    VIEW3D_PT_gp_posetab_inbetweens,
+    VIEW3D_PT_gp_posetab_propagate,
+    VIEW3D_PT_gp_posetab_poselibrary,
+    VIEW3D_PT_gp_posetab_motionpaths,
+
+    # bfa - separated tooltips
+    MASK_MT_flood_fill_invert,
+    MASK_MT_flood_fill_fill,
+    MASK_MT_flood_fill_clear,
+    VIEW3D_MT_object_mirror_global_x,
+    VIEW3D_MT_object_mirror_global_y,
+    VIEW3D_MT_object_mirror_global_z,
+    VIEW3D_MT_object_mirror_local_x,
+    VIEW3D_MT_object_mirror_local_y,
+    VIEW3D_MT_object_mirror_local_z,
 
 )
 

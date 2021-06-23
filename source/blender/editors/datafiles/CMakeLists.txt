@@ -499,16 +499,16 @@ lightprobe_planar
 view_remove_local
 shape
 
-#~ DEF_ICON_BLANK(518)
-#~ DEF_ICON_BLANK(519)
-#~ DEF_ICON_BLANK(520)
-#~ DEF_ICON_BLANK(521)
-#~ DEF_ICON_BLANK(522)
-#~ DEF_ICON_BLANK(523)
-#~ DEF_ICON_BLANK(524)
-#~ DEF_ICON_BLANK(525)
-#~ DEF_ICON_BLANK(526)
-#~ DEF_ICON_BLANK(527)
+mask_slice_fill
+mask_slice_new
+simplify_sample
+simplify_adaptive
+toggle_close
+separate_gp_strokes
+separate_gp_points
+separate_gp_layer
+bone_layer
+clean_channels_frames
 
 # ------------------------- row 8 --------------------------*/
 
@@ -567,16 +567,16 @@ node_top
 normals_face
 normals_vertex
 
-#~ DEF_ICON_BLANK(586)
-#~ DEF_ICON_BLANK(587)
-#~ DEF_ICON_BLANK(588)
-#~ DEF_ICON_BLANK(589)
-#~ DEF_ICON_BLANK(590)
-#~ DEF_ICON_BLANK(591)
-#~ DEF_ICON_BLANK(592)
-#~ DEF_ICON_BLANK(593)
-#~ DEF_ICON_BLANK(594)
-#~ DEF_ICON_BLANK(595)
+mod_armature_selected
+node_transform_clear
+propagate_marker
+propagate_next
+propagate_previous
+propagate_selected
+select_by_material
+pose_from_breakdown
+pose_relax_to_breakdown
+raycast
 
 # ------------------------- row 9 --------------------------*/
 

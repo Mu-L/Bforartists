@@ -38,7 +38,7 @@ extern "C" {
 #define BLENDER_VERSION_CYCLE alpha
 
 /* Bforartists major and minor version. */
-#define BFORARTISTS_VERSION 28
+#define BFORARTISTS_VERSION 29
 /* Bforartists patch version for bugfix releases. */
 #define BFORARTISTS_VERSION_PATCH 0
 /** Bforartists release cycle stage: alpha/beta/rc/release. */
@@ -46,7 +46,7 @@ extern "C" {
 
 /* Blender file format version. */
 #define BLENDER_FILE_VERSION BLENDER_VERSION
-#define BLENDER_FILE_SUBVERSION 2
+#define BLENDER_FILE_SUBVERSION 4
 
 /* Minimum Blender version that supports reading file written with the current
  * version. Older Blender versions will test this and show a warning if the file

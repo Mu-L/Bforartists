@@ -127,6 +127,20 @@ static const EnumPropertyItem node_chunksize_items[] = {
 };
 #endif
 
+static const EnumPropertyItem rna_enum_execution_mode_items[] = {
+    {NTREE_EXECUTION_MODE_TILED,
+     "TILED",
+     0,
+     "Tiled",
+     "Compositing is tiled, having as priority to display first tiles as fast as possible"},
+    {NTREE_EXECUTION_MODE_FULL_FRAME,
+     "FULL_FRAME",
+     0,
+     "Full Frame",
+     "Composites full image result as fast as possible"},
+    {0, NULL, 0, NULL, NULL},
+};
+
 const EnumPropertyItem rna_enum_mapping_type_items[] = {
     {NODE_MAPPING_TYPE_POINT, "POINT", 0, "Point", "Transform a point"},
     {NODE_MAPPING_TYPE_TEXTURE,
@@ -234,6 +248,7 @@ const EnumPropertyItem rna_enum_node_vec_math_items[] = {
     {NODE_VECTOR_MATH_SUBTRACT, "SUBTRACT", 0, "Subtract", "A - B"},
     {NODE_VECTOR_MATH_MULTIPLY, "MULTIPLY", 0, "Multiply", "Entry-wise multiply"},
     {NODE_VECTOR_MATH_DIVIDE, "DIVIDE", 0, "Divide", "Entry-wise divide"},
+    {NODE_VECTOR_MATH_MULTIPLY_ADD, "MULTIPLY_ADD", 0, "Multiply Add", "A * B + C"},
     {0, "", ICON_NONE, NULL, NULL},
     {NODE_VECTOR_MATH_CROSS_PRODUCT, "CROSS_PRODUCT", 0, "Cross Product", "A cross B"},
     {NODE_VECTOR_MATH_PROJECT, "PROJECT", 0, "Project", "Project A onto B"},
@@ -449,6 +464,10 @@ static EnumPropertyItem rna_node_geometry_mesh_circle_fill_type_items[] = {
   { \
     GEO_NODE_ATTRIBUTE_INPUT_COLOR, "COLOR", 0, "Color", "" \
   }
+#define ITEM_INTEGER \
+  { \
+    GEO_NODE_ATTRIBUTE_INPUT_INTEGER, "INTEGER", 0, "Integer", "" \
+  }
 #define ITEM_BOOLEAN \
   { \
     GEO_NODE_ATTRIBUTE_INPUT_BOOLEAN, "BOOLEAN", 0, "Boolean", "" \
@@ -460,6 +479,7 @@ static const EnumPropertyItem rna_node_geometry_attribute_input_type_items_any[]
     ITEM_FLOAT,
     ITEM_VECTOR,
     ITEM_COLOR,
+    ITEM_INTEGER,
     ITEM_BOOLEAN,
     {0, NULL, 0, NULL, NULL},
 };
@@ -480,6 +500,11 @@ static const EnumPropertyItem rna_node_geometry_attribute_input_type_items_float
 static const EnumPropertyItem rna_node_geometry_attribute_input_type_items_float[] = {
     ITEM_ATTRIBUTE,
     ITEM_FLOAT,
+    {0, NULL, 0, NULL, NULL},
+};
+static const EnumPropertyItem rna_node_geometry_attribute_input_type_items_int[] = {
+    ITEM_ATTRIBUTE,
+    ITEM_INTEGER,
     {0, NULL, 0, NULL, NULL},
 };
 static const EnumPropertyItem rna_node_geometry_attribute_input_type_items_no_boolean[] = {
@@ -1268,6 +1293,13 @@ static bNodeLink *rna_NodeTree_link_new(bNodeTree *ntree,
     if (nodeCountSocketLinks(ntree, tosock) + 1 > nodeSocketLinkLimit(tosock)) {
       nodeRemSocketLinks(ntree, tosock);
     }
+    if (tosock->flag & SOCK_MULTI_INPUT) {
+      LISTBASE_FOREACH_MUTABLE (bNodeLink *, link, &ntree->links) {
+        if (link->fromsock == fromsock && link->tosock == tosock) {
+          nodeRemLink(ntree, link);
+        }
+      }
+    }
   }
 
   ret = nodeAddLink(ntree, fromnode, fromsock, tonode, tosock);
@@ -1970,7 +2002,9 @@ static bool switch_type_supported(const EnumPropertyItem *item)
               SOCK_RGBA,
               SOCK_GEOMETRY,
               SOCK_OBJECT,
-              SOCK_COLLECTION);
+              SOCK_COLLECTION,
+              SOCK_TEXTURE,
+              SOCK_MATERIAL);
 }
 
 static const EnumPropertyItem *rna_GeometryNodeSwitch_type_itemf(bContext *UNUSED(C),
@@ -3973,7 +4007,7 @@ static void rna_NodeCryptomatte_layer_name_set(PointerRNA *ptr, int new_value)
   }
 }
 
-static const EnumPropertyItem *rna_NodeCryptomatte_layer_name_itemf(bContext *UNUSED(C),
+static const EnumPropertyItem *rna_NodeCryptomatte_layer_name_itemf(bContext *C,
                                                                     PointerRNA *ptr,
                                                                     PropertyRNA *UNUSED(prop),
                                                                     bool *r_free)
@@ -3984,7 +4018,7 @@ static const EnumPropertyItem *rna_NodeCryptomatte_layer_name_itemf(bContext *UN
   EnumPropertyItem template = {0, "", 0, "", ""};
   int totitem = 0;
 
-  ntreeCompositCryptomatteUpdateLayerNames(node);
+  ntreeCompositCryptomatteUpdateLayerNames(CTX_data_scene(C), node);
   int layer_index;
   LISTBASE_FOREACH_INDEX (CryptomatteLayer *, layer, &storage->runtime.layers, layer_index) {
     template.value = layer_index;
@@ -4076,7 +4110,7 @@ static void rna_NodeCryptomatte_matte_set(PointerRNA *ptr, const char *value)
 
 static void rna_NodeCryptomatte_update_add(Main *bmain, Scene *scene, PointerRNA *ptr)
 {
-  ntreeCompositCryptomatteSyncFromAdd(ptr->data);
+  ntreeCompositCryptomatteSyncFromAdd(scene, ptr->data);
   rna_Node_update(bmain, scene, ptr);
 }
 
@@ -9823,6 +9857,50 @@ static void def_geo_curve_resample(StructRNA *srna)
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 
+static void def_geo_curve_subdivide(StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  RNA_def_struct_sdna_from(srna, "NodeGeometryCurveSubdivide", "storage");
+
+  prop = RNA_def_property(srna, "cuts_type", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, rna_node_geometry_attribute_input_type_items_int);
+  RNA_def_property_ui_text(prop, "Cuts Type", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+}
+
+static void def_geo_curve_to_points(StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  static EnumPropertyItem mode_items[] = {
+      {GEO_NODE_CURVE_SAMPLE_EVALUATED,
+       "EVALUATED",
+       0,
+       "Evaluated",
+       "Create points from the curve's evaluated points, based on the resolution attribute for "
+       "NURBS and Bezier splines"},
+      {GEO_NODE_CURVE_SAMPLE_COUNT,
+       "COUNT",
+       0,
+       "Count",
+       "Sample each spline by evenly distributing the specified number of points"},
+      {GEO_NODE_CURVE_SAMPLE_LENGTH,
+       "LENGTH",
+       0,
+       "Length",
+       "Sample each spline by splitting it into segments with the specified length"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  RNA_def_struct_sdna_from(srna, "NodeGeometryCurveToPoints", "storage");
+
+  prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, mode_items);
+  RNA_def_property_ui_text(prop, "Mode", "How to generate points from the input curve");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+}
+
 static void def_geo_attribute_transfer(StructRNA *srna)
 {
   static EnumPropertyItem mapping_items[] = {
@@ -9868,6 +9946,42 @@ static void def_geo_input_material(StructRNA *srna)
   RNA_def_property_override_flag(prop, PROPOVERRIDE_OVERRIDABLE_LIBRARY);
   RNA_def_property_ui_text(prop, "Material", "");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+}
+
+static void def_geo_raycast(StructRNA *srna)
+{
+  static EnumPropertyItem mapping_items[] = {
+      {GEO_NODE_RAYCAST_INTERPOLATED,
+       "INTERPOLATED",
+       0,
+       "Interpolated",
+       "Interpolate the attribute from the corners of the hit face"},
+      {GEO_NODE_RAYCAST_NEAREST,
+       "NEAREST",
+       0,
+       "Nearest",
+       "Use the attribute value of the closest mesh element"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  PropertyRNA *prop;
+
+  RNA_def_struct_sdna_from(srna, "NodeGeometryRaycast", "storage");
+
+  prop = RNA_def_property(srna, "mapping", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, mapping_items);
+  RNA_def_property_ui_text(prop, "Mapping", "Mapping from the target geometry to hit points");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+  prop = RNA_def_property(srna, "input_type_ray_direction", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, rna_node_geometry_attribute_input_type_items_vector);
+  RNA_def_property_ui_text(prop, "Input Type Ray Direction", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
+
+  prop = RNA_def_property(srna, "input_type_ray_length", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_items(prop, rna_node_geometry_attribute_input_type_items_float);
+  RNA_def_property_ui_text(prop, "Input Type Ray Length", "");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_socket_update");
 }
 
 /* -------------------------------------------------------------------------- */
@@ -10814,6 +10928,10 @@ static void rna_def_node_socket_standard_types(BlenderRNA *brna)
       brna, "NodeSocketFloatAngle", "NodeSocketInterfaceFloatAngle", PROP_ANGLE);
   rna_def_node_socket_float(
       brna, "NodeSocketFloatTime", "NodeSocketInterfaceFloatTime", PROP_TIME);
+  rna_def_node_socket_float(brna,
+                            "NodeSocketFloatTimeAbsolute",
+                            "NodeSocketInterfaceFloatTimeAbsolute",
+                            PROP_TIME_ABSOLUTE);
   rna_def_node_socket_float(
       brna, "NodeSocketFloatDistance", "NodeSocketInterfaceFloatDistance", PROP_DISTANCE);
 
@@ -11668,6 +11786,12 @@ static void rna_def_composite_nodetree(BlenderRNA *brna)
   RNA_def_struct_sdna(srna, "bNodeTree");
   RNA_def_struct_ui_icon(srna, ICON_RENDERLAYERS);
 
+  prop = RNA_def_property(srna, "execution_mode", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "execution_mode");
+  RNA_def_property_enum_items(prop, rna_enum_execution_mode_items);
+  RNA_def_property_ui_text(prop, "Execution Mode", "Set how compositing is executed");
+  RNA_def_property_update(prop, NC_NODE | ND_DISPLAY, "rna_NodeTree_update");
+
   prop = RNA_def_property(srna, "render_quality", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "render_quality");
   RNA_def_property_enum_items(prop, node_quality_items);
@@ -12186,6 +12310,9 @@ static int node_type_to_icon(int type)
       icon = ICON_VIEW_SWITCHACTIVECAM;
       break;
     /* Filter */
+    case CMP_NODE_ANTIALIASING:
+      icon = ICON_ANTIALIASED;
+      break;
     case CMP_NODE_BILATERALBLUR:
       icon = ICON_NODE_BILATERAL_BLUR;
       break;
@@ -12449,6 +12576,12 @@ static int node_type_to_icon(int type)
     case GEO_NODE_POINTS_TO_VOLUME:
       icon = ICON_POINT_TO_VOLUME;
       break;
+    case GEO_NODE_RAYCAST:
+      icon = ICON_RAYCAST;
+      break;
+    case GEO_NODE_SEPARATE_COMPONENTS:
+      icon = ICON_SEPARATE;
+      break;
     case GEO_NODE_COLLECTION_INFO:
       icon = ICON_COLLECTION_INFO;
       break;
@@ -12472,6 +12605,13 @@ static int node_type_to_icon(int type)
       break;
     case GEO_NODE_MATERIAL_REPLACE:
       icon = ICON_MATERIAL_REPLACE;
+      break;
+
+    case GEO_NODE_CONVEX_HULL:
+      icon = ICON_CONVEXHULL;
+      break;
+    case GEO_NODE_SELECT_BY_MATERIAL:
+      icon = ICON_SELECT_BY_MATERIAL;
       break;
 
       /*primitives*/
@@ -12520,14 +12660,29 @@ static int node_type_to_icon(int type)
       icon = ICON_NODE_REROUTE;
       break;
       /*curve*/
+    case GEO_NODE_CURVE_LENGTH:
+      icon = ICON_PARTICLEBRUSH_LENGTH;
+      break;
     case GEO_NODE_CURVE_TO_MESH:
       icon = ICON_OUTLINER_OB_MESH;
+      break;
+    case GEO_NODE_DELETE_GEOMETRY:
+      icon = ICON_DELETE;
       break;
     case GEO_NODE_MESH_TO_CURVE:
       icon = ICON_OUTLINER_OB_CURVE;
       break;
+    case GEO_NODE_CURVE_SUBDIVIDE:
+      icon = ICON_SUBDIVIDE_EDGES;
+      break;
     case GEO_NODE_CURVE_RESAMPLE:
       icon = ICON_CURVE_RESAMPLE;
+      break;
+    case GEO_NODE_CURVE_REVERSE:
+      icon = ICON_SWITCH_DIRECTION;
+      break;
+    case GEO_NODE_CURVE_TO_POINTS:
+      icon = ICON_POINTCLOUD_DATA;
       break;
   }
   return icon;

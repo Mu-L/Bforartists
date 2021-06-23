@@ -1,7 +1,7 @@
 
 msgid ""
 msgstr ""
-"Project-Id-Version: Blender 2.93.0 Beta (b'3c7b80ae2ca6')\n"
+"Project-Id-Version: Blender 3.0.0 Alpha (b'748475b9431c')\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2020-01-01 00:00:00\n"
 "PO-Revision-Date: \n"
@@ -1130,12 +1130,8 @@ msgid "Face"
 msgstr "Fläche"
 
 
-msgid "Curve"
-msgstr "Kurve"
-
-
-msgid "Attribute on hair curve"
-msgstr "Einstellungen auf Haarkurve"
+msgid "Spline"
+msgstr "Spline"
 
 
 msgid "Name of the Attribute"
@@ -5224,6 +5220,10 @@ msgstr "Maske, die diese Sequenz verwendet"
 
 msgid "Color management settings used for displaying images on the display"
 msgstr "Schriftgröße, die zum Anzeigen der Beschriftung verwendet wird"
+
+
+msgid "Curve"
+msgstr "Kurve"
 
 
 msgid "Color curve mapping applied before display transform"
@@ -10064,6 +10064,14 @@ msgid "Asset Library"
 msgstr "Bestand-Bibliothek"
 
 
+msgid "Link"
+msgstr "Verknüpfen"
+
+
+msgid "Append"
+msgstr "Anfügen"
+
+
 msgid "Float2 Attribute Value"
 msgstr "Float2 Eigenschaftswert"
 
@@ -13500,10 +13508,6 @@ msgid "Bevel Depth"
 msgstr "Fasentiefe"
 
 
-msgid "Spline"
-msgstr "Spline"
-
-
 msgid "Bevel Mode"
 msgstr "Anfasmodus"
 
@@ -13580,15 +13584,7 @@ msgid "Texture Space Location"
 msgstr "Texturraum-Position"
 
 
-msgid "Texture space location"
-msgstr "Texturraum"
-
-
 msgid "Texture Space Size"
-msgstr "Texturraum"
-
-
-msgid "Texture space size"
 msgstr "Texturraum"
 
 
@@ -15150,6 +15146,14 @@ msgid "Derive texture coordinates from another mesh"
 msgstr "Ableitung von Textur Koordinaten einer anderen Masche"
 
 
+msgid "Texture space location"
+msgstr "Texturraum"
+
+
+msgid "Texture space size"
+msgstr "Texturraum"
+
+
 msgid "Texture Mesh"
 msgstr "Maschentextur"
 
@@ -15424,6 +15428,10 @@ msgstr "Niedrig"
 
 msgid "Low quality"
 msgstr "Niedrige Qualität"
+
+
+msgid "Tiled"
+msgstr "Gekachelt"
 
 
 msgid "Render Quality"
@@ -19822,10 +19830,6 @@ msgstr "Selbstüberlagerung"
 
 msgid "Material slot in an object"
 msgstr "Materialsteckplatz in einem Objekt"
-
-
-msgid "Link"
-msgstr "Verknüpfen"
 
 
 msgid "Link material to object or the object's data"
@@ -25349,12 +25353,44 @@ msgid "Normalize A"
 msgstr "Normalisiere A"
 
 
+msgid "Type of rotation"
+msgstr "Rotationstyp"
+
+
+msgid "Rotate a point using X axis"
+msgstr "Drehen eines Punktes mit X-Achse"
+
+
+msgid "Rotate a point using Y axis"
+msgstr "Drehen eines Punktes mit Y-Achse"
+
+
+msgid "Z Axis"
+msgstr "Z-Achse"
+
+
+msgid "Rotate a point using Z axis"
+msgstr "Drehen eines Punktes mit Z-Achse"
+
+
+msgid "Rotate a point using XYZ order"
+msgstr "Drehen eines Punktes mit XYZ-Reihenfolge"
+
+
 msgid "Collection Info"
 msgstr "Sammlungsinfo"
 
 
 msgid "Original"
 msgstr "Original"
+
+
+msgid "Convex Hull"
+msgstr "Konvexe Hülse"
+
+
+msgid "Delete Geometry"
+msgstr "Geometrie löschen"
 
 
 msgid "Is Viewport"
@@ -26030,30 +26066,6 @@ msgid "Invert angle"
 msgstr "Achse invertieren"
 
 
-msgid "Type of rotation"
-msgstr "Rotationstyp"
-
-
-msgid "Rotate a point using X axis"
-msgstr "Drehen eines Punktes mit X-Achse"
-
-
-msgid "Rotate a point using Y axis"
-msgstr "Drehen eines Punktes mit Y-Achse"
-
-
-msgid "Z Axis"
-msgstr "Z-Achse"
-
-
-msgid "Rotate a point using Z axis"
-msgstr "Drehen eines Punktes mit Z-Achse"
-
-
-msgid "Rotate a point using XYZ order"
-msgstr "Drehen eines Punktes mit XYZ-Reihenfolge"
-
-
 msgid "Vector Transform"
 msgstr "Vektor transformieren"
 
@@ -26104,10 +26116,6 @@ msgstr "Knoteneingaben"
 
 msgid "Name of the socket"
 msgstr "Name der Buchse"
-
-
-msgid "Int"
-msgstr "Int"
 
 
 msgid "From node"
@@ -29613,6 +29621,14 @@ msgid "Loose Points"
 msgstr "Lose Punkte"
 
 
+msgid "Renderable Objects"
+msgstr "Renderfähige Objekte"
+
+
+msgid "Visible Objects"
+msgstr "Sichtbare Objekte"
+
+
 msgid "Remember Export Settings"
 msgstr "Exporteinstellungen merken"
 
@@ -29686,11 +29702,6 @@ msgstr "Bilder pro Sekunde"
 
 msgid "Rest Frame"
 msgstr "Einzelbild ruhen lassen"
-
-
-msgctxt "Operator"
-msgid "Automatically Pack Into .blend"
-msgstr "Automatisches Packen in .blend"
 
 
 msgctxt "Operator"
@@ -29783,18 +29794,8 @@ msgid "Toggle hide hidden dot files"
 msgstr "Versteckte Punkt-Dateien verbergen/zeigen"
 
 
-msgctxt "Operator"
-msgid "Make All Paths Absolute"
-msgstr "Alle Pfade absolut machen"
-
-
 msgid "Make all paths to external files absolute"
 msgstr "Alle Pfade zu externen Dateien absolut machen"
-
-
-msgctxt "Operator"
-msgid "Make All Paths Relative"
-msgstr "Alle Pfade relativ machen"
 
 
 msgctxt "Operator"
@@ -29804,24 +29805,6 @@ msgstr "Nächstes Verzeichnis"
 
 msgid "Move to next folder"
 msgstr "Zum nächsten Verzeichnis bewegen"
-
-
-msgctxt "Operator"
-msgid "Pack All Into .blend"
-msgstr "Packen Sie alles in .blend"
-
-
-msgid "Pack all used external files into the .blend"
-msgstr "Alle verwendeten, externen Dateien in der .blend-Datei verpacken"
-
-
-msgctxt "Operator"
-msgid "Pack Blender Libraries"
-msgstr "Blender-Datei speichern"
-
-
-msgid "Pack all used Blender library files into the current .blend"
-msgstr "Alle verwendeten, externen Dateien in der .blend-Datei verpacken"
 
 
 msgctxt "Operator"
@@ -29909,11 +29892,6 @@ msgid "Smooth Scroll"
 msgstr "Weich scrollen"
 
 
-msgctxt "Operator"
-msgid "Unpack All Into Files"
-msgstr "Entpacken Sie alle Dateien"
-
-
 msgid "How to unpack"
 msgstr "Wie entpackt werden soll"
 
@@ -29933,15 +29911,6 @@ msgstr "Bild auspacken"
 
 msgid "Write file to current directory (overwrite existing file)"
 msgstr "Dateien in aktuelles Verzeichnis schreiben (existierende Dateien überschreiben)"
-
-
-msgctxt "Operator"
-msgid "Unpack Blender Libraries"
-msgstr "Eine Blender-Datei öffnen"
-
-
-msgid "Unpack all used Blender library files from this .blend file"
-msgstr "Alle verwendeten, externen Dateien in der .blend-Datei verpacken"
 
 
 msgctxt "Operator"
@@ -30283,16 +30252,8 @@ msgid "Add new Annotation data-block"
 msgstr "Hinzufügen eines neuen Annotation-Datenblocks"
 
 
-msgid "Threshold Angle"
-msgstr "Schwellenwinkel"
-
-
 msgid "Target Frame"
 msgstr "Ziel Einzelbild"
-
-
-msgid "Stroke Offset"
-msgstr "Strichversatz"
 
 
 msgid "Only Selected Keyframes"
@@ -30317,6 +30278,14 @@ msgstr "Die Striche mit der Y-Z-Ebene neu projizieren"
 
 msgid "Reproject the strokes using the X-Y plane"
 msgstr "Die Striche mit der X-Y-Ebene neu projizieren"
+
+
+msgid "Threshold Angle"
+msgstr "Schwellenwinkel"
+
+
+msgid "Stroke Offset"
+msgstr "Strichversatz"
 
 
 msgid "New Object"
@@ -30611,10 +30580,6 @@ msgstr "Ebene duplizieren"
 
 msgid "Empty Keyframes"
 msgstr "Leere Schlüsselbilder"
-
-
-msgid "Make a copy of the active Grease Pencil layer to new object"
-msgstr "Erstellen einer Kopie der aktiven Wachsstiftebene in ein neues Objekt"
 
 
 msgctxt "Operator"
@@ -31389,10 +31354,6 @@ msgstr "Bildhöhe"
 
 msgid "Image data-block name"
 msgstr "Bilddatenblockname"
-
-
-msgid "Tiled"
-msgstr "Gekachelt"
 
 
 msgid "Create a tiled image"
@@ -34323,10 +34284,6 @@ msgid "Y-coordinate (screen space) to place the new object under"
 msgstr "Y-Koordinate (Bildschirmraum), um das neue Objekt unter"
 
 
-msgid "Duplicate object but not object data, linking to the original data"
-msgstr "Objekt duplizieren, aber Objektdaten mit den Originaldaten verknüpfen"
-
-
 msgid "Object name to add"
 msgstr "Hinzuzufügender Objektname"
 
@@ -34522,6 +34479,10 @@ msgstr "Objekte duplizieren"
 
 msgid "Duplicate selected objects"
 msgstr "Ausgewählte Objekte duplizieren"
+
+
+msgid "Duplicate object but not object data, linking to the original data"
+msgstr "Objekt duplizieren, aber Objektdaten mit den Originaldaten verknüpfen"
 
 
 msgid "Duplicate selected objects and move them"
@@ -36892,10 +36853,6 @@ msgid "Target Path"
 msgstr "Zielpfad"
 
 
-msgid "User Prefs"
-msgstr "Benutzer-Voreinstellungen"
-
-
 msgctxt "Operator"
 msgid "Refresh"
 msgstr "Aktualisieren"
@@ -37330,10 +37287,6 @@ msgstr "Rigid Body entfernen"
 
 msgid "Remove Rigid Body settings from Object"
 msgstr "Entfernt Rigid Body Einstellungen vom Objekt"
-
-
-msgid "Convex Hull"
-msgstr "Konvexe Hülse"
 
 
 msgctxt "Operator"
@@ -37880,10 +37833,6 @@ msgid "Toggle Visibility"
 msgstr "Sichtbarkeit umschalten"
 
 
-msgid "Delete Geometry"
-msgstr "Geometrie löschen"
-
-
 msgid "Preserve Previous Mask"
 msgstr "Bewahre Vorherige Maske"
 
@@ -38192,10 +38141,6 @@ msgid "Make Meta Strip"
 msgstr "Metastreifen erzeugen"
 
 
-msgid "Group selected strips into a metastrip"
-msgstr "Ausgewählte Streifen zu einem Metastreifen gruppieren"
-
-
 msgctxt "Operator"
 msgid "UnMeta Strip"
 msgstr "Eigenschaft bearbeiten"
@@ -38383,10 +38328,6 @@ msgstr "Modifikator zum Streifen hinzufügen"
 msgctxt "Operator"
 msgid "Copy to Selected Strips"
 msgstr "Kopieren zu ausgewählte Streifen"
-
-
-msgid "Append"
-msgstr "Anfügen"
 
 
 msgctxt "Operator"
@@ -47636,10 +47577,6 @@ msgid "Camera Override"
 msgstr "Kamera überschreiben"
 
 
-msgid "Use Grease Pencil"
-msgstr "Wachsstift verwenden"
-
-
 msgid "Sound Sequence"
 msgstr "Sound-Sequenz"
 
@@ -54247,10 +54184,6 @@ msgid "Invert"
 msgstr "Invertieren"
 
 
-msgid "Transparency Masks:"
-msgstr "Transparenzmasken:"
-
-
 msgctxt "Operator"
 msgid "Lock Unselected"
 msgstr "Sperre unausgewähltes"
@@ -58286,10 +58219,6 @@ msgid "With Automatic Weights"
 msgstr "Mit automatischer Gewichtung"
 
 
-msgid "No layer to copy"
-msgstr "Keine Ebene zum kopieren"
-
-
 msgctxt "Operator"
 msgid "Paste by Layer"
 msgstr "Lagenweise einfügen"
@@ -58612,16 +58541,16 @@ msgid "Const"
 msgstr "Konstante"
 
 
-msgid "blend_data"
-msgstr "blend_daten"
-
-
 msgid "UVMap"
 msgstr "UV-Map"
 
 
 msgid "Col"
 msgstr "Farbe"
+
+
+msgid "Int"
+msgstr "Int"
 
 
 msgid "PreviewCol"
@@ -59353,6 +59282,10 @@ msgstr "Kein aktives Einzelbild zum Löschen"
 
 msgid "No active frame(s) to delete"
 msgstr "Kein aktive(s) Einzelbild(er) zum Löschen"
+
+
+msgid "Nothing selected"
+msgstr "Nichts ausgewählt"
 
 
 msgid "No active area"
@@ -60114,14 +60047,6 @@ msgid "Only"
 msgstr "Nur"
 
 
-msgid "Renderable Objects"
-msgstr "Renderfähige Objekte"
-
-
-msgid "Visible Objects"
-msgstr "Sichtbare Objekte"
-
-
 msgid "Object Options"
 msgstr "Objekt Optionen"
 
@@ -60281,10 +60206,6 @@ msgstr "Ungültige Auswahlreihenfolge"
 
 msgid "Mouse path too short"
 msgstr "Mauspfad zu kurz"
-
-
-msgid "Nothing selected"
-msgstr "Nichts ausgewählt"
 
 
 msgid "Selection not supported in object mode"
@@ -60468,10 +60389,6 @@ msgstr "Feld"
 
 msgid "Object not found"
 msgstr "Objekt nicht gefunden"
-
-
-msgid "Object could not be duplicated"
-msgstr "Objekt kann nicht dupliziert werden"
 
 
 msgid "Cannot edit external library data"
@@ -60970,6 +60887,10 @@ msgid "Swap Areas"
 msgstr "Bereiche tauschen"
 
 
+msgid "Maximize Area"
+msgstr "Flächenbereich maximieren"
+
+
 msgid "Flip to Bottom"
 msgstr "Nach unten schieben"
 
@@ -60984,14 +60905,6 @@ msgstr "Kopfzeile anzeigen"
 
 msgid "Show Tool Settings"
 msgstr "Zeige Werkzeug Einstellungen"
-
-
-msgid "Tile Area"
-msgstr "Kacheln"
-
-
-msgid "Maximize Area"
-msgstr "Flächenbereich maximieren"
 
 
 msgid "Show Footer"
@@ -61573,154 +61486,6 @@ msgstr "Aktiver Streifenname"
 
 msgid "No valid action to add"
 msgstr "Keine gültige Aktion zum Hinzufügen"
-
-
-msgid "Sta"
-msgstr "Stempel"
-
-
-msgid "Label Size"
-msgstr "Beschriftungsgröße"
-
-
-msgid "Frame: %d"
-msgstr "Einzelbild: %d"
-
-
-msgid "Squash"
-msgstr "Quetschen"
-
-
-msgid "Center:"
-msgstr "Mittelpunkt:"
-
-
-msgid "Bokeh Type:"
-msgstr "Bokeh Typ:"
-
-
-msgid "Speed:"
-msgstr "Geschwindigkeit:"
-
-
-msgid "Inner Edge:"
-msgstr "Innere Kante:"
-
-
-msgid "Buffer Edge:"
-msgstr "Pufferkante:"
-
-
-msgid "Color Space:"
-msgstr "Farbraum:"
-
-
-msgid "Despill Channel:"
-msgstr "Auffüll-kanal:"
-
-
-msgid "Limiting Channel:"
-msgstr "Kanal begrenzen:"
-
-
-msgid "Key Channel:"
-msgstr "Schlüsselkanal:"
-
-
-msgid "Path:"
-msgstr "Pfad:"
-
-
-msgid "Base Path:"
-msgstr "Basispfad:"
-
-
-msgid "Add Input"
-msgstr "Eingabe hinzufügen"
-
-
-msgid "File Subpath:"
-msgstr "Dateiunterpfad:"
-
-
-msgid "Format:"
-msgstr "Format:"
-
-
-msgid "Master"
-msgstr "Master"
-
-
-msgid "Highlights"
-msgstr "Glanzpunkte"
-
-
-msgid "Midtones"
-msgstr "Mitteltöne"
-
-
-msgid "Matte Objects:"
-msgstr "Matte Objekte:"
-
-
-msgid "Undefined Socket Type"
-msgstr "Undefinierter Sockel Typ"
-
-
-msgid "NodeTree"
-msgstr "Knotenbaum"
-
-
-msgid "Could not add an image node"
-msgstr "Bild-Knoten konnte nicht hinzugefügt werden"
-
-
-msgid "Could not add a mask node"
-msgstr "Masken-Knoten konnte nicht hinzugefügt werden"
-
-
-msgid "Mask '%s' not found"
-msgstr "Maske '%s' nicht gefunden"
-
-
-msgid "Clipboard is empty"
-msgstr "Zwischenablage ist leer"
-
-
-msgid "Clipboard nodes are an incompatible type"
-msgstr "Zwischanablage-Knoten sind inkompatible Typen"
-
-
-msgid "Cannot ungroup"
-msgstr "Gruppierung kann nicht aufgehoben werden"
-
-
-msgid "Not inside node group"
-msgstr "Nicht innerhalb einer Gruppe"
-
-
-msgid "Cannot separate nodes"
-msgstr "Knoten können nicht separiert werden"
-
-
-msgid "Disconnect"
-msgstr "Trennen"
-
-
-msgid "Dependency Loop"
-msgstr "Auflösung"
-
-
-msgid "Add node to input"
-msgstr "Knoten zu Eingabe hinzufügen"
-
-
-msgid "Remove nodes connected to the input"
-msgstr "Entferne Knoten, die mit dem Eingang verbunden sind"
-
-
-msgid "Disconnect nodes connected to the input"
-msgstr "Knoten trennen, die mit dem Eingang verbunden sind"
 
 
 msgid "No active collection"
@@ -63129,14 +62894,6 @@ msgid "Transmission Depth"
 msgstr "Transmissionstiefe"
 
 
-msgid "Color1"
-msgstr "Farbe1"
-
-
-msgid "Color2"
-msgstr "Farbe2"
-
-
 msgid "Color Fac"
 msgstr "Farbfaktor"
 
@@ -63151,6 +62908,14 @@ msgstr "Textur weichzeichnen"
 
 msgid "BSSRDF"
 msgstr "BSSRDF"
+
+
+msgid "Color1"
+msgstr "Farbe1"
+
+
+msgid "Color2"
+msgstr "Farbe2"
 
 
 msgid "Mortar"

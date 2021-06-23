@@ -1,7 +1,7 @@
 
 msgid ""
 msgstr ""
-"Project-Id-Version: Blender 2.93.0 Beta (b'3c7b80ae2ca6')\n"
+"Project-Id-Version: Blender 3.0.0 Alpha (b'748475b9431c')\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2020-01-01 00:00:00\n"
 "PO-Revision-Date: 2020-01-04 05:04+0900\n"
@@ -979,8 +979,8 @@ msgid "Face"
 msgstr "페이스"
 
 
-msgid "Curve"
-msgstr "커브"
+msgid "Spline"
+msgstr "스플라인"
 
 
 msgid "Bake Data"
@@ -4609,6 +4609,10 @@ msgstr "다음에서 시퀀서 동작하는 컬러 공간"
 
 msgid "Color management settings used for displaying images on the display"
 msgstr "디스플레이에서 이미지을 표시하는 데 사용되는 컬러 매니지먼트 설정"
+
+
+msgid "Curve"
+msgstr "커브"
 
 
 msgid "Color curve mapping applied before display transform"
@@ -11013,6 +11017,14 @@ msgid "Sort items descending, from highest value to lowest"
 msgstr "가장 높은 값에서 가장 낮은 값으로 내림차순으로 항목 정렬"
 
 
+msgid "Link"
+msgstr "연결"
+
+
+msgid "Append"
+msgstr "덧붙이기"
+
+
 msgid "Domain Settings"
 msgstr "도메인 설정"
 
@@ -13153,10 +13165,6 @@ msgid "Material Index"
 msgstr "매테리얼 인댁스"
 
 
-msgid "Index of material used in this stroke"
-msgstr "이 스트로크에서 사용된 매테리얼의 인덱스"
-
-
 msgid "Stroke Points"
 msgstr "스트로크 포인트"
 
@@ -14499,10 +14507,6 @@ msgstr "라이브러리 재정의"
 
 msgid "Library override data"
 msgstr "라이브러리 재정의 데이터"
-
-
-msgid "Preview image and icon of this data-block (None if not supported for this type of data)"
-msgstr "이 데이터 블럭의 아이콘 및 이미지를 미리보기 (데이터의 유형이 지원되지 않은 경우 없음)"
 
 
 msgid "Tag"
@@ -16294,10 +16298,6 @@ msgid "End Mapping Type"
 msgstr "종료 맵핑 유형"
 
 
-msgid "Spline"
-msgstr "스플라인"
-
-
 msgid "Start Mapping Type"
 msgstr "시작 매핑 유형"
 
@@ -16418,16 +16418,8 @@ msgid "Texture Space Location"
 msgstr "텍스처 공간 위치"
 
 
-msgid "Texture space location"
-msgstr "텍스처 공간 위치"
-
-
 msgid "Texture Space Size"
 msgstr "텍스처 공간 크기"
-
-
-msgid "Texture space size"
-msgstr "텍스처 공간의 크기"
 
 
 msgid "Twist Method"
@@ -17520,10 +17512,6 @@ msgstr "화면 공간"
 
 msgid "Set stroke thickness relative to the screen space"
 msgstr "화면 공간을 기준으로 스트로크 두께를 설정합니다"
-
-
-msgid "Lock automatically all layers except active one to avoid accidental changes"
-msgstr "우발적인 변경을 피하기 위해 활성 레이어를 제외한 모든 레이어를 자동으로 잠급니다"
 
 
 msgid "Use Custom Ghost Colors"
@@ -19040,6 +19028,14 @@ msgid "Derive texture coordinates from another mesh"
 msgstr "다른 메쉬의 텍스처 좌표를 도출"
 
 
+msgid "Texture space location"
+msgstr "텍스처 공간 위치"
+
+
+msgid "Texture space size"
+msgstr "텍스처 공간의 크기"
+
+
 msgid "Texture Mesh"
 msgstr "텍스처 메쉬"
 
@@ -19490,6 +19486,10 @@ msgstr "낮은"
 
 msgid "Low quality"
 msgstr "낮은 품질"
+
+
+msgid "Tiled"
+msgstr "타일화"
 
 
 msgid "Render Quality"
@@ -26764,10 +26764,6 @@ msgid "Material slot in an object"
 msgstr "오브젝트에 매테리얼 슬롯"
 
 
-msgid "Link"
-msgstr "연결"
-
-
 msgid "Link material to object or the object's data"
 msgstr "오브젝트 또는 오브젝트의 데이터로 매테리얼을 연결"
 
@@ -27271,10 +27267,6 @@ msgstr "메타볼 컨텍스트 메뉴"
 
 msgid "Generate Weights"
 msgstr "웨이트를 생성"
-
-
-msgid "Copy Layer to Object"
-msgstr "레이어를 오브젝트에 복사"
 
 
 msgid "Hooks"
@@ -35122,8 +35114,16 @@ msgid "Round A to the largest integer multiple of B less than or equal A"
 msgstr "A를 A보다 작거나 같은 B의 가장 큰 정수 배수로 반올림"
 
 
+msgid "Z Axis"
+msgstr "Z 축"
+
+
 msgid "Original"
 msgstr "원본"
+
+
+msgid "Convex Hull"
+msgstr "볼록 선체"
 
 
 msgid "Fill Type"
@@ -36043,10 +36043,6 @@ msgid "Vector Math"
 msgstr "벡터 수학"
 
 
-msgid "Z Axis"
-msgstr "Z 축"
-
-
 msgid "Vector Transform"
 msgstr "벡터 변환"
 
@@ -36169,10 +36165,6 @@ msgstr "소켓의 이름"
 
 msgid "Data type of the socket"
 msgstr "소켓의 데이터 유형"
-
-
-msgid "Int"
-msgstr "정수"
 
 
 msgid "From node"
@@ -41794,11 +41786,6 @@ msgid "Write the rest state at the first frame"
 msgstr "첫번째 프레임에서 휴식 상태를 쓰기"
 
 
-msgctxt "Operator"
-msgid "Automatically Pack Into .blend"
-msgstr "자동으로 .blend 파일에 포장"
-
-
 msgid "Automatically pack all external files into the .blend file"
 msgstr "자동으로 모든 외부 파일을 .blend 파일에 포장합니다"
 
@@ -41899,14 +41886,6 @@ msgid "Execute selected file"
 msgstr "선택된 파일을 실행"
 
 
-msgid "Need Active"
-msgstr "활성 필요"
-
-
-msgid "Only execute if there's an active selected file in the file list"
-msgstr "파일 목록에서 활성 선택한 파일이 있을 경우에만 실행"
-
-
 msgctxt "Operator"
 msgid "Increment Number in Filename"
 msgstr "파일 이름에 증가 번호"
@@ -41960,18 +41939,8 @@ msgid "Highlight selected file(s)"
 msgstr "선택된 파일(들)을 강조"
 
 
-msgctxt "Operator"
-msgid "Make All Paths Absolute"
-msgstr "모든 경로를 절대적으로 만들기"
-
-
 msgid "Make all paths to external files absolute"
 msgstr "외부 파일에 대한 모든 경로를 절대적으로 만듭니다"
-
-
-msgctxt "Operator"
-msgid "Make All Paths Relative"
-msgstr "모든 경로를 상대적으로 만들기"
 
 
 msgid "Make all paths to external files relative to current .blend"
@@ -41985,24 +41954,6 @@ msgstr "다음 폴더"
 
 msgid "Move to next folder"
 msgstr "다음 폴더로 이동"
-
-
-msgctxt "Operator"
-msgid "Pack All Into .blend"
-msgstr "모두 .blend 파일에 포장"
-
-
-msgid "Pack all used external files into the .blend"
-msgstr "사용된 모든 외부 데이터를 .blend 파일에 포장합니다"
-
-
-msgctxt "Operator"
-msgid "Pack Blender Libraries"
-msgstr "블렌더 라이브러리를 포장"
-
-
-msgid "Pack all used Blender library files into the current .blend"
-msgstr "사용된 모든 블렌더 라이브러리를 현재 .blend 파일에 포장합니다"
 
 
 msgctxt "Operator"
@@ -42123,11 +42074,6 @@ msgid "Change sorting to use column under cursor"
 msgstr "커서 아래 열을 사용하도록 정렬을 변경"
 
 
-msgctxt "Operator"
-msgid "Unpack All Into Files"
-msgstr "모두 파일로 포장 해제"
-
-
 msgid "Unpack all files packed into this .blend to external ones"
 msgstr "포장된 모든 파일을 .blend 파일에 외부로 포장 해제합니다"
 
@@ -42187,15 +42133,6 @@ msgstr "원래 위치의 파일을 사용 (필요한 경우 생성)"
 
 msgid "Write file to original location (overwrite existing file)"
 msgstr "원래 위치로 파일을 작성 (기존의 파일을 덮어 쓰기)"
-
-
-msgctxt "Operator"
-msgid "Unpack Blender Libraries"
-msgstr "블렌더 라이브러리를 포장 해제"
-
-
-msgid "Unpack all used Blender library files from this .blend file"
-msgstr "모든 사용된 블렌더 라이브러리 파일을 이 .blend 파일에서 포장 해제"
 
 
 msgctxt "Operator"
@@ -43190,12 +43127,8 @@ msgid "Duplicate Layer to New Object"
 msgstr "레이어를 새 오브젝트로 복제"
 
 
-msgid "Make a copy of the active Grease Pencil layer to new object"
-msgstr "활성 그리스 펜슬 레이어의 복사본을 새로운 오브젝트로 만듭니다"
-
-
-msgid "Name of the destination object"
-msgstr "목적지 오브젝트의 이름"
+msgid "Only Active"
+msgstr "활성 만"
 
 
 msgctxt "Operator"
@@ -44089,10 +44022,6 @@ msgid "Add F-Modifier to the active/selected F-Curves"
 msgstr "활성/선택된 F-커브에 F-모디파이어를 추가"
 
 
-msgid "Only Active"
-msgstr "활성 만"
-
-
 msgid "Only add F-Modifier to active F-Curve"
 msgstr "활성 F-커브로 F-모디파이어를 추가 만"
 
@@ -44408,10 +44337,6 @@ msgstr "이미지 높이"
 
 msgid "Image data-block name"
 msgstr "이미지 데이터 블럭 이름"
-
-
-msgid "Tiled"
-msgstr "타일화"
 
 
 msgid "Create a tiled image"
@@ -49562,10 +49487,6 @@ msgid "Add named object"
 msgstr "명명된 오브젝트를 추가"
 
 
-msgid "Duplicate object but not object data, linking to the original data"
-msgstr "오브젝트 가 복제되었지만 오브젝트 데이터가 아니라 원본 데이터에 연결"
-
-
 msgid "Object name to add"
 msgstr "추가하는 오브젝트 이름"
 
@@ -49942,6 +49863,10 @@ msgstr "오브젝트를 복제"
 
 msgid "Duplicate selected objects"
 msgstr "선택된 오브젝트를 복제"
+
+
+msgid "Duplicate object but not object data, linking to the original data"
+msgstr "오브젝트 가 복제되었지만 오브젝트 데이터가 아니라 원본 데이터에 연결"
 
 
 msgid "Duplicate selected objects and move them"
@@ -54271,10 +54196,6 @@ msgid "Target Path"
 msgstr "대상 경로"
 
 
-msgid "User Prefs"
-msgstr "사용자 환경 설정"
-
-
 msgctxt "Operator"
 msgid "Refresh"
 msgstr "새로 고침"
@@ -54812,10 +54733,6 @@ msgid "Automatically calculate mass values for Rigid Body Objects based on volum
 msgstr "자동으로 볼륨에 따라 리지드 바디 오브젝트에 대한 질량 값을 계산"
 
 
-msgid "Custom density value (kg/m^3) to use instead of material preset"
-msgstr "매테리얼 프리셋 대신 사용할 밀도 값 (kg/m^3)을 커스텀"
-
-
 msgid "Material Preset"
 msgstr "매테리얼 프리셋"
 
@@ -54900,10 +54817,6 @@ msgstr "리지드 바디 셰이프"
 
 msgid "Box-like shapes (i.e. cubes), including planes (i.e. ground planes)"
 msgstr "박스 모양 (즉, 큐브), 평면을 포함하여 (즉, 접지면)"
-
-
-msgid "Convex Hull"
-msgstr "볼록 선체"
 
 
 msgid "A mesh-like surface encompassing (i.e. shrinkwrap over) all vertices (best results with fewer vertices)"
@@ -56414,26 +56327,14 @@ msgid "Make Meta Strip"
 msgstr "메타 스트립을 만들기"
 
 
-msgid "Group selected strips into a metastrip"
-msgstr "메타 스트립에 선택된 스트립을 그룹"
-
-
 msgctxt "Operator"
 msgid "UnMeta Strip"
 msgstr "메타 스트립을 해제"
 
 
-msgid "Put the contents of a metastrip back in the sequencer"
-msgstr "시퀀서에서 메타 스트립 뒤쪽의 내용을 넣기"
-
-
 msgctxt "Operator"
 msgid "Toggle Meta Strip"
 msgstr "메타 스트립을 토글"
-
-
-msgid "Toggle a metastrip (to edit enclosed strips)"
-msgstr "메타 스트립을 토글 (동봉된 스트립을 편집)"
 
 
 msgctxt "Operator"
@@ -56773,10 +56674,6 @@ msgstr "활성 스트립의 모디파이어를 선택한 모든 스트립에 복
 
 msgid "Replace modifiers in destination"
 msgstr "목적지에서 모디파이어를 교체"
-
-
-msgid "Append"
-msgstr "덧붙이기"
 
 
 msgid "Append active modifiers to selected strips"
@@ -58671,10 +58568,6 @@ msgstr "UV 경계 안으로 각 UV의 페이스를 포장"
 
 msgid "New Image"
 msgstr "새로운 이미지"
-
-
-msgid "Assign new images for every mesh (only one if shared tex space enabled)"
-msgstr "모든 메쉬에 대해 새 이미지를 할당 (공유 텍 문자 공간이 활성화된 경우에만 하나씩)"
 
 
 msgid "Pack Quality"
@@ -71512,14 +71405,6 @@ msgid "Sequence strip to load a video"
 msgstr "비디오를 불러오는 시퀀스 스트립"
 
 
-msgid "MPEG Preseek"
-msgstr "MPEG Preseek"
-
-
-msgid "For MPEG movies, preseek this many frames"
-msgstr "MPEG 무비의 경우, preseek이 많은 프레임"
-
-
 msgid "Stream Index"
 msgstr "흐름 인덱스"
 
@@ -71562,14 +71447,6 @@ msgstr "씬의 3D 카메라를 입력으로 사용"
 
 msgid "Use the Scene's Sequencer timeline as input"
 msgstr "씬의 시퀀서 타임 라인을 입력으로 사용"
-
-
-msgid "Use Grease Pencil"
-msgstr "그리스 펜슬을 사용"
-
-
-msgid "Show Grease Pencil strokes in OpenGL previews"
-msgstr "OpenGL 미리보기에서 그리스 펜슬 스트로크를 표시합니다"
 
 
 msgid "Sound Sequence"
@@ -71966,10 +71843,6 @@ msgstr "빌드 75% 프록시 해상도"
 
 msgid "Location of custom proxy file"
 msgstr "커스텀 프록시 파일의 위치"
-
-
-msgid "JPEG Quality of proxies to build"
-msgstr "작성하는 프록시의 JPEG 품질"
 
 
 msgid "Method for reading the inputs timecode"
@@ -82953,10 +82826,6 @@ msgid "Tracker"
 msgstr "트래커"
 
 
-msgid "Build JPEG Quality"
-msgstr "빌드 JPEG 품질"
-
-
 msgid "Fractional Preview Zoom"
 msgstr "분수적 미리보기 줌"
 
@@ -84869,10 +84738,6 @@ msgid "With Automatic Weights"
 msgstr "자동 웨이트와 함께"
 
 
-msgid "No layer to copy"
-msgstr "복사 할 레이어가 없습니다"
-
-
 msgctxt "Operator"
 msgid "Paste by Layer"
 msgstr "레이어로 붙여 넣기"
@@ -84973,10 +84838,6 @@ msgstr "페이스를 삭제"
 msgctxt "Operator"
 msgid "Clear Freestyle Face"
 msgstr "프리스타일 페이스를 지우기"
-
-
-msgid "No destination object"
-msgstr "목적지 오브젝트가 없음"
 
 
 msgid "Specular Lighting"
@@ -85216,16 +85077,16 @@ msgid "Const"
 msgstr "상수"
 
 
-msgid "blend_data"
-msgstr "blend_data"
-
-
 msgid "UVMap"
 msgstr "UV 맵"
 
 
 msgid "Col"
 msgstr "Col"
+
+
+msgid "Int"
+msgstr "정수"
 
 
 msgid "PreviewCol"
@@ -86715,6 +86576,10 @@ msgid "Cannot separate an object with one layer only"
 msgstr "한 레이어 만 오브젝트를 분리 할 수 없습니다"
 
 
+msgid "Nothing selected"
+msgstr "아무 것도 선택되지 않음"
+
+
 msgid "No active area"
 msgstr "활성 영역 없음"
 
@@ -87771,10 +87636,6 @@ msgid "Mouse path too short"
 msgstr "너무 짧 마우스 경로"
 
 
-msgid "Nothing selected"
-msgstr "아무 것도 선택되지 않음"
-
-
 msgid "Selection not supported in object mode"
 msgstr "오브젝트 모드에서 지원되지 않는 선택"
 
@@ -87955,10 +87816,6 @@ msgstr "연결된 오브젝트/오브젝트 데이터를 변환하여 '원본 �
 
 msgid "Object not found"
 msgstr "오브젝트를 찾을 수 없습니다"
-
-
-msgid "Object could not be duplicated"
-msgstr "오브젝트를 복제 할 수 없음"
 
 
 msgid "This data does not support joining in edit mode"
@@ -88945,6 +88802,10 @@ msgid "Swap Areas"
 msgstr "영역을 교환"
 
 
+msgid "Maximize Area"
+msgstr "최대화 영역"
+
+
 msgid "Flip to Bottom"
 msgstr "아래쪽으로 뒤집기"
 
@@ -88959,14 +88820,6 @@ msgstr "해더를 표시"
 
 msgid "Show Tool Settings"
 msgstr "도구 설정을 표시"
-
-
-msgid "Tile Area"
-msgstr "타일 영역"
-
-
-msgid "Maximize Area"
-msgstr "최대화 영역"
 
 
 msgid "Show Footer"
@@ -89959,196 +89812,8 @@ msgid "Modifier could not be added to (%s : %s) (see console for details)"
 msgstr "모디파이어를 (%s : %s)에 추가할 수 없습니다 (자세한 내용은 콘솔 참조)"
 
 
-msgid "Sta"
-msgstr "Sta"
-
-
-msgid "Label Size"
-msgstr "레이블 크기"
-
-
-msgid "Frame: %d"
-msgstr "프레임: %d"
-
-
-msgid "Squash"
-msgstr "스쿼시"
-
-
-msgid "Center:"
-msgstr "중심:"
-
-
-msgid "Bokeh Type:"
-msgstr "보케 유형:"
-
-
-msgid "Speed:"
-msgstr "속력:"
-
-
-msgid "Inner Edge:"
-msgstr "안쪽 에지:"
-
-
-msgid "Buffer Edge:"
-msgstr "버퍼 에지:"
-
-
-msgid "Color Space:"
-msgstr "컬러 공간:"
-
-
-msgid "Despill Channel:"
-msgstr "디스필 채널:"
-
-
-msgid "Limiting Channel:"
-msgstr "채널을 제한:"
-
-
-msgid "Key Channel:"
-msgstr "키 채널:"
-
-
-msgid "Path:"
-msgstr "경로:"
-
-
-msgid "Base Path:"
-msgstr "베이스 경로:"
-
-
-msgid "Add Input"
-msgstr "입력을 추가"
-
-
-msgid "File Subpath:"
-msgstr "파일 하위 경로:"
-
-
-msgid "Format:"
-msgstr "형식:"
-
-
-msgid "Master"
-msgstr "마스터"
-
-
-msgid "Highlights"
-msgstr "강조"
-
-
-msgid "Midtones"
-msgstr "중간톤"
-
-
-msgid "Matte Objects:"
-msgstr "매트 오브젝트:"
-
-
-msgid "Add Crypto Layer"
-msgstr "크립토 레이어를 추가"
-
-
-msgid "Remove Crypto Layer"
-msgstr "크립토 레이어를 제거"
-
-
-msgid "Disabled, built without OpenImageDenoise"
-msgstr "비활성화, OpenImageDenoise없이 빌드"
-
-
-msgid "Disabled, CPU with SSE4.1 is required"
-msgstr "비활성화됨, SSE4.1이 있는 CPU가 필요합니다"
-
-
-msgid "Undefined Socket Type"
-msgstr "정의되지 않은 소켓 유형"
-
-
-msgid "NodeTree"
-msgstr "노드트리"
-
-
-msgid "Could not add an image node"
-msgstr "이미지 노드를 추가 할 수 없음"
-
-
-msgid "Could not add a mask node"
-msgstr "마스크 노드를 추가 할 수 없음"
-
-
-msgid "Mask '%s' not found"
-msgstr "마스크 '%s'을 찾을 수 없습니다"
-
-
-msgid "Node tree type %s undefined"
-msgstr "노드 트리 유형 %s 미정의"
-
-
 msgid "Sockets"
 msgstr "소켓"
-
-
-msgid "Clipboard is empty"
-msgstr "클립 보드가 비어 있음"
-
-
-msgid "Clipboard nodes are an incompatible type"
-msgstr "클립 보드 노드는 호환되지 않는 유형"
-
-
-msgid "Some nodes references could not be restored, will be left empty"
-msgstr "일부 노드 참조는 복원 할 수 없음, 엠프티로 남김"
-
-
-msgid "Text not used by any node, no update done"
-msgstr "모든 노드에 의해 사용되지 않는 텍스트, 업데이트 수행되지 않음"
-
-
-msgid "Cannot add node %s into node tree %s"
-msgstr "%s 노드를 노드 트리 %s에 추가할 수 없습니다"
-
-
-msgid "Cannot ungroup"
-msgstr "그룹을 해제 할 수 없습니다"
-
-
-msgid "Not inside node group"
-msgstr "내부 노드 그룹이 없습니다"
-
-
-msgid "Cannot separate nodes"
-msgstr "노드를 분리 할 수 없습니다"
-
-
-msgid "Can not add node '%s' in a group"
-msgstr "그룹에 노드 '%s'를 추가 할 수 없습니다"
-
-
-msgid "LMB: drag node link, RMB: cancel"
-msgstr "LMB: 드래그 노드 연결, RMB: 취소"
-
-
-msgid "Disconnect"
-msgstr "연결 끊기"
-
-
-msgid "Dependency Loop"
-msgstr "의존 루프"
-
-
-msgid "Add node to input"
-msgstr "입력에 노드를 추가"
-
-
-msgid "Remove nodes connected to the input"
-msgstr "입력에 연결된 노드를 제거"
-
-
-msgid "Disconnect nodes connected to the input"
-msgstr "입력에 연결된 노드를 연결 끊기"
 
 
 msgid "More than one collection is selected"
@@ -92664,14 +92329,6 @@ msgid "Transmission Depth"
 msgstr "전달 깊이"
 
 
-msgid "Color1"
-msgstr "컬러1"
-
-
-msgid "Color2"
-msgstr "컬러2"
-
-
 msgid "Color Fac"
 msgstr "컬러 팩터"
 
@@ -92686,6 +92343,14 @@ msgstr "텍스처 블러"
 
 msgid "BSSRDF"
 msgstr "BSSRDF"
+
+
+msgid "Color1"
+msgstr "컬러1"
+
+
+msgid "Color2"
+msgstr "컬러2"
 
 
 msgid "Mortar"

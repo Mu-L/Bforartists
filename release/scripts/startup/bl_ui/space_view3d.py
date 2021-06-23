@@ -2615,7 +2615,7 @@ class VIEW3D_MT_object_animation(Menu):
         layout.operator("anim.keyframe_insert_menu", text="Insert Keyframe", icon= 'KEYFRAMES_INSERT')
         layout.operator("anim.keyframe_delete_v3d", text="Delete Keyframes", icon= 'KEYFRAMES_REMOVE')
         layout.operator("anim.keyframe_clear_v3d", text="Clear Keyframes", icon= 'KEYFRAMES_CLEAR')
-        layout.operator("anim.keying_set_active_set", text="Change Keying Set", icon='TRIA_RIGHT')
+        layout.operator("anim.keying_set_active_set", text="Change Keying Set", icon='KEYINGSET')
 
         layout.separator()
 
@@ -3528,9 +3528,9 @@ class VIEW3D_MT_mask(Menu):
         props = layout.operator("mesh.paint_mask_slice", text="Mask Slice", icon = "MASK_SLICE")
         props.fill_holes = False
         props.new_object = False
-        props = layout.operator("mesh.paint_mask_slice", text="Mask Slice and Fill Holes", icon = "MASK_SLICE")
+        props = layout.operator("mesh.paint_mask_slice", text="Mask Slice and Fill Holes", icon = "MASK_SLICE_FILL")
         props.new_object = False
-        props = layout.operator("mesh.paint_mask_slice", text="Mask Slice to New Object", icon = "MASK_SLICE")
+        props = layout.operator("mesh.paint_mask_slice", text="Mask Slice to New Object", icon = "MASK_SLICE_NEW")
 
         layout.separator()
 
@@ -3560,14 +3560,9 @@ class VIEW3D_MT_face_sets(Menu):
     def draw(self, _context):
         layout = self.layout
 
-        op = layout.operator("sculpt.face_sets_create", text='Face Set from Masked', icon = "MOD_MASK")
-        op.mode = 'MASKED'
-
-        op = layout.operator("sculpt.face_sets_create", text='Face Set from Visible', icon = "FILL_MASK")
-        op.mode = 'VISIBLE'
-
-        op = layout.operator("sculpt.face_sets_create", text='Face Set from Edit Mode Selection', icon = "EDITMODE_HLT")
-        op.mode = 'SELECTION'
+        layout.operator("sculpt.face_sets_create", text='Face Set from Masked', icon = "MOD_MASK").mode = 'MASKED'
+        layout.operator("sculpt.face_sets_create", text='Face Set from Visible', icon = "FILL_MASK").mode = 'VISIBLE'
+        layout.operator("sculpt.face_sets_create", text='Face Set from Edit Mode Selection', icon = "EDITMODE_HLT").mode = 'SELECTION'
 
         layout.separator()
 
@@ -3575,31 +3570,23 @@ class VIEW3D_MT_face_sets(Menu):
 
         layout.separator()
 
-        op = layout.operator("sculpt.face_set_edit", text='Grow Face Set', icon = 'SELECTMORE')
-        op.mode = 'GROW'
-
-        op = layout.operator("sculpt.face_set_edit", text='Shrink Face Set', icon = 'SELECTLESS')
-        op.mode = 'SHRINK'
+        layout.operator("sculpt.face_set_edit", text='Grow Face Set', icon = 'SELECTMORE').mode = 'GROW'
+        layout.operator("sculpt.face_set_edit", text='Shrink Face Set', icon = 'SELECTLESS').mode = 'SHRINK'
 
         layout.separator()
 
-        op = layout.operator("mesh.face_set_extract", text='Extract Face Set', icon = "SEPARATE")
+        layout.operator("mesh.face_set_extract", text='Extract Face Set', icon = "SEPARATE")
 
         layout.separator()
 
-        op = layout.operator("sculpt.face_set_change_visibility", text='Invert Visible Face Sets', icon = "INVERT_MASK")
-        op.mode = 'INVERT'
-
-        op = layout.operator("sculpt.face_set_change_visibility", text='Show All Face Sets', icon = "HIDE_OFF")
-        op.mode = 'SHOW_ALL'
-        op = layout.operator("sculpt.face_set_change_visibility", text='Toggle Visibility', icon = "HIDE_UNSELECTED")
-        op.mode = 'TOGGLE'
-        op = layout.operator("sculpt.face_set_change_visibility", text='Hide Active Face Sets', icon = "HIDE_ON")
-        op.mode = 'HIDE_ACTIVE'
+        layout.operator("sculpt.face_set_change_visibility", text='Invert Visible Face Sets', icon = "INVERT_MASK").mode = 'INVERT'
+        layout.operator("sculpt.face_set_change_visibility", text='Show All Face Sets', icon = "HIDE_OFF").mode = 'SHOW_ALL'
+        layout.operator("sculpt.face_set_change_visibility", text='Toggle Visibility', icon = "HIDE_UNSELECTED").mode = 'TOGGLE'
+        layout.operator("sculpt.face_set_change_visibility", text='Hide Active Face Sets', icon = "HIDE_ON").mode = 'HIDE_ACTIVE'
 
         layout.separator()
 
-        op = layout.operator("sculpt.face_sets_randomize_colors", text='Randomize Colors', icon = "COLOR")
+        layout.operator("sculpt.face_sets_randomize_colors", text='Randomize Colors', icon = "COLOR")
 
 
 class VIEW3D_MT_sculpt_set_pivot(Menu):
@@ -3679,32 +3666,15 @@ class VIEW3D_MT_face_sets_init(Menu):
     def draw(self, _context):
         layout = self.layout
 
-        op = layout.operator("sculpt.face_sets_init", text='By Loose Parts', icon = "SELECT_LOOSE")
-        op.mode = 'LOOSE_PARTS'
-
-        op = layout.operator("sculpt.face_sets_init", text='By Face Set Boundaries', icon = "SELECT_BOUNDARY")
-        op.mode = 'FACE_SET_BOUNDARIES'
-
-        op = layout.operator("sculpt.face_sets_init", text='By Materials', icon = "MATERIAL_DATA")
-        op.mode = 'MATERIALS'
-
-        op = layout.operator("sculpt.face_sets_init", text='By Normals', icon = "RECALC_NORMALS")
-        op.mode = 'NORMALS'
-
-        op = layout.operator("sculpt.face_sets_init", text='By UV Seams', icon = "MARK_SEAM")
-        op.mode = 'UV_SEAMS'
-
-        op = layout.operator("sculpt.face_sets_init", text='By Edge Creases', icon = "CREASE")
-        op.mode = 'CREASES'
-
-        op = layout.operator("sculpt.face_sets_init", text='By Edge Bevel Weight', icon = "BEVEL")
-        op.mode = 'BEVEL_WEIGHT'
-
-        op = layout.operator("sculpt.face_sets_init", text='By Sharp Edges', icon = "SELECT_SHARPEDGES")
-        op.mode = 'SHARP_EDGES'
-
-        op = layout.operator("sculpt.face_sets_init", text='By Face Maps', icon = "FACE_MAPS")
-        op.mode = 'FACE_MAPS'
+        layout.operator("sculpt.face_sets_init", text='By Loose Parts', icon = "SELECT_LOOSE").mode = 'LOOSE_PARTS'
+        layout.operator("sculpt.face_sets_init", text='By Face Set Boundaries', icon = "SELECT_BOUNDARY").mode = 'FACE_SET_BOUNDARIES'
+        layout.operator("sculpt.face_sets_init", text='By Materials', icon = "MATERIAL_DATA").mode = 'MATERIALS'
+        layout.operator("sculpt.face_sets_init", text='By Normals', icon = "RECALC_NORMALS").mode = 'NORMALS'
+        layout.operator("sculpt.face_sets_init", text='By UV Seams', icon = "MARK_SEAM").mode = 'UV_SEAMS'
+        layout.operator("sculpt.face_sets_init", text='By Edge Creases', icon = "CREASE").mode = 'CREASES'
+        layout.operator("sculpt.face_sets_init", text='By Edge Bevel Weight', icon = "BEVEL").mode = 'BEVEL_WEIGHT'
+        layout.operator("sculpt.face_sets_init", text='By Sharp Edges', icon = "SELECT_SHARPEDGES").mode = 'SHARP_EDGES'
+        layout.operator("sculpt.face_sets_init", text='By Face Maps', icon = "FACE_MAPS").mode = 'FACE_MAPS'
 
 
 class VIEW3D_MT_random_mask(Menu):
@@ -3713,14 +3683,9 @@ class VIEW3D_MT_random_mask(Menu):
     def draw(self, _context):
         layout = self.layout
 
-        op = layout.operator("sculpt.mask_init", text='Per Vertex', icon = "SELECT_UNGROUPED_VERTS")
-        op.mode = 'RANDOM_PER_VERTEX'
-
-        op = layout.operator("sculpt.mask_init", text='Per Face Set', icon = "FACESEL")
-        op.mode = 'RANDOM_PER_FACE_SET'
-
-        op = layout.operator("sculpt.mask_init", text='Per Loose Part', icon = "SELECT_LOOSE")
-        op.mode = 'RANDOM_PER_LOOSE_PART'
+        layout.operator("sculpt.mask_init", text='Per Vertex', icon = "SELECT_UNGROUPED_VERTS").mode = 'RANDOM_PER_VERTEX'
+        layout.operator("sculpt.mask_init", text='Per Face Set', icon = "FACESEL").mode = 'RANDOM_PER_FACE_SET'
+        layout.operator("sculpt.mask_init", text='Per Loose Part', icon = "SELECT_LOOSE").mode = 'RANDOM_PER_LOOSE_PART'
 
 
 class VIEW3D_MT_particle(Menu):
@@ -3882,7 +3847,7 @@ class VIEW3D_MT_pose_transform(Menu):
         layout = self.layout
 
         layout.operator("pose.transforms_clear", text="All", icon = "CLEAR")
-        layout.operator("pose.user_transforms_clear", icon = "CLEAR")
+        layout.operator("pose.user_transforms_clear", icon = "NODE_TRANSFORM_CLEAR")
 
         layout.separator()
 
@@ -3903,8 +3868,8 @@ class VIEW3D_MT_pose_slide(Menu):
 
         layout.operator("pose.push_rest", icon = 'PUSH_POSE')
         layout.operator("pose.relax_rest", icon = 'RELAX_POSE')
-        layout.operator("pose.push", icon = 'PUSH_POSE')
-        layout.operator("pose.relax", icon = 'RELAX_POSE')
+        layout.operator("pose.push", icon = 'POSE_FROM_BREAKDOWN')
+        layout.operator("pose.relax", icon = 'POSE_RELAX_TO_BREAKDOWN')
         layout.operator("pose.breakdown", icon = 'BREAKDOWNER_POSE')
 
 
@@ -3918,16 +3883,16 @@ class VIEW3D_MT_pose_propagate(Menu):
 
         layout.separator()
 
-        layout.operator("pose.propagate", text="To Next Keyframe", icon = "PROPAGATE").mode = 'NEXT_KEY'
-        layout.operator("pose.propagate", text="To Last Keyframe (Make Cyclic)", icon = "PROPAGATE").mode = 'LAST_KEY'
+        layout.operator("pose.propagate", text="To Next Keyframe", icon = "PROPAGATE_NEXT").mode = 'NEXT_KEY'
+        layout.operator("pose.propagate", text="To Last Keyframe (Make Cyclic)", icon = "PROPAGATE_PREVIOUS").mode = 'LAST_KEY'
 
         layout.separator()
 
-        layout.operator("pose.propagate", text="On Selected Keyframes", icon = "PROPAGATE").mode = 'SELECTED_KEYS'
+        layout.operator("pose.propagate", text="On Selected Keyframes", icon = "PROPAGATE_SELECTED").mode = 'SELECTED_KEYS'
 
         layout.separator()
 
-        layout.operator("pose.propagate", text="On Selected Markers", icon = "PROPAGATE").mode = 'SELECTED_MARKERS'
+        layout.operator("pose.propagate", text="On Selected Markers", icon = "PROPAGATE_MARKER").mode = 'SELECTED_MARKERS'
 
 
 class VIEW3D_MT_pose_library(Menu):
@@ -4028,7 +3993,7 @@ class VIEW3D_MT_pose_apply(Menu):
         layout = self.layout
 
         layout.operator("pose.armature_apply", icon = "MOD_ARMATURE")
-        layout.operator("pose.armature_apply", text="Apply Selected as Rest Pose", icon = "MOD_ARMATURE").selected = True
+        layout.operator("pose.armature_apply", text="Apply Selected as Rest Pose", icon = "MOD_ARMATURE_SELECTED").selected = True
         layout.operator("pose.visual_transform_apply", icon = "APPLYMOVE")
 
         layout.separator()
@@ -4077,7 +4042,7 @@ class VIEW3D_MT_pose_context_menu(Menu):
 
         layout.separator()
 
-        layout.operator("pose.user_transforms_clear", icon = "CLEAR")
+        layout.operator("pose.user_transforms_clear", icon = "NODE_TRANSFORM_CLEAR")
 
 
 class BoneOptions:
@@ -4538,7 +4503,7 @@ class VIEW3D_MT_edit_mesh_vertices_legacy(Menu):
 class VIEW3D_MT_edit_mesh_edges_data(Menu):
     bl_label = "Edge Data"
 
-    def draw(self, context):
+    def draw(self, _context):
         layout = self.layout
 
         layout.operator_context = 'INVOKE_REGION_WIN'
@@ -5398,7 +5363,7 @@ class VIEW3D_MT_edit_armature(Menu):
 
         layout.operator_context = 'INVOKE_REGION_WIN'
         layout.operator("armature.armature_layers", icon = "LAYER")
-        layout.operator("armature.bone_layers", icon = "LAYER")
+        layout.operator("armature.bone_layers", icon = "BONE_LAYER")
 
         layout.separator()
 
@@ -5539,8 +5504,8 @@ class VIEW3D_MT_gpencil_simplify(Menu):
     def draw(self, _context):
         layout = self.layout
         layout.operator("gpencil.stroke_simplify_fixed", text="Fixed", icon = "MOD_SIMPLIFY")
-        layout.operator("gpencil.stroke_simplify", text="Adaptative", icon = "MOD_SIMPLIFY")
-        layout.operator("gpencil.stroke_sample", text="Sample", icon = "MOD_SIMPLIFY")
+        layout.operator("gpencil.stroke_simplify", text="Adaptative", icon = "SIMPLIFY_ADAPTIVE")
+        layout.operator("gpencil.stroke_sample", text="Sample", icon = "SIMPLIFY_SAMPLE")
 
 
 class VIEW3D_MT_draw_gpencil(Menu):
@@ -5687,7 +5652,7 @@ class VIEW3D_MT_edit_gpencil_stroke(Menu):
         layout.separator()
 
         layout.operator("gpencil.stroke_join", text="Join", icon = "JOIN").type = 'JOIN'
-        layout.operator("gpencil.stroke_join", text="Join and Copy", icon = "JOIN").type = 'JOINCOPY'
+        layout.operator("gpencil.stroke_join", text="Join and Copy", icon = "JOINCOPY").type = 'JOINCOPY'
 
         layout.separator()
 
@@ -5699,7 +5664,7 @@ class VIEW3D_MT_edit_gpencil_stroke(Menu):
         layout.separator()
 
         # Convert
-        op = layout.operator("gpencil.stroke_cyclical_set", text="Close", icon = 'TOGGLE_CYCLIC')
+        op = layout.operator("gpencil.stroke_cyclical_set", text="Close", icon = 'TOGGLE_CLOSE')
         op.type = 'CLOSE'
         op.geometry = True
         layout.operator("gpencil.stroke_cyclical_set", text="Toggle Cyclic", icon = 'TOGGLE_CYCLIC').type = 'TOGGLE'
@@ -5709,6 +5674,11 @@ class VIEW3D_MT_edit_gpencil_stroke(Menu):
         layout.separator()
 
         layout.operator_menu_enum("gpencil.reproject", property="type", text="Reproject Strokes")
+
+        layout.operator("gpencil.stroke_normalize", text="Normalize Thickness", icon = "MOD_THICKNESS").mode = 'THICKNESS'
+        layout.operator("gpencil.stroke_normalize", text="Normalize Opacity", icon = "MOD_OPACITY").mode = 'OPACITY'
+
+        layout.separator()
 
         layout.separator()
         layout.operator("gpencil.reset_transform_fill", text="Reset Fill Transform", icon = "RESET")
@@ -5997,17 +5967,10 @@ class VIEW3D_MT_sculpt_face_sets_edit_pie(Menu):
         layout = self.layout
         pie = layout.menu_pie()
 
-        op = pie.operator("sculpt.face_sets_create", text='Face Set from Masked')
-        op.mode = 'MASKED'
-
-        op = pie.operator("sculpt.face_sets_create", text='Face Set from Visible')
-        op.mode = 'VISIBLE'
-
-        op = pie.operator("sculpt.face_set_change_visibility", text='Invert Visible')
-        op.mode = 'INVERT'
-
-        op = pie.operator("sculpt.face_set_change_visibility", text='Show All')
-        op.mode = 'SHOW_ALL'
+        pie.operator("sculpt.face_sets_create", text='Face Set from Masked').mode = 'MASKED'
+        pie.operator("sculpt.face_sets_create", text='Face Set from Visible').mode = 'VISIBLE'
+        pie.operator("sculpt.face_set_change_visibility", text='Invert Visible').mode = 'INVERT'
+        pie.operator("sculpt.face_set_change_visibility", text='Show All').mode = 'SHOW_ALL'
 
 
 class VIEW3D_MT_wpaint_vgroup_lock_pie(Menu):
@@ -7995,7 +7958,7 @@ class VIEW3D_PT_context_properties(Panel):
 
         if member:
             # Draw with no edit button
-            rna_prop_ui.draw(self.layout, context, member, object, False)
+            rna_prop_ui.draw(self.layout, context, member, object, use_edit = False)
 
 
 # Grease Pencil Object - Multiframe falloff tools
@@ -8110,7 +8073,7 @@ class VIEW3D_MT_gpencil_edit_context_menu(Menu):
             col.operator("gpencil.stroke_merge", text="Merge", icon = "MERGE")
             col.operator("gpencil.stroke_merge_by_distance", icon = "MERGE").use_unselected = False
             col.operator("gpencil.stroke_split", text="Split", icon = "SPLIT")
-            col.operator("gpencil.stroke_separate", text="Separate", icon = "SEPARATE").mode = 'POINT'
+            col.operator("gpencil.stroke_separate", text="Separate", icon = "SEPARATE_GP_POINTS").mode = 'POINT'
 
             col.separator()
 
@@ -8162,7 +8125,7 @@ class VIEW3D_MT_gpencil_edit_context_menu(Menu):
             col.operator("gpencil.stroke_merge_by_distance", icon = "MERGE").use_unselected = True
             col.operator_menu_enum("gpencil.stroke_join", "type", text="Join", icon ='JOIN')
             col.operator("gpencil.stroke_split", text="Split", icon = "SPLIT")
-            col.operator("gpencil.stroke_separate", text="Separate", icon = "SEPARATE").mode = 'STROKE'
+            col.operator("gpencil.stroke_separate", text="Separate", icon = "SEPARATE_GP_STROKES").mode = 'STROKE'
 
             col.separator()
 
@@ -8405,7 +8368,7 @@ class VIEW3D_MT_gpencil_sculpt(Menu):
 
         layout.operator("gpencil.stroke_subdivide", text="Subdivide", icon = "SUBDIVIDE_EDGES")
         layout.operator("gpencil.stroke_simplify_fixed", text="Simplify", icon = "MOD_SIMPLIFY")
-        layout.operator("gpencil.stroke_simplify", text="Simplify Adaptative", icon = "MOD_SIMPLIFY")
+        layout.operator("gpencil.stroke_simplify", text="Simplify Adaptative", icon = "SIMPLIFY_ADAPTIVE")
 
         if context.mode == 'WEIGHT_GPENCIL':
             layout.separator()
