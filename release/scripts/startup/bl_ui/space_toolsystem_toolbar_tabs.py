@@ -891,12 +891,12 @@ class VIEW3D_PT_objecttab_apply_delta(toolshelf_calculate, Panel):
                 myvar.mode = 'ROT'
                 myvar.arg = 'Apply Rotation to Deltas\nConverts normal object transforms to delta transforms\nAny existing delta transform will be included as well'
 
-                myvar = row.operator("object.transforms_to_deltas", text="All Transforms to Deltas", icon = "APPLYALLDELTA")
+                myvar = row.operator("object.transforms_to_deltas", text="", icon = "APPLYALLDELTA")
                 myvar.mode = 'SCALE'
                 myvar.arg = 'Apply Scale to Deltas\nConverts normal object transforms to delta transforms\nAny existing delta transform will be included as well'
 
                 row = col.row(align=True)
-                myvar = row.operator("object.transforms_to_deltas", text="All Transforms to Deltas", icon = "APPLYALLDELTA")
+                myvar = row.operator("object.transforms_to_deltas", text="", icon = "APPLYALLDELTA")
                 myvar.mode = 'ALL'
                 myvar.arg = 'Apply All Transforms to Deltas\nConverts normal object transforms to delta transforms\nAny existing delta transform will be included as well'
 
@@ -4859,6 +4859,79 @@ class VIEW3D_PT_gp_armaturetab_recalcboneroll(toolshelf_calculate, Panel):
                 col.operator("armature.calculate_roll", text= "", icon = "CURSOR").type = 'CURSOR'
 
 
+class VIEW3D_PT_gp_armaturetab_names(toolshelf_calculate, Panel):
+    bl_label = "Names"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'TOOLS'
+    bl_context = "armature_edit"
+    bl_category = "Armature"
+    bl_options = {'HIDE_BG', 'DEFAULT_CLOSED'}
+
+    # just show when the toolshelf tabs toggle in the view menu is on.
+    @classmethod
+    def poll(cls, context):
+        view = context.space_data
+        overlay = view.overlay
+        return overlay.show_toolshelf_tabs == True
+
+    def draw(self, _context):
+        layout = self.layout
+
+        column_count = self.ts_width(layout, _context.region, scale_y= 1.75)
+
+        #text buttons
+        if column_count == 4:
+
+            col = layout.column(align=True)
+            col.scale_y = 2
+
+            col.operator_context = 'EXEC_REGION_WIN'
+            col.operator("armature.autoside_names", text="Auto-Name Left/Right", icon = "RENAME_X").type = 'XAXIS'
+            col.operator("armature.autoside_names", text="Auto-Name Front/Back", icon = "RENAME_Y").type = 'YAXIS'
+            col.operator("armature.autoside_names", text="Auto-Name Top/Bottom", icon = "RENAME_Z").type = 'ZAXIS'
+            col.operator("armature.flip_names", icon = "FLIP")
+
+        # icon buttons
+        else:
+
+            col = layout.column(align=True)
+            col.scale_x = 2
+            col.scale_y = 2
+
+            if column_count == 3:
+
+                col.operator_context = 'EXEC_REGION_WIN'
+
+                row = col.row(align=True)
+                row.operator("armature.autoside_names", text="", icon = "RENAME_X").type = 'XAXIS'
+                row.operator("armature.autoside_names", text="", icon = "RENAME_Y").type = 'YAXIS'
+                row.operator("armature.autoside_names", text="", icon = "RENAME_Z").type = 'ZAXIS'
+
+                row = col.row(align=True)
+                row.operator("armature.flip_names", text="", icon = "FLIP")
+
+            elif column_count == 2:
+
+                col.operator_context = 'EXEC_REGION_WIN'
+
+                row = col.row(align=True)
+                row.operator("armature.autoside_names", text="", icon = "RENAME_X").type = 'XAXIS'
+                row.operator("armature.autoside_names", text="", icon = "RENAME_Y").type = 'YAXIS'
+
+                row = col.row(align=True)
+                row.operator("armature.autoside_names", text="", icon = "RENAME_Z").type = 'ZAXIS'
+                row.operator("armature.flip_names", text="", icon = "FLIP")
+
+            elif column_count == 1:
+
+                col.operator_context = 'EXEC_REGION_WIN'
+                col.operator("armature.autoside_names", text="", icon = "RENAME_X").type = 'XAXIS'
+                col.operator("armature.autoside_names", text="", icon = "RENAME_Y").type = 'YAXIS'
+                col.operator("armature.autoside_names", text="", icon = "RENAME_Z").type = 'ZAXIS'
+                col.operator("armature.flip_names", text="", icon = "FLIP")
+
+
+
 class VIEW3D_PT_gp_posetab_pose(toolshelf_calculate, Panel):
     bl_label = "Pose"
     bl_space_type = 'VIEW_3D'
@@ -4891,7 +4964,7 @@ class VIEW3D_PT_gp_posetab_pose(toolshelf_calculate, Panel):
 
             col.operator_context = 'INVOKE_AREA'
             col.operator("armature.armature_layers", text="Change Armature Layers", icon = "LAYER")
-            col.operator("pose.bone_layers", text="Change Bone Layers", icon = "LAYER")
+            col.operator("pose.bone_layers", text="Change Bone Layers", icon = "BONE_LAYER")
 
         # icon buttons
         else:
@@ -4906,14 +4979,14 @@ class VIEW3D_PT_gp_posetab_pose(toolshelf_calculate, Panel):
                 row.operator("pose.quaternions_flip", text="", icon = "FLIP")
                 row.operator_context = 'INVOKE_AREA'
                 row.operator("armature.armature_layers", text="", icon = "LAYER")
-                row.operator("pose.bone_layers", text="", icon = "LAYER")
+                row.operator("pose.bone_layers", text="", icon = "BONE_LAYER")
 
             elif column_count == 2:
 
                 row = col.row(align=True)
                 row.operator("pose.quaternions_flip", text="", icon = "FLIP")
                 row.operator_context = 'INVOKE_AREA'
-                row.operator("armature.armature_layers", text="", icon = "LAYER")
+                row.operator("armature.armature_layers", text="", icon = "BONE_LAYER")
 
                 row = col.row(align=True)
                 row.operator("pose.bone_layers", text="", icon = "LAYER")
@@ -4926,7 +4999,7 @@ class VIEW3D_PT_gp_posetab_pose(toolshelf_calculate, Panel):
 
                 col.operator_context = 'INVOKE_AREA'
                 col.operator("armature.armature_layers", text="", icon = "LAYER")
-                col.operator("pose.bone_layers", text="", icon = "LAYER")
+                col.operator("pose.bone_layers", text="", icon = "BONE_LAYER")
 
 
 class VIEW3D_PT_gp_posetab_cleartransform(toolshelf_calculate, Panel):
@@ -5379,6 +5452,199 @@ class VIEW3D_PT_gp_posetab_motionpaths(toolshelf_calculate, Panel):
                 col.operator("pose.paths_clear", text="", icon ='MOTIONPATHS_CLEAR')
 
 
+class VIEW3D_PT_gp_posetab_ik(toolshelf_calculate, Panel):
+    bl_label = "IK"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'TOOLS'
+    bl_context = "posemode"
+    bl_category = "Pose"
+    bl_options = {'HIDE_BG', 'DEFAULT_CLOSED'}
+
+    # just show when the toolshelf tabs toggle in the view menu is on.
+    @classmethod
+    def poll(cls, context):
+        view = context.space_data
+        overlay = view.overlay
+        return overlay.show_toolshelf_tabs == True
+
+    def draw(self, _context):
+        layout = self.layout
+
+        column_count = self.ts_width(layout, _context.region, scale_y= 1.75)
+
+        #text buttons
+        if column_count == 4:
+
+            col = layout.column(align=True)
+            col.scale_y = 2
+
+            col.operator("pose.ik_add", icon= "ADD_IK")
+            col.operator("pose.ik_clear", icon = "CLEAR_IK")
+
+        # icon buttons
+        else:
+
+            col = layout.column(align=True)
+            col.scale_x = 2
+            col.scale_y = 2
+
+            if column_count == 3:
+
+                row = col.row(align=True)
+                row.operator("pose.ik_add", text = "", icon= "ADD_IK")
+                row.operator("pose.ik_clear", text = "", icon = "CLEAR_IK")
+
+            elif column_count == 2:
+
+                row = col.row(align=True)
+                row.operator("pose.ik_add", text = "", icon= "ADD_IK")
+                row.operator("pose.ik_clear", text = "", icon = "CLEAR_IK")
+
+            elif column_count == 1:
+
+                col.operator("pose.ik_add", text = "", icon= "ADD_IK")
+                col.operator("pose.ik_clear", text = "", icon = "CLEAR_IK")
+
+
+class VIEW3D_PT_gp_posetab_constraints(toolshelf_calculate, Panel):
+    bl_label = "Constraints"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'TOOLS'
+    bl_context = "posemode"
+    bl_category = "Pose"
+    bl_options = {'HIDE_BG', 'DEFAULT_CLOSED'}
+
+    # just show when the toolshelf tabs toggle in the view menu is on.
+    @classmethod
+    def poll(cls, context):
+        view = context.space_data
+        overlay = view.overlay
+        return overlay.show_toolshelf_tabs == True
+
+    def draw(self, _context):
+        layout = self.layout
+
+        column_count = self.ts_width(layout, _context.region, scale_y= 1.75)
+
+        #text buttons
+        if column_count == 4:
+
+            col = layout.column(align=True)
+            col.scale_y = 2
+
+            col.operator("object.constraint_add_with_targets", icon = "CONSTRAINT_DATA")
+            col.operator("object.constraints_copy", icon = "COPYDOWN")
+
+            col.separator(factor = 0.5)
+
+            col.operator("object.constraints_clear", icon = "CLEAR_CONSTRAINT")
+
+        # icon buttons
+        else:
+
+            col = layout.column(align=True)
+            col.scale_x = 2
+            col.scale_y = 2
+
+            if column_count == 3:
+
+                row = col.row(align=True)
+                row.operator("object.constraint_add_with_targets", text = "", icon = "CONSTRAINT_DATA")
+                row.operator("object.constraints_copy", text = "", icon = "COPYDOWN")
+                row.operator("object.constraints_clear", text = "", icon = "CLEAR_CONSTRAINT")
+
+            elif column_count == 2:
+
+                row = col.row(align=True)
+                row.operator("object.constraint_add_with_targets", text = "", icon = "CONSTRAINT_DATA")
+                row.operator("object.constraints_copy", text = "", icon = "COPYDOWN")
+
+                row = col.row(align=True)
+                row.operator("object.constraints_clear", text = "", icon = "CLEAR_CONSTRAINT")
+
+
+            elif column_count == 1:
+
+                col.operator("object.constraint_add_with_targets", text = "", icon = "CONSTRAINT_DATA")
+                col.operator("object.constraints_copy", text = "", icon = "COPYDOWN")
+
+                col.separator(factor = 0.5)
+
+                col.operator("object.constraints_clear", text = "", icon = "CLEAR_CONSTRAINT")
+
+
+class VIEW3D_PT_gp_posetab_names(toolshelf_calculate, Panel):
+    bl_label = "Names"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'TOOLS'
+    bl_context = "posemode"
+    bl_category = "Pose"
+    bl_options = {'HIDE_BG', 'DEFAULT_CLOSED'}
+
+    # just show when the toolshelf tabs toggle in the view menu is on.
+    @classmethod
+    def poll(cls, context):
+        view = context.space_data
+        overlay = view.overlay
+        return overlay.show_toolshelf_tabs == True
+
+    def draw(self, _context):
+        layout = self.layout
+
+        column_count = self.ts_width(layout, _context.region, scale_y= 1.75)
+
+        #text buttons
+        if column_count == 4:
+
+            col = layout.column(align=True)
+            col.scale_y = 2
+
+            col.operator_context = 'EXEC_REGION_WIN'
+            col.operator("pose.autoside_names", text="Auto-Name Left/Right", icon = "RENAME_X").axis = 'XAXIS'
+            col.operator("pose.autoside_names", text="Auto-Name Front/Back", icon = "RENAME_Y").axis = 'YAXIS'
+            col.operator("pose.autoside_names", text="Auto-Name Top/Bottom", icon = "STRING").axis = 'ZAXIS'
+            col.operator("pose.flip_names", icon = "FLIP")
+
+        # icon buttons
+        else:
+
+            col = layout.column(align=True)
+            col.scale_x = 2
+            col.scale_y = 2
+
+            if column_count == 3:
+
+                col.operator_context = 'EXEC_REGION_WIN'
+
+                row = col.row(align=True)
+                row.operator("pose.autoside_names", text="", icon = "RENAME_X").axis = 'XAXIS'
+                row.operator("pose.autoside_names", text="", icon = "RENAME_Y").axis = 'YAXIS'
+                row.operator("pose.autoside_names", text="", icon = "RENAME_Z").axis = 'ZAXIS'
+
+                row = col.row(align=True)
+                row.operator("pose.flip_names", text="", icon = "FLIP")
+
+            elif column_count == 2:
+
+                col.operator_context = 'EXEC_REGION_WIN'
+
+                row = col.row(align=True)
+                row.operator("pose.autoside_names", text="", icon = "RENAME_X").axis = 'XAXIS'
+                row.operator("pose.autoside_names", text="", icon = "RENAME_Y").axis = 'YAXIS'
+
+                row = col.row(align=True)
+                row.operator("pose.autoside_names", text="", icon = "RENAME_Z").axis = 'ZAXIS'
+                row.operator("pose.flip_names", text="", icon = "FLIP")
+
+            elif column_count == 1:
+
+                col.operator_context = 'EXEC_REGION_WIN'
+                col.operator("pose.autoside_names", text="", icon = "RENAME_X").axis = 'XAXIS'
+                col.operator("pose.autoside_names", text="", icon = "RENAME_Y").axis = 'YAXIS'
+                col.operator("pose.autoside_names", text="", icon = "RENAME_Z").axis = 'ZAXIS'
+                col.operator("pose.flip_names", text="", icon = "FLIP")
+
+
 classes = (
 
     #object menu
@@ -5448,6 +5714,7 @@ classes = (
     # armature edit mode
     VIEW3D_PT_gp_armaturetab_armature,
     VIEW3D_PT_gp_armaturetab_recalcboneroll,
+    VIEW3D_PT_gp_armaturetab_names,
 
     #armature pose mode
     VIEW3D_PT_gp_posetab_pose,
@@ -5457,6 +5724,9 @@ classes = (
     VIEW3D_PT_gp_posetab_propagate,
     VIEW3D_PT_gp_posetab_poselibrary,
     VIEW3D_PT_gp_posetab_motionpaths,
+    VIEW3D_PT_gp_posetab_ik,
+    VIEW3D_PT_gp_posetab_constraints,
+    VIEW3D_PT_gp_posetab_names,
 
     # bfa - separated tooltips
     MASK_MT_flood_fill_invert,

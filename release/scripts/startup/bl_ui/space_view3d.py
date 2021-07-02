@@ -2837,7 +2837,7 @@ class VIEW3D_MT_object_context_menu(Menu):
                 layout.operator_menu_enum("gpencil.convert", "type", text="Convert To")
 
             if (
-                    obj.type in {'MESH', 'CURVE', 'SURFACE', 'GPENCIL', 'LATTICE', 'ARMATURE', 'META'} or
+                    obj.type in {'MESH', 'CURVE', 'SURFACE', 'GPENCIL', 'LATTICE', 'ARMATURE', 'META', 'FONT'} or
                     (obj.type == 'EMPTY' and obj.instance_collection is not None)
             ):
                 layout.operator_context = 'INVOKE_REGION_WIN'
@@ -3832,7 +3832,7 @@ class VIEW3D_MT_pose(Menu):
 
         layout.operator_context = 'INVOKE_AREA'
         layout.operator("armature.armature_layers", text="Change Armature Layers", icon = "LAYER")
-        layout.operator("pose.bone_layers", text="Change Bone Layers", icon = "LAYER")
+        layout.operator("pose.bone_layers", text="Change Bone Layers", icon = "BONE_LAYER")
 
         layout.separator()
 
@@ -3969,9 +3969,9 @@ class VIEW3D_MT_pose_names(Menu):
         layout = self.layout
 
         layout.operator_context = 'EXEC_REGION_WIN'
-        layout.operator("pose.autoside_names", text="Auto-Name Left/Right", icon = "STRING").axis = 'XAXIS'
-        layout.operator("pose.autoside_names", text="Auto-Name Front/Back", icon = "STRING").axis = 'YAXIS'
-        layout.operator("pose.autoside_names", text="Auto-Name Top/Bottom", icon = "STRING").axis = 'ZAXIS'
+        layout.operator("pose.autoside_names", text="Auto-Name Left/Right", icon = "RENAME_X").axis = 'XAXIS'
+        layout.operator("pose.autoside_names", text="Auto-Name Front/Back", icon = "RENAME_Y").axis = 'YAXIS'
+        layout.operator("pose.autoside_names", text="Auto-Name Top/Bottom", icon = "RENAME_Z").axis = 'ZAXIS'
         layout.operator("pose.flip_names", icon = "FLIP")
 
 
@@ -4184,6 +4184,8 @@ class VIEW3D_MT_edit_mesh_context_menu(Menu):
 
         layout = self.layout
 
+        with_freestyle = bpy.app.build_options.freestyle
+
         layout.operator_context = 'INVOKE_REGION_WIN'
 
         # If nothing is selected
@@ -4292,10 +4294,11 @@ class VIEW3D_MT_edit_mesh_context_menu(Menu):
             col.operator("mesh.mark_sharp", icon = "MARKSHARPEDGES")
             col.operator("mesh.mark_sharp", text="Clear Sharp", icon = "CLEARSHARPEDGES").clear = True
 
-            col.separator()
+            if with_freestyle:
+                col.separator()
 
-            col.operator("mesh.mark_freestyle_edge", icon = "MARK_FS_EDGE").clear = False
-            col.operator("mesh.mark_freestyle_edge", text="Clear Freestyle Edge", icon = "CLEAR_FS_EDGE").clear = True
+                col.operator("mesh.mark_freestyle_edge", icon = "MARK_FS_EDGE").clear = False
+                col.operator("mesh.mark_freestyle_edge", text="Clear Freestyle Edge", icon = "CLEAR_FS_EDGE").clear = True
 
             col.separator()
 
@@ -4498,40 +4501,6 @@ class VIEW3D_MT_edit_mesh_vertices_legacy(Menu):
         layout.operator_context = 'EXEC_REGION_WIN'
         layout.operator("mesh.vertices_smooth", text="Smooth Vertices", icon = "SMOOTH_VERTEX").factor = 0.5
         layout.operator_context = 'INVOKE_REGION_WIN'
-
-
-class VIEW3D_MT_edit_mesh_edges_data(Menu):
-    bl_label = "Edge Data"
-
-    def draw(self, _context):
-        layout = self.layout
-
-        layout.operator_context = 'INVOKE_REGION_WIN'
-
-        layout.menu ("VIEW3D_MT_edit_mesh_edges")
-
-        layout.operator("transform.edge_crease", icon = "CREASE")
-        layout.operator("transform.edge_bevelweight", icon = "BEVEL")
-
-        layout.separator()
-
-        layout.operator("mesh.mark_seam", icon = 'MARK_SEAM').clear = False
-        layout.operator("mesh.mark_seam", text="Clear Seam", icon = 'CLEAR_SEAM').clear = True
-
-        layout.separator()
-
-        layout.operator("mesh.mark_sharp", icon = "MARKSHARPEDGES")
-        layout.operator("mesh.mark_sharp", text="Clear Sharp", icon = "CLEARSHARPEDGES").clear = True
-
-        layout.operator("mesh.mark_sharp", text="Mark Sharp from Vertices", icon = "MARKSHARPVERTS").use_verts = True
-        props = layout.operator("mesh.mark_sharp", text="Clear Sharp from Vertices", icon = "CLEARSHARPVERTS")
-        props.use_verts = True
-        props.clear = True
-
-        layout.separator()
-
-        layout.operator("mesh.mark_freestyle_edge", icon = "MARK_FS_EDGE").clear = False
-        layout.operator("mesh.mark_freestyle_edge", text="Clear Freestyle Edge", icon = "CLEAR_FS_EDGE").clear = True
 
 
 class VIEW3D_MT_edit_mesh_edges(Menu):
@@ -4878,6 +4847,7 @@ class VIEW3D_MT_edit_mesh_show_hide(Menu):
         layout.operator("mesh.reveal", text="Show Hidden", icon = "HIDE_OFF")
         layout.operator("mesh.hide", text="Hide Selected", icon = "HIDE_ON").unselected = False
         layout.operator("mesh.hide", text="Hide Unselected", icon = "HIDE_UNSELECTED").unselected = True
+
 
 class VIEW3D_MT_edit_gpencil_delete(Menu):
     bl_label = "Delete"
@@ -5445,9 +5415,9 @@ class VIEW3D_MT_edit_armature_names(Menu):
         layout = self.layout
 
         layout.operator_context = 'EXEC_REGION_WIN'
-        layout.operator("armature.autoside_names", text="Auto-Name Left/Right", icon = "STRING").type = 'XAXIS'
-        layout.operator("armature.autoside_names", text="Auto-Name Front/Back", icon = "STRING").type = 'YAXIS'
-        layout.operator("armature.autoside_names", text="Auto-Name Top/Bottom", icon = "STRING").type = 'ZAXIS'
+        layout.operator("armature.autoside_names", text="Auto-Name Left/Right", icon = "RENAME_X").type = 'XAXIS'
+        layout.operator("armature.autoside_names", text="Auto-Name Front/Back", icon = "RENAME_Y").type = 'YAXIS'
+        layout.operator("armature.autoside_names", text="Auto-Name Top/Bottom", icon = "RENAME_Z").type = 'ZAXIS'
         layout.operator("armature.flip_names", text="Flip Names", icon = "FLIP")
 
 
@@ -8604,7 +8574,6 @@ classes = (
     VIEW3D_MT_edit_mesh_vertices_legacy,
     VIEW3D_MT_edit_mesh_edges,
     VIEW3D_MT_edit_mesh_edges_legacy,
-    VIEW3D_MT_edit_mesh_edges_data,
     VIEW3D_MT_edit_mesh_faces,
     VIEW3D_MT_edit_mesh_faces_legacy,
     VIEW3D_MT_edit_mesh_faces_data,
