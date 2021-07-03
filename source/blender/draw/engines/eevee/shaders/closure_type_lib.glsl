@@ -108,13 +108,8 @@ Closure closure_mix(Closure cl1, Closure cl2, float fac)
 
   cl.ssr_data.rgb = packVec3(mix(spec_cl1.rgb, spec_cl2.rgb, fac), mix(diffuse_cl1.rgb, diffuse_cl2.rgb, fac));
   bool use_cl1_ssr = FLAG_TEST(cl1.flag, CLOSURE_SSR_FLAG);
-<<<<<<< HEAD
   /* When mixing SSR don't blend roughness and normals but only specular (ssr_data.xyz).*/
   cl.ssr_data.w = (use_cl1_ssr) ? packFloat(spec_cl1.a,  mix(diffuse_cl1.a, diffuse_cl2.a, fac)) : packFloat(spec_cl2.a,  mix(diffuse_cl1.a, diffuse_cl2.a, fac));
-=======
-  /* When mixing SSR don't blend roughness and normals but only specular (ssr_data.xyz). */
-  cl.ssr_data.w = (use_cl1_ssr) ? cl1.ssr_data.w : cl2.ssr_data.w;
->>>>>>> cbf236691e64e5699a891065f9a221a9f2a59429
   cl.ssr_normal = (use_cl1_ssr) ? cl1.ssr_normal : cl2.ssr_normal;
 
 #  ifdef USE_SSS
@@ -144,13 +139,8 @@ Closure closure_add(Closure cl1, Closure cl2)
 
   cl.ssr_data.rgb = packVec3((spec_cl1.rgb + spec_cl2.rgb), (diffuse_cl1.rgb + diffuse_cl2.rgb));
   bool use_cl1_ssr = FLAG_TEST(cl1.flag, CLOSURE_SSR_FLAG);
-<<<<<<< HEAD
   /* When mixing SSR don't blend roughness and normals.*/
   cl.ssr_data.w = (use_cl1_ssr) ? packFloat(spec_cl1.a, diffuse_cl1.a + diffuse_cl2.a): packFloat(spec_cl2.a, diffuse_cl1.a + diffuse_cl2.a);
-=======
-  /* When mixing SSR don't blend roughness and normals. */
-  cl.ssr_data.w = (use_cl1_ssr) ? cl1.ssr_data.w : cl2.ssr_data.w;
->>>>>>> cbf236691e64e5699a891065f9a221a9f2a59429
   cl.ssr_normal = (use_cl1_ssr) ? cl1.ssr_normal : cl2.ssr_normal;
 
 #  ifdef USE_SSS
