@@ -1,21 +1,9 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2018-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
- * \ingroup clog
+ * \ingroup intern_clog
  */
 
 #include <assert.h>
@@ -183,16 +171,15 @@ static void clg_str_append(CLogStringBuf *cstr, const char *str)
 }
 
 ATTR_PRINTF_FORMAT(2, 0)
-static void clg_str_vappendf(CLogStringBuf *cstr, const char *fmt, va_list args)
+static void clg_str_vappendf(CLogStringBuf *cstr, const char *format, va_list args)
 {
   /* Use limit because windows may use '-1' for a formatting error. */
   const uint len_max = 65535;
+  uint len_avail = cstr->len_alloc - cstr->len;
   while (true) {
-    uint len_avail = cstr->len_alloc - cstr->len;
-
     va_list args_cpy;
     va_copy(args_cpy, args);
-    int retval = vsnprintf(cstr->data + cstr->len, len_avail, fmt, args_cpy);
+    int retval = vsnprintf(cstr->data + cstr->len, len_avail, format, args_cpy);
     va_end(args_cpy);
 
     if (retval < 0) {
@@ -200,22 +187,23 @@ static void clg_str_vappendf(CLogStringBuf *cstr, const char *fmt, va_list args)
        * message. */
       break;
     }
-    else if ((uint)retval <= len_avail) {
+
+    if ((uint)retval <= len_avail) {
       /* Copy was successful. */
       cstr->len += (uint)retval;
       break;
     }
-    else {
-      /* vsnprintf was not successful, due to lack of allocated space, retval contains expected
-       * length of the formatted string, use it to allocate required amount of memory. */
-      uint len_alloc = cstr->len + (uint)retval;
-      if (len_alloc >= len_max) {
-        /* Safe upper-limit, just in case... */
-        break;
-      }
-      clg_str_reserve(cstr, len_alloc);
-      len_avail = cstr->len_alloc - cstr->len;
+
+    /* `vsnprintf` was not successful, due to lack of allocated space, `retval` contains expected
+     * length of the formatted string, use it to allocate required amount of memory. */
+    uint len_alloc = cstr->len + (uint)retval;
+    if (len_alloc >= len_max) {
+      /* Safe upper-limit, just in case... */
+      break;
     }
+
+    clg_str_reserve(cstr, len_alloc);
+    len_avail = cstr->len_alloc - cstr->len;
   }
 }
 
@@ -268,9 +256,7 @@ static const char *clg_severity_as_text(enum CLG_Severity severity)
   if (ok) {
     return clg_severity_str[severity];
   }
-  else {
-    return "INVALID_SEVERITY";
-  }
+  return "INVALID_SEVERITY";
 }
 
 static enum eCLogColor clg_severity_to_color(enum CLG_Severity severity)
@@ -330,7 +316,8 @@ static bool clg_ctx_filter_check(CLogContext *ctx, const char *identifier)
       }
       else if ((len >= 2) && (STREQLEN(".*", &flt->match[len - 2], 2))) {
         if (((identifier_len == len - 2) && STREQLEN(identifier, flt->match, len - 2)) ||
-            ((identifier_len >= len - 1) && STREQLEN(identifier, flt->match, len - 1))) {
+            ((identifier_len >= len - 1) && STREQLEN(identifier, flt->match, len - 1)))
+        {
           return (bool)i;
         }
       }
@@ -388,7 +375,7 @@ static void clg_ctx_fatal_action(CLogContext *ctx)
 
 static void clg_ctx_backtrace(CLogContext *ctx)
 {
-  /* Note: we avoid writing to 'FILE', for back-trace we make an exception,
+  /* NOTE: we avoid writing to 'FILE', for back-trace we make an exception,
    * if necessary we could have a version of the callback that writes to file
    * descriptor all at once. */
   ctx->callbacks.backtrace_fn(ctx->output_file);
@@ -440,7 +427,7 @@ static void write_severity(CLogStringBuf *cstr, enum CLG_Severity severity, bool
   }
 }
 
-static void write_type(CLogStringBuf *cstr, CLG_LogType *lg)
+static void write_type(CLogStringBuf *cstr, const CLG_LogType *lg)
 {
   clg_str_append(cstr, " (");
   clg_str_append(cstr, lg->identifier);
@@ -471,7 +458,7 @@ static void write_file_line_fn(CLogStringBuf *cstr,
   clg_str_append(cstr, ": ");
 }
 
-void CLG_log_str(CLG_LogType *lg,
+void CLG_log_str(const CLG_LogType *lg,
                  enum CLG_Severity severity,
                  const char *file_line,
                  const char *fn,
@@ -509,11 +496,11 @@ void CLG_log_str(CLG_LogType *lg,
   }
 }
 
-void CLG_logf(CLG_LogType *lg,
+void CLG_logf(const CLG_LogType *lg,
               enum CLG_Severity severity,
               const char *file_line,
               const char *fn,
-              const char *fmt,
+              const char *format,
               ...)
 {
   CLogStringBuf cstr;
@@ -531,8 +518,8 @@ void CLG_logf(CLG_LogType *lg,
     write_file_line_fn(&cstr, file_line, fn, lg->ctx->use_basename);
 
     va_list ap;
-    va_start(ap, fmt);
-    clg_str_vappendf(&cstr, fmt, ap);
+    va_start(ap, format);
+    clg_str_vappendf(&cstr, format, ap);
     va_end(ap);
   }
   clg_str_append(&cstr, "\n");

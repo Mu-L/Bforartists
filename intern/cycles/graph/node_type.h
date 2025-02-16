@@ -1,45 +1,34 @@
-/*
- * Copyright 2011-2016 Blender Foundation
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
 #include "graph/node_enum.h"
-#include "util/util_array.h"
-#include "util/util_map.h"
-#include "util/util_param.h"
-#include "util/util_string.h"
-#include "util/util_vector.h"
+#include "util/array.h"  // IWYU pragma: keep
+#include "util/map.h"
+#include "util/param.h"
+#include "util/unique_ptr.h"
+#include "util/vector.h"
 
 CCL_NAMESPACE_BEGIN
 
 struct Node;
 struct NodeType;
 
-typedef uint64_t SocketModifiedFlags;
+using SocketModifiedFlags = uint64_t;
 
 /* Socket Type */
 
 struct SocketType {
   enum Type {
-    UNDEFINED,
+    UNDEFINED = 0,
 
     BOOLEAN,
     FLOAT,
     INT,
     UINT,
+    UINT64,
     COLOR,
     VECTOR,
     POINT,
@@ -62,6 +51,8 @@ struct SocketType {
     STRING_ARRAY,
     TRANSFORM_ARRAY,
     NODE_ARRAY,
+
+    NUM_TYPES,
   };
 
   enum Flags {
@@ -75,11 +66,14 @@ struct SocketType {
     LINK_TEXTURE_GENERATED = (1 << 4),
     LINK_TEXTURE_NORMAL = (1 << 5),
     LINK_TEXTURE_UV = (1 << 6),
-    LINK_INCOMING = (1 << 7),
-    LINK_NORMAL = (1 << 8),
-    LINK_POSITION = (1 << 9),
-    LINK_TANGENT = (1 << 10),
-    DEFAULT_LINK_MASK = (1 << 4) | (1 << 5) | (1 << 6) | (1 << 7) | (1 << 8) | (1 << 9) | (1 << 10)
+    LINK_TEXTURE_INCOMING = (1 << 7),
+    LINK_INCOMING = (1 << 8),
+    LINK_NORMAL = (1 << 9),
+    LINK_POSITION = (1 << 10),
+    LINK_TANGENT = (1 << 11),
+    LINK_OSL_INITIALIZER = (1 << 12),
+    DEFAULT_LINK_MASK = (1 << 4) | (1 << 5) | (1 << 6) | (1 << 7) | (1 << 8) | (1 << 9) |
+                        (1 << 10) | (1 << 11) | (1 << 12)
   };
 
   ustring name;
@@ -106,16 +100,16 @@ struct SocketType {
 struct NodeType {
   enum Type { NONE, SHADER };
 
-  explicit NodeType(Type type = NONE, const NodeType *base = NULL);
+  explicit NodeType(Type type = NONE, const NodeType *base = nullptr);
   ~NodeType();
 
   void register_input(ustring name,
                       ustring ui_name,
                       SocketType::Type type,
-                      int struct_offset,
+                      const int struct_offset,
                       const void *default_value,
-                      const NodeEnum *enum_values = NULL,
-                      const NodeType *node_type = NULL,
+                      const NodeEnum *enum_values = nullptr,
+                      const NodeType *node_type = nullptr,
                       int flags = 0,
                       int extra_flags = 0);
   void register_output(ustring name, ustring ui_name, SocketType::Type type);
@@ -123,7 +117,7 @@ struct NodeType {
   const SocketType *find_input(ustring name) const;
   const SocketType *find_output(ustring name) const;
 
-  typedef Node *(*CreateFunc)(const NodeType *type);
+  using CreateFunc = unique_ptr<Node> (*)(const NodeType *);
 
   ustring name;
   Type type;
@@ -135,9 +129,9 @@ struct NodeType {
   static NodeType *add(const char *name,
                        CreateFunc create,
                        Type type = NONE,
-                       const NodeType *base = NULL);
+                       const NodeType *base = nullptr);
   static const NodeType *find(ustring name);
-  static unordered_map<ustring, NodeType, ustringHash> &types();
+  static unordered_map<ustring, NodeType> &types();
 };
 
 /* Node Definition Macros
@@ -148,14 +142,14 @@ struct NodeType {
 #define NODE_DECLARE \
   static const NodeType *get_node_type(); \
   template<typename T> static const NodeType *register_type(); \
-  static Node *create(const NodeType *type); \
+  static unique_ptr<Node> create(const NodeType *type); \
   static const NodeType *node_type;
 
 #define NODE_DEFINE(structname) \
   const NodeType *structname::node_type = structname::register_type<structname>(); \
-  Node *structname::create(const NodeType *) \
+  unique_ptr<Node> structname::create(const NodeType *) \
   { \
-    return new structname(); \
+    return make_unique<structname>(); \
   } \
   const NodeType *structname::get_node_type() \
   { \
@@ -184,14 +178,14 @@ struct NodeType {
 #define SOCKET_DEFINE(name, ui_name, default_value, datatype, TYPE, flags, ...) \
   { \
     static datatype defval = default_value; \
-    CHECK_TYPE(T::name, datatype); \
+    static_assert(std::is_same_v<decltype(T::name), datatype>); \
     type->register_input(ustring(#name), \
                          ustring(ui_name), \
                          TYPE, \
                          SOCKET_OFFSETOF(T, name), \
                          &defval, \
-                         NULL, \
-                         NULL, \
+                         nullptr, \
+                         nullptr, \
                          flags, \
                          ##__VA_ARGS__); \
   }
@@ -202,6 +196,8 @@ struct NodeType {
   SOCKET_DEFINE(name, ui_name, default_value, int, SocketType::INT, 0, ##__VA_ARGS__)
 #define SOCKET_UINT(name, ui_name, default_value, ...) \
   SOCKET_DEFINE(name, ui_name, default_value, uint, SocketType::UINT, 0, ##__VA_ARGS__)
+#define SOCKET_UINT64(name, ui_name, default_value, ...) \
+  SOCKET_DEFINE(name, ui_name, default_value, uint64_t, SocketType::UINT64, 0, ##__VA_ARGS__)
 #define SOCKET_FLOAT(name, ui_name, default_value, ...) \
   SOCKET_DEFINE(name, ui_name, default_value, float, SocketType::FLOAT, 0, ##__VA_ARGS__)
 #define SOCKET_COLOR(name, ui_name, default_value, ...) \
@@ -228,19 +224,19 @@ struct NodeType {
                          SOCKET_OFFSETOF(T, name), \
                          &defval, \
                          &values, \
-                         NULL, \
+                         nullptr, \
                          ##__VA_ARGS__); \
   }
 #define SOCKET_NODE(name, ui_name, node_type, ...) \
   { \
-    static Node *defval = NULL; \
+    static Node *defval = nullptr; \
     assert(SOCKET_SIZEOF(T, name) == sizeof(Node *)); \
     type->register_input(ustring(#name), \
                          ustring(ui_name), \
                          SocketType::NODE, \
                          SOCKET_OFFSETOF(T, name), \
-                         &defval, \
-                         NULL, \
+                         (const void *)&defval, \
+                         nullptr, \
                          node_type, \
                          ##__VA_ARGS__); \
   }
@@ -288,7 +284,7 @@ struct NodeType {
                          SocketType::NODE_ARRAY, \
                          SOCKET_OFFSETOF(T, name), \
                          &defval, \
-                         NULL, \
+                         nullptr, \
                          node_type, \
                          ##__VA_ARGS__); \
   }
@@ -357,9 +353,9 @@ struct NodeType {
                        ustring(ui_name), \
                        SocketType::CLOSURE, \
                        0, \
-                       NULL, \
-                       NULL, \
-                       NULL, \
+                       nullptr, \
+                       nullptr, \
+                       nullptr, \
                        SocketType::LINKABLE, \
                        ##__VA_ARGS__)
 

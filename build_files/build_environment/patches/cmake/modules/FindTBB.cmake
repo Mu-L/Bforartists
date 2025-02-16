@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2016 Blender Authors
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
 # - Find TBB library
 # Find the native TBB includes and library
 # This module defines
@@ -10,17 +14,6 @@
 #
 # also defined, but not for general use are
 #  TBB_LIBRARY, where to find the TBB library.
-
-#=============================================================================
-# Copyright 2016 Blender Foundation.
-#
-# Distributed under the OSI-approved BSD License (the "License");
-# see accompanying file Copyright.txt for details.
-#
-# This software is distributed WITHOUT ANY WARRANTY; without even the
-# implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the License for more information.
-#=============================================================================
 
 # If TBB_ROOT_DIR was defined in the environment, use it.
 IF(NOT TBB_ROOT_DIR AND NOT $ENV{TBB_ROOT_DIR} STREQUAL "")
@@ -48,7 +41,7 @@ FIND_LIBRARY(TBB_LIBRARY
     ${_tbb_SEARCH_DIRS}
   PATH_SUFFIXES
     lib64 lib
-  )
+)
 
 # handle the QUIETLY and REQUIRED arguments and set TBB_FOUND to TRUE if
 # all listed variables are TRUE

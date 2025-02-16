@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2017-2022 Blender Authors
+#
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 import unittest
 
 __all__ = (
@@ -19,11 +23,14 @@ __all__ = (
 # ############################################################
 
 
+# UNUSED.
+"""
 def listbase_iter(data, struct, listbase):
     element = data.get_pointer((struct, listbase, b'first'))
     while element is not None:
         yield element
         element = element.get_pointer(b'next')
+"""
 
 
 def linkdata_iter(collection, data):
@@ -249,7 +256,6 @@ class ViewLayerTesting(unittest.TestCase):
         import bpy
         import os
         import tempfile
-        import filecmp
 
         ROOT = self.get_root()
         with tempfile.TemporaryDirectory() as dirpath:
@@ -346,7 +352,6 @@ class ViewLayerTesting(unittest.TestCase):
         import bpy
         import os
         import tempfile
-        import filecmp
 
         ROOT = self.get_root()
         with tempfile.TemporaryDirectory() as dirpath:
@@ -382,7 +387,6 @@ class ViewLayerTesting(unittest.TestCase):
         import bpy
         import os
         import tempfile
-        import filecmp
 
         ROOT = self.get_root()
         with tempfile.TemporaryDirectory() as dirpath:

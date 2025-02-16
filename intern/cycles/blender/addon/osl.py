@@ -1,24 +1,13 @@
+# SPDX-FileCopyrightText: 2011-2022 Blender Foundation
 #
-# Copyright 2011-2013 Blender Foundation
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
+# SPDX-License-Identifier: Apache-2.0
 
-# <pep8 compliant>
 from __future__ import annotations
 
 import bpy
 import _cycles
+
+from bpy.app.translations import pgettext_tip as tip_
 
 
 def osl_compile(input_path, report):
@@ -118,7 +107,7 @@ def update_script_node(node, report):
         ok = _cycles.osl_update_node(data, node.id_data.as_pointer(), node.as_pointer(), oso_path)
 
         if not ok:
-            report({'ERROR'}, "OSL query failed to open " + oso_path)
+            report({'ERROR'}, tip_("OSL query failed to open %s") % oso_path)
     else:
         report({'ERROR'}, "OSL script compilation failed, see console for errors")
 

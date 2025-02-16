@@ -1,8 +1,9 @@
-/*
- * Distance.hpp
+/* SPDX-FileCopyrightText: 2009 Ruben Smits
  *
- *  Created on: Jan 30, 2009
- *      Author: rsmits
+ * SPDX-License-Identifier: LGPL-2.1-or-later */
+
+/** \file
+ * \ingroup intern_itasc
  */
 
 #ifndef DISTANCE_HPP_

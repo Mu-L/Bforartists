@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -29,12 +17,8 @@ template<typename T> class AutoPtr : public std::unique_ptr<T> {
  public:
   using std::unique_ptr<T>::unique_ptr;
 
-  AutoPtr() : std::unique_ptr<T>()
-  {
-  }
-  AutoPtr(T *ptr) : std::unique_ptr<T>(ptr)
-  {
-  }
+  AutoPtr() : std::unique_ptr<T>() {}
+  AutoPtr(T *ptr) : std::unique_ptr<T>(ptr) {}
 
   /* Mimic behavior of legacy auto_ptr.
    * Keep implementation as small as possible, hens delete assignment operator. */

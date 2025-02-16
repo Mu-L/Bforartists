@@ -1,20 +1,7 @@
+# SPDX-FileCopyrightText: 2011-2022 Blender Foundation
 #
-# Copyright 2011-2013 Blender Foundation
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
+# SPDX-License-Identifier: Apache-2.0
 
-# <pep8 compliant>
 from __future__ import annotations
 
 bl_info = {
@@ -58,11 +45,12 @@ class CyclesRender(bpy.types.RenderEngine):
     bl_use_eevee_viewport = True
     bl_use_preview = True
     bl_use_exclude_layers = True
-    bl_use_save_buffers = True
     bl_use_spherical_stereo = True
     bl_use_custom_freestyle = True
+    bl_use_alembic_procedural = True
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.session = None
 
     def __del__(self):
@@ -73,7 +61,7 @@ class CyclesRender(bpy.types.RenderEngine):
         if not self.session:
             if self.is_preview:
                 cscene = bpy.context.scene.cycles
-                use_osl = cscene.shading_system and cscene.device == 'CPU'
+                use_osl = cscene.shading_system
 
                 engine.create(self, data, preview_osl=use_osl)
             else:
@@ -84,12 +72,29 @@ class CyclesRender(bpy.types.RenderEngine):
     def render(self, depsgraph):
         engine.render(self, depsgraph)
 
+    def render_frame_finish(self):
+        engine.render_frame_finish(self)
+
+    def draw(self, context, depsgraph):
+        engine.draw(self, depsgraph, context.space_data)
+
     def bake(self, depsgraph, obj, pass_type, pass_filter, width, height):
         engine.bake(self, depsgraph, obj, pass_type, pass_filter, width, height)
 
     # viewport render
     def view_update(self, context, depsgraph):
         if not self.session:
+            # When starting a new render session in viewport (by switching
+            # viewport to Rendered shading) unpause the render. The way to think
+            # of it is: artist requests render, so we start to render.
+            # Do it for both original and evaluated scene so that Cycles
+            # immediately reacts to un-paused render.
+            cscene = context.scene.cycles
+            cscene_eval = depsgraph.scene_eval.cycles
+            if cscene.preview_pause or cscene_eval.preview_pause:
+                cscene.preview_pause = False
+                cscene_eval.preview_pause = False
+
             engine.create(self, context.blend_data,
                           context.region, context.space_data, context.region_data)
 
@@ -97,14 +102,14 @@ class CyclesRender(bpy.types.RenderEngine):
         engine.sync(self, depsgraph, context.blend_data)
 
     def view_draw(self, context, depsgraph):
-        engine.draw(self, depsgraph, context.region, context.space_data, context.region_data)
+        engine.view_draw(self, depsgraph, context.region, context.space_data, context.region_data)
 
     def update_script_node(self, node):
         if engine.with_osl():
             from . import osl
             osl.update_script_node(node, self.report)
         else:
-            self.report({'ERROR'}, "OSL support disabled in this build.")
+            self.report({'ERROR'}, "OSL support disabled in this build")
 
     def update_render_passes(self, scene, srl):
         engine.register_passes(self, scene, srl)
@@ -150,7 +155,6 @@ def unregister():
     from . import operators
     from . import properties
     from . import presets
-    import atexit
 
     bpy.app.handlers.version_update.remove(version_update.do_versions)
 

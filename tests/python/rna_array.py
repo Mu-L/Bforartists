@@ -1,4 +1,6 @@
-# Apache License, Version 2.0
+# SPDX-FileCopyrightText: 2009-2022 Blender Authors
+#
+# SPDX-License-Identifier: Apache-2.0
 
 import unittest
 import random

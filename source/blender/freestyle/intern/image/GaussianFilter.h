@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -26,25 +14,23 @@
 
 #include "../system/FreestyleConfig.h"
 
-#include "BLI_math.h"
-
-#ifdef WITH_CXX_GUARDEDALLOC
-#  include "MEM_guardedalloc.h"
-#endif
+#include "MEM_guardedalloc.h"
 
 namespace Freestyle {
 
 class GaussianFilter {
  protected:
   /* The mask is a symmetrical 2d array (with respect to the middle point).
-   * Thus, M(i,j) = M(-i,j) = M(i,-j) = M(-i,-j).
-   * For this reason, to represent a NxN array (N odd), we only store a ((N+1)/2)x((N+1)/2) array.
-   */
+   * Thus: `M(i,j) = M(-i,j) = M(i,-j) = M(-i,-j)`.
+   * For this reason, to represent a NxN array (N odd),
+   * we only store a `((N+1)/2)x((N+1)/2)` array. */
+
+  /** The sigma value of the gaussian function. */
   float _sigma;
   float *_mask;
   int _bound;
-  // the real mask size (must be odd)(the size of the mask we store is
-  // ((_maskSize+1)/2)*((_maskSize+1)/2))
+  /* the real mask size (must be odd)(the size of the mask we store is:
+   * `((_maskSize+1)/2)*((_maskSize+1)/2))`. */
   int _maskSize;
   int _storedMaskSize;  // (_maskSize+1)/2)
 
@@ -58,15 +44,13 @@ class GaussianFilter {
    * value. The sigma value determines the mask size (~ 2 x sigma).
    * \param map: The image we wish to work on.
    * The Map template must implement the following methods:
-   * - float pixel(unsigned int x,unsigned int y) const;
-   * - unsigned width() const;
-   * - unsigned height() const;
+   * - float pixel(uint x, uint y) const;
+   * - uint width() const;
+   * - uint height() const;
    *  \param x:
    *    The abscissa of the pixel where we want to evaluate the gaussian blur.
    *  \param y:
    *    The ordinate of the pixel where we want to evaluate the gaussian blur.
-   *  \param sigma:
-   *    The sigma value of the gaussian function.
    */
   template<class Map> float getSmoothedPixel(Map *map, int x, int y);
 
@@ -104,9 +88,7 @@ class GaussianFilter {
  protected:
   void computeMask();
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:GaussianFilter")
-#endif
 };
 
 /*
@@ -123,7 +105,7 @@ class GaussianFilter {
 
 template<class Map> float GaussianFilter::getSmoothedPixel(Map *map, int x, int y)
 {
-  float sum = 0.0f;
+  // float sum = 0.0f;
   float L = 0.0f;
   int w = (int)map->width();   // soc
   int h = (int)map->height();  // soc
@@ -142,7 +124,7 @@ template<class Map> float GaussianFilter::getSmoothedPixel(Map *map, int x, int 
       float tmpL = map->pixel(x + j, y + i);
       float m = _mask[abs(i) * _storedMaskSize + abs(j)];
       L += m * tmpL;
-      sum += m;
+      // sum += m;
     }
   }
   // L /= sum;

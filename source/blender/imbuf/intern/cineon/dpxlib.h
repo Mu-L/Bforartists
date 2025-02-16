@@ -1,20 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by the Free
- * Software Foundation; either version 2 of the License, or (at your option)
- * any later version.
+/* SPDX-FileCopyrightText: 1999-2002 David Hodson <hodsond@acm.org>.
  *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
- * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
- * for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * Copyright 1999 - 2002 David Hodson <hodsond@acm.org>
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup imbcineon
@@ -24,23 +10,19 @@
 
 #pragma once
 
-#include <math.h>
+#include <cmath>
 
 #include "logImageCore.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 #define DPX_FILE_MAGIC 0x53445058
 #define DPX_UNDEFINED_U8 0xFF
 #define DPX_UNDEFINED_U16 0xFFFF
 #define DPX_UNDEFINED_U32 0xFFFFFFFF
 #define DPX_UNDEFINED_R32 NAN
-#define IS_DPX_UNDEFINED_R32(x) isnan(x)
+#define IS_DPX_UNDEFINED_R32(x) std::isnan(x)
 #define DPX_UNDEFINED_CHAR 0
 
-typedef struct {
+struct DpxFileHeader {
   unsigned int magic_num;
   unsigned int offset;
   char version[8];
@@ -56,9 +38,9 @@ typedef struct {
   char copyright[200];
   unsigned int key;
   char reserved[104];
-} DpxFileHeader;
+};
 
-typedef struct {
+struct DpxElementHeader {
   unsigned int data_sign;
   unsigned int ref_low_data;
   float ref_low_quantity;
@@ -74,18 +56,18 @@ typedef struct {
   unsigned int line_padding;
   unsigned int element_padding;
   char description[32];
-} DpxElementHeader;
+};
 
-typedef struct {
+struct DpxImageHeader {
   unsigned short orientation;
   unsigned short elements_per_image;
   unsigned int pixels_per_line;
   unsigned int lines_per_element;
   DpxElementHeader element[8];
   char reserved[52];
-} DpxImageHeader;
+};
 
-typedef struct {
+struct DpxOrientationHeader {
   unsigned int x_offset;
   unsigned int y_offset;
   float x_center;
@@ -99,9 +81,9 @@ typedef struct {
   unsigned short border_validity[4];
   unsigned int pixel_aspect_ratio[2];
   char reserved[28];
-} DpxOrientationHeader;
+};
 
-typedef struct {
+struct DpxFilmHeader {
   char film_manufacturer_id[2];
   char film_type[2];
   char edge_code_perforation_offset[2];
@@ -116,9 +98,9 @@ typedef struct {
   char frame_identification[32];
   char slate_info[100];
   char reserved[56];
-} DpxFilmHeader;
+};
 
-typedef struct {
+struct DpxTelevisionHeader {
   unsigned int time_code;
   unsigned int user_bits;
   unsigned char interlace;
@@ -136,19 +118,19 @@ typedef struct {
   float white_level;
   float integration_times;
   unsigned char reserved[76];
-} DpxTelevisionHeader;
+};
 
-typedef struct {
+struct DpxMainHeader {
   DpxFileHeader fileHeader;
   DpxImageHeader imageHeader;
   DpxOrientationHeader orientationHeader;
   DpxFilmHeader filmHeader;
   DpxTelevisionHeader televisionHeader;
-} DpxMainHeader;
+};
 
 void dpxSetVerbose(int verbosity);
 LogImageFile *dpxOpen(const unsigned char *byteStuff, int fromMemory, size_t bufferSize);
-LogImageFile *dpxCreate(const char *filename,
+LogImageFile *dpxCreate(const char *filepath,
                         int width,
                         int height,
                         int bitsPerSample,
@@ -158,7 +140,3 @@ LogImageFile *dpxCreate(const char *filename,
                         int referenceBlack,
                         float gamma,
                         const char *creator);
-
-#ifdef __cplusplus
-}
-#endif

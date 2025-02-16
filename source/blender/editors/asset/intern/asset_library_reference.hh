@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup edasset
@@ -22,25 +10,24 @@
 
 #pragma once
 
-#include <cstdint>
+#include "BLI_hash.hh"
 
 #include "DNA_asset_types.h"
 
-namespace blender::ed::asset {
+inline bool operator==(const AssetLibraryReference &a, const AssetLibraryReference &b)
+{
+  return (a.type == b.type) &&
+         ((a.type == ASSET_LIBRARY_CUSTOM) ? (a.custom_library_index == b.custom_library_index) :
+                                             true);
+}
 
-/**
- * Wrapper to add logic to the AssetLibraryReference DNA struct.
- */
-class AssetLibraryReferenceWrapper : public AssetLibraryReference {
- public:
-  /* Intentionally not `explicit`, allow implicit conversion for convenience. Might have to be
-   * NOLINT */
-  AssetLibraryReferenceWrapper(const AssetLibraryReference &reference);
-  ~AssetLibraryReferenceWrapper() = default;
+namespace blender {
 
-  friend bool operator==(const AssetLibraryReferenceWrapper &a,
-                         const AssetLibraryReferenceWrapper &b);
-  uint64_t hash() const;
+template<> struct DefaultHash<AssetLibraryReference> {
+  uint64_t operator()(const AssetLibraryReference &value) const
+  {
+    return get_default_hash(value.type, value.custom_library_index);
+  }
 };
 
-}  // namespace blender::ed::asset
+}  // namespace blender

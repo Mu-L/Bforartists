@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup balembic
@@ -20,23 +8,25 @@
 
 #include "abc_util.h"
 
-#include "abc_axis_conversion.h"
 #include "abc_reader_camera.h"
 #include "abc_reader_curves.h"
 #include "abc_reader_mesh.h"
-#include "abc_reader_nurbs.h"
 #include "abc_reader_points.h"
 #include "abc_reader_transform.h"
 
+#include <Alembic/AbcGeom/ILight.h>
+#include <Alembic/AbcGeom/INuPatch.h>
 #include <Alembic/AbcMaterial/IMaterial.h>
 
 #include <algorithm>
 
 #include "DNA_object_types.h"
 
-#include "BLI_math_geom.h"
+#include "BLI_time.h"
 
-#include "PIL_time.h"
+using Alembic::Abc::IV3fArrayProperty;
+using Alembic::Abc::PropertyHeader;
+using Alembic::Abc::V3fArraySamplePtr;
 
 namespace blender::io::alembic {
 
@@ -63,15 +53,6 @@ std::string get_valid_abc_name(const char *name)
   return name_string;
 }
 
-/**
- * \brief get_object_dag_path_name returns the name under which the object
- *  will be exported in the Alembic file. It is of the form
- *  "[../grandparent/]parent/object" if dupli_parent is NULL, or
- *  "dupli_parent/[../grandparent/]parent/object" otherwise.
- * \param ob:
- * \param dupli_parent:
- * \return
- */
 std::string get_object_dag_path_name(const Object *const ob, Object *dupli_parent)
 {
   std::string name = get_id_name(ob);
@@ -90,13 +71,13 @@ std::string get_object_dag_path_name(const Object *const ob, Object *dupli_paren
   return name;
 }
 
-Imath::M44d convert_matrix_datatype(float mat[4][4])
+Imath::M44d convert_matrix_datatype(const float mat[4][4])
 {
   Imath::M44d m;
 
   for (int i = 0; i < 4; i++) {
     for (int j = 0; j < 4; j++) {
-      m[i][j] = mat[i][j];
+      m[i][j] = double(mat[i][j]);
     }
   }
 
@@ -107,7 +88,7 @@ void convert_matrix_datatype(const Imath::M44d &xform, float r_mat[4][4])
 {
   for (int i = 0; i < 4; i++) {
     for (int j = 0; j < 4; j++) {
-      r_mat[i][j] = static_cast<float>(xform[i][j]);
+      r_mat[i][j] = float(xform[i][j]);
     }
   }
 }
@@ -135,41 +116,76 @@ bool has_property(const Alembic::Abc::ICompoundProperty &prop, const std::string
   return prop.getPropertyHeader(name) != nullptr;
 }
 
-using index_time_pair_t = std::pair<Alembic::AbcCoreAbstract::index_t, float>;
-
-float get_weight_and_index(float time,
-                           const Alembic::AbcCoreAbstract::TimeSamplingPtr &time_sampling,
-                           int samples_number,
-                           Alembic::AbcGeom::index_t &i0,
-                           Alembic::AbcGeom::index_t &i1)
+V3fArraySamplePtr get_velocity_prop(const Alembic::Abc::ICompoundProperty &schema,
+                                    const Alembic::AbcGeom::ISampleSelector &selector,
+                                    const std::string &name)
 {
-  samples_number = std::max(samples_number, 1);
+  for (size_t i = 0; i < schema.getNumProperties(); i++) {
+    const PropertyHeader &header = schema.getPropertyHeader(i);
+
+    if (header.isCompound()) {
+      const Alembic::Abc::ICompoundProperty &prop = Alembic::Abc::ICompoundProperty(
+          schema, header.getName());
+
+      if (has_property(prop, name)) {
+        /* Header cannot be null here, as its presence is checked via has_property, so it is safe
+         * to dereference. */
+        const PropertyHeader *header = prop.getPropertyHeader(name);
+        if (!IV3fArrayProperty::matches(*header)) {
+          continue;
+        }
+
+        const IV3fArrayProperty &velocity_prop = IV3fArrayProperty(prop, name, 0);
+        if (velocity_prop) {
+          return velocity_prop.getValue(selector);
+        }
+      }
+    }
+    else if (header.isArray()) {
+      if (header.getName() == name && IV3fArrayProperty::matches(header)) {
+        const IV3fArrayProperty &velocity_prop = IV3fArrayProperty(schema, name, 0);
+        return velocity_prop.getValue(selector);
+      }
+    }
+  }
+
+  return V3fArraySamplePtr();
+}
+
+using index_time_pair_t = std::pair<Alembic::AbcCoreAbstract::index_t, Alembic::AbcGeom::chrono_t>;
+
+std::optional<SampleInterpolationSettings> get_sample_interpolation_settings(
+    const Alembic::AbcGeom::ISampleSelector &selector,
+    const Alembic::AbcCoreAbstract::TimeSamplingPtr &time_sampling,
+    size_t samples_number)
+{
+  const chrono_t time = selector.getRequestedTime();
+  samples_number = std::max(samples_number, size_t(1));
 
   index_time_pair_t t0 = time_sampling->getFloorIndex(time, samples_number);
-  i0 = i1 = t0.first;
+  Alembic::AbcCoreAbstract::index_t i0 = t0.first;
 
-  if (samples_number == 1 || (fabs(time - t0.second) < 0.0001f)) {
-    return 0.0f;
+  if (samples_number == 1 || (fabs(time - t0.second) < 0.0001)) {
+    return {};
   }
 
   index_time_pair_t t1 = time_sampling->getCeilIndex(time, samples_number);
-  i1 = t1.first;
+  Alembic::AbcCoreAbstract::index_t i1 = t1.first;
 
   if (i0 == i1) {
-    return 0.0f;
+    return {};
   }
 
-  const float bias = (time - t0.second) / (t1.second - t0.second);
+  const double bias = (time - t0.second) / (t1.second - t0.second);
 
-  if (fabs(1.0f - bias) < 0.0001f) {
-    i0 = i1;
-    return 0.0f;
+  if (fabs(1.0 - bias) < 0.0001) {
+    return {};
   }
 
-  return bias;
+  return SampleInterpolationSettings{i0, i1, bias};
 }
 
-//#define USE_NURBS
+// #define USE_NURBS
 
 AbcObjectReader *create_reader(const Alembic::AbcGeom::IObject &object, ImportSettings &settings)
 {
@@ -225,14 +241,13 @@ AbcObjectReader *create_reader(const Alembic::AbcGeom::IObject &object, ImportSe
 
 /* ********************** */
 
-ScopeTimer::ScopeTimer(const char *message)
-    : m_message(message), m_start(PIL_check_seconds_timer())
+ScopeTimer::ScopeTimer(const char *message) : m_message(message), m_start(BLI_time_now_seconds())
 {
 }
 
 ScopeTimer::~ScopeTimer()
 {
-  fprintf(stderr, "%s: %fs\n", m_message, PIL_check_seconds_timer() - m_start);
+  fprintf(stderr, "%s: %fs\n", m_message, BLI_time_now_seconds() - m_start);
 }
 
 /* ********************** */

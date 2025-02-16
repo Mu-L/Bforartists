@@ -1,65 +1,64 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2023 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(INC
+  ../asset
   ../include
-  ../../blenfont
-  ../../blenkernel
-  ../../blenlib
-  ../../blenloader
-  ../../blentranslation
-  ../../bmesh
-  ../../depsgraph
-  ../../gpu
-  ../../imbuf
-  ../../makesdna
   ../../makesrna
-  ../../sequencer
-  ../../windowmanager
-  ../../../../intern/glew-mx
-  ../../../../intern/guardedalloc
+  ../../../../extern/fmtlib/include
+  # RNA_prototypes.hh
+  ${CMAKE_BINARY_DIR}/source/blender/makesrna
+)
+
+set(INC_SYS
 )
 
 set(SRC
-  area.c
-  area_query.c
-  area_utils.c
-  glutil.c
-  screen_context.c
-  screen_draw.c
-  screen_edit.c
-  screen_geometry.c
-  screen_ops.c
-  screen_user_menu.c
-  screendump.c
-  workspace_edit.c
-  workspace_layout_edit.c
+  area.cc
+  area_query.cc
+  area_utils.cc
+  glutil.cc
+  screen_context.cc
+  screen_draw.cc
+  screen_edit.cc
+  screen_geometry.cc
+  screen_ops.cc
+  screen_user_menu.cc
+  screendump.cc
+  workspace_edit.cc
+  workspace_layout_edit.cc
+  workspace_listen.cc
 
-  screen_intern.h
+  screen_intern.hh
 )
 
 set(LIB
+  PRIVATE bf::animrig
+  PRIVATE bf::asset_system
+  PRIVATE bf::blenfont
+  PRIVATE bf::blenkernel
+  PRIVATE bf::blenlib
+  PRIVATE bf::blenloader
+  PRIVATE bf::blentranslation
+  PRIVATE bf::bmesh
+  PRIVATE bf::depsgraph
+  PRIVATE bf::dna
   bf_editor_datafiles
   bf_editor_space_sequencer
+  PRIVATE bf::gpu
+  PRIVATE bf::imbuf
+  PRIVATE bf::intern::guardedalloc
+  PRIVATE bf::extern::fmtlib
+  PRIVATE bf::sequencer
+  PRIVATE bf::windowmanager
 )
 
-if(WITH_INTERNATIONAL)
-  add_definitions(-DWITH_INTERNATIONAL)
+if(WITH_HEADLESS)
+  add_definitions(-DWITH_HEADLESS)
 endif()
 
-
 blender_add_lib(bf_editor_screen "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+
+# RNA_prototypes.hh
+add_dependencies(bf_editor_screen bf_rna)

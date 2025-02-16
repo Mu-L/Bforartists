@@ -1,9 +1,13 @@
-/* Apache License, Version 2.0 */
+/* SPDX-FileCopyrightText: 2023 Blender Authors
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
+
+#include "testing/testing.h"
 
 #include "BLI_index_range.hh"
-#include "BLI_strict_flags.h"
 #include "BLI_vector.hh"
-#include "testing/testing.h"
+
+#include "BLI_strict_flags.h" /* IWYU pragma: keep. Keep last. */
 
 namespace blender::tests {
 
@@ -17,6 +21,86 @@ TEST(index_range, DefaultConstructor)
     vector.append(value);
   }
   EXPECT_EQ(vector.size(), 0);
+}
+
+TEST(index_range, FromBeginSize)
+{
+  {
+    const IndexRange range = IndexRange::from_begin_size(0, 0);
+    EXPECT_TRUE(range.is_empty());
+  }
+  {
+    const IndexRange range = IndexRange::from_begin_size(0, 10);
+    EXPECT_EQ(range.size(), 10);
+    EXPECT_EQ(range.first(), 0);
+  }
+  {
+    const IndexRange range = IndexRange::from_begin_size(4, 10);
+    EXPECT_EQ(range.size(), 10);
+    EXPECT_EQ(range.first(), 4);
+    EXPECT_EQ(range.last(), 13);
+  }
+}
+
+TEST(index_range, FromBeginEnd)
+{
+  {
+    const IndexRange range = IndexRange::from_begin_end(0, 0);
+    EXPECT_TRUE(range.is_empty());
+  }
+  {
+    const IndexRange range = IndexRange::from_begin_end(0, 10);
+    EXPECT_EQ(range.size(), 10);
+    EXPECT_EQ(range.first(), 0);
+  }
+  {
+    const IndexRange range = IndexRange::from_begin_end(4, 10);
+    EXPECT_EQ(range.size(), 6);
+    EXPECT_EQ(range.first(), 4);
+    EXPECT_EQ(range.last(), 9);
+  }
+}
+
+TEST(index_range, FromBeginEndInclusive)
+{
+  {
+    const IndexRange range = IndexRange::from_begin_end_inclusive(0, 0);
+    EXPECT_EQ(range.size(), 1);
+    EXPECT_EQ(range.first(), 0);
+  }
+  {
+    const IndexRange range = IndexRange::from_begin_end_inclusive(100, 200);
+    EXPECT_EQ(range.size(), 101);
+    EXPECT_EQ(range.first(), 100);
+    EXPECT_EQ(range.last(), 200);
+  }
+}
+
+TEST(index_range, FromEndSize)
+{
+  {
+    const IndexRange range = IndexRange::from_end_size(0, 0);
+    EXPECT_TRUE(range.is_empty());
+  }
+  {
+    const IndexRange range = IndexRange::from_end_size(100, 20);
+    EXPECT_EQ(range.first(), 80);
+    EXPECT_EQ(range.last(), 99);
+  }
+}
+
+TEST(index_range, FromSingle)
+{
+  {
+    const IndexRange range = IndexRange::from_single(0);
+    EXPECT_EQ(range.size(), 1);
+    EXPECT_EQ(range.first(), 0);
+  }
+  {
+    const IndexRange range = IndexRange::from_single(100);
+    EXPECT_EQ(range.size(), 1);
+    EXPECT_EQ(range.first(), 100);
+  }
 }
 
 TEST(index_range, SingleElementRange)
@@ -105,6 +189,12 @@ TEST(index_range, OneAfterEnd)
   EXPECT_EQ(range.one_after_last(), 8);
 }
 
+TEST(index_range, OneBeforeStart)
+{
+  IndexRange range = IndexRange(5, 3);
+  EXPECT_EQ(range.one_before_start(), 4);
+}
+
 TEST(index_range, Start)
 {
   IndexRange range = IndexRange(6, 2);
@@ -120,6 +210,17 @@ TEST(index_range, Slice)
   EXPECT_EQ(slice.last(), 12);
 }
 
+TEST(index_range, Intersect)
+{
+  IndexRange range = IndexRange(5, 15);
+  EXPECT_EQ(range.intersect(IndexRange(2, 2)), IndexRange(5, 0));
+  EXPECT_EQ(range.intersect(IndexRange(4, 2)), IndexRange(5, 1));
+  EXPECT_EQ(range.intersect(IndexRange(3, 20)), IndexRange(5, 15));
+  EXPECT_EQ(range.intersect(IndexRange(5, 15)), IndexRange(5, 15));
+  EXPECT_EQ(range.intersect(IndexRange(15, 10)), IndexRange(15, 5));
+  EXPECT_EQ(range.intersect(IndexRange(22, 2)), IndexRange(20, 0));
+}
+
 TEST(index_range, SliceRange)
 {
   IndexRange range = IndexRange(5, 15);
@@ -129,15 +230,77 @@ TEST(index_range, SliceRange)
   EXPECT_EQ(slice.last(), 12);
 }
 
-TEST(index_range, AsSpan)
+TEST(index_range, DropBack)
 {
-  IndexRange range = IndexRange(4, 6);
-  Span<int64_t> span = range.as_span();
-  EXPECT_EQ(span.size(), 6);
-  EXPECT_EQ(span[0], 4);
-  EXPECT_EQ(span[1], 5);
-  EXPECT_EQ(span[2], 6);
-  EXPECT_EQ(span[3], 7);
+  IndexRange a(4, 4);
+  auto slice = a.drop_back(2);
+  EXPECT_EQ(slice.size(), 2);
+  EXPECT_EQ(slice.start(), 4);
+  EXPECT_EQ(slice[1], 5);
+}
+
+TEST(index_range, DropBackAll)
+{
+  IndexRange a(4, 4);
+  auto slice = a.drop_back(a.size());
+  EXPECT_TRUE(slice.is_empty());
+}
+
+TEST(index_range, DropFront)
+{
+  IndexRange a(4, 4);
+  auto slice = a.drop_front(1);
+  EXPECT_EQ(slice.size(), 3);
+  EXPECT_EQ(slice[0], 5);
+  EXPECT_EQ(slice[1], 6);
+  EXPECT_EQ(slice.last(), 7);
+}
+
+TEST(index_range, DropFrontLargeN)
+{
+  IndexRange a(1, 5);
+  IndexRange slice = a.drop_front(100);
+  EXPECT_TRUE(slice.is_empty());
+}
+
+TEST(index_range, DropFrontAll)
+{
+  IndexRange a(50);
+  IndexRange slice = a.drop_front(a.size());
+  EXPECT_TRUE(slice.is_empty());
+}
+
+TEST(index_range, TakeFront)
+{
+  IndexRange a(4, 4);
+  IndexRange slice = a.take_front(2);
+  EXPECT_EQ(slice.size(), 2);
+  EXPECT_EQ(slice[0], 4);
+  EXPECT_EQ(slice[1], 5);
+}
+
+TEST(index_range, TakeFrontLargeN)
+{
+  IndexRange a(4, 4);
+  IndexRange slice = a.take_front(100);
+  EXPECT_EQ(slice.size(), 4);
+}
+
+TEST(index_range, TakeBack)
+{
+  IndexRange a(4, 4);
+  auto slice = a.take_back(2);
+  EXPECT_EQ(slice.size(), 2);
+  EXPECT_EQ(slice[0], 6);
+  EXPECT_EQ(slice[1], 7);
+}
+
+TEST(index_range, TakeBackLargeN)
+{
+  IndexRange a(3, 4);
+  IndexRange slice = a.take_back(100);
+  EXPECT_EQ(slice.size(), 4);
+  EXPECT_EQ(slice.size(), 4);
 }
 
 TEST(index_range, constexpr_)
@@ -154,6 +317,70 @@ TEST(index_range, GenericAlgorithms)
   EXPECT_TRUE(std::any_of(range.begin(), range.end(), [](int v) { return v == 6; }));
   EXPECT_FALSE(std::any_of(range.begin(), range.end(), [](int v) { return v == 20; }));
   EXPECT_EQ(std::count_if(range.begin(), range.end(), [](int v) { return v < 7; }), 3);
+}
+
+TEST(index_range, SplitByAlignment)
+{
+  {
+    AlignedIndexRanges ranges = split_index_range_by_alignment(IndexRange(0, 0), 16);
+    EXPECT_EQ(ranges.prefix, IndexRange());
+    EXPECT_EQ(ranges.aligned, IndexRange());
+    EXPECT_EQ(ranges.suffix, IndexRange());
+  }
+  {
+    AlignedIndexRanges ranges = split_index_range_by_alignment(IndexRange(0, 24), 8);
+    EXPECT_EQ(ranges.prefix, IndexRange());
+    EXPECT_EQ(ranges.aligned, IndexRange(0, 24));
+    EXPECT_EQ(ranges.suffix, IndexRange());
+  }
+  {
+    AlignedIndexRanges ranges = split_index_range_by_alignment(IndexRange(1, 2), 4);
+    EXPECT_EQ(ranges.prefix, IndexRange(1, 2));
+    EXPECT_EQ(ranges.aligned, IndexRange());
+    EXPECT_EQ(ranges.suffix, IndexRange());
+  }
+  {
+    AlignedIndexRanges ranges = split_index_range_by_alignment(IndexRange(3, 50), 8);
+    EXPECT_EQ(ranges.prefix, IndexRange(3, 5));
+    EXPECT_EQ(ranges.aligned, IndexRange(8, 40));
+    EXPECT_EQ(ranges.suffix, IndexRange(48, 5));
+  }
+  {
+    AlignedIndexRanges ranges = split_index_range_by_alignment(IndexRange(3, 50), 1);
+    EXPECT_EQ(ranges.prefix, IndexRange());
+    EXPECT_EQ(ranges.aligned, IndexRange(3, 50));
+    EXPECT_EQ(ranges.suffix, IndexRange());
+  }
+  {
+    AlignedIndexRanges ranges = split_index_range_by_alignment(IndexRange(64, 16), 16);
+    EXPECT_EQ(ranges.prefix, IndexRange());
+    EXPECT_EQ(ranges.aligned, IndexRange(64, 16));
+    EXPECT_EQ(ranges.suffix, IndexRange());
+  }
+  {
+    AlignedIndexRanges ranges = split_index_range_by_alignment(IndexRange(3, 5), 8);
+    EXPECT_EQ(ranges.prefix, IndexRange(3, 5));
+    EXPECT_EQ(ranges.aligned, IndexRange());
+    EXPECT_EQ(ranges.suffix, IndexRange());
+  }
+  {
+    AlignedIndexRanges ranges = split_index_range_by_alignment(IndexRange(64), 64);
+    EXPECT_EQ(ranges.prefix, IndexRange());
+    EXPECT_EQ(ranges.aligned, IndexRange(64));
+    EXPECT_EQ(ranges.suffix, IndexRange());
+  }
+  {
+    AlignedIndexRanges ranges = split_index_range_by_alignment(IndexRange(64, 64), 64);
+    EXPECT_EQ(ranges.prefix, IndexRange());
+    EXPECT_EQ(ranges.aligned, IndexRange(64, 64));
+    EXPECT_EQ(ranges.suffix, IndexRange());
+  }
+  {
+    AlignedIndexRanges ranges = split_index_range_by_alignment(IndexRange(4, 8), 64);
+    EXPECT_EQ(ranges.prefix, IndexRange(4, 8));
+    EXPECT_EQ(ranges.aligned, IndexRange());
+    EXPECT_EQ(ranges.suffix, IndexRange());
+  }
 }
 
 }  // namespace blender::tests

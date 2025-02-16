@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -110,7 +98,7 @@ class Stack {
   int64_t size_;
 
   /** The buffer used to implement small object optimization. */
-  TypedBuffer<T, InlineBufferCapacity> inline_buffer_;
+  BLI_NO_UNIQUE_ADDRESS TypedBuffer<T, InlineBufferCapacity> inline_buffer_;
 
   /**
    * A chunk referencing the inline buffer. This is always the bottom-most chunk.
@@ -119,7 +107,7 @@ class Stack {
   Chunk inline_chunk_;
 
   /** Used for allocations when the inline buffer is not large enough. */
-  Allocator allocator_;
+  BLI_NO_UNIQUE_ADDRESS Allocator allocator_;
 
  public:
   /**
@@ -137,9 +125,7 @@ class Stack {
     size_ = 0;
   }
 
-  Stack(NoExceptConstructor, Allocator allocator = {}) noexcept : Stack(allocator)
-  {
-  }
+  Stack(NoExceptConstructor, Allocator allocator = {}) noexcept : Stack(allocator) {}
 
   /**
    * Create a new stack that contains the given elements. The values are pushed to the stack in
@@ -233,7 +219,7 @@ class Stack {
     this->push_as(std::move(value));
   }
   /* This is similar to `std::stack::emplace`. */
-  template<typename... ForwardT> void push_as(ForwardT &&... value)
+  template<typename... ForwardT> void push_as(ForwardT &&...value)
   {
     if (top_ == top_chunk_->capacity_end) {
       this->activate_next_chunk(1);
@@ -341,6 +327,15 @@ class Stack {
     this->destruct_all_elements();
     top_chunk_ = &inline_chunk_;
     top_ = top_chunk_->begin;
+  }
+
+  /**
+   * Removes all elements from the stack and frees any allocated memory.
+   */
+  void clear_and_shrink()
+  {
+    std::destroy_at(this);
+    new (this) Stack(NoExceptConstructor{});
   }
 
   /* This should only be called by unit tests. */

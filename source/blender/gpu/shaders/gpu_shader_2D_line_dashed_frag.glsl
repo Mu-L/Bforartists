@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2017-2022 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /*
  * Fragment Shader for dashed lines, with uniform multi-color(s),
@@ -6,54 +9,28 @@
  * Dashed is performed in screen space.
  */
 
-uniform float dash_width;
+#include "infos/gpu_shader_line_dashed_uniform_color_info.hh"
 
-/* Simple mode, discarding non-dash parts (so no need for blending at all). */
-uniform float dash_factor; /* if > 1.0, solid line. */
-
-/* More advanced mode, allowing for complex, multi-colored patterns.
- * Enabled when colors_len > 0. */
-/* Note: max number of steps/colors in pattern is 32! */
-uniform int colors_len; /* Enabled if > 0, 1 for solid line. */
-uniform vec4 colors[32];
-
-flat in vec4 color_vert;
-
-noperspective in vec2 stipple_pos;
-flat in vec2 stipple_start;
-
-out vec4 fragColor;
+FRAGMENT_SHADER_CREATE_INFO(gpu_shader_3D_line_dashed_uniform_color)
 
 void main()
 {
   float distance_along_line = distance(stipple_pos, stipple_start);
-  /* Multi-color option. */
-  if (colors_len > 0) {
-    /* Solid line case, simple. */
-    if (colors_len == 1) {
-      fragColor = colors[0];
-    }
-    /* Actually dashed line... */
-    else {
-      float normalized_distance = fract(distance_along_line / dash_width);
-      fragColor = colors[int(normalized_distance * colors_len)];
-    }
+  /* Solid line case, simple. */
+  if (udash_factor >= 1.0f) {
+    fragColor = color;
   }
-  /* Single color option. */
+  /* Actually dashed line... */
   else {
-    /* Solid line case, simple. */
-    if (dash_factor >= 1.0f) {
-      fragColor = color_vert;
+    float normalized_distance = fract(distance_along_line / dash_width);
+    if (normalized_distance <= udash_factor) {
+      fragColor = color;
     }
-    /* Actually dashed line... */
+    else if (colors_len > 0) {
+      fragColor = color2;
+    }
     else {
-      float normalized_distance = fract(distance_along_line / dash_width);
-      if (normalized_distance <= dash_factor) {
-        fragColor = color_vert;
-      }
-      else {
-        discard;
-      }
+      discard;
     }
   }
 }

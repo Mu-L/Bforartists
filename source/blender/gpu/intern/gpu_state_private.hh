@@ -1,20 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2020 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * Copyright 2020, Blender Foundation.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup gpu
@@ -24,14 +10,13 @@
 
 #include "BLI_utildefines.h"
 
-#include "GPU_state.h"
+#include "GPU_state.hh"
 
 #include "gpu_texture_private.hh"
 
 #include <cstring>
 
-namespace blender {
-namespace gpu {
+namespace blender::gpu {
 
 /* Encapsulate all pipeline state that we need to track.
  * Try to keep small to reduce validation time. */
@@ -62,7 +47,7 @@ union GPUState {
     uint32_t polygon_smooth : 1;
     uint32_t line_smooth : 1;
   };
-  /* Here to allow fast bitwise ops. */
+  /* Here to allow fast bit-wise ops. */
   uint64_t data;
 };
 
@@ -107,11 +92,11 @@ union GPUStateMutable {
     uint8_t stencil_write_mask;
     uint8_t stencil_compare_mask;
     uint8_t stencil_reference;
-    uint8_t _pad0;
+    uint8_t _pad0[5];
     /* IMPORTANT: ensure x64 struct alignment. */
   };
   /* Here to allow fast bit-wise ops. */
-  uint64_t data[9];
+  uint64_t data[3];
 };
 
 BLI_STATIC_ASSERT(sizeof(GPUStateMutable) == sizeof(GPUStateMutable::data),
@@ -119,7 +104,7 @@ BLI_STATIC_ASSERT(sizeof(GPUStateMutable) == sizeof(GPUStateMutable::data),
 
 inline bool operator==(const GPUStateMutable &a, const GPUStateMutable &b)
 {
-  return memcmp(&a, &b, sizeof(GPUStateMutable)) == 0;
+  return a.data[0] == b.data[0] && a.data[1] == b.data[1] && a.data[2] == b.data[2];
 }
 
 inline bool operator!=(const GPUStateMutable &a, const GPUStateMutable &b)
@@ -155,25 +140,52 @@ class StateManager {
   GPUStateMutable mutable_state;
   bool use_bgl = false;
 
- public:
   StateManager();
-  virtual ~StateManager(){};
+  virtual ~StateManager() = default;
 
-  virtual void apply_state(void) = 0;
-  virtual void force_state(void) = 0;
+  virtual void apply_state() = 0;
+  virtual void force_state() = 0;
 
   virtual void issue_barrier(eGPUBarrier barrier_bits) = 0;
 
-  virtual void texture_bind(Texture *tex, eGPUSamplerState sampler, int unit) = 0;
+  virtual void texture_bind(Texture *tex, GPUSamplerState sampler, int unit) = 0;
   virtual void texture_unbind(Texture *tex) = 0;
-  virtual void texture_unbind_all(void) = 0;
+  virtual void texture_unbind_all() = 0;
 
   virtual void image_bind(Texture *tex, int unit) = 0;
   virtual void image_unbind(Texture *tex) = 0;
-  virtual void image_unbind_all(void) = 0;
+  virtual void image_unbind_all() = 0;
 
   virtual void texture_unpack_row_length_set(uint len) = 0;
 };
 
-}  // namespace gpu
-}  // namespace blender
+/**
+ * GPUFence.
+ */
+class Fence {
+ protected:
+  bool signalled_ = false;
+
+ public:
+  Fence() = default;
+  virtual ~Fence() = default;
+
+  virtual void signal() = 0;
+  virtual void wait() = 0;
+};
+
+/* Syntactic sugar. */
+static inline GPUFence *wrap(Fence *pixbuf)
+{
+  return reinterpret_cast<GPUFence *>(pixbuf);
+}
+static inline Fence *unwrap(GPUFence *pixbuf)
+{
+  return reinterpret_cast<Fence *>(pixbuf);
+}
+static inline const Fence *unwrap(const GPUFence *pixbuf)
+{
+  return reinterpret_cast<const Fence *>(pixbuf);
+}
+
+}  // namespace blender::gpu

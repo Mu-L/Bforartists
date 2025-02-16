@@ -1,53 +1,27 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2021 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2021 by Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup draw
  */
 
-#include "MEM_guardedalloc.h"
+#include "DNA_meshdata_types.h"
 
-#include "BKE_deform.h"
+#include "BLI_array_utils.hh"
 
-#include "draw_cache_extract_mesh_private.h"
+#include "BKE_deform.hh"
+
+#include "draw_subdivision.hh"
+#include "extract_mesh.hh"
 
 namespace blender::draw {
-
-/* ---------------------------------------------------------------------- */
-/** \name Extract Vertex Weight
- * \{ */
-
-struct MeshExtract_Weight_Data {
-  float *vbo_data;
-  const DRW_MeshWeightState *wstate;
-  const MDeformVert *dvert; /* For #Mesh. */
-  int cd_ofs;               /* For #BMesh. */
-};
 
 static float evaluate_vertex_weight(const MDeformVert *dvert, const DRW_MeshWeightState *wstate)
 {
   /* Error state. */
   if ((wstate->defgroup_active < 0) && (wstate->defgroup_len > 0)) {
     return -2.0f;
-  }
-  if (dvert == nullptr) {
-    return (wstate->alert_mode != OB_DRAW_GROUPUSER_NONE) ? -1.0f : 0.0f;
   }
 
   float input = 0.0f;
@@ -93,97 +67,93 @@ static float evaluate_vertex_weight(const MDeformVert *dvert, const DRW_MeshWeig
   return input;
 }
 
-static void extract_weights_init(const MeshRenderData *mr,
-                                 struct MeshBatchCache *cache,
-                                 void *buf,
-                                 void *tls_data)
+static void extract_weights_mesh(const MeshRenderData &mr,
+                                 const DRW_MeshWeightState &weight_state,
+                                 MutableSpan<float> vbo_data)
 {
-  GPUVertBuf *vbo = static_cast<GPUVertBuf *>(buf);
+  const Mesh &mesh = *mr.mesh;
+  const Span<MDeformVert> dverts = mesh.deform_verts();
+  if (dverts.is_empty()) {
+    vbo_data.fill(weight_state.alert_mode == OB_DRAW_GROUPUSER_NONE ? 0.0f : -1.0f);
+    return;
+  }
+
+  Array<float> weights(dverts.size());
+  threading::parallel_for(weights.index_range(), 1024, [&](const IndexRange range) {
+    for (const int vert : range) {
+      weights[vert] = evaluate_vertex_weight(&dverts[vert], &weight_state);
+    }
+  });
+  array_utils::gather(weights.as_span(), mr.corner_verts, vbo_data);
+}
+
+static void extract_weights_bm(const MeshRenderData &mr,
+                               const DRW_MeshWeightState &weight_state,
+                               MutableSpan<float> vbo_data)
+{
+  const BMesh &bm = *mr.bm;
+  const int offset = CustomData_get_offset(&bm.vdata, CD_MDEFORMVERT);
+  if (offset == -1) {
+    vbo_data.fill(weight_state.alert_mode == OB_DRAW_GROUPUSER_NONE ? 0.0f : -1.0f);
+    return;
+  }
+
+  threading::parallel_for(IndexRange(bm.totface), 2048, [&](const IndexRange range) {
+    for (const int face_index : range) {
+      const BMFace &face = *BM_face_at_index(&const_cast<BMesh &>(bm), face_index);
+      const BMLoop *loop = BM_FACE_FIRST_LOOP(&face);
+      for ([[maybe_unused]] const int i : IndexRange(face.len)) {
+        const int index = BM_elem_index_get(loop);
+        vbo_data[index] = evaluate_vertex_weight(
+            static_cast<const MDeformVert *>(BM_ELEM_CD_GET_VOID_P(loop->v, offset)),
+            &weight_state);
+        loop = loop->next;
+      }
+    }
+  });
+}
+
+void extract_weights(const MeshRenderData &mr, const MeshBatchCache &cache, gpu::VertBuf &vbo)
+{
   static GPUVertFormat format = {0};
   if (format.attr_len == 0) {
     GPU_vertformat_attr_add(&format, "weight", GPU_COMP_F32, 1, GPU_FETCH_FLOAT);
   }
-  GPU_vertbuf_init_with_format(vbo, &format);
-  GPU_vertbuf_data_alloc(vbo, mr->loop_len + mr->loop_loose_len);
+  GPU_vertbuf_init_with_format(vbo, format);
+  GPU_vertbuf_data_alloc(vbo, mr.corners_num);
+  MutableSpan<float> vbo_data = vbo.data<float>();
 
-  MeshExtract_Weight_Data *data = static_cast<MeshExtract_Weight_Data *>(tls_data);
-  data->vbo_data = (float *)GPU_vertbuf_get_data(vbo);
-  data->wstate = &cache->weight_state;
-
-  if (data->wstate->defgroup_active == -1) {
-    /* Nothing to show. */
-    data->dvert = nullptr;
-    data->cd_ofs = -1;
+  const DRW_MeshWeightState &weight_state = cache.weight_state;
+  if (weight_state.defgroup_active == -1) {
+    vbo_data.fill(weight_state.alert_mode == OB_DRAW_GROUPUSER_NONE ? 0.0f : -1.0f);
+    return;
   }
-  else if (mr->extract_type == MR_EXTRACT_BMESH) {
-    data->dvert = nullptr;
-    data->cd_ofs = CustomData_get_offset(&mr->bm->vdata, CD_MDEFORMVERT);
+
+  if (mr.extract_type == MeshExtractType::Mesh) {
+    extract_weights_mesh(mr, weight_state, vbo_data);
   }
   else {
-    data->dvert = (const MDeformVert *)CustomData_get_layer(&mr->me->vdata, CD_MDEFORMVERT);
-    data->cd_ofs = -1;
+    extract_weights_bm(mr, weight_state, vbo_data);
   }
 }
 
-static void extract_weights_iter_poly_bm(const MeshRenderData *UNUSED(mr),
-                                         const BMFace *f,
-                                         const int UNUSED(f_index),
-                                         void *_data)
+void extract_weights_subdiv(const MeshRenderData &mr,
+                            const DRWSubdivCache &subdiv_cache,
+                            const MeshBatchCache &cache,
+                            gpu::VertBuf &vbo)
 {
-  MeshExtract_Weight_Data *data = static_cast<MeshExtract_Weight_Data *>(_data);
-  BMLoop *l_iter, *l_first;
-  l_iter = l_first = BM_FACE_FIRST_LOOP(f);
-  do {
-    const int l_index = BM_elem_index_get(l_iter);
-    if (data->cd_ofs != -1) {
-      const MDeformVert *dvert = (const MDeformVert *)BM_ELEM_CD_GET_VOID_P(l_iter->v,
-                                                                            data->cd_ofs);
-      data->vbo_data[l_index] = evaluate_vertex_weight(dvert, data->wstate);
-    }
-    else {
-      data->vbo_data[l_index] = evaluate_vertex_weight(nullptr, data->wstate);
-    }
-  } while ((l_iter = l_iter->next) != l_first);
-}
-
-static void extract_weights_iter_poly_mesh(const MeshRenderData *mr,
-                                           const MPoly *mp,
-                                           const int UNUSED(mp_index),
-                                           void *_data)
-{
-  MeshExtract_Weight_Data *data = static_cast<MeshExtract_Weight_Data *>(_data);
-  const MLoop *mloop = mr->mloop;
-  const int ml_index_end = mp->loopstart + mp->totloop;
-  for (int ml_index = mp->loopstart; ml_index < ml_index_end; ml_index += 1) {
-    const MLoop *ml = &mloop[ml_index];
-    if (data->dvert != nullptr) {
-      const MDeformVert *dvert = &data->dvert[ml->v];
-      data->vbo_data[ml_index] = evaluate_vertex_weight(dvert, data->wstate);
-    }
-    else {
-      const MDeformVert *dvert = nullptr;
-      data->vbo_data[ml_index] = evaluate_vertex_weight(dvert, data->wstate);
-    }
+  static GPUVertFormat format = {0};
+  if (format.attr_len == 0) {
+    GPU_vertformat_attr_add(&format, "weight", GPU_COMP_F32, 1, GPU_FETCH_FLOAT);
   }
-}
+  GPU_vertbuf_init_build_on_device(vbo, format, subdiv_cache.num_subdiv_loops);
 
-constexpr MeshExtract create_extractor_weights()
-{
-  MeshExtract extractor = {nullptr};
-  extractor.init = extract_weights_init;
-  extractor.iter_poly_bm = extract_weights_iter_poly_bm;
-  extractor.iter_poly_mesh = extract_weights_iter_poly_mesh;
-  extractor.data_type = MR_DATA_NONE;
-  extractor.data_size = sizeof(MeshExtract_Weight_Data);
-  extractor.use_threading = true;
-  extractor.mesh_buffer_offset = offsetof(MeshBufferCache, vbo.weights);
-  return extractor;
-}
+  gpu::VertBuf *coarse_weights = GPU_vertbuf_calloc();
+  extract_weights(mr, cache, *coarse_weights);
 
-/** \} */
+  draw_subdiv_interp_custom_data(subdiv_cache, *coarse_weights, vbo, GPU_COMP_F32, 1, 0);
+
+  GPU_vertbuf_discard(coarse_weights);
+}
 
 }  // namespace blender::draw
-
-extern "C" {
-const MeshExtract extract_weights = blender::draw::create_extractor_weights();
-}

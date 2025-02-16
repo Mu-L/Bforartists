@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -30,9 +18,7 @@
 
 #include "../winged_edge/WEdge.h"
 
-#ifdef WITH_CXX_GUARDEDALLOC
-#  include "MEM_guardedalloc.h"
-#endif
+#include "MEM_guardedalloc.h"
 
 namespace Freestyle {
 
@@ -81,7 +67,7 @@ inline Vec3r closestPointOnPolygon(const Vec3r &point, const Polygon3r &poly)
   real distance;
   Vec3r closest = closestPointToSegment(
       point, poly.getVertices()[2], poly.getVertices()[0], distance);
-  for (unsigned int i = 0; i < 2; ++i) {
+  for (uint i = 0; i < 2; ++i) {
     real t;
     Vec3r p = closestPointToSegment(point, poly.getVertices()[i], poly.getVertices()[i + 1], t);
     if (t < distance) {
@@ -104,7 +90,7 @@ inline real distancePointToPolygon(const Vec3r &point, const Polygon3r &poly)
 
   // Otherwise, get the nearest point on each edge, and take the closest
   real distance = GeomUtils::distPointSegment(point, poly.getVertices()[2], poly.getVertices()[0]);
-  for (unsigned int i = 0; i < 2; ++i) {
+  for (uint i = 0; i < 2; ++i) {
     real t = GeomUtils::distPointSegment(point, poly.getVertices()[i], poly.getVertices()[i + 1]);
     if (t < distance) {
       distance = t;
@@ -118,9 +104,7 @@ class Transform {
   virtual ~Transform() = 0;
   virtual Vec3r operator()(const Vec3r &point) const = 0;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:GridHelpers:Transform")
-#endif
 };
 
 inline bool insideProscenium(const real proscenium[4], const Polygon3r &polygon)
@@ -132,7 +116,8 @@ inline bool insideProscenium(const real proscenium[4], const Polygon3r &polygon)
   Vec3r bbMin, bbMax;
   polygon.getBBox(bbMin, bbMax);
   if (bbMax[0] < proscenium[0] || bbMin[0] > proscenium[1] || bbMax[1] < proscenium[2] ||
-      bbMin[1] > proscenium[3]) {
+      bbMin[1] > proscenium[3])
+  {
     return false;
   }
 
@@ -154,7 +139,8 @@ inline vector<Vec3r> enumerateVertices(const vector<WOEdge *> &fedges)
   vector<Vec3r> points;
   // Iterate over vertices, storing projections in points
   for (vector<WOEdge *>::const_iterator woe = fedges.begin(), woend = fedges.end(); woe != woend;
-       woe++) {
+       woe++)
+  {
     points.push_back((*woe)->GetaVertex()->GetVertex());
   }
 

@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -49,18 +37,16 @@ class NodeCamera : public Node {
   NodeCamera(const NodeCamera &iBrother);
 #endif
 
-  virtual ~NodeCamera()
-  {
-  }
+  virtual ~NodeCamera() {}
 
   /** Accept the corresponding visitor */
   virtual void accept(SceneVisitor &v);
 
   /** Matrix is copied */
-  void setModelViewMatrix(double modelview_matrix[16]);
+  void setModelViewMatrix(const double modelview_matrix[16]);
 
   /** Matrix is copied */
-  void setProjectionMatrix(double projection_matrix[16]);
+  void setProjectionMatrix(const double projection_matrix[16]);
 
   double *modelViewMatrix()
   {
@@ -80,9 +66,7 @@ class NodeCamera : public Node {
 
   CameraType camera_type_;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:NodeCamera")
-#endif
 };
 
 class NodeOrthographicCamera : public NodeCamera {
@@ -146,9 +130,7 @@ class NodeOrthographicCamera : public NodeCamera {
   double zNear_;
   double zFar_;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:NodeOrthographicCamera")
-#endif
 };
 
 class NodePerspectiveCamera : public NodeCamera {
@@ -210,9 +192,7 @@ class NodePerspectiveCamera : public NodeCamera {
   NodePerspectiveCamera(
       double left, double right, double bottom, double top, double zNear, double zFar);
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:NodePerspectiveCamera")
-#endif
 };
 
 } /* namespace Freestyle */

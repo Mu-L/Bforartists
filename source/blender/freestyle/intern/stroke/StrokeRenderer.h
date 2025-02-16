@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -32,9 +20,7 @@
 
 #include "../system/FreestyleConfig.h"
 
-#ifdef WITH_CXX_GUARDEDALLOC
-#  include "MEM_guardedalloc.h"
-#endif
+#include "MEM_guardedalloc.h"
 
 namespace Freestyle {
 
@@ -58,14 +44,14 @@ class TextureManager {
   }
 
   void load();
-  unsigned getBrushTextureIndex(string name, Stroke::MediumType iType = Stroke::OPAQUE_MEDIUM);
+  uint getBrushTextureIndex(string name, Stroke::MediumType iType = Stroke::OPAQUE_MEDIUM);
 
   inline bool hasLoaded() const
   {
     return _hasLoadedTextures;
   }
 
-  inline unsigned int getDefaultTextureId() const
+  inline uint getDefaultTextureId() const
   {
     return _defaultTextureId;
   }
@@ -80,7 +66,7 @@ class TextureManager {
 
  protected:
   virtual void loadStandardBrushes() = 0;
-  virtual unsigned loadBrush(string fileName, Stroke::MediumType = Stroke::OPAQUE_MEDIUM) = 0;
+  virtual uint loadBrush(string fileName, Stroke::MediumType = Stroke::OPAQUE_MEDIUM) = 0;
 
   typedef std::pair<string, Stroke::MediumType> BrushTexture;
   struct cmpBrushTexture {
@@ -95,18 +81,16 @@ class TextureManager {
       }
     }
   };
-  typedef std::map<BrushTexture, unsigned, cmpBrushTexture> brushesMap;
+  typedef std::map<BrushTexture, uint, cmpBrushTexture> brushesMap;
 
   static TextureManager *_pInstance;
   bool _hasLoadedTextures;
   brushesMap _brushesMap;
   static string _patterns_path;
   static string _brushes_path;
-  unsigned int _defaultTextureId;
+  uint _defaultTextureId;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:TextureManager")
-#endif
 };
 
 /**********************************/
@@ -131,12 +115,10 @@ class StrokeRenderer {
   // lazy, checks if it has already been done
   static bool loadTextures();
 
-  // static unsigned int getTextureIndex(unsigned int index);
+  // static uint getTextureIndex(uint index);
   static TextureManager *_textureManager;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:StrokeRenderer")
-#endif
 };
 
 } /* namespace Freestyle */

@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup spoutliner
@@ -21,19 +9,21 @@
 #include "BLI_listbase.h"
 #include "BLI_listbase_wrapper.hh"
 
-#include "BKE_collection.h"
-#include "BKE_main.h"
+#include "BKE_collection.hh"
+#include "BKE_library.hh"
+#include "BKE_main.hh"
 
 #include "DNA_collection_types.h"
+#include "DNA_space_types.h"
 
-#include "BLT_translation.h"
+#include "BLT_translation.hh"
 
-#include "../outliner_intern.h"
+#include "../outliner_intern.hh"
+#include "common.hh"
 #include "tree_display.hh"
 
 namespace blender::ed::outliner {
 
-/* Convenience/readability. */
 template<typename T> using List = ListBaseWrapper<T>;
 
 TreeDisplayLibraries::TreeDisplayLibraries(SpaceOutliner &space_outliner)
@@ -41,7 +31,7 @@ TreeDisplayLibraries::TreeDisplayLibraries(SpaceOutliner &space_outliner)
 {
 }
 
-ListBase TreeDisplayLibraries::buildTree(const TreeSourceData &source_data)
+ListBase TreeDisplayLibraries::build_tree(const TreeSourceData &source_data)
 {
   ListBase tree = {nullptr};
 
@@ -61,7 +51,7 @@ ListBase TreeDisplayLibraries::buildTree(const TreeSourceData &source_data)
   for (ID *id : List<ID>(source_data.bmain->libraries)) {
     Library *lib = reinterpret_cast<Library *>(id);
     TreeElement *ten = add_library_contents(*source_data.bmain, tree, lib);
-    /* NULL-check matters, due to filtering there may not be a new element. */
+    /* Null-check matters, due to filtering there may not be a new element. */
     if (ten) {
       lib->id.newid = (ID *)ten;
     }
@@ -77,13 +67,13 @@ ListBase TreeDisplayLibraries::buildTree(const TreeSourceData &source_data)
     TreeStoreElem *tselem = TREESTORE(ten);
     Library *lib = (Library *)tselem->id;
     BLI_assert(!lib || (GS(lib->id.name) == ID_LI));
-    if (!lib || !lib->parent) {
+    if (!lib || !lib->runtime->parent) {
       continue;
     }
 
-    TreeElement *parent = (TreeElement *)lib->parent->id.newid;
+    TreeElement *parent = (TreeElement *)lib->runtime->parent->id.newid;
 
-    if (tselem->id->tag & LIB_TAG_INDIRECT) {
+    if (tselem->id->tag & ID_TAG_INDIRECT) {
       /* Only remove from 'first level' if lib is not also directly used. */
       BLI_remlink(&tree, ten);
       BLI_addtail(&parent->subtree, ten);
@@ -105,30 +95,31 @@ ListBase TreeDisplayLibraries::buildTree(const TreeSourceData &source_data)
   return tree;
 }
 
-TreeElement *TreeDisplayLibraries::add_library_contents(Main &mainvar,
-                                                        ListBase &lb,
-                                                        Library *lib) const
+TreeElement *TreeDisplayLibraries::add_library_contents(Main &mainvar, ListBase &lb, Library *lib)
 {
   const short filter_id_type = id_filter_get();
 
-  ListBase *lbarray[INDEX_ID_MAX];
-  int tot;
+  Vector<ListBase *> lbarray;
   if (filter_id_type) {
-    lbarray[0] = which_libbase(&mainvar, space_outliner_.filter_id_type);
-    tot = 1;
+    lbarray.append(which_libbase(&mainvar, space_outliner_.filter_id_type));
   }
   else {
-    tot = set_listbasepointers(&mainvar, lbarray);
+    lbarray.extend(BKE_main_lists_get(mainvar));
   }
 
   TreeElement *tenlib = nullptr;
-  for (int a = 0; a < tot; a++) {
+  for (int a = 0; a < lbarray.size(); a++) {
     if (!lbarray[a] || !lbarray[a]->first) {
       continue;
     }
 
     ID *id = static_cast<ID *>(lbarray[a]->first);
     const bool is_library = (GS(id->name) == ID_LI) && (lib != nullptr);
+
+    /* Don't show deprecated types. */
+    if (ID_TYPE_IS_DEPRECATED(GS(id->name))) {
+      continue;
+    }
 
     /* check if there's data in current lib */
     for (ID *id_iter : List<ID>(lbarray[a])) {
@@ -144,10 +135,10 @@ TreeElement *TreeDisplayLibraries::add_library_contents(Main &mainvar,
       if (!tenlib) {
         /* Create library tree element on demand, depending if there are any data-blocks. */
         if (lib) {
-          tenlib = outliner_add_element(&space_outliner_, &lb, lib, nullptr, TSE_SOME_ID, 0);
+          tenlib = add_element(&lb, reinterpret_cast<ID *>(lib), nullptr, nullptr, TSE_SOME_ID, 0);
         }
         else {
-          tenlib = outliner_add_element(&space_outliner_, &lb, &mainvar, nullptr, TSE_ID_BASE, 0);
+          tenlib = add_element(&lb, nullptr, &mainvar, nullptr, TSE_ID_BASE, 0);
           tenlib->name = IFACE_("Current File");
         }
       }
@@ -160,15 +151,15 @@ TreeElement *TreeDisplayLibraries::add_library_contents(Main &mainvar,
           ten = tenlib;
         }
         else {
-          ten = outliner_add_element(
-              &space_outliner_, &tenlib->subtree, lbarray[a], nullptr, TSE_ID_BASE, 0);
+          ten = add_element(
+              &tenlib->subtree, reinterpret_cast<ID *>(lib), nullptr, nullptr, TSE_ID_BASE, a);
           ten->directdata = lbarray[a];
           ten->name = outliner_idcode_to_plural(GS(id->name));
         }
 
         for (ID *id : List<ID>(lbarray[a])) {
           if (library_id_filter_poll(lib, id)) {
-            outliner_add_element(&space_outliner_, &ten->subtree, id, ten, TSE_SOME_ID, 0);
+            add_element(&ten->subtree, id, nullptr, ten, TSE_SOME_ID, 0);
           }
         }
       }
@@ -186,7 +177,7 @@ short TreeDisplayLibraries::id_filter_get() const
   return 0;
 }
 
-bool TreeDisplayLibraries::library_id_filter_poll(Library *lib, ID *id) const
+bool TreeDisplayLibraries::library_id_filter_poll(const Library *lib, ID *id) const
 {
   if (id->lib != lib) {
     return false;
@@ -198,7 +189,7 @@ bool TreeDisplayLibraries::library_id_filter_poll(Library *lib, ID *id) const
     Collection *collection = (Collection *)id;
     bool has_non_scene_parent = false;
 
-    for (CollectionParent *cparent : List<CollectionParent>(collection->parents)) {
+    for (CollectionParent *cparent : List<CollectionParent>(collection->runtime.parents)) {
       if (!(cparent->collection->flag & COLLECTION_IS_MASTER)) {
         has_non_scene_parent = true;
       }

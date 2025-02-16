@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2020 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2020 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup depsgraph
@@ -25,15 +10,12 @@
 
 #include "deg_builder_cache.h"
 
-#include "intern/depsgraph_type.h"
-
 struct Depsgraph;
 struct Main;
 struct Scene;
 struct ViewLayer;
 
-namespace blender {
-namespace deg {
+namespace blender::deg {
 
 struct Depsgraph;
 class DepsgraphNodeBuilder;
@@ -61,8 +43,8 @@ class AbstractBuilderPipeline {
   ViewLayer *view_layer_;
   DepsgraphBuilderCache builder_cache_;
 
-  virtual unique_ptr<DepsgraphNodeBuilder> construct_node_builder();
-  virtual unique_ptr<DepsgraphRelationBuilder> construct_relation_builder();
+  virtual std::unique_ptr<DepsgraphNodeBuilder> construct_node_builder();
+  virtual std::unique_ptr<DepsgraphRelationBuilder> construct_relation_builder();
 
   virtual void build_step_sanity_check();
   void build_step_nodes();
@@ -73,5 +55,4 @@ class AbstractBuilderPipeline {
   virtual void build_relations(DepsgraphRelationBuilder &relation_builder) = 0;
 };
 
-}  // namespace deg
-}  // namespace blender
+}  // namespace blender::deg

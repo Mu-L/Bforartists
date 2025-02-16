@@ -1,33 +1,22 @@
-/*
- * Copyright 2011-2016 Blender Foundation
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "testing/mock_log.h"
 #include "testing/testing.h"
 
 #include "device/device.h"
 
-#include "render/graph.h"
-#include "render/nodes.h"
-#include "render/scene.h"
+#include "scene/colorspace.h"
+#include "scene/scene.h"
+#include "scene/shader_graph.h"
+#include "scene/shader_nodes.h"
 
-#include "util/util_array.h"
-#include "util/util_logging.h"
-#include "util/util_stats.h"
-#include "util/util_string.h"
-#include "util/util_vector.h"
+#include "util/array.h"
+#include "util/log.h"
+#include "util/stats.h"
+#include "util/string.h"
+#include "util/vector.h"
 
 using testing::_;
 using testing::AnyNumber;
@@ -59,7 +48,7 @@ template<typename T> class ShaderNodeBuilder {
   template<typename V> ShaderNodeBuilder &set(const string &input_name, V value)
   {
     ShaderInput *input_socket = node_->input(input_name.c_str());
-    EXPECT_NE((void *)NULL, input_socket);
+    EXPECT_NE((void *)nullptr, input_socket);
     input_socket->set(value);
     return *this;
   }
@@ -67,7 +56,7 @@ template<typename T> class ShaderNodeBuilder {
   template<typename V> ShaderNodeBuilder &set_param(const string &input_name, V value)
   {
     const SocketType *input_socket = node_->type->find_input(ustring(input_name.c_str()));
-    EXPECT_NE((void *)NULL, input_socket);
+    EXPECT_NE((void *)nullptr, input_socket);
     node_->set(*input_socket, value);
     return *this;
   }
@@ -86,36 +75,37 @@ class ShaderGraphBuilder {
 
   ShaderNode *find_node(const string &name)
   {
-    map<string, ShaderNode *>::iterator it = node_map_.find(name);
+    const map<string, ShaderNode *>::iterator it = node_map_.find(name);
     if (it == node_map_.end()) {
-      return NULL;
+      return nullptr;
     }
     return it->second;
   }
 
   template<typename T> ShaderGraphBuilder &add_node(const T &node)
   {
-    EXPECT_EQ(find_node(node.name()), (void *)NULL);
-    graph_->add(node.node());
+    EXPECT_EQ(find_node(node.name()), (void *)nullptr);
     node_map_[node.name()] = node.node();
     return *this;
   }
 
   ShaderGraphBuilder &add_connection(const string &from, const string &to)
   {
-    vector<string> tokens_from, tokens_to;
+    vector<string> tokens_from;
+    vector<string> tokens_to;
     string_split(tokens_from, from, "::");
     string_split(tokens_to, to, "::");
     EXPECT_EQ(tokens_from.size(), 2);
     EXPECT_EQ(tokens_to.size(), 2);
-    ShaderNode *node_from = find_node(tokens_from[0]), *node_to = find_node(tokens_to[0]);
-    EXPECT_NE((void *)NULL, node_from);
-    EXPECT_NE((void *)NULL, node_to);
+    ShaderNode *node_from = find_node(tokens_from[0]);
+    ShaderNode *node_to = find_node(tokens_to[0]);
+    EXPECT_NE((void *)nullptr, node_from);
+    EXPECT_NE((void *)nullptr, node_to);
     EXPECT_NE(node_from, node_to);
     ShaderOutput *socket_from = node_from->output(tokens_from[1].c_str());
     ShaderInput *socket_to = node_to->input(tokens_to[1].c_str());
-    EXPECT_NE((void *)NULL, socket_from);
-    EXPECT_NE((void *)NULL, socket_to);
+    EXPECT_NE((void *)nullptr, socket_from);
+    EXPECT_NE((void *)nullptr, socket_to);
     graph_->connect(socket_from, socket_to);
     return *this;
   }
@@ -166,29 +156,41 @@ class RenderGraph : public testing::Test {
   Stats stats;
   Profiler profiler;
   DeviceInfo device_info;
-  Device *device_cpu;
+  unique_ptr<Device> device_cpu;
   SceneParams scene_params;
-  Scene *scene;
+  unique_ptr<Scene> scene;
   ShaderGraph graph;
   ShaderGraphBuilder builder;
 
-  RenderGraph() : testing::Test(), builder(&graph)
-  {
-  }
+  RenderGraph() : testing::Test(), builder(&graph) {}
 
-  virtual void SetUp()
+  void SetUp() override
   {
-    util_logging_start();
-    util_logging_verbosity_set(1);
+    /* The test is running outside of the typical application configuration when the OCIO is
+     * initialized prior to Cycles. Explicitly create the raw configuration to avoid the warning
+     * printed by the OCIO when accessing non-figured environment.
+     * Functionally it is the same as not doing this explicit call: the OCIO will warn and then do
+     * the same raw configuration. */
+    ColorSpaceManager::init_fallback_config();
 
     device_cpu = Device::create(device_info, stats, profiler, true);
-    scene = new Scene(scene_params, device_cpu);
+    scene = make_unique<Scene>(scene_params, device_cpu.get());
+
+    /* Initialize logging after the creation of the essential resources. This way the logging
+     * mock sink does not warn about uninteresting messages which happens prior to the setup of
+     * the actual mock sinks. */
+    util_logging_start();
+    util_logging_verbosity_set(5);
   }
 
-  virtual void TearDown()
+  void TearDown() override
   {
-    delete scene;
-    delete device_cpu;
+    /* Effectively disable logging, so that the next test suit starts in an environment which is
+     * not logging by default. */
+    util_logging_verbosity_set(0);
+
+    scene.reset();
+    device_cpu.reset();
   }
 };
 
@@ -227,7 +229,7 @@ TEST_F(RenderGraph, deduplicate_deep)
       .add_connection("Noise2::Color", "Mix::Color2")
       .output_color("Mix::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 
   EXPECT_EQ(graph.nodes.size(), 5);
 }
@@ -247,7 +249,7 @@ TEST_F(RenderGraph, constant_fold_rgb_to_bw)
                     .set("Color", make_float3(0.8f, 0.8f, 0.8f)))
       .output_color("RGBToBWNodeNode::Val");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -262,7 +264,7 @@ TEST_F(RenderGraph, constant_fold_emission1)
   builder.add_node(ShaderNodeBuilder<EmissionNode>(graph, "Emission").set("Color", zero_float3()))
       .output_closure("Emission::Emission");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 TEST_F(RenderGraph, constant_fold_emission2)
@@ -273,7 +275,7 @@ TEST_F(RenderGraph, constant_fold_emission2)
   builder.add_node(ShaderNodeBuilder<EmissionNode>(graph, "Emission").set("Strength", 0.0f))
       .output_closure("Emission::Emission");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -289,7 +291,7 @@ TEST_F(RenderGraph, constant_fold_background1)
       .add_node(ShaderNodeBuilder<BackgroundNode>(graph, "Background").set("Color", zero_float3()))
       .output_closure("Background::Background");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 TEST_F(RenderGraph, constant_fold_background2)
@@ -300,7 +302,7 @@ TEST_F(RenderGraph, constant_fold_background2)
   builder.add_node(ShaderNodeBuilder<BackgroundNode>(graph, "Background").set("Strength", 0.0f))
       .output_closure("Background::Background");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -324,7 +326,7 @@ TEST_F(RenderGraph, constant_fold_shader_add)
       .add_connection("AddClosure2::Closure", "AddClosure3::Closure2")
       .output_closure("AddClosure3::Closure");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -354,7 +356,7 @@ TEST_F(RenderGraph, constant_fold_shader_mix)
       .add_connection("MixClosure2::Closure", "MixClosure3::Closure2")
       .output_closure("MixClosure3::Closure");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -372,7 +374,7 @@ TEST_F(RenderGraph, constant_fold_invert)
                     .set("Color", make_float3(0.2f, 0.5f, 0.8f)))
       .output_color("Invert::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -389,7 +391,7 @@ TEST_F(RenderGraph, constant_fold_invert_fac_0)
       .add_connection("Attribute::Color", "Invert::Color")
       .output_color("Invert::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -407,7 +409,7 @@ TEST_F(RenderGraph, constant_fold_invert_fac_0_const)
                     .set("Color", make_float3(0.2f, 0.5f, 0.8f)))
       .output_color("Invert::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -428,7 +430,7 @@ TEST_F(RenderGraph, constant_fold_mix_add)
                     .set("Color2", make_float3(0.4f, 0.8f, 0.9f)))
       .output_color("MixAdd::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -449,7 +451,7 @@ TEST_F(RenderGraph, constant_fold_mix_add_clamp)
                     .set("Color2", make_float3(0.4f, 0.8f, 0.9f)))
       .output_color("MixAdd::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -471,7 +473,7 @@ TEST_F(RenderGraph, constant_fold_part_mix_dodge_no_fac_0)
       .add_connection("Attribute2::Color", "Mix::Color2")
       .output_color("Mix::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -493,7 +495,7 @@ TEST_F(RenderGraph, constant_fold_part_mix_light_no_fac_0)
       .add_connection("Attribute2::Color", "Mix::Color2")
       .output_color("Mix::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -515,7 +517,7 @@ TEST_F(RenderGraph, constant_fold_part_mix_burn_no_fac_0)
       .add_connection("Attribute2::Color", "Mix::Color2")
       .output_color("Mix::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -537,7 +539,7 @@ TEST_F(RenderGraph, constant_fold_part_mix_blend_clamped_no_fac_0)
       .add_connection("Attribute2::Color", "Mix::Color2")
       .output_color("Mix::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -577,12 +579,12 @@ TEST_F(RenderGraph, constant_fold_part_mix_blend)
       .add_connection("MixBlend2::Color", "MixBlend3::Color2")
       .output_color("MixBlend3::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
  * Tests:
- *  - NOT folding of MixRGB Sub with the same inputs and fac NOT 1.
+ *  - NOT folding of MixRGB Subtract with the same inputs and fac NOT 1.
  */
 TEST_F(RenderGraph, constant_fold_part_mix_sub_same_fac_bad)
 {
@@ -598,12 +600,12 @@ TEST_F(RenderGraph, constant_fold_part_mix_sub_same_fac_bad)
       .add_connection("Attribute::Color", "Mix::Color2")
       .output_color("Mix::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
  * Tests:
- *  - Folding of MixRGB Sub with the same inputs and fac 1.
+ *  - Folding of MixRGB Subtract with the same inputs and fac 1.
  */
 TEST_F(RenderGraph, constant_fold_part_mix_sub_same_fac_1)
 {
@@ -619,7 +621,7 @@ TEST_F(RenderGraph, constant_fold_part_mix_sub_same_fac_1)
       .add_connection("Attribute::Color", "Mix::Color2")
       .output_color("Mix::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -628,7 +630,7 @@ TEST_F(RenderGraph, constant_fold_part_mix_sub_same_fac_1)
  */
 static void build_mix_partial_test_graph(ShaderGraphBuilder &builder,
                                          NodeMix type,
-                                         float3 constval)
+                                         const float3 constval)
 {
   builder
       .add_attribute("Attribute")
@@ -695,11 +697,11 @@ TEST_F(RenderGraph, constant_fold_part_mix_add_0)
   INVALID_INFO_MESSAGE(log, "Folding Out");
 
   build_mix_partial_test_graph(builder, NODE_MIX_ADD, make_float3(0, 0, 0));
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
- * Tests: partial folding for RGB Sub with known 0.
+ * Tests: partial folding for RGB Subtract with known 0.
  */
 TEST_F(RenderGraph, constant_fold_part_mix_sub_0)
 {
@@ -712,11 +714,11 @@ TEST_F(RenderGraph, constant_fold_part_mix_sub_0)
   INVALID_INFO_MESSAGE(log, "Folding Out");
 
   build_mix_partial_test_graph(builder, NODE_MIX_SUB, make_float3(0, 0, 0));
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
- * Tests: partial folding for RGB Mul with known 1.
+ * Tests: partial folding for RGB Multiply with known 1.
  */
 TEST_F(RenderGraph, constant_fold_part_mix_mul_1)
 {
@@ -730,11 +732,11 @@ TEST_F(RenderGraph, constant_fold_part_mix_mul_1)
   INVALID_INFO_MESSAGE(log, "Folding Out");
 
   build_mix_partial_test_graph(builder, NODE_MIX_MUL, make_float3(1, 1, 1));
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
- * Tests: partial folding for RGB Div with known 1.
+ * Tests: partial folding for RGB Divide with known 1.
  */
 TEST_F(RenderGraph, constant_fold_part_mix_div_1)
 {
@@ -747,11 +749,11 @@ TEST_F(RenderGraph, constant_fold_part_mix_div_1)
   INVALID_INFO_MESSAGE(log, "Folding Out");
 
   build_mix_partial_test_graph(builder, NODE_MIX_DIV, make_float3(1, 1, 1));
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
- * Tests: partial folding for RGB Mul with known 0.
+ * Tests: partial folding for RGB Multiply with known 0.
  */
 TEST_F(RenderGraph, constant_fold_part_mix_mul_0)
 {
@@ -767,11 +769,11 @@ TEST_F(RenderGraph, constant_fold_part_mix_mul_0)
   INVALID_INFO_MESSAGE(log, "Folding Out1234");
 
   build_mix_partial_test_graph(builder, NODE_MIX_MUL, make_float3(0, 0, 0));
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
- * Tests: partial folding for RGB Div with known 0.
+ * Tests: partial folding for RGB Divide with known 0.
  */
 TEST_F(RenderGraph, constant_fold_part_mix_div_0)
 {
@@ -786,7 +788,7 @@ TEST_F(RenderGraph, constant_fold_part_mix_div_0)
   INVALID_INFO_MESSAGE(log, "Folding Out1234");
 
   build_mix_partial_test_graph(builder, NODE_MIX_DIV, make_float3(0, 0, 0));
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -809,7 +811,7 @@ TEST_F(RenderGraph, constant_fold_separate_combine_rgb)
       .add_connection("SeparateRGB::B", "CombineRGB::B")
       .output_color("CombineRGB::Image");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -834,7 +836,7 @@ TEST_F(RenderGraph, constant_fold_separate_combine_xyz)
       .add_connection("SeparateXYZ::Z", "CombineXYZ::Z")
       .output_color("CombineXYZ::Vector");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -857,7 +859,7 @@ TEST_F(RenderGraph, constant_fold_separate_combine_hsv)
       .add_connection("SeparateHSV::V", "CombineHSV::V")
       .output_color("CombineHSV::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -874,7 +876,7 @@ TEST_F(RenderGraph, constant_fold_gamma)
                     .set("Gamma", 1.5f))
       .output_color("Gamma::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -903,7 +905,7 @@ TEST_F(RenderGraph, constant_fold_gamma_part_0)
       .add_connection("Gamma_xC::Color", "Out::Color2")
       .output_color("Out::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -932,7 +934,7 @@ TEST_F(RenderGraph, constant_fold_gamma_part_1)
       .add_connection("Gamma_xC::Color", "Out::Color2")
       .output_color("Out::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -950,7 +952,7 @@ TEST_F(RenderGraph, constant_fold_bright_contrast)
                     .set("Contrast", 1.2f))
       .output_color("BrightContrast::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -959,13 +961,13 @@ TEST_F(RenderGraph, constant_fold_bright_contrast)
 TEST_F(RenderGraph, constant_fold_blackbody)
 {
   EXPECT_ANY_MESSAGE(log);
-  CORRECT_INFO_MESSAGE(log, "Folding Blackbody::Color to constant (3.94163, 0.226523, 0).");
+  CORRECT_INFO_MESSAGE(log, "Folding Blackbody::Color to constant (3.96553, 0.227897, 0).");
 
   builder
       .add_node(ShaderNodeBuilder<BlackbodyNode>(graph, "Blackbody").set("Temperature", 1200.0f))
       .output_color("Blackbody::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /* A Note About The Math Node
@@ -991,7 +993,7 @@ TEST_F(RenderGraph, constant_fold_math)
                     .set("Value2", 0.9f))
       .output_value("Math::Value");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -1010,7 +1012,7 @@ TEST_F(RenderGraph, constant_fold_math_clamp)
                     .set("Value2", 0.9f))
       .output_value("Math::Value");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -1019,7 +1021,7 @@ TEST_F(RenderGraph, constant_fold_math_clamp)
  */
 static void build_math_partial_test_graph(ShaderGraphBuilder &builder,
                                           NodeMathType type,
-                                          float constval)
+                                          const float constval)
 {
   builder
       .add_attribute("Attribute")
@@ -1056,11 +1058,11 @@ TEST_F(RenderGraph, constant_fold_part_math_add_0)
   INVALID_INFO_MESSAGE(log, "Folding clamp::");
 
   build_math_partial_test_graph(builder, NODE_MATH_ADD, 0.0f);
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
- * Tests: partial folding for Math Sub with known 0.
+ * Tests: partial folding for Math Subtract with known 0.
  */
 TEST_F(RenderGraph, constant_fold_part_math_sub_0)
 {
@@ -1071,11 +1073,11 @@ TEST_F(RenderGraph, constant_fold_part_math_sub_0)
   INVALID_INFO_MESSAGE(log, "Folding clamp::");
 
   build_math_partial_test_graph(builder, NODE_MATH_SUBTRACT, 0.0f);
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
- * Tests: partial folding for Math Mul with known 1.
+ * Tests: partial folding for Math Multiply with known 1.
  */
 TEST_F(RenderGraph, constant_fold_part_math_mul_1)
 {
@@ -1086,11 +1088,11 @@ TEST_F(RenderGraph, constant_fold_part_math_mul_1)
   INVALID_INFO_MESSAGE(log, "Folding clamp::");
 
   build_math_partial_test_graph(builder, NODE_MATH_MULTIPLY, 1.0f);
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
- * Tests: partial folding for Math Div with known 1.
+ * Tests: partial folding for Math Divide with known 1.
  */
 TEST_F(RenderGraph, constant_fold_part_math_div_1)
 {
@@ -1101,11 +1103,11 @@ TEST_F(RenderGraph, constant_fold_part_math_div_1)
   INVALID_INFO_MESSAGE(log, "Folding clamp::");
 
   build_math_partial_test_graph(builder, NODE_MATH_DIVIDE, 1.0f);
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
- * Tests: partial folding for Math Mul with known 0.
+ * Tests: partial folding for Math Multiply with known 0.
  */
 TEST_F(RenderGraph, constant_fold_part_math_mul_0)
 {
@@ -1117,11 +1119,11 @@ TEST_F(RenderGraph, constant_fold_part_math_mul_0)
   CORRECT_INFO_MESSAGE(log, "Discarding closure EmissionNode.");
 
   build_math_partial_test_graph(builder, NODE_MATH_MULTIPLY, 0.0f);
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
- * Tests: partial folding for Math Div with known 0.
+ * Tests: partial folding for Math Divide with known 0.
  */
 TEST_F(RenderGraph, constant_fold_part_math_div_0)
 {
@@ -1132,7 +1134,7 @@ TEST_F(RenderGraph, constant_fold_part_math_div_0)
   INVALID_INFO_MESSAGE(log, "Folding clamp::");
 
   build_math_partial_test_graph(builder, NODE_MATH_DIVIDE, 0.0f);
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -1147,7 +1149,7 @@ TEST_F(RenderGraph, constant_fold_part_math_pow_0)
   INVALID_INFO_MESSAGE(log, "Folding clamp::");
 
   build_math_partial_test_graph(builder, NODE_MATH_POWER, 0.0f);
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -1162,7 +1164,7 @@ TEST_F(RenderGraph, constant_fold_part_math_pow_1)
   INVALID_INFO_MESSAGE(log, "Folding clamp::");
 
   build_math_partial_test_graph(builder, NODE_MATH_POWER, 1.0f);
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -1180,7 +1182,7 @@ TEST_F(RenderGraph, constant_fold_vector_math)
                     .set("Vector2", make_float3(-1.7f, 0.5f, 0.7f)))
       .output_color("VectorMath::Vector");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -1189,7 +1191,7 @@ TEST_F(RenderGraph, constant_fold_vector_math)
  */
 static void build_vecmath_partial_test_graph(ShaderGraphBuilder &builder,
                                              NodeVectorMathType type,
-                                             float3 constval)
+                                             const float3 constval)
 {
   builder
       .add_attribute("Attribute")
@@ -1223,11 +1225,11 @@ TEST_F(RenderGraph, constant_fold_part_vecmath_add_0)
   INVALID_INFO_MESSAGE(log, "Folding Out::");
 
   build_vecmath_partial_test_graph(builder, NODE_VECTOR_MATH_ADD, make_float3(0, 0, 0));
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
- * Tests: partial folding for Vector Math Sub with known 0.
+ * Tests: partial folding for Vector Math Subtract with known 0.
  */
 TEST_F(RenderGraph, constant_fold_part_vecmath_sub_0)
 {
@@ -1238,7 +1240,7 @@ TEST_F(RenderGraph, constant_fold_part_vecmath_sub_0)
   INVALID_INFO_MESSAGE(log, "Folding Out::");
 
   build_vecmath_partial_test_graph(builder, NODE_VECTOR_MATH_SUBTRACT, make_float3(0, 0, 0));
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -1254,7 +1256,7 @@ TEST_F(RenderGraph, constant_fold_part_vecmath_cross_0)
   CORRECT_INFO_MESSAGE(log, "Discarding closure EmissionNode.");
 
   build_vecmath_partial_test_graph(builder, NODE_VECTOR_MATH_CROSS_PRODUCT, make_float3(0, 0, 0));
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -1270,7 +1272,7 @@ TEST_F(RenderGraph, constant_fold_bump)
       .add_connection("Geometry1::Normal", "Bump::Normal")
       .output_color("Bump::Normal");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -1283,15 +1285,15 @@ TEST_F(RenderGraph, constant_fold_bump_no_input)
 
   builder.add_node(ShaderNodeBuilder<BumpNode>(graph, "Bump")).output_color("Bump::Normal");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
-template<class T> void init_test_curve(array<T> &buffer, T start, T end, int steps)
+template<class T> void init_test_curve(array<T> &buffer, T start, T end, const int steps)
 {
   buffer.resize(steps);
 
   for (int i = 0; i < steps; i++) {
-    buffer[i] = lerp(start, end, float(i) / (steps - 1));
+    buffer[i] = mix(start, end, float(i) / (steps - 1));
   }
 }
 
@@ -1316,7 +1318,7 @@ TEST_F(RenderGraph, constant_fold_rgb_curves)
                     .set("Color", make_float3(0.3f, 0.5f, 0.7f)))
       .output_color("Curves::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -1340,7 +1342,7 @@ TEST_F(RenderGraph, constant_fold_rgb_curves_fac_0)
       .add_connection("Attribute::Color", "Curves::Color")
       .output_color("Curves::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -1364,7 +1366,7 @@ TEST_F(RenderGraph, constant_fold_rgb_curves_fac_0_const)
                     .set("Color", make_float3(0.3f, 0.5f, 0.7f)))
       .output_color("Curves::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -1388,7 +1390,7 @@ TEST_F(RenderGraph, constant_fold_vector_curves)
                     .set("Vector", make_float3(0.3f, 0.5f, 0.7f)))
       .output_color("Curves::Vector");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -1412,7 +1414,7 @@ TEST_F(RenderGraph, constant_fold_vector_curves_fac_0)
       .add_connection("Attribute::Vector", "Curves::Vector")
       .output_color("Curves::Vector");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -1441,7 +1443,7 @@ TEST_F(RenderGraph, constant_fold_rgb_ramp)
       .add_connection("Ramp::Alpha", "Mix::Color2")
       .output_color("Mix::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -1470,7 +1472,7 @@ TEST_F(RenderGraph, constant_fold_rgb_ramp_flat)
       .add_connection("Ramp::Alpha", "Mix::Color2")
       .output_color("Mix::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -1490,7 +1492,7 @@ TEST_F(RenderGraph, constant_fold_convert_float_color_float)
       .add_connection("Attribute::Fac", "Invert::Color")
       .output_value("Invert::Color");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -1512,7 +1514,7 @@ TEST_F(RenderGraph, constant_fold_convert_color_vector_color)
       .add_connection("Attribute::Color", "VecAdd::Vector1")
       .output_color("VecAdd::Vector");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 /*
@@ -1533,7 +1535,7 @@ TEST_F(RenderGraph, constant_fold_convert_color_float_color)
       .add_connection("Attribute::Color", "MathAdd::Value1")
       .output_color("MathAdd::Value");
 
-  graph.finalize(scene);
+  graph.finalize(scene.get());
 }
 
 CCL_NAMESPACE_END

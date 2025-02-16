@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2020 Blender Authors
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
 # - Find clang-tidy executable
 #
 # Find the native clang-tidy executable
@@ -14,16 +18,13 @@
 #
 #  CLANG_TIDY_FOUND, If false, do not try to use Eigen3.
 
-#=============================================================================
-# Copyright 2020 Blender Foundation.
-#
-# Distributed under the OSI-approved BSD 3-Clause License,
-# see accompanying file BSD-3-Clause-license.txt for details.
-#=============================================================================
-
-# If CLANG_TIDY_ROOT_DIR was defined in the environment, use it.
-if(NOT CLANG_TIDY_ROOT_DIR AND NOT $ENV{CLANG_TIDY_ROOT_DIR} STREQUAL "")
+# If `CLANG_TIDY_ROOT_DIR` was defined in the environment, use it.
+if(DEFINED CLANG_TIDY_ROOT_DIR)
+  # Pass.
+elseif(DEFINED ENV{CLANG_TIDY_ROOT_DIR})
   set(CLANG_TIDY_ROOT_DIR $ENV{CLANG_TIDY_ROOT_DIR})
+else()
+  set(CLANG_TIDY_ROOT_DIR "")
 endif()
 
 set(_clang_tidy_SEARCH_DIRS
@@ -103,3 +104,5 @@ ${CLANG_TIDY_VERSION_PATCH}")
 else()
   set(CLANG_TIDY_FOUND FALSE)
 endif()
+
+unset(_clang_tidy_SEARCH_DIRS)

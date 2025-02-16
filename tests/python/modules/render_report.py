@@ -1,58 +1,24 @@
-# Apache License, Version 2.0
+# SPDX-FileCopyrightText: 2018-2023 Blender Authors
 #
-# Compare renders or screenshots against reference versions and generate
-# a HTML report showing the differences, for regression testing.
+# SPDX-License-Identifier: Apache-2.0
+
+"""
+Compare renders or screenshots against reference versions and generate
+a HTML report showing the differences, for regression testing.
+"""
 
 import glob
 import os
 import pathlib
 import shutil
 import subprocess
-import sys
 import time
 
 from . import global_report
+from .colored_print import (print_message, use_message_colors)
 
 
-class COLORS_ANSI:
-    RED = '\033[00;31m'
-    GREEN = '\033[00;32m'
-    ENDC = '\033[0m'
-
-
-class COLORS_DUMMY:
-    RED = ''
-    GREEN = ''
-    ENDC = ''
-
-
-COLORS = COLORS_DUMMY
-
-
-def print_message(message, type=None, status=''):
-    if type == 'SUCCESS':
-        print(COLORS.GREEN, end="")
-    elif type == 'FAILURE':
-        print(COLORS.RED, end="")
-    status_text = ...
-    if status == 'RUN':
-        status_text = " RUN      "
-    elif status == 'OK':
-        status_text = "       OK "
-    elif status == 'PASSED':
-        status_text = "  PASSED  "
-    elif status == 'FAILED':
-        status_text = "  FAILED  "
-    else:
-        status_text = status
-    if status_text:
-        print("[{}]" . format(status_text), end="")
-    print(COLORS.ENDC, end="")
-    print(" {}" . format(message))
-    sys.stdout.flush()
-
-
-def blend_list(dirpath, device, blacklist):
+def blend_list(dirpath, blocklist):
     import re
 
     for root, dirs, files in os.walk(dirpath):
@@ -61,8 +27,8 @@ def blend_list(dirpath, device, blacklist):
                 continue
 
             skip = False
-            for blacklist_entry in blacklist:
-                if re.match(blacklist_entry, filename):
+            for blocklist_entry in blocklist:
+                if re.match(blocklist_entry, filename):
                     skip = True
                     break
 
@@ -76,12 +42,18 @@ def test_get_name(filepath):
     return os.path.splitext(filename)[0]
 
 
-def test_get_images(output_dir, filepath, reference_dir):
+def test_get_images(output_dir, filepath, reference_dir, reference_override_dir):
     testname = test_get_name(filepath)
     dirpath = os.path.dirname(filepath)
 
     old_dirpath = os.path.join(dirpath, reference_dir)
     old_img = os.path.join(old_dirpath, testname + ".png")
+    if reference_override_dir:
+        override_dirpath = os.path.join(dirpath, reference_override_dir)
+        override_img = os.path.join(override_dirpath, testname + ".png")
+        if os.path.exists(override_img):
+            old_dirpath = override_dirpath
+            old_img = override_img
 
     ref_dirpath = os.path.join(output_dir, os.path.basename(dirpath), "ref")
     ref_img = os.path.join(ref_dirpath, testname + ".png")
@@ -95,18 +67,21 @@ def test_get_images(output_dir, filepath, reference_dir):
 
     diff_dirpath = os.path.join(output_dir, os.path.basename(dirpath), "diff")
     os.makedirs(diff_dirpath, exist_ok=True)
-    diff_img = os.path.join(diff_dirpath, testname + ".diff.png")
+    diff_color_img = os.path.join(diff_dirpath, testname + ".diff_color.png")
+    diff_alpha_img = os.path.join(diff_dirpath, testname + ".diff_alpha.png")
 
-    return old_img, ref_img, new_img, diff_img
+    return old_img, ref_img, new_img, diff_color_img, diff_alpha_img
 
 
 class Report:
     __slots__ = (
         'title',
+        'engine_name',
         'output_dir',
         'global_dir',
         'reference_dir',
-        'idiff',
+        'reference_override_dir',
+        'oiiotool',
         'pixelated',
         'fail_threshold',
         'fail_percent',
@@ -116,33 +91,36 @@ class Report:
         'passed_tests',
         'compare_tests',
         'compare_engine',
-        'device',
-        'blacklist',
+        'blocklist',
     )
 
-    def __init__(self, title, output_dir, idiff, device=None, blacklist=[]):
+    def __init__(self, title, output_dir, oiiotool, variation=None, blocklist=[]):
         self.title = title
-        self.output_dir = output_dir
-        self.global_dir = os.path.dirname(output_dir)
+
+        # Normalize the path to avoid output_dir and global_dir being the same when a directory
+        # ends with a trailing slash.
+        self.output_dir = os.path.normpath(output_dir)
+        self.global_dir = os.path.dirname(self.output_dir)
+
         self.reference_dir = 'reference_renders'
-        self.idiff = idiff
+        self.reference_override_dir = None
+        self.oiiotool = oiiotool
         self.compare_engine = None
         self.fail_threshold = 0.016
         self.fail_percent = 1
-        self.device = device
-        self.blacklist = blacklist
+        self.engine_name = self.title.lower().replace(" ", "_")
+        self.blocklist = [] if os.getenv('BLENDER_TEST_IGNORE_BLOCKLIST') is not None else blocklist
 
-        if device:
-            self.title = self._engine_title(title, device)
-            self.output_dir = self._engine_path(self.output_dir, device.lower())
+        if variation:
+            self.title = self._engine_title(title, variation)
+            self.output_dir = self._engine_path(self.output_dir, variation.lower())
 
         self.pixelated = False
         self.verbose = os.environ.get("BLENDER_VERBOSE") is not None
         self.update = os.getenv('BLENDER_TEST_UPDATE') is not None
 
         if os.environ.get("BLENDER_TEST_COLOR") is not None:
-            global COLORS, COLORS_ANSI
-            COLORS = COLORS_ANSI
+            use_message_colors()
 
         self.failed_tests = ""
         self.passed_tests = ""
@@ -156,16 +134,25 @@ class Report:
     def set_fail_threshold(self, threshold):
         self.fail_threshold = threshold
 
+    def set_fail_percent(self, percent):
+        self.fail_percent = percent
+
     def set_reference_dir(self, reference_dir):
         self.reference_dir = reference_dir
 
-    def set_compare_engine(self, other_engine, other_device=None):
-        self.compare_engine = (other_engine, other_device)
+    def set_reference_override_dir(self, reference_override_dir):
+        self.reference_override_dir = reference_override_dir
 
-    def run(self, dirpath, blender, arguments_cb, batch=False):
+    def set_compare_engine(self, other_engine, other_variation=None):
+        self.compare_engine = (other_engine, other_variation)
+
+    def set_engine_name(self, engine_name):
+        self.engine_name = engine_name
+
+    def run(self, dirpath, blender, arguments_cb, batch=False, fail_silently=False):
         # Run tests and output report.
         dirname = os.path.basename(dirpath)
-        ok = self._run_all_tests(dirname, dirpath, blender, arguments_cb, batch)
+        ok = self._run_all_tests(dirname, dirpath, blender, arguments_cb, batch, fail_silently)
         self._write_data(dirname)
         self._write_html()
         if self.compare_engine:
@@ -193,15 +180,16 @@ class Report:
         else:
             return """<li class="breadcrumb-item"><a href="%s">%s</a></li>""" % (href, title)
 
-    def _engine_title(self, engine, device):
-        if device:
-            return engine.title() + ' ' + device
+    def _engine_title(self, engine, variation):
+        if variation:
+            return engine.title() + ' ' + variation
         else:
             return engine.title()
 
-    def _engine_path(self, path, device):
-        if device:
-            return os.path.join(path, device.lower())
+    def _engine_path(self, path, variation):
+        if variation:
+            variation = variation.replace(' ', '_')
+            return os.path.join(path, variation.lower())
         else:
             return path
 
@@ -251,8 +239,11 @@ class Report:
         failed = len(failed_tests) > 0
         if failed:
             message = """<div class="alert alert-danger" role="alert">"""
-            message += """Run this command to update reference images for failed tests, or create images for new tests:<br>"""
-            message += """<tt>BLENDER_TEST_UPDATE=1 ctest -R %s</tt>""" % self.title.lower()
+            message += """<p>Run this command to regenerate reference (ground truth) images:</p>"""
+            message += """<p><tt>BLENDER_TEST_UPDATE=1 ctest -R %s</tt></p>""" % self.engine_name
+            message += """<p>This then happens for new and failing tests; reference images of """ \
+                       """passing test cases will not be updated. Be sure to commit the new reference """ \
+                       """images to the tests/data git submodule afterwards.</p>"""
             message += """</div>"""
         else:
             message = ""
@@ -264,13 +255,22 @@ class Report:
             columns_html = "<tr><th>Name</th><th>%s</th><th>%s</th>" % (engine_self, engine_other)
         else:
             title = self.title + " Test Report"
-            columns_html = "<tr><th>Name</th><th>New</th><th>Reference</th><th>Diff</th>"
+            columns_html = "<tr><th>Name</th><th>New</th><th>Reference</th><th>Diff Color</th><th>Diff Alpha</th>"
 
-        html = """
+        html = f"""
 <html>
 <head>
     <title>{title}</title>
     <style>
+        div.page_container {{
+          text-align: center;
+        }}
+        div.page_container div {{
+          text-align: left;
+        }}
+        div.page_content {{
+          display: inline-block;
+        }}
         img {{ image-rendering: {image_rendering}; width: 256px; background-color: #000; }}
         img.render {{
             background-color: #fff;
@@ -292,11 +292,12 @@ class Report:
             background-position:0 0, 25px 0, 25px -25px, 0px 25px;
         }}
         table td:first-child {{ width: 256px; }}
+        p {{ margin-bottom: 0.5rem; }}
     </style>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
 </head>
 <body>
-    <div class="container">
+    <div class="page_container"><div class="page_content">
         <br/>
         <h1>{title}</h1>
         {menu}
@@ -308,15 +309,10 @@ class Report:
             {tests_html}
         </table>
         <br/>
-    </div>
+    </div></div>
 </body>
 </html>
-            """ . format(title=title,
-                         menu=menu,
-                         message=message,
-                         image_rendering=image_rendering,
-                         tests_html=tests_html,
-                         columns_html=columns_html)
+            """
 
         filename = "report.html" if not comparison else "compare.html"
         filepath = os.path.join(self.output_dir, filename)
@@ -337,28 +333,25 @@ class Report:
         name = test_get_name(filepath)
         name = name.replace('_', ' ')
 
-        old_img, ref_img, new_img, diff_img = test_get_images(self.output_dir, filepath, self.reference_dir)
+        old_img, ref_img, new_img, diff_color_img, diff_alpha_img = test_get_images(
+            self.output_dir, filepath, self.reference_dir, self.reference_override_dir)
 
         status = error if error else ""
         tr_style = """ class="table-danger" """ if error else ""
 
         new_url = self._relative_url(new_img)
         ref_url = self._relative_url(ref_img)
-        diff_url = self._relative_url(diff_img)
+        diff_color_url = self._relative_url(diff_color_img)
+        diff_alpha_url = self._relative_url(diff_alpha_img)
 
-        test_html = """
+        test_html = f"""
             <tr{tr_style}>
                 <td><b>{name}</b><br/>{testname}<br/>{status}</td>
                 <td><img src="{new_url}" onmouseover="this.src='{ref_url}';" onmouseout="this.src='{new_url}';" class="render"></td>
                 <td><img src="{ref_url}" onmouseover="this.src='{new_url}';" onmouseout="this.src='{ref_url}';" class="render"></td>
-                <td><img src="{diff_url}"></td>
-            </tr>""" . format(tr_style=tr_style,
-                              name=name,
-                              testname=testname,
-                              status=status,
-                              new_url=new_url,
-                              ref_url=ref_url,
-                              diff_url=diff_url)
+                <td><img src="{diff_color_url}"></td>
+                <td><img src="{diff_alpha_url}"></td>
+            </tr>"""
 
         if error:
             self.failed_tests += test_html
@@ -384,7 +377,8 @@ class Report:
             self.compare_tests += test_html
 
     def _diff_output(self, filepath, tmp_filepath):
-        old_img, ref_img, new_img, diff_img = test_get_images(self.output_dir, filepath, self.reference_dir)
+        old_img, ref_img, new_img, diff_color_img, diff_alpha_img = test_get_images(
+            self.output_dir, filepath, self.reference_dir, self.reference_override_dir)
 
         # Create reference render directory.
         old_dirpath = os.path.dirname(old_img)
@@ -399,19 +393,20 @@ class Report:
         if os.path.exists(ref_img):
             # Diff images test with threshold.
             command = (
-                self.idiff,
-                "-fail", str(self.fail_threshold),
-                "-failpercent", str(self.fail_percent),
+                self.oiiotool,
                 ref_img,
                 tmp_filepath,
+                "--fail", str(self.fail_threshold),
+                "--failpercent", str(self.fail_percent),
+                "--diff",
             )
             try:
                 subprocess.check_output(command)
                 failed = False
             except subprocess.CalledProcessError as e:
                 if self.verbose:
-                    print_message(e.output.decode("utf-8"))
-                failed = e.returncode != 1
+                    print_message(e.output.decode("utf-8", 'ignore'))
+                failed = e.returncode != 0
         else:
             if not self.update:
                 return False
@@ -424,22 +419,61 @@ class Report:
             shutil.copy(new_img, old_img)
             failed = False
 
-        # Generate diff image.
+        # Generate color diff image.
         command = (
-            self.idiff,
-            "-o", diff_img,
-            "-abs", "-scale", "16",
+            self.oiiotool,
             ref_img,
-            tmp_filepath
+            "--ch", "R,G,B",
+            tmp_filepath,
+            "--ch", "R,G,B",
+            "--sub",
+            "--abs",
+            "--mulc", "16",
+            "-o", diff_color_img,
         )
-
         try:
-            subprocess.check_output(command)
+            subprocess.check_output(command, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as e:
             if self.verbose:
-                print_message(e.output.decode("utf-8"))
+                print_message(e.output.decode("utf-8", 'ignore'))
+
+        # Generate alpha diff image.
+        command = (
+            self.oiiotool,
+            ref_img,
+            "--ch", "A",
+            tmp_filepath,
+            "--ch", "A",
+            "--sub",
+            "--abs",
+            "--mulc", "16",
+            "-o", diff_alpha_img,
+        )
+        try:
+            subprocess.check_output(command, stderr=subprocess.STDOUT)
+        except subprocess.CalledProcessError as e:
+            if self.verbose:
+                msg = e.output.decode("utf-8", 'ignore')
+                for line in msg.splitlines():
+                    # Ignore warnings for images without alpha channel.
+                    if "--ch: Unknown channel name" not in line:
+                        print_message(line)
 
         return not failed
+
+    def _get_render_arguments(self, arguments_cb, filepath, base_output_filepath):
+        # Each render test can override this method to provide extra functionality.
+        # See Cycles render tests for an example.
+        # Do not delete.
+        return arguments_cb(filepath, base_output_filepath)
+
+    def _get_arguments_suffix(self):
+        # Get command line arguments that need to be provided after all file-specific ones.
+        # For example the Cycles render device argument needs to be added at the end of
+        # the argument list, otherwise tests can't be batched together.
+        #
+        # Each render test is supposed to override this method.
+        return []
 
     def _run_tests(self, filepaths, blender, arguments_cb, batch):
         # Run multiple tests in a single Blender process since startup can be
@@ -465,14 +499,13 @@ class Report:
                 if os.path.exists(output_filepath):
                     os.remove(output_filepath)
 
-                command.extend(arguments_cb(filepath, base_output_filepath))
+                command.extend(self._get_render_arguments(arguments_cb, filepath, base_output_filepath))
 
                 # Only chain multiple commands for batch
                 if not batch:
                     break
 
-            if self.device:
-                command.extend(['--', '--cycles-device', self.device])
+            command.extend(self._get_arguments_suffix())
 
             # Run process
             crash = False
@@ -482,13 +515,13 @@ class Report:
                 if completed_process.returncode != 0:
                     crash = True
                 output = completed_process.stdout
-            except BaseException as e:
+            except Exception:
                 crash = True
 
             if verbose:
                 print(" ".join(command))
             if (verbose or crash) and output:
-                print(output.decode("utf-8"))
+                print(output.decode("utf-8", 'ignore'))
 
             # Detect missing filepaths and consider those errors
             for filepath, output_filepath in zip(remaining_filepaths[:], output_filepaths):
@@ -521,11 +554,16 @@ class Report:
 
         return errors
 
-    def _run_all_tests(self, dirname, dirpath, blender, arguments_cb, batch):
+    def _run_all_tests(self, dirname, dirpath, blender, arguments_cb, batch, fail_silently):
         passed_tests = []
         failed_tests = []
-        all_files = list(blend_list(dirpath, self.device, self.blacklist))
+        silently_failed_tests = []
+        all_files = list(blend_list(dirpath, self.blocklist))
         all_files.sort()
+        if not list(blend_list(dirpath, [])):
+            print_message("No .blend files found in '{}'!".format(dirpath), 'FAILURE', 'FAILED')
+            return False
+
         print_message("Running {} tests from 1 test case." .
                       format(len(all_files)),
                       'SUCCESS', "==========")
@@ -538,7 +576,11 @@ class Report:
                     return False
                 elif error == "NO_START":
                     return False
-                failed_tests.append(testname)
+
+                if fail_silently and error != 'CRASH':
+                    silently_failed_tests.append(testname)
+                else:
+                    failed_tests.append(testname)
             else:
                 passed_tests.append(testname)
             self._write_test_html(dirname, filepath, error)
@@ -551,12 +593,13 @@ class Report:
         print_message("{} tests." .
                       format(len(passed_tests)),
                       'SUCCESS', 'PASSED')
-        if failed_tests:
+        all_failed_tests = silently_failed_tests + failed_tests
+        if all_failed_tests:
             print_message("{} tests, listed below:" .
-                          format(len(failed_tests)),
+                          format(len(all_failed_tests)),
                           'FAILURE', 'FAILED')
-            failed_tests.sort()
-            for test in failed_tests:
+            all_failed_tests.sort()
+            for test in all_failed_tests:
                 print_message("{}" . format(test), 'FAILURE', "FAILED")
 
         return not bool(failed_tests)

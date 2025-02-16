@@ -1,27 +1,11 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2012 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2012 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include <cassert>
+#include <cmath>
+#include <cstring>
 #include <iostream>
-#include <math.h>
-#include <sstream>
-#include <string.h>
 
 #ifdef _MSC_VER
 #  pragma warning(push)
@@ -36,22 +20,27 @@ using namespace OCIO_NAMESPACE;
 
 #include "MEM_guardedalloc.h"
 
-#include "BLI_math.h"
 #include "BLI_math_color.h"
+#include "BLI_math_color.hh"
 #include "BLI_math_matrix.h"
+#include "BLI_math_matrix.hh"
 
 #include "ocio_impl.h"
 
 #if !defined(WITH_ASSERT_ABORT)
 #  define OCIO_abort()
 #else
-#  include <stdlib.h>
+#  include <cstdlib>
 #  define OCIO_abort() abort()
 #endif
 
 #if defined(_MSC_VER)
 #  define __func__ __FUNCTION__
 #endif
+
+using blender::double4x4;
+using blender::float3;
+using blender::float3x3;
 
 static void OCIO_reportError(const char *err)
 {
@@ -65,23 +54,24 @@ static void OCIO_reportException(Exception &exception)
   OCIO_reportError(exception.what());
 }
 
-OCIO_ConstConfigRcPtr *OCIOImpl::getCurrentConfig(void)
+OCIO_ConstConfigRcPtr *OCIOImpl::getCurrentConfig()
 {
-  ConstConfigRcPtr *config = OBJECT_GUARDED_NEW(ConstConfigRcPtr);
+  ConstConfigRcPtr *config = MEM_new<ConstConfigRcPtr>(__func__);
 
   try {
     *config = GetCurrentConfig();
 
-    if (*config)
+    if (*config) {
       return (OCIO_ConstConfigRcPtr *)config;
+    }
   }
   catch (Exception &exception) {
     OCIO_reportException(exception);
   }
 
-  OBJECT_GUARDED_DELETE(config, ConstConfigRcPtr);
+  MEM_delete(config);
 
-  return NULL;
+  return nullptr;
 }
 
 void OCIOImpl::setCurrentConfig(const OCIO_ConstConfigRcPtr *config)
@@ -94,47 +84,49 @@ void OCIOImpl::setCurrentConfig(const OCIO_ConstConfigRcPtr *config)
   }
 }
 
-OCIO_ConstConfigRcPtr *OCIOImpl::configCreateFromEnv(void)
+OCIO_ConstConfigRcPtr *OCIOImpl::configCreateFromEnv()
 {
-  ConstConfigRcPtr *config = OBJECT_GUARDED_NEW(ConstConfigRcPtr);
+  ConstConfigRcPtr *config = MEM_new<ConstConfigRcPtr>(__func__);
 
   try {
     *config = Config::CreateFromEnv();
 
-    if (*config)
+    if (*config) {
       return (OCIO_ConstConfigRcPtr *)config;
+    }
   }
   catch (Exception &exception) {
     OCIO_reportException(exception);
   }
 
-  OBJECT_GUARDED_DELETE(config, ConstConfigRcPtr);
+  MEM_delete(config);
 
-  return NULL;
+  return nullptr;
 }
 
 OCIO_ConstConfigRcPtr *OCIOImpl::configCreateFromFile(const char *filename)
 {
-  ConstConfigRcPtr *config = OBJECT_GUARDED_NEW(ConstConfigRcPtr);
+  ConstConfigRcPtr *config = MEM_new<ConstConfigRcPtr>(__func__);
 
   try {
     *config = Config::CreateFromFile(filename);
 
-    if (*config)
+    if (*config) {
       return (OCIO_ConstConfigRcPtr *)config;
+    }
   }
   catch (Exception &exception) {
     OCIO_reportException(exception);
   }
 
-  OBJECT_GUARDED_DELETE(config, ConstConfigRcPtr);
+  MEM_delete(config);
 
-  return NULL;
+  return nullptr;
 }
 
 void OCIOImpl::configRelease(OCIO_ConstConfigRcPtr *config)
 {
-  OBJECT_GUARDED_DELETE((ConstConfigRcPtr *)config, ConstConfigRcPtr);
+  MEM_delete((ConstConfigRcPtr *)config);
 }
 
 int OCIOImpl::configGetNumColorSpaces(OCIO_ConstConfigRcPtr *config)
@@ -158,27 +150,28 @@ const char *OCIOImpl::configGetColorSpaceNameByIndex(OCIO_ConstConfigRcPtr *conf
     OCIO_reportException(exception);
   }
 
-  return NULL;
+  return nullptr;
 }
 
 OCIO_ConstColorSpaceRcPtr *OCIOImpl::configGetColorSpace(OCIO_ConstConfigRcPtr *config,
                                                          const char *name)
 {
-  ConstColorSpaceRcPtr *cs = OBJECT_GUARDED_NEW(ConstColorSpaceRcPtr);
+  ConstColorSpaceRcPtr *cs = MEM_new<ConstColorSpaceRcPtr>(__func__);
 
   try {
     *cs = (*(ConstConfigRcPtr *)config)->getColorSpace(name);
 
-    if (*cs)
+    if (*cs) {
       return (OCIO_ConstColorSpaceRcPtr *)cs;
+    }
   }
   catch (Exception &exception) {
     OCIO_reportException(exception);
   }
 
-  OBJECT_GUARDED_DELETE(cs, ConstColorSpaceRcPtr);
+  MEM_delete(cs);
 
-  return NULL;
+  return nullptr;
 }
 
 int OCIOImpl::configGetIndexForColorSpace(OCIO_ConstConfigRcPtr *config, const char *name)
@@ -202,7 +195,7 @@ const char *OCIOImpl::configGetDefaultDisplay(OCIO_ConstConfigRcPtr *config)
     OCIO_reportException(exception);
   }
 
-  return NULL;
+  return nullptr;
 }
 
 int OCIOImpl::configGetNumDisplays(OCIO_ConstConfigRcPtr *config)
@@ -226,7 +219,7 @@ const char *OCIOImpl::configGetDisplay(OCIO_ConstConfigRcPtr *config, int index)
     OCIO_reportException(exception);
   }
 
-  return NULL;
+  return nullptr;
 }
 
 const char *OCIOImpl::configGetDefaultView(OCIO_ConstConfigRcPtr *config, const char *display)
@@ -238,7 +231,7 @@ const char *OCIOImpl::configGetDefaultView(OCIO_ConstConfigRcPtr *config, const 
     OCIO_reportException(exception);
   }
 
-  return NULL;
+  return nullptr;
 }
 
 int OCIOImpl::configGetNumViews(OCIO_ConstConfigRcPtr *config, const char *display)
@@ -262,7 +255,7 @@ const char *OCIOImpl::configGetView(OCIO_ConstConfigRcPtr *config, const char *d
     OCIO_reportException(exception);
   }
 
-  return NULL;
+  return nullptr;
 }
 
 const char *OCIOImpl::configGetDisplayColorSpaceName(OCIO_ConstConfigRcPtr *config,
@@ -270,13 +263,18 @@ const char *OCIOImpl::configGetDisplayColorSpaceName(OCIO_ConstConfigRcPtr *conf
                                                      const char *view)
 {
   try {
-    return (*(ConstConfigRcPtr *)config)->getDisplayViewColorSpaceName(display, view);
+    const char *name = (*(ConstConfigRcPtr *)config)->getDisplayViewColorSpaceName(display, view);
+    /* OpenColorIO does not resolve this token for us, so do it ourselves. */
+    if (strcasecmp(name, "<USE_DISPLAY_NAME>") == 0) {
+      return display;
+    }
+    return name;
   }
   catch (Exception &exception) {
     OCIO_reportException(exception);
   }
 
-  return NULL;
+  return nullptr;
 }
 
 void OCIOImpl::configGetDefaultLumaCoefs(OCIO_ConstConfigRcPtr *config, float *rgb)
@@ -322,13 +320,14 @@ static bool to_scene_linear_matrix(ConstConfigRcPtr &config,
   return true;
 }
 
-void OCIOImpl::configGetXYZtoRGB(OCIO_ConstConfigRcPtr *config_, float xyz_to_rgb[3][3])
+void OCIOImpl::configGetXYZtoSceneLinear(OCIO_ConstConfigRcPtr *config_,
+                                         float xyz_to_scene_linear[3][3])
 {
   ConstConfigRcPtr config = (*(ConstConfigRcPtr *)config_);
 
   /* Default to ITU-BT.709 in case no appropriate transform found.
    * Note XYZ is defined here as having a D65 white point. */
-  memcpy(xyz_to_rgb, OCIO_XYZ_TO_LINEAR_SRGB, sizeof(OCIO_XYZ_TO_LINEAR_SRGB));
+  memcpy(xyz_to_scene_linear, OCIO_XYZ_TO_REC709, sizeof(OCIO_XYZ_TO_REC709));
 
   /* Get from OpenColorO config if it has the required roles. */
   if (!config->hasRole(ROLE_SCENE_LINEAR)) {
@@ -336,21 +335,18 @@ void OCIOImpl::configGetXYZtoRGB(OCIO_ConstConfigRcPtr *config_, float xyz_to_rg
   }
 
   if (config->hasRole("aces_interchange")) {
-    /* Standard OpenColorIO role, defined as ACES2065-1. */
-    const float xyz_E_to_aces[3][3] = {{1.0498110175f, -0.4959030231f, 0.0f},
-                                       {0.0f, 1.3733130458f, 0.0f},
-                                       {-0.0000974845f, 0.0982400361f, 0.9912520182f}};
-    const float xyz_D65_to_E[3][3] = {
-        {1.0521111f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 0.9184170f}};
+    /* Standard OpenColorIO role, defined as ACES AP0 (ACES2065-1). */
+    float aces_to_scene_linear[3][3];
+    if (to_scene_linear_matrix(config, "aces_interchange", aces_to_scene_linear)) {
+      float xyz_to_aces[3][3];
+      invert_m3_m3(xyz_to_aces, OCIO_ACES_TO_XYZ);
 
-    float aces_to_rgb[3][3];
-    if (to_scene_linear_matrix(config, "aces_interchange", aces_to_rgb)) {
-      mul_m3_series(xyz_to_rgb, aces_to_rgb, xyz_E_to_aces, xyz_D65_to_E);
+      mul_m3_m3m3(xyz_to_scene_linear, aces_to_scene_linear, xyz_to_aces);
     }
   }
   else if (config->hasRole("XYZ")) {
     /* Custom role used before the standard existed. */
-    to_scene_linear_matrix(config, "XYZ", xyz_to_rgb);
+    to_scene_linear_matrix(config, "XYZ", xyz_to_scene_linear);
   }
 }
 
@@ -375,26 +371,27 @@ const char *OCIOImpl::configGetLookNameByIndex(OCIO_ConstConfigRcPtr *config, in
     OCIO_reportException(exception);
   }
 
-  return NULL;
+  return nullptr;
 }
 
 OCIO_ConstLookRcPtr *OCIOImpl::configGetLook(OCIO_ConstConfigRcPtr *config, const char *name)
 {
-  ConstLookRcPtr *look = OBJECT_GUARDED_NEW(ConstLookRcPtr);
+  ConstLookRcPtr *look = MEM_new<ConstLookRcPtr>(__func__);
 
   try {
     *look = (*(ConstConfigRcPtr *)config)->getLook(name);
 
-    if (*look)
+    if (*look) {
       return (OCIO_ConstLookRcPtr *)look;
+    }
   }
   catch (Exception &exception) {
     OCIO_reportException(exception);
   }
 
-  OBJECT_GUARDED_DELETE(look, ConstLookRcPtr);
+  MEM_delete(look);
 
-  return NULL;
+  return nullptr;
 }
 
 const char *OCIOImpl::lookGetProcessSpace(OCIO_ConstLookRcPtr *look)
@@ -404,7 +401,7 @@ const char *OCIOImpl::lookGetProcessSpace(OCIO_ConstLookRcPtr *look)
 
 void OCIOImpl::lookRelease(OCIO_ConstLookRcPtr *look)
 {
-  OBJECT_GUARDED_DELETE((ConstLookRcPtr *)look, ConstLookRcPtr);
+  MEM_delete((ConstLookRcPtr *)look);
 }
 
 int OCIOImpl::colorSpaceIsInvertible(OCIO_ConstColorSpaceRcPtr *cs_)
@@ -490,14 +487,16 @@ void OCIOImpl::colorSpaceIsBuiltin(OCIO_ConstConfigRcPtr *config_,
 
     /* Make sure that there is no channel crosstalk. */
     if (fabsf(cR[1]) > 1e-5f || fabsf(cR[2]) > 1e-5f || fabsf(cG[0]) > 1e-5f ||
-        fabsf(cG[2]) > 1e-5f || fabsf(cB[0]) > 1e-5f || fabsf(cB[1]) > 1e-5f) {
+        fabsf(cG[2]) > 1e-5f || fabsf(cB[0]) > 1e-5f || fabsf(cB[1]) > 1e-5f)
+    {
       is_scene_linear = false;
       is_srgb = false;
       break;
     }
     /* Make sure that the three primaries combine linearly. */
     if (!compare_floats(cR[0], cW[0], 1e-6f, 64) || !compare_floats(cG[1], cW[1], 1e-6f, 64) ||
-        !compare_floats(cB[2], cW[2], 1e-6f, 64)) {
+        !compare_floats(cB[2], cW[2], 1e-6f, 64))
+    {
       is_scene_linear = false;
       is_srgb = false;
       break;
@@ -513,7 +512,7 @@ void OCIOImpl::colorSpaceIsBuiltin(OCIO_ConstConfigRcPtr *config_,
     if (!compare_floats(v, out_v, 1e-6f, 64)) {
       is_scene_linear = false;
     }
-    if (!compare_floats(srgb_to_linearrgb(v), out_v, 1e-6f, 64)) {
+    if (!compare_floats(srgb_to_linearrgb(v), out_v, 1e-4f, 64)) {
       is_srgb = false;
     }
   }
@@ -521,39 +520,40 @@ void OCIOImpl::colorSpaceIsBuiltin(OCIO_ConstConfigRcPtr *config_,
 
 void OCIOImpl::colorSpaceRelease(OCIO_ConstColorSpaceRcPtr *cs)
 {
-  OBJECT_GUARDED_DELETE((ConstColorSpaceRcPtr *)cs, ConstColorSpaceRcPtr);
+  MEM_delete((ConstColorSpaceRcPtr *)cs);
 }
 
 OCIO_ConstProcessorRcPtr *OCIOImpl::configGetProcessorWithNames(OCIO_ConstConfigRcPtr *config,
                                                                 const char *srcName,
                                                                 const char *dstName)
 {
-  ConstProcessorRcPtr *processor = OBJECT_GUARDED_NEW(ConstProcessorRcPtr);
+  ConstProcessorRcPtr *processor = MEM_new<ConstProcessorRcPtr>(__func__);
 
   try {
     *processor = (*(ConstConfigRcPtr *)config)->getProcessor(srcName, dstName);
 
-    if (*processor)
+    if (*processor) {
       return (OCIO_ConstProcessorRcPtr *)processor;
+    }
   }
   catch (Exception &exception) {
     OCIO_reportException(exception);
   }
 
-  OBJECT_GUARDED_DELETE(processor, ConstProcessorRcPtr);
+  MEM_delete(processor);
 
-  return 0;
+  return nullptr;
 }
 
 void OCIOImpl::processorRelease(OCIO_ConstProcessorRcPtr *processor)
 {
-  OBJECT_GUARDED_DELETE(processor, ConstProcessorRcPtr);
+  MEM_delete(processor);
 }
 
 OCIO_ConstCPUProcessorRcPtr *OCIOImpl::processorGetCPUProcessor(
     OCIO_ConstProcessorRcPtr *processor)
 {
-  ConstCPUProcessorRcPtr *cpu_processor = OBJECT_GUARDED_NEW(ConstCPUProcessorRcPtr);
+  ConstCPUProcessorRcPtr *cpu_processor = MEM_new<ConstCPUProcessorRcPtr>(__func__);
   *cpu_processor = (*(ConstProcessorRcPtr *)processor)->getDefaultCPUProcessor();
   return (OCIO_ConstCPUProcessorRcPtr *)cpu_processor;
 }
@@ -577,27 +577,46 @@ void OCIOImpl::cpuProcessorApply_predivide(OCIO_ConstCPUProcessorRcPtr *cpu_proc
     int channels = img->getNumChannels();
 
     if (channels == 4) {
+      /* Convert from premultiplied alpha to straight alpha. */
       assert(img->isFloat());
-      float *pixels = (float *)img->getData();
-
-      int width = img->getWidth();
-      int height = img->getHeight();
-
-      for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-          float *pixel = pixels + 4 * (y * width + x);
-
-          cpuProcessorApplyRGBA_predivide(cpu_processor, pixel);
+      float *pixel = (float *)img->getData();
+      size_t pixel_count = img->getWidth() * img->getHeight();
+      for (size_t i = 0; i < pixel_count; i++, pixel += 4) {
+        float alpha = pixel[3];
+        if (alpha != 0.0f && alpha != 1.0f) {
+          float inv_alpha = 1.0f / alpha;
+          pixel[0] *= inv_alpha;
+          pixel[1] *= inv_alpha;
+          pixel[2] *= inv_alpha;
         }
       }
     }
-    else {
-      (*(ConstCPUProcessorRcPtr *)cpu_processor)->apply(*img);
+
+    (*(ConstCPUProcessorRcPtr *)cpu_processor)->apply(*img);
+
+    if (channels == 4) {
+      /* Back to premultiplied alpha. */
+      assert(img->isFloat());
+      float *pixel = (float *)img->getData();
+      size_t pixel_count = img->getWidth() * img->getHeight();
+      for (size_t i = 0; i < pixel_count; i++, pixel += 4) {
+        float alpha = pixel[3];
+        if (alpha != 0.0f && alpha != 1.0f) {
+          pixel[0] *= alpha;
+          pixel[1] *= alpha;
+          pixel[2] *= alpha;
+        }
+      }
     }
   }
   catch (Exception &exception) {
     OCIO_reportException(exception);
   }
+}
+
+bool OCIOImpl::cpuProcessorIsNoOp(OCIO_ConstCPUProcessorRcPtr *cpu_processor)
+{
+  return (*(ConstCPUProcessorRcPtr *)cpu_processor)->isNoOp();
 }
 
 void OCIOImpl::cpuProcessorApplyRGB(OCIO_ConstCPUProcessorRcPtr *cpu_processor, float *pixel)
@@ -636,7 +655,7 @@ void OCIOImpl::cpuProcessorApplyRGBA_predivide(OCIO_ConstCPUProcessorRcPtr *cpu_
 
 void OCIOImpl::cpuProcessorRelease(OCIO_ConstCPUProcessorRcPtr *cpu_processor)
 {
-  OBJECT_GUARDED_DELETE(cpu_processor, ConstCPUProcessorRcPtr);
+  MEM_delete(cpu_processor);
 }
 
 const char *OCIOImpl::colorSpaceGetName(OCIO_ConstColorSpaceRcPtr *cs)
@@ -654,21 +673,34 @@ const char *OCIOImpl::colorSpaceGetFamily(OCIO_ConstColorSpaceRcPtr *cs)
   return (*(ConstColorSpaceRcPtr *)cs)->getFamily();
 }
 
+int OCIOImpl::colorSpaceGetNumAliases(OCIO_ConstColorSpaceRcPtr *cs)
+{
+  return (*(ConstColorSpaceRcPtr *)cs)->getNumAliases();
+}
+const char *OCIOImpl::colorSpaceGetAlias(OCIO_ConstColorSpaceRcPtr *cs, const int index)
+{
+  return (*(ConstColorSpaceRcPtr *)cs)->getAlias(index);
+}
+
 OCIO_ConstProcessorRcPtr *OCIOImpl::createDisplayProcessor(OCIO_ConstConfigRcPtr *config_,
                                                            const char *input,
                                                            const char *view,
                                                            const char *display,
                                                            const char *look,
                                                            const float scale,
-                                                           const float exponent)
+                                                           const float exponent,
+                                                           const float temperature,
+                                                           const float tint,
+                                                           const bool use_white_balance,
+                                                           const bool inverse)
 
 {
   ConstConfigRcPtr config = *(ConstConfigRcPtr *)config_;
   GroupTransformRcPtr group = GroupTransform::Create();
 
-  /* Exposure. */
-  if (scale != 1.0f) {
-    /* Always apply exposure in scene linear. */
+  /* Linear transforms. */
+  if (scale != 1.0f || use_white_balance) {
+    /* Always apply exposure and/or white balance in scene linear. */
     ColorSpaceTransformRcPtr ct = ColorSpaceTransform::Create();
     ct->setSrc(input);
     ct->setDst(ROLE_SCENE_LINEAR);
@@ -679,9 +711,26 @@ OCIO_ConstProcessorRcPtr *OCIOImpl::createDisplayProcessor(OCIO_ConstConfigRcPtr
 
     /* Apply scale. */
     MatrixTransformRcPtr mt = MatrixTransform::Create();
-    const double matrix[16] = {
-        scale, 0.0, 0.0, 0.0, 0.0, scale, 0.0, 0.0, 0.0, 0.0, scale, 0.0, 0.0, 0.0, 0.0, 1.0};
-    mt->setMatrix(matrix);
+    float3x3 matrix = float3x3::identity() * scale;
+
+    /* Apply white balance. */
+    if (use_white_balance) {
+      /* Compute white point of the scene space in XYZ.*/
+      float3x3 xyz_to_scene;
+      configGetXYZtoSceneLinear(config_, xyz_to_scene.ptr());
+      float3x3 scene_to_xyz = blender::math::invert(xyz_to_scene);
+      float3 target = scene_to_xyz * float3(1.0f);
+
+      /* Add operations to the matrix.
+       * Note: Since we're multiplying from the right, the operations here will be performed in
+       * reverse list order (scene-to-XYZ, then adaption, then XYZ-to-scene, then exposure). */
+      matrix *= xyz_to_scene;
+      matrix *= blender::math::chromatic_adaption_matrix(
+          blender::math::whitepoint_from_temp_tint(temperature, tint), target);
+      matrix *= scene_to_xyz;
+    }
+
+    mt->setMatrix(double4x4(blender::math::transpose(matrix)).base_ptr());
     group->appendTransform(mt);
   }
 
@@ -723,22 +772,27 @@ OCIO_ConstProcessorRcPtr *OCIOImpl::createDisplayProcessor(OCIO_ConstConfigRcPtr
     group->appendTransform(et);
   }
 
+  if (inverse) {
+    group->setDirection(TRANSFORM_DIR_INVERSE);
+  }
+
   /* Create processor from transform. This is the moment were OCIO validates
    * the entire transform, no need to check for the validity of inputs above. */
-  ConstProcessorRcPtr *p = OBJECT_GUARDED_NEW(ConstProcessorRcPtr);
+  ConstProcessorRcPtr *p = MEM_new<ConstProcessorRcPtr>(__func__);
 
   try {
     *p = config->getProcessor(group);
 
-    if (*p)
+    if (*p) {
       return (OCIO_ConstProcessorRcPtr *)p;
+    }
   }
   catch (Exception &exception) {
     OCIO_reportException(exception);
   }
 
-  OBJECT_GUARDED_DELETE(p, ConstProcessorRcPtr);
-  return NULL;
+  MEM_delete(p);
+  return nullptr;
 }
 
 OCIO_PackedImageDesc *OCIOImpl::createOCIO_PackedImageDesc(float *data,
@@ -750,15 +804,15 @@ OCIO_PackedImageDesc *OCIOImpl::createOCIO_PackedImageDesc(float *data,
                                                            long yStrideBytes)
 {
   try {
-    void *mem = MEM_mallocN(sizeof(PackedImageDesc), __func__);
-    PackedImageDesc *id = new (mem) PackedImageDesc(data,
-                                                    width,
-                                                    height,
-                                                    numChannels,
-                                                    BIT_DEPTH_F32,
-                                                    chanStrideBytes,
-                                                    xStrideBytes,
-                                                    yStrideBytes);
+    PackedImageDesc *id = MEM_new<PackedImageDesc>(__func__,
+                                                   data,
+                                                   width,
+                                                   height,
+                                                   numChannels,
+                                                   BIT_DEPTH_F32,
+                                                   chanStrideBytes,
+                                                   xStrideBytes,
+                                                   yStrideBytes);
 
     return (OCIO_PackedImageDesc *)id;
   }
@@ -766,20 +820,20 @@ OCIO_PackedImageDesc *OCIOImpl::createOCIO_PackedImageDesc(float *data,
     OCIO_reportException(exception);
   }
 
-  return NULL;
+  return nullptr;
 }
 
 void OCIOImpl::OCIO_PackedImageDescRelease(OCIO_PackedImageDesc *id)
 {
-  OBJECT_GUARDED_DELETE((PackedImageDesc *)id, PackedImageDesc);
+  MEM_delete((PackedImageDesc *)id);
 }
 
-const char *OCIOImpl::getVersionString(void)
+const char *OCIOImpl::getVersionString()
 {
   return GetVersion();
 }
 
-int OCIOImpl::getVersionHex(void)
+int OCIOImpl::getVersionHex()
 {
   return GetVersionHex();
 }

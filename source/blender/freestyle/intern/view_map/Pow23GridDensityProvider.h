@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -31,15 +19,15 @@ class Pow23GridDensityProvider : public GridDensityProvider {
   Pow23GridDensityProvider &operator=(const Pow23GridDensityProvider &other);
 
  public:
-  Pow23GridDensityProvider(OccluderSource &source, const real proscenium[4], unsigned numFaces);
+  Pow23GridDensityProvider(OccluderSource &source, const real proscenium[4], uint numFaces);
   Pow23GridDensityProvider(OccluderSource &source,
                            const BBox<Vec3r> &bbox,
                            const GridHelpers::Transform &transform,
-                           unsigned numFaces);
-  Pow23GridDensityProvider(OccluderSource &source, unsigned numFaces);
+                           uint numFaces);
+  Pow23GridDensityProvider(OccluderSource &source, uint numFaces);
 
  protected:
-  unsigned numFaces;
+  uint numFaces;
 
  private:
   void initialize(const real proscenium[4]);
@@ -47,7 +35,7 @@ class Pow23GridDensityProvider : public GridDensityProvider {
 
 class Pow23GridDensityProviderFactory : public GridDensityProviderFactory {
  public:
-  Pow23GridDensityProviderFactory(unsigned numFaces);
+  Pow23GridDensityProviderFactory(uint numFaces);
 
   AutoPtr<GridDensityProvider> newGridDensityProvider(OccluderSource &source,
                                                       const real proscenium[4]);
@@ -57,7 +45,7 @@ class Pow23GridDensityProviderFactory : public GridDensityProviderFactory {
   AutoPtr<GridDensityProvider> newGridDensityProvider(OccluderSource &source);
 
  protected:
-  unsigned numFaces;
+  uint numFaces;
 };
 
 } /* namespace Freestyle */

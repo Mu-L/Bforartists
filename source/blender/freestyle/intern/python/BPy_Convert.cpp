@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2008-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -57,10 +45,6 @@
 
 #include "../stroke/StrokeRep.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 using namespace Freestyle;
 using namespace Freestyle::Geometry;
 
@@ -73,6 +57,32 @@ using namespace Freestyle::Geometry;
 PyObject *PyBool_from_bool(bool b)
 {
   return PyBool_FromLong(b ? 1 : 0);
+}
+
+PyObject *PyLong_subtype_new(PyTypeObject *ty, long value)
+{
+  BLI_assert(ty->tp_basicsize == sizeof(PyLongObject));
+  PyLongObject *result = PyObject_NewVar(PyLongObject, ty, 1);
+#if PY_VERSION_HEX >= 0x030c0000
+  {
+    /* Account for change in `PyLongObject` in Python 3.12+.
+     * The values of longs are no longer accessible via public API's, copy the value instead. */
+    PyLongObject *value_py = (PyLongObject *)PyLong_FromLong(value);
+    memcpy(&result->long_value, &value_py->long_value, sizeof(result->long_value));
+    Py_DECREF(value_py);
+  }
+#else
+  result->ob_digit[0] = value;
+#endif
+  return (PyObject *)result;
+}
+
+void PyLong_subtype_add_to_dict(PyObject *dict, PyTypeObject *ty, const char *attr, long value)
+{
+  PyObject *result = PyLong_subtype_new(ty, value);
+  PyDict_SetItemString(dict, attr, result);
+  /* Owned by the dictionary. */
+  Py_DECREF(result);
 }
 
 PyObject *Vector_from_Vec2f(Vec2f &vec)
@@ -250,7 +260,7 @@ PyObject *BPy_FEdge_from_FEdge(FEdge &fe)
   return py_fe;
 }
 
-PyObject *BPy_Nature_from_Nature(unsigned short n)
+PyObject *BPy_Nature_from_Nature(ushort n)
 {
   PyObject *args = PyTuple_New(1);
   PyTuple_SET_ITEM(args, 0, PyLong_FromLong(n));
@@ -390,7 +400,7 @@ PyObject *BPy_CurvePoint_from_CurvePoint(CurvePoint &cp)
   // member whose value is mutable upon iteration over different CurvePoints.
   // It is likely that such a mutable reference is passed to this function,
   // so that a new allocated CurvePoint instance is created here to avoid
-  // nasty bugs (cf. T41464).
+  // nasty bugs (cf. #41464).
   ((BPy_CurvePoint *)py_cp)->cp = new CurvePoint(cp);
   ((BPy_CurvePoint *)py_cp)->py_if0D.if0D = ((BPy_CurvePoint *)py_cp)->cp;
   ((BPy_CurvePoint *)py_cp)->py_if0D.borrowed = false;
@@ -583,7 +593,7 @@ bool Vec3r_ptr_from_PyObject(PyObject *obj, Vec3r &vec)
 
 bool Vec2f_ptr_from_Vector(PyObject *obj, Vec2f &vec)
 {
-  if (!VectorObject_Check(obj) || ((VectorObject *)obj)->size != 2) {
+  if (!VectorObject_Check(obj) || ((VectorObject *)obj)->vec_num != 2) {
     return false;
   }
   if (BaseMath_ReadCallback((BaseMathObject *)obj) == -1) {
@@ -596,7 +606,7 @@ bool Vec2f_ptr_from_Vector(PyObject *obj, Vec2f &vec)
 
 bool Vec3f_ptr_from_Vector(PyObject *obj, Vec3f &vec)
 {
-  if (!VectorObject_Check(obj) || ((VectorObject *)obj)->size != 3) {
+  if (!VectorObject_Check(obj) || ((VectorObject *)obj)->vec_num != 3) {
     return false;
   }
   if (BaseMath_ReadCallback((BaseMathObject *)obj) == -1) {
@@ -610,7 +620,7 @@ bool Vec3f_ptr_from_Vector(PyObject *obj, Vec3f &vec)
 
 bool Vec3r_ptr_from_Vector(PyObject *obj, Vec3r &vec)
 {
-  if (!VectorObject_Check(obj) || ((VectorObject *)obj)->size != 3) {
+  if (!VectorObject_Check(obj) || ((VectorObject *)obj)->vec_num != 3) {
     return false;
   }
   if (BaseMath_ReadCallback((BaseMathObject *)obj) == -1) {
@@ -772,7 +782,7 @@ bool Vec3r_ptr_from_PyTuple(PyObject *obj, Vec3r &vec)
 
 bool float_array_from_PyObject(PyObject *obj, float *v, int n)
 {
-  if (VectorObject_Check(obj) && ((VectorObject *)obj)->size == n) {
+  if (VectorObject_Check(obj) && ((VectorObject *)obj)->vec_num == n) {
     if (BaseMath_ReadCallback((BaseMathObject *)obj) == -1) {
       return false;
     }
@@ -815,7 +825,3 @@ int convert_v2(PyObject *obj, void *v)
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
-
-#ifdef __cplusplus
-}
-#endif

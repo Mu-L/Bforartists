@@ -1,9 +1,10 @@
+/* SPDX-FileCopyrightText: 2016-2022 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-in vec2 texCoord_interp;
-out vec4 fragColor;
+#include "infos/gpu_shader_2D_image_rect_color_info.hh"
 
-uniform vec4 color;
-uniform sampler2D image;
+FRAGMENT_SHADER_CREATE_INFO(gpu_shader_2D_image_rect_color)
 
 void main()
 {

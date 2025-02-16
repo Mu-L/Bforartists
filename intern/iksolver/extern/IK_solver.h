@@ -1,25 +1,9 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2001-2002 NaN Holding BV. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- * Original author: Laurence
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
- * \ingroup iksolver
+ * \ingroup intern_iksolver
  */
 
 /**
@@ -93,7 +77,7 @@ extern "C" {
  * start * rest_basis * basis * basis_change * translation_change * translate(0,length,0)
  */
 
-typedef void IK_Segment;
+using IK_Segment = void;
 
 enum IK_SegmentFlag {
   IK_XDOF = 1,
@@ -104,14 +88,14 @@ enum IK_SegmentFlag {
   IK_TRANS_ZDOF = 32
 };
 
-typedef enum IK_SegmentAxis {
+enum IK_SegmentAxis {
   IK_X = 0,
   IK_Y = 1,
   IK_Z = 2,
   IK_TRANS_X = 3,
   IK_TRANS_Y = 4,
   IK_TRANS_Z = 5
-} IK_SegmentAxis;
+};
 
 extern IK_Segment *IK_CreateSegment(int flag);
 extern void IK_FreeSegment(IK_Segment *seg);
@@ -138,7 +122,7 @@ extern void IK_GetTranslationChange(IK_Segment *seg, float *translation_change);
  * It returns 1 if the system converged, 0 otherwise.
  */
 
-typedef void IK_Solver;
+using IK_Solver = void;
 
 IK_Solver *IK_CreateSolver(IK_Segment *root);
 void IK_FreeSolver(IK_Solver *solver);

@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2006 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2006 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
@@ -26,16 +11,15 @@
 #include "DNA_defs.h"
 #include "DNA_vec_types.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /* general defines for kernel functions */
 #define CM_RESOL 32
 #define CM_TABLE 256
 #define CM_TABLEDIV (1.0f / 256.0f)
 
 #define CM_TOT 4
+
+#define GPU_SKY_WIDTH 512
+#define GPU_SKY_HEIGHT 128
 
 typedef struct CurveMapPoint {
   float x, y;
@@ -48,6 +32,8 @@ enum {
   CUMA_SELECT = (1 << 0),
   CUMA_HANDLE_VECTOR = (1 << 1),
   CUMA_HANDLE_AUTO_ANIM = (1 << 2),
+  /** Temporary tag for point deletion. */
+  CUMA_REMOVE = (1 << 3),
 };
 
 typedef struct CurveMap {
@@ -70,6 +56,8 @@ typedef struct CurveMap {
   /** For RGB curves, pre-multiplied extrapolation vector. */
   float premul_ext_in[2];
   float premul_ext_out[2];
+  short default_handle_type;
+  char _pad[6];
 } CurveMap;
 
 typedef struct CurveMapping {
@@ -104,6 +92,7 @@ typedef enum eCurveMappingFlags {
 
   /** The curve is extended by extrapolation. When not set the curve is extended horizontally. */
   CUMA_EXTEND_EXTRAPOLATE = (1 << 4),
+  CUMA_USE_WRAPPING = (1 << 5),
 } eCurveMappingFlags;
 
 /** #CurveMapping.preset */
@@ -112,11 +101,12 @@ typedef enum eCurveMappingPreset {
   CURVE_PRESET_SHARP = 1,
   CURVE_PRESET_SMOOTH = 2,
   CURVE_PRESET_MAX = 3,
-  CURVE_PRESET_MID9 = 4,
+  CURVE_PRESET_MID8 = 4,
   CURVE_PRESET_ROUND = 5,
   CURVE_PRESET_ROOT = 6,
   CURVE_PRESET_GAUSS = 7,
   CURVE_PRESET_BELL = 8,
+  CURVE_PRESET_CONSTANT_MEDIAN = 9,
 } eCurveMappingPreset;
 
 /** #CurveMapping.tone */
@@ -157,25 +147,30 @@ typedef struct Histogram {
   float co[2][2];
 } Histogram;
 
+/* Multiplier to map YUV U,V range (+-0.436, +-0.615) to +-0.5 on both axes. */
+#define SCOPES_VEC_U_SCALE float(0.5f / 0.436f)
+#define SCOPES_VEC_V_SCALE float(0.5f / 0.615f)
+
 typedef struct Scopes {
   int ok;
   int sample_full;
   int sample_lines;
-  float accuracy;
   int wavefrm_mode;
+  int vecscope_mode;
+  int wavefrm_height;
+  int vecscope_height;
+  int waveform_tot;
+  float accuracy;
   float wavefrm_alpha;
   float wavefrm_yfac;
-  int wavefrm_height;
   float vecscope_alpha;
-  int vecscope_height;
   float minmax[3][2];
   struct Histogram hist;
   float *waveform_1;
   float *waveform_2;
   float *waveform_3;
   float *vecscope;
-  int waveform_tot;
-  char _pad[4];
+  float *vecscope_rgb;
 } Scopes;
 
 /** #Scopes.wavefrm_mode */
@@ -186,6 +181,12 @@ enum {
   SCOPES_WAVEFRM_YCC_709 = 3,
   SCOPES_WAVEFRM_YCC_JPEG = 4,
   SCOPES_WAVEFRM_RGB = 5,
+};
+
+/** #Scopes.vecscope_mode */
+enum {
+  SCOPES_VECSCOPE_RGB = 0,
+  SCOPES_VECSCOPE_LUMA = 1,
 };
 
 typedef struct ColorManagedViewSettings {
@@ -200,6 +201,9 @@ typedef struct ColorManagedViewSettings {
   float exposure;
   /** Post-display gamma transform. */
   float gamma;
+  /** White balance parameters. */
+  float temperature;
+  float tint;
   /** Pre-display RGB curves transform. */
   struct CurveMapping *curve_mapping;
   void *_pad2;
@@ -217,8 +221,6 @@ typedef struct ColorManagedColorspaceSettings {
 /** #ColorManagedViewSettings.flag */
 enum {
   COLORMANAGE_VIEW_USE_CURVES = (1 << 0),
+  COLORMANAGE_VIEW_USE_HDR = (1 << 1),
+  COLORMANAGE_VIEW_USE_WHITE_BALANCE = (1 << 2),
 };
-
-#ifdef __cplusplus
-}
-#endif

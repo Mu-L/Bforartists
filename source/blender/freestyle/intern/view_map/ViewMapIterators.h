@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -74,9 +62,7 @@ class orientedViewEdgeIterator : public Iterator {
 
  public:
   /** Default constructor */
-  inline orientedViewEdgeIterator()
-  {
-  }
+  inline orientedViewEdgeIterator() {}
 
   inline orientedViewEdgeIterator(Nature::VertexNature iNature)
   {
@@ -99,9 +85,7 @@ class orientedViewEdgeIterator : public Iterator {
     }
   }
 
-  virtual ~orientedViewEdgeIterator()
-  {
-  }
+  virtual ~orientedViewEdgeIterator() {}
 
  public:
   inline orientedViewEdgeIterator(edge_pointers_container::iterator begin,
@@ -228,9 +212,7 @@ class orientedViewEdgeIterator : public Iterator {
     return 0;
   }
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:orientedViewEdgeIterator")
-#endif
 };
 
 }  // namespace ViewVertexInternal
@@ -254,10 +236,10 @@ class SVertexIterator : public Interface0DIteratorNested {
  public:
   SVertexIterator()
   {
-    _vertex = NULL;
-    _begin = NULL;
-    _previous_edge = NULL;
-    _next_edge = NULL;
+    _vertex = nullptr;
+    _begin = nullptr;
+    _previous_edge = nullptr;
+    _next_edge = nullptr;
     _t = 0;
   }
 
@@ -289,9 +271,7 @@ class SVertexIterator : public Interface0DIteratorNested {
     return *this;
   }
 
-  virtual ~SVertexIterator()
-  {
-  }
+  virtual ~SVertexIterator() {}
 
   virtual string getExactTypeName() const
   {
@@ -337,7 +317,7 @@ class SVertexIterator : public Interface0DIteratorNested {
   virtual int increment()
   {
     if (!_next_edge) {
-      _vertex = NULL;
+      _vertex = nullptr;
       return 0;
     }
     _t += (float)_next_edge->getLength2D();
@@ -350,7 +330,7 @@ class SVertexIterator : public Interface0DIteratorNested {
   virtual int decrement()
   {
     if (!_previous_edge) {
-      _vertex = NULL;
+      _vertex = nullptr;
       return 0;
     }
     if ((!_next_edge) && (!_vertex)) {
@@ -405,9 +385,7 @@ class SVertexIterator : public Interface0DIteratorNested {
   FEdge *_next_edge;
   float _t;  // curvilinear abscissa
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:SVertexIterator")
-#endif
 };
 
 //
@@ -430,7 +408,7 @@ class ViewEdgeIterator : public Iterator {
    *    ViewVertex of begin. If false, we'll search over the ViewEdges surrounding the ending
    *    ViewVertex of begin.
    */
-  ViewEdgeIterator(ViewEdge *begin = NULL, bool orientation = true)
+  ViewEdgeIterator(ViewEdge *begin = nullptr, bool orientation = true)
   {
     _orientation = orientation;
     _edge = begin;
@@ -445,9 +423,7 @@ class ViewEdgeIterator : public Iterator {
     _begin = it._begin;
   }
 
-  virtual ~ViewEdgeIterator()
-  {
-  }
+  virtual ~ViewEdgeIterator() {}
 
   /** Returns the string "ViewEdgeIterator" */
   virtual string getExactTypeName() const
@@ -581,9 +557,7 @@ class ViewEdgeIterator : public Iterator {
   ViewEdge *_edge;
   ViewEdge *_begin;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:ViewEdgeIterator")
-#endif
 };
 
 }  // end of namespace ViewEdgeInternal

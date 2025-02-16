@@ -1,3 +1,10 @@
+/* SPDX-FileCopyrightText: 2019-2022 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
+
+#include "gpu_shader_common_hash.glsl"
+#include "gpu_shader_common_math_utils.glsl"
+
 vec2 calc_brick_texture(vec3 p,
                         float mortar_size,
                         float mortar_smooth,

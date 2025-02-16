@@ -1,77 +1,84 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "node_geometry_util.hh"
 
-static bNodeSocketTemplate geo_node_join_geometry_in[]{
-    {SOCK_GEOMETRY, N_("Geometry")},
-    {-1, ""},
-};
+namespace blender::nodes::node_geo_separate_components_cc {
 
-static bNodeSocketTemplate geo_node_join_geometry_out[]{
-    {SOCK_GEOMETRY, N_("Mesh")},
-    {SOCK_GEOMETRY, N_("Point Cloud")},
-    {SOCK_GEOMETRY, N_("Curve")},
-    {SOCK_GEOMETRY, N_("Volume")},
-    {-1, ""},
-};
+static void node_declare(NodeDeclarationBuilder &b)
+{
+  b.add_input<decl::Geometry>("Geometry");
+  b.add_output<decl::Geometry>("Mesh").propagate_all();
+  b.add_output<decl::Geometry>("Curve").propagate_all();
+  b.add_output<decl::Geometry>("Grease Pencil").propagate_all();
+  b.add_output<decl::Geometry>("Point Cloud").propagate_all();
+  b.add_output<decl::Geometry>("Volume")
+      .translation_context(BLT_I18NCONTEXT_ID_ID)
+      .propagate_all();
+  b.add_output<decl::Geometry>("Instances").propagate_all();
+}
 
-namespace blender::nodes {
-
-static void geo_node_separate_components_exec(GeoNodeExecParams params)
+static void node_geo_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
 
-  /* Note that it will be possible to skip realizing instances here when instancing
-   * geometry directly is supported by creating corresponding geometry instances. */
-  geometry_set = bke::geometry_set_realize_instances(geometry_set);
-
   GeometrySet meshes;
+  GeometrySet curves;
+  GeometrySet grease_pencil;
   GeometrySet point_clouds;
   GeometrySet volumes;
-  GeometrySet curves;
+  GeometrySet instances;
+
+  const std::string &name = geometry_set.name;
+  meshes.name = name;
+  curves.name = name;
+  grease_pencil.name = name;
+  point_clouds.name = name;
+  volumes.name = name;
+  instances.name = name;
 
   if (geometry_set.has<MeshComponent>()) {
-    meshes.add(*geometry_set.get_component_for_read<MeshComponent>());
-  }
-  if (geometry_set.has<PointCloudComponent>()) {
-    point_clouds.add(*geometry_set.get_component_for_read<PointCloudComponent>());
+    meshes.add(*geometry_set.get_component<MeshComponent>());
   }
   if (geometry_set.has<CurveComponent>()) {
-    curves.add(*geometry_set.get_component_for_read<CurveComponent>());
+    curves.add(*geometry_set.get_component<CurveComponent>());
+  }
+  if (geometry_set.has<GreasePencilComponent>()) {
+    grease_pencil.add(*geometry_set.get_component<GreasePencilComponent>());
+  }
+  if (geometry_set.has<PointCloudComponent>()) {
+    point_clouds.add(*geometry_set.get_component<PointCloudComponent>());
   }
   if (geometry_set.has<VolumeComponent>()) {
-    volumes.add(*geometry_set.get_component_for_read<VolumeComponent>());
+    volumes.add(*geometry_set.get_component<VolumeComponent>());
+  }
+  if (geometry_set.has<InstancesComponent>()) {
+    instances.add(*geometry_set.get_component<InstancesComponent>());
   }
 
   params.set_output("Mesh", meshes);
-  params.set_output("Point Cloud", point_clouds);
   params.set_output("Curve", curves);
+  params.set_output("Grease Pencil", grease_pencil);
+  params.set_output("Point Cloud", point_clouds);
   params.set_output("Volume", volumes);
+  params.set_output("Instances", instances);
 }
 
-}  // namespace blender::nodes
-
-void register_node_type_geo_separate_components()
+static void node_register()
 {
-  static bNodeType ntype;
+  static blender::bke::bNodeType ntype;
 
-  geo_node_type_base(
-      &ntype, GEO_NODE_SEPARATE_COMPONENTS, "Separate Components", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(&ntype, geo_node_join_geometry_in, geo_node_join_geometry_out);
-  ntype.geometry_node_execute = blender::nodes::geo_node_separate_components_exec;
-  nodeRegisterType(&ntype);
+  geo_node_type_base(&ntype, "GeometryNodeSeparateComponents", GEO_NODE_SEPARATE_COMPONENTS);
+  ntype.ui_name = "Separate Components";
+  ntype.ui_description =
+      "Split a geometry into a separate output for each type of data in the geometry";
+  ntype.enum_name_legacy = "SEPARATE_COMPONENTS";
+  ntype.nclass = NODE_CLASS_GEOMETRY;
+  ntype.declare = node_declare;
+  ntype.geometry_node_execute = node_geo_exec;
+  blender::bke::node_register_type(&ntype);
 }
+NOD_REGISTER_NODE(node_register)
+
+}  // namespace blender::nodes::node_geo_separate_components_cc

@@ -1,16 +1,19 @@
-in vec4 mColor;
-in vec2 mTexCoord;
+/* SPDX-FileCopyrightText: 2018-2023 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-out vec4 fragColor;
+#include "infos/gpu_shader_gpencil_stroke_info.hh"
+
+FRAGMENT_SHADER_CREATE_INFO(gpu_shader_gpencil_stroke)
 
 void main()
 {
   const vec2 center = vec2(0, 0.5);
-  vec4 tColor = vec4(mColor);
+  vec4 tColor = interp.mColor;
   /* if alpha < 0, then encap */
-  if (mColor.a < 0) {
+  if (tColor.a < 0) {
     tColor.a = tColor.a * -1.0;
-    float dist = length(mTexCoord - center);
+    float dist = length(interp.mTexCoord - center);
     if (dist > 0.25) {
       discard;
     }

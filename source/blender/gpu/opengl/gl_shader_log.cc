@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2021 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2021 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup gpu
@@ -23,11 +8,13 @@
 
 #include "gl_shader.hh"
 
-#include "GPU_platform.h"
+#include "GPU_platform.hh"
 
 namespace blender::gpu {
 
-char *GLLogParser::parse_line(char *log_line, GPULogItem &log_item)
+const char *GLLogParser::parse_line(const char *source_combined,
+                                    const char *log_line,
+                                    GPULogItem &log_item)
 {
   /* Skip ERROR: or WARNING:. */
   log_line = skip_severity_prefix(log_line, log_item);
@@ -35,7 +22,7 @@ char *GLLogParser::parse_line(char *log_line, GPULogItem &log_item)
 
   /* Parse error line & char numbers. */
   if (at_number(log_line)) {
-    char *error_line_number_end;
+    const char *error_line_number_end;
     log_item.cursor.row = parse_number(log_line, &error_line_number_end);
     /* Try to fetch the error character (not always available). */
     if (at_any(error_line_number_end, "(:") && at_number(&error_line_number_end[1])) {
@@ -54,14 +41,44 @@ char *GLLogParser::parse_line(char *log_line, GPULogItem &log_item)
   }
 
   if ((log_item.cursor.row != -1) && (log_item.cursor.column != -1)) {
-    if (GPU_type_matches(GPU_DEVICE_NVIDIA, GPU_OS_ANY, GPU_DRIVER_OFFICIAL) ||
-        GPU_type_matches(GPU_DEVICE_INTEL, GPU_OS_MAC, GPU_DRIVER_OFFICIAL)) {
-      /* 0:line */
+    if (GPU_type_matches(GPU_DEVICE_NVIDIA, GPU_OS_ANY, GPU_DRIVER_OFFICIAL)) {
+      /* source:row */
+      log_item.cursor.source = log_item.cursor.row;
+      log_item.cursor.row = log_item.cursor.column;
+      log_item.cursor.column = -1;
+    }
+    else if (GPU_type_matches(GPU_DEVICE_ATI, GPU_OS_UNIX, GPU_DRIVER_OFFICIAL) &&
+             /* WORKAROUND(@fclem): Both Mesa and AMDGPU-PRO are reported as official. */
+             StringRefNull(GPU_platform_version()).find(" Mesa ") == -1)
+    {
+      /* source:row */
+      log_item.cursor.source = log_item.cursor.row;
       log_item.cursor.row = log_item.cursor.column;
       log_item.cursor.column = -1;
     }
     else {
       /* line:char */
+    }
+  }
+
+  /* TODO: Temporary fix for new line directive. Eventually this whole parsing should be done in
+   * C++ with regex for simplicity. */
+  if (log_item.cursor.source != -1) {
+    StringRefNull src(source_combined);
+    std::string needle = std::string("#line 1 ") + std::to_string(log_item.cursor.source);
+
+    int64_t file_start = src.find(needle);
+    if (file_start == -1) {
+      /* Can be generated code or wrapper code outside of the main sources. */
+      log_item.cursor.row = -1;
+    }
+    else {
+      StringRef previous_sources(source_combined, file_start);
+      for (const char c : previous_sources) {
+        if (c == '\n') {
+          log_item.cursor.row++;
+        }
+      }
     }
   }
 
@@ -74,14 +91,14 @@ char *GLLogParser::parse_line(char *log_line, GPULogItem &log_item)
   return log_line;
 }
 
-char *GLLogParser::skip_severity_prefix(char *log_line, GPULogItem &log_item)
+const char *GLLogParser::skip_severity_prefix(const char *log_line, GPULogItem &log_item)
 {
-  return skip_severity(log_line, log_item, "ERROR", "WARNING");
+  return skip_severity(log_line, log_item, "ERROR", "WARNING", "NOTE");
 }
 
-char *GLLogParser::skip_severity_keyword(char *log_line, GPULogItem &log_item)
+const char *GLLogParser::skip_severity_keyword(const char *log_line, GPULogItem &log_item)
 {
-  return skip_severity(log_line, log_item, "error", "warning");
+  return skip_severity(log_line, log_item, "error", "warning", "note");
 }
 
 }  // namespace blender::gpu

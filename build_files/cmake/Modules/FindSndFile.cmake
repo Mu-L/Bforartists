@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2011 Blender Authors
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
 # - Find SndFile library
 # Find the native SndFile includes and library
 # This module defines
@@ -11,50 +15,49 @@
 # also defined, but not for general use are
 #  LIBSNDFILE_LIBRARY, where to find the SndFile library.
 
-#=============================================================================
-# Copyright 2011 Blender Foundation.
-#
-# Distributed under the OSI-approved BSD 3-Clause License,
-# see accompanying file BSD-3-Clause-license.txt for details.
-#=============================================================================
+# If `LIBSNDFILE_ROOT_DIR` was defined in the environment, use it.
+if(DEFINED LIBSNDFILE_ROOT_DIR)
+  # Pass.
+elseif(DEFINED ENV{LIBSNDFILE_ROOT_DIR})
+  set(LIBSNDFILE_ROOT_DIR $ENV{LIBSNDFILE_ROOT_DIR})
+else()
+  set(LIBSNDFILE_ROOT_DIR "")
+endif()
 
-# If LIBSNDFILE_ROOT_DIR was defined in the environment, use it.
-IF(NOT LIBSNDFILE_ROOT_DIR AND NOT $ENV{LIBSNDFILE_ROOT_DIR} STREQUAL "")
-  SET(LIBSNDFILE_ROOT_DIR $ENV{LIBSNDFILE_ROOT_DIR})
-ENDIF()
-
-SET(_sndfile_SEARCH_DIRS
+set(_sndfile_SEARCH_DIRS
   ${LIBSNDFILE_ROOT_DIR}
 )
 
-FIND_PATH(LIBSNDFILE_INCLUDE_DIR sndfile.h
+find_path(LIBSNDFILE_INCLUDE_DIR sndfile.h
   HINTS
     ${_sndfile_SEARCH_DIRS}
   PATH_SUFFIXES
     include
 )
 
-FIND_LIBRARY(LIBSNDFILE_LIBRARY
+find_library(LIBSNDFILE_LIBRARY
   NAMES
     sndfile
   HINTS
     ${_sndfile_SEARCH_DIRS}
   PATH_SUFFIXES
     lib64 lib
-  )
+)
 
 # handle the QUIETLY and REQUIRED arguments and set SNDFILE_FOUND to TRUE if
 # all listed variables are TRUE
-INCLUDE(FindPackageHandleStandardArgs)
-FIND_PACKAGE_HANDLE_STANDARD_ARGS(SndFile DEFAULT_MSG
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(SndFile DEFAULT_MSG
   LIBSNDFILE_LIBRARY LIBSNDFILE_INCLUDE_DIR)
 
-IF(SNDFILE_FOUND)
-  SET(LIBSNDFILE_LIBRARIES ${LIBSNDFILE_LIBRARY})
-  SET(LIBSNDFILE_INCLUDE_DIRS ${LIBSNDFILE_INCLUDE_DIR})
-ENDIF()
+if(SNDFILE_FOUND)
+  set(LIBSNDFILE_LIBRARIES ${LIBSNDFILE_LIBRARY})
+  set(LIBSNDFILE_INCLUDE_DIRS ${LIBSNDFILE_INCLUDE_DIR})
+endif()
 
-MARK_AS_ADVANCED(
+mark_as_advanced(
   LIBSNDFILE_INCLUDE_DIR
   LIBSNDFILE_LIBRARY
 )
+
+unset(_sndfile_SEARCH_DIRS)

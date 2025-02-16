@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
@@ -20,13 +8,29 @@
 
 #pragma once
 
+#include "BLI_utildefines.h"
+
 #include "DNA_defs.h"
 #include "DNA_listBase.h"
-#include "DNA_session_uuid_types.h"
+#include "DNA_packedFile_types.h"
+#include "DNA_session_uid_types.h"
 
 #ifdef __cplusplus
-extern "C" {
+#  include "BLI_span.hh"
+
+namespace blender {
+struct NodesModifierRuntime;
+namespace bke {
+struct BVHTreeFromMesh;
+}
+}  // namespace blender
+using NodesModifierRuntimeHandle = blender::NodesModifierRuntime;
+using BVHTreeFromMeshHandle = blender::bke::BVHTreeFromMesh;
+#else
+typedef struct NodesModifierRuntimeHandle NodesModifierRuntimeHandle;
+typedef struct BVHTreeFromMeshHandle BVHTreeFromMeshHandle;
 #endif
+struct LineartModifierRuntime;
 
 /* WARNING ALERT! TYPEDEF VALUES ARE WRITTEN IN FILES! SO DO NOT CHANGE!
  * (ONLY ADD NEW ITEMS AT THE END)
@@ -98,6 +102,32 @@ typedef enum ModifierType {
   eModifierType_MeshToVolume = 58,
   eModifierType_VolumeDisplace = 59,
   eModifierType_VolumeToMesh = 60,
+  eModifierType_GreasePencilOpacity = 61,
+  eModifierType_GreasePencilSubdiv = 62,
+  eModifierType_GreasePencilColor = 63,
+  eModifierType_GreasePencilTint = 64,
+  eModifierType_GreasePencilSmooth = 65,
+  eModifierType_GreasePencilOffset = 66,
+  eModifierType_GreasePencilNoise = 67,
+  eModifierType_GreasePencilMirror = 68,
+  eModifierType_GreasePencilThickness = 69,
+  eModifierType_GreasePencilLattice = 70,
+  eModifierType_GreasePencilDash = 71,
+  eModifierType_GreasePencilMultiply = 72,
+  eModifierType_GreasePencilLength = 73,
+  eModifierType_GreasePencilWeightAngle = 74,
+  eModifierType_GreasePencilArray = 75,
+  eModifierType_GreasePencilWeightProximity = 76,
+  eModifierType_GreasePencilHook = 77,
+  eModifierType_GreasePencilLineart = 78,
+  eModifierType_GreasePencilArmature = 79,
+  eModifierType_GreasePencilTime = 80,
+  eModifierType_GreasePencilEnvelope = 81,
+  eModifierType_GreasePencilOutline = 82,
+  eModifierType_GreasePencilShrinkwrap = 83,
+  eModifierType_GreasePencilBuild = 84,
+  eModifierType_GreasePencilSimplify = 85,
+  eModifierType_GreasePencilTexture = 86,
   NUM_MODIFIER_TYPES,
 } ModifierType;
 
@@ -114,43 +144,70 @@ typedef enum ModifierMode {
   eModifierMode_ApplyOnSpline = (1 << 6),
   eModifierMode_DisableTemporary = (1u << 31),
 } ModifierMode;
+ENUM_OPERATORS(ModifierMode, eModifierMode_DisableTemporary);
 
 typedef struct ModifierData {
   struct ModifierData *next, *prev;
 
   int type, mode;
-  char _pad0[4];
+  /** Time in seconds that the modifier took to evaluate. This is only set on evaluated objects. */
+  float execution_time;
   short flag;
-  /* An "expand" bit for each of the modifier's (sub)panels (uiPanelDataExpansion). */
+  /** An "expand" bit for each of the modifier's (sub)panels (#uiPanelDataExpansion). */
   short ui_expand_flag;
+  /**
+   * Bits that can be used for open-states of layout panels in the modifier. This can replace
+   * `ui_expand_flag` once all modifiers use layout panels. Currently, trying to reuse the same
+   * flags is problematic, because the bits in `ui_expand_flag` are mapped to panels automatically
+   * and easily conflict with the explicit mapping of bits to panels here.
+   */
+  uint16_t layout_panel_open_flag;
+  char _pad[2];
+  /**
+   * Uniquely identifies the modifier within the object. This identifier is stable across Blender
+   * sessions. Modifiers on the original and corresponding evaluated object have matching
+   * identifiers. The identifier stays the same if the modifier is renamed or moved in the modifier
+   * stack.
+   *
+   * A valid identifier is non-negative (>= 1). Modifiers that are currently not on an object may
+   * have invalid identifiers. It has to be initialized with #BKE_modifiers_persistent_uid_init
+   * when it is added to an object.
+   */
+  int persistent_uid;
   /** MAX_NAME. */
   char name[64];
 
   char *error;
 
-  /* Pointer to a ModifierData in the original domain. */
-  struct ModifierData *orig_modifier_data;
-
-  /* Runtime field which contains unique identifier of the modifier. */
-  SessionUUID session_uuid;
-
-  /* Runtime field which contains runtime data which is specific to a modifier type. */
+  /** Runtime field which contains runtime data which is specific to a modifier type. */
   void *runtime;
 } ModifierData;
 
 typedef enum {
-  /* This modifier has been inserted in local override, and hence can be fully edited. */
+  /** This modifier has been inserted in local override, and hence can be fully edited. */
   eModifierFlag_OverrideLibrary_Local = (1 << 0),
-  /* This modifier does not own its caches, but instead shares them with another modifier. */
+  /** This modifier does not own its caches, but instead shares them with another modifier. */
   eModifierFlag_SharedCaches = (1 << 1),
   /**
    * This modifier is the object's active modifier. Used for context in the node editor.
    * Only one modifier on an object should have this flag set.
    */
   eModifierFlag_Active = (1 << 2),
+  /**
+   * Only set on modifiers in evaluated objects. The flag indicates that the user modified inputs
+   * to the modifier which might invalidate simulation caches.
+   */
+  eModifierFlag_UserModified = (1 << 3),
+  /**
+   * New modifiers are added before this modifier, and dragging non-pinned modifiers after is
+   * disabled.
+   */
+  eModifierFlag_PinLast = (1 << 4),
 } ModifierFlag;
 
-/* not a real modifier */
+/**
+ * \note Not a real modifier.
+ */
 typedef struct MappingInfoModifierData {
   ModifierData modifier;
 
@@ -158,7 +215,8 @@ typedef struct MappingInfoModifierData {
   struct Object *map_object;
   char map_bone[64];
   /** MAX_CUSTOMDATA_LAYER_NAME. */
-  char uvlayer_name[64];
+  char uvlayer_name[68];
+  char _pad1[4];
   int uvlayer_tmp;
   int texmapping;
 } MappingInfoModifierData;
@@ -210,14 +268,15 @@ typedef struct LatticeModifierData {
   ModifierData modifier;
 
   struct Object *object;
-  /** Optional vertexgroup name, MAX_VGROUP_NAME. */
+  /** Optional vertex-group name, #MAX_VGROUP_NAME. */
   char name[64];
   float strength;
   short flag;
   char _pad[2];
+  void *_pad1;
 } LatticeModifierData;
 
-/* Lattice modifier flags. */
+/** #LatticeModifierData.flag */
 enum {
   MOD_LATTICE_INVERT_VGROUP = (1 << 0),
 };
@@ -226,20 +285,21 @@ typedef struct CurveModifierData {
   ModifierData modifier;
 
   struct Object *object;
-  /** Optional vertexgroup name, MAX_VGROUP_NAME. */
+  /** Optional vertex-group name, #MAX_VGROUP_NAME. */
   char name[64];
   /** Axis along which curve deforms. */
   short defaxis;
   short flag;
   char _pad[4];
+  void *_pad1;
 } CurveModifierData;
 
-/* Curve modifier flags */
+/** #CurveModifierData.flag */
 enum {
   MOD_CURVE_INVERT_VGROUP = (1 << 0),
 };
 
-/* CurveModifierData->defaxis */
+/** #CurveModifierData.defaxis */
 enum {
   MOD_CURVE_POSX = 1,
   MOD_CURVE_POSY = 2,
@@ -261,7 +321,7 @@ typedef struct BuildModifierData {
   int seed;
 } BuildModifierData;
 
-/* Build Modifier -> flag */
+/** #BuildModifierData.flag */
 enum {
   /** order of vertices is randomized */
   MOD_BUILD_FLAG_RANDOMIZE = (1 << 0),
@@ -269,13 +329,13 @@ enum {
   MOD_BUILD_FLAG_REVERSE = (1 << 1),
 };
 
-/* Mask Modifier */
+/** Mask Modifier. */
 typedef struct MaskModifierData {
   ModifierData modifier;
 
   /** Armature to use to in place of hardcoded vgroup. */
   struct Object *ob_arm;
-  /** Name of vertex group to use to mask, MAX_VGROUP_NAME. */
+  /** Name of vertex group to use to mask, #MAX_VGROUP_NAME. */
   char vgroup[64];
 
   /** Using armature or hardcoded vgroup. */
@@ -283,79 +343,86 @@ typedef struct MaskModifierData {
   /** Flags for various things. */
   short flag;
   float threshold;
+  void *_pad1;
 } MaskModifierData;
 
-/* Mask Modifier -> mode */
+/** #MaskModifierData.mode */
 enum {
   MOD_MASK_MODE_VGROUP = 0,
   MOD_MASK_MODE_ARM = 1,
 };
 
-/* Mask Modifier -> flag */
+/** #MaskModifierData.flag */
 enum {
   MOD_MASK_INV = (1 << 0),
+  MOD_MASK_SMOOTH = (1 << 1),
 };
 
 typedef struct ArrayModifierData {
   ModifierData modifier;
 
-  /* the object with which to cap the start of the array. */
+  /** The object with which to cap the start of the array. */
   struct Object *start_cap;
-  /* the object with which to cap the end of the array. */
+  /** The object with which to cap the end of the array. */
   struct Object *end_cap;
-  /* the curve object to use for MOD_ARR_FITCURVE. */
+  /** The curve object to use for #MOD_ARR_FITCURVE. */
   struct Object *curve_ob;
-  /* the object to use for object offset. */
+  /** The object to use for object offset. */
   struct Object *offset_ob;
-  /* a constant duplicate offset;
-   * 1 means the duplicates are 1 unit apart
+  /**
+   * A constant duplicate offset;
+   * 1 means the duplicates are 1 unit apart.
    */
   float offset[3];
-  /* a scaled factor for duplicate offsets;
-   * 1 means the duplicates are 1 object-width apart
+  /**
+   * A scaled factor for duplicate offsets;
+   * 1 means the duplicates are 1 object-width apart.
    */
   float scale[3];
-  /* the length over which to distribute the duplicates */
+  /** The length over which to distribute the duplicates. */
   float length;
-  /* the limit below which to merge vertices in adjacent duplicates */
+  /** The limit below which to merge vertices in adjacent duplicates. */
   float merge_dist;
-  /* determines how duplicate count is calculated; one of:
-   * - MOD_ARR_FIXEDCOUNT -> fixed
-   * - MOD_ARR_FITLENGTH  -> calculated to fit a set length
-   * - MOD_ARR_FITCURVE   -> calculated to fit the length of a Curve object
+  /**
+   * Determines how duplicate count is calculated; one of:
+   * - #MOD_ARR_FIXEDCOUNT -> fixed.
+   * - #MOD_ARR_FITLENGTH  -> calculated to fit a set length.
+   * - #MOD_ARR_FITCURVE   -> calculated to fit the length of a Curve object.
    */
   int fit_type;
-  /* flags specifying how total offset is calculated; binary OR of:
-   * - MOD_ARR_OFF_CONST    -> total offset += offset
-   * - MOD_ARR_OFF_RELATIVE -> total offset += relative * object width
-   * - MOD_ARR_OFF_OBJ      -> total offset += offset_ob's matrix
-   * total offset is the sum of the individual enabled offsets
+  /**
+   * Flags specifying how total offset is calculated; binary OR of:
+   * - #MOD_ARR_OFF_CONST    -> total offset += offset.
+   * - #MOD_ARR_OFF_RELATIVE -> total offset += relative * object width.
+   * - #MOD_ARR_OFF_OBJ      -> total offset += offset_ob's matrix.
+   * Total offset is the sum of the individual enabled offsets.
    */
   int offset_type;
-  /* general flags:
-   * MOD_ARR_MERGE -> merge vertices in adjacent duplicates
+  /**
+   * General flags:
+   * #MOD_ARR_MERGE -> merge vertices in adjacent duplicates.
    */
   int flags;
-  /* the number of duplicates to generate for MOD_ARR_FIXEDCOUNT */
+  /** The number of duplicates to generate for #MOD_ARR_FIXEDCOUNT. */
   int count;
   float uv_offset[2];
 } ArrayModifierData;
 
-/* ArrayModifierData->fit_type */
+/** #ArrayModifierData.fit_type */
 enum {
   MOD_ARR_FIXEDCOUNT = 0,
   MOD_ARR_FITLENGTH = 1,
   MOD_ARR_FITCURVE = 2,
 };
 
-/* ArrayModifierData->offset_type */
+/** #ArrayModifierData.offset_type */
 enum {
   MOD_ARR_OFF_CONST = (1 << 0),
   MOD_ARR_OFF_RELATIVE = (1 << 1),
   MOD_ARR_OFF_OBJ = (1 << 2),
 };
 
-/* ArrayModifierData->flags */
+/** #ArrayModifierData.flags */
 enum {
   MOD_ARR_MERGE = (1 << 0),
   MOD_ARR_MERGEFINAL = (1 << 1),
@@ -369,13 +436,22 @@ typedef struct MirrorModifierData {
   short flag;
   float tolerance;
   float bisect_threshold;
-  char _pad[4];
+
+  /** Mirror modifier used to merge the old vertex into its new copy, which would break code
+   * relying on access to the original geometry vertices. However, modifying this behavior to the
+   * correct one (i.e. merging the copy vertices into their original sources) has several potential
+   * effects on other modifiers and tools, so we need to keep that incorrect behavior for existing
+   * modifiers, and only use the new correct one for new modifiers. */
+  uint8_t use_correct_order_on_merge;
+
+  char _pad[3];
   float uv_offset[2];
   float uv_offset_copy[2];
   struct Object *mirror_ob;
+  void *_pad1;
 } MirrorModifierData;
 
-/* MirrorModifierData->flag */
+/** #MirrorModifierData.flag */
 enum {
   MOD_MIR_CLIPPING = (1 << 0),
   MOD_MIR_MIRROR_U = (1 << 1),
@@ -402,7 +478,7 @@ typedef struct EdgeSplitModifierData {
   int flags;
 } EdgeSplitModifierData;
 
-/* EdgeSplitModifierData->flags */
+/** #EdgeSplitModifierData.flags */
 enum {
   MOD_EDGESPLIT_FROMANGLE = (1 << 1),
   MOD_EDGESPLIT_FROMFLAG = (1 << 2),
@@ -444,16 +520,21 @@ typedef struct BevelModifierData {
   float bevel_angle;
   float spread;
   /** if the MOD_BEVEL_VWEIGHT option is set,
-   * this will be the name of the vert group, MAX_VGROUP_NAME */
+   * this will be the name of the vert group, #MAX_VGROUP_NAME */
   char defgrp_name[64];
 
   char _pad1[4];
   /** Curve info for the custom profile */
   struct CurveProfile *custom_profile;
 
+  /** Custom bevel edge weight name. */
+  char edge_weight_name[64];
+
+  /** Custom bevel vertex weight name. */
+  char vertex_weight_name[64];
 } BevelModifierData;
 
-/* BevelModifierData->flags and BevelModifierData->lim_flags */
+/** #BevelModifierData.flags and BevelModifierData.lim_flags */
 enum {
 #ifdef DNA_DEPRECATED_ALLOW
   MOD_BEVEL_VERT_DEPRECATED = (1 << 1),
@@ -476,7 +557,7 @@ enum {
   MOD_BEVEL_HARDEN_NORMALS = (1 << 15),
 };
 
-/* BevelModifierData->val_flags (not used as flags any more) */
+/** #BevelModifierData.val_flags (not used as flags any more) */
 enum {
   MOD_BEVEL_AMT_OFFSET = 0,
   MOD_BEVEL_AMT_WIDTH = 1,
@@ -485,19 +566,19 @@ enum {
   MOD_BEVEL_AMT_ABSOLUTE = 4,
 };
 
-/* BevelModifierData->profile_type */
+/** #BevelModifierData.profile_type */
 enum {
   MOD_BEVEL_PROFILE_SUPERELLIPSE = 0,
   MOD_BEVEL_PROFILE_CUSTOM = 1,
 };
 
-/* BevelModifierData->edge_flags */
+/** #BevelModifierData.edge_flags */
 enum {
   MOD_BEVEL_MARK_SEAM = (1 << 0),
   MOD_BEVEL_MARK_SHARP = (1 << 1),
 };
 
-/* BevelModifierData->face_str_mode */
+/** #BevelModifierData.face_str_mode */
 enum {
   MOD_BEVEL_FACE_STRENGTH_NONE = 0,
   MOD_BEVEL_FACE_STRENGTH_NEW = 1,
@@ -505,20 +586,20 @@ enum {
   MOD_BEVEL_FACE_STRENGTH_ALL = 3,
 };
 
-/* BevelModifier->miter_inner and ->miter_outer */
+/** #BevelModifier.miter_inner & #BevelModifier.miter_outer */
 enum {
   MOD_BEVEL_MITER_SHARP = 0,
   MOD_BEVEL_MITER_PATCH = 1,
   MOD_BEVEL_MITER_ARC = 2,
 };
 
-/* BevelModifier->vmesh_method */
+/** #BevelModifier.vmesh_method */
 enum {
   MOD_BEVEL_VMESH_ADJ = 0,
   MOD_BEVEL_VMESH_CUTOFF = 1,
 };
 
-/* BevelModifier->affect_type */
+/** #BevelModifier.affect_type */
 enum {
   MOD_BEVEL_AFFECT_VERTICES = 0,
   MOD_BEVEL_AFFECT_EDGES = 1,
@@ -535,9 +616,10 @@ typedef struct FluidModifierData {
   float time;
   /** Domain, inflow, outflow, .... */
   int type;
+  void *_pad1;
 } FluidModifierData;
 
-/* Fluid modifier flags */
+/** #FluidModifierData.type */
 enum {
   MOD_FLUID_TYPE_DOMAIN = (1 << 0),
   MOD_FLUID_TYPE_FLOW = (1 << 1),
@@ -547,32 +629,34 @@ enum {
 typedef struct DisplaceModifierData {
   ModifierData modifier;
 
-  /* keep in sync with MappingInfoModifierData */
+  /* Keep in sync with #MappingInfoModifierData. */
+
   struct Tex *texture;
   struct Object *map_object;
   char map_bone[64];
   /** MAX_CUSTOMDATA_LAYER_NAME. */
-  char uvlayer_name[64];
+  char uvlayer_name[68];
+  char _pad1[4];
   int uvlayer_tmp;
   int texmapping;
   /* end MappingInfoModifierData */
 
   float strength;
   int direction;
-  /** MAX_VGROUP_NAME. */
+  /** #MAX_VGROUP_NAME. */
   char defgrp_name[64];
   float midlevel;
   int space;
   short flag;
-  char _pad[6];
+  char _pad2[6];
 } DisplaceModifierData;
 
-/* DisplaceModifierData->flag */
+/** #DisplaceModifierData.flag */
 enum {
   MOD_DISP_INVERT_VGROUP = (1 << 0),
 };
 
-/* DisplaceModifierData->direction */
+/** #DisplaceModifierData.direction */
 enum {
   MOD_DISP_DIR_X = 0,
   MOD_DISP_DIR_Y = 1,
@@ -582,7 +666,7 @@ enum {
   MOD_DISP_DIR_CLNOR = 5,
 };
 
-/* DisplaceModifierData->texmapping */
+/** #DisplaceModifierData.texmapping */
 enum {
   MOD_DISP_MAP_LOCAL = 0,
   MOD_DISP_MAP_GLOBAL = 1,
@@ -590,7 +674,7 @@ enum {
   MOD_DISP_MAP_UV = 3,
 };
 
-/* DisplaceModifierData->space */
+/** #DisplaceModifierData.space */
 enum {
   MOD_DISP_SPACE_LOCAL = 0,
   MOD_DISP_SPACE_GLOBAL = 1,
@@ -598,18 +682,18 @@ enum {
 
 typedef struct UVProjectModifierData {
   ModifierData modifier;
-
-  /* the objects which do the projecting */
-  /** MOD_UVPROJECT_MAXPROJECTORS. */
+  /**
+   * The objects which do the projecting.
+   * \note 10=MOD_UVPROJECT_MAXPROJECTORS.
+   */
   struct Object *projectors[10];
   char _pad2[4];
-  int num_projectors;
+  int projectors_num;
   float aspectx, aspecty;
   float scalex, scaley;
   /** MAX_CUSTOMDATA_LAYER_NAME. */
-  char uvlayer_name[64];
+  char uvlayer_name[68];
   int uvlayer_tmp;
-  char _pad[4];
 } UVProjectModifierData;
 
 #define MOD_UVPROJECT_MAXPROJECTORS 10
@@ -628,12 +712,12 @@ typedef struct DecimateModifierData {
   /** (mode == MOD_DECIM_MODE_DISSOLVE). */
   float angle;
 
-  /** MAX_VGROUP_NAME. */
+  /** #MAX_VGROUP_NAME. */
   char defgrp_name[64];
   float defgrp_factor;
   short flag, mode;
 
-  /* runtime only */
+  /** runtime only. */
   int face_count;
 } DecimateModifierData;
 
@@ -656,13 +740,13 @@ enum {
 typedef struct SmoothModifierData {
   ModifierData modifier;
   float fac;
-  /** MAX_VGROUP_NAME. */
+  /** #MAX_VGROUP_NAME. */
   char defgrp_name[64];
   short flag, repeat;
 
 } SmoothModifierData;
 
-/* Smooth modifier flags */
+/** #SmoothModifierData.flag */
 enum {
   MOD_SMOOTH_INVERT_VGROUP = (1 << 0),
   MOD_SMOOTH_X = (1 << 1),
@@ -677,12 +761,15 @@ typedef struct CastModifierData {
   float fac;
   float radius;
   float size;
-  /** MAX_VGROUP_NAME. */
+  /** #MAX_VGROUP_NAME. */
   char defgrp_name[64];
-  short flag, type;
+  short flag;
+  /** Cast modifier projection type. */
+  short type;
+  void *_pad1;
 } CastModifierData;
 
-/* Cast modifier flags */
+/** #CastModifierData.flag */
 enum {
   /* And what bout (1 << 0) flag? ;) */
   MOD_CAST_INVERT_VGROUP = (1 << 0),
@@ -693,7 +780,7 @@ enum {
   MOD_CAST_SIZE_FROM_RADIUS = (1 << 5),
 };
 
-/* Cast modifier projection types */
+/** #CastModifierData.type */
 enum {
   MOD_CAST_TYPE_SPHERE = 0,
   MOD_CAST_TYPE_CYLINDER = 1,
@@ -703,31 +790,34 @@ enum {
 typedef struct WaveModifierData {
   ModifierData modifier;
 
-  /* keep in sync with MappingInfoModifierData */
+  /* Keep in sync with #MappingInfoModifierData. */
+
   struct Tex *texture;
   struct Object *map_object;
   char map_bone[64];
   /** MAX_CUSTOMDATA_LAYER_NAME. */
-  char uvlayer_name[64];
+  char uvlayer_name[68];
+  char _pad1[4];
   int uvlayer_tmp;
   int texmapping;
-  /* end MappingInfoModifierData */
+  /* End MappingInfoModifierData. */
 
   struct Object *objectcenter;
-  /** MAX_VGROUP_NAME. */
+  /** #MAX_VGROUP_NAME. */
   char defgrp_name[64];
 
   short flag;
-  char _pad[2];
+  char _pad2[2];
 
   float startx, starty, height, width;
   float narrow, speed, damp, falloff;
 
   float timeoffs, lifetime;
-  char _pad1[4];
+  char _pad3[4];
+  void *_pad4;
 } WaveModifierData;
 
-/* WaveModifierData.flag */
+/** #WaveModifierData.flag */
 enum {
   MOD_WAVE_INVERT_VGROUP = (1 << 0),
   MOD_WAVE_X = (1 << 1),
@@ -748,7 +838,7 @@ typedef struct ArmatureModifierData {
   struct Object *object;
   /** Stored input of previous modifier, for vertex-group blending. */
   float (*vert_coords_prev)[3];
-  /** MAX_VGROUP_NAME. */
+  /** #MAX_VGROUP_NAME. */
   char defgrp_name[64];
 } ArmatureModifierData;
 
@@ -757,7 +847,7 @@ enum {
   MOD_HOOK_INVERT_VGROUP = (1 << 1),
 };
 
-/* same as WarpModifierFalloff */
+/** \note same as #WarpModifierFalloff */
 typedef enum {
   eHook_Falloff_None = 0,
   eHook_Falloff_Curve = 1,
@@ -791,12 +881,13 @@ typedef struct HookModifierData {
 
   struct CurveMapping *curfalloff;
 
-  /** If NULL, it's using vertexgroup. */
+  /** If NULL, it's using vertex-group. */
   int *indexar;
-  int totindex;
+  int indexar_num;
   float force;
-  /** Optional vertexgroup name, MAX_VGROUP_NAME. */
+  /** Optional vertex-group name, #MAX_VGROUP_NAME. */
   char name[64];
+  void *_pad1;
 } HookModifierData;
 
 typedef struct SoftbodyModifierData {
@@ -813,15 +904,17 @@ typedef struct ClothModifierData {
   /** Definition is in DNA_cloth_types.h. */
   struct ClothCollSettings *coll_parms;
 
-  /* PointCache can be shared with other instances of ClothModifierData.
-   * Inspect (modifier.flag & eModifierFlag_SharedCaches) to find out. */
+  /**
+   * PointCache can be shared with other instances of #ClothModifierData.
+   * Inspect `modifier.flag & eModifierFlag_SharedCaches` to find out.
+   */
   /** Definition is in DNA_object_force_types.h. */
   struct PointCache *point_cache;
   struct ListBase ptcaches;
 
-  /* XXX nasty hack, remove once hair can be separated from cloth modifier data */
+  /** XXX: nasty hack, remove once hair can be separated from cloth modifier data. */
   struct ClothHairData *hairdata;
-  /* grid geometry values of hair continuum */
+  /** Grid geometry values of hair continuum. */
   float hair_grid_min[3];
   float hair_grid_max[3];
   int hair_grid_res[3];
@@ -834,19 +927,19 @@ typedef struct CollisionModifierData {
   ModifierData modifier;
 
   /** Position at the beginning of the frame. */
-  struct MVert *x;
+  float (*x)[3];
   /** Position at the end of the frame. */
-  struct MVert *xnew;
-  /** Unused atm, but was discussed during sprint. */
-  struct MVert *xold;
+  float (*xnew)[3];
+  /** Unused at the moment, but was discussed during sprint. */
+  float (*xold)[3];
   /** New position at the actual inter-frame step. */
-  struct MVert *current_xnew;
+  float (*current_xnew)[3];
   /** Position at the actual inter-frame step. */
-  struct MVert *current_x;
+  float (*current_x)[3];
   /** (xnew - x) at the actual inter-frame step. */
-  struct MVert *current_v;
+  float (*current_v)[3];
 
-  struct MVertTri *tri;
+  int (*vert_tris)[3];
 
   unsigned int mvert_num;
   unsigned int tri_num;
@@ -860,20 +953,24 @@ typedef struct CollisionModifierData {
   struct BVHTree *bvhtree;
 } CollisionModifierData;
 
-typedef struct SurfaceModifierData {
-  ModifierData modifier;
+typedef struct SurfaceModifierData_Runtime {
 
-  /** Old position. */
-  struct MVert *x;
-  /** Velocity. */
-  struct MVert *v;
+  float (*vert_positions_prev)[3];
+  float (*vert_velocities)[3];
 
   struct Mesh *mesh;
 
   /** Bounding volume hierarchy of the mesh faces. */
-  struct BVHTreeFromMesh *bvhtree;
+  BVHTreeFromMeshHandle *bvhtree;
 
-  int cfra, numverts;
+  int cfra_prev, verts_num;
+
+} SurfaceModifierData_Runtime;
+
+typedef struct SurfaceModifierData {
+  ModifierData modifier;
+
+  SurfaceModifierData_Runtime runtime;
 } SurfaceModifierData;
 
 typedef struct BooleanModifierData {
@@ -884,24 +981,32 @@ typedef struct BooleanModifierData {
   float double_threshold;
   char operation;
   char solver;
+  /** #BooleanModifierMaterialMode. */
+  char material_mode;
   char flag;
   char bm_flag;
+  char _pad[7];
 } BooleanModifierData;
 
-/* BooleanModifierData->operation */
+typedef enum BooleanModifierMaterialMode {
+  eBooleanModifierMaterialMode_Index = 0,
+  eBooleanModifierMaterialMode_Transfer = 1,
+} BooleanModifierMaterialMode;
+
+/** #BooleanModifierData.operation */
 typedef enum {
   eBooleanModifierOp_Intersect = 0,
   eBooleanModifierOp_Union = 1,
   eBooleanModifierOp_Difference = 2,
 } BooleanModifierOp;
 
-/* BooleanModifierData->solver */
+/** #BooleanModifierData.solver */
 typedef enum {
-  eBooleanModifierSolver_Fast = 0,
-  eBooleanModifierSolver_Exact = 1,
+  eBooleanModifierSolver_Float = 0,
+  eBooleanModifierSolver_Mesh_Arr = 1,
 } BooleanModifierSolver;
 
-/* BooleanModifierData->flag */
+/** #BooleanModifierData.flag */
 enum {
   eBooleanModifierFlag_Self = (1 << 0),
   eBooleanModifierFlag_Object = (1 << 1),
@@ -909,7 +1014,7 @@ enum {
   eBooleanModifierFlag_HoleTolerant = (1 << 3),
 };
 
-/* bm_flag only used when G_DEBUG. */
+/** #BooleanModifierData.bm_flag (only used when #G_DEBUG is set). */
 enum {
   eBooleanModifierBMeshFlag_BMesh_Separate = (1 << 0),
   eBooleanModifierBMeshFlag_BMesh_NoDissolve = (1 << 1),
@@ -923,7 +1028,7 @@ typedef struct MDefInfluence {
 
 typedef struct MDefCell {
   int offset;
-  int totinfluence;
+  int influences_num;
 } MDefCell;
 
 typedef struct MeshDeformModifierData {
@@ -931,7 +1036,7 @@ typedef struct MeshDeformModifierData {
 
   /** Mesh object. */
   struct Object *object;
-  /** Optional vertexgroup name, MAX_VGROUP_NAME. */
+  /** Optional vertex-group name, #MAX_VGROUP_NAME. */
   char defgrp_name[64];
 
   short gridsize, flag;
@@ -945,19 +1050,19 @@ typedef struct MeshDeformModifierData {
   /** Coordinates that cage was bound with. */
   float *bindcagecos;
   /** Total vertices in mesh and cage. */
-  int totvert, totcagevert;
+  int verts_num, cage_verts_num;
 
   /* result of dynamic binding */
   /** Grid with dynamic binding cell points. */
   MDefCell *dyngrid;
   /** Dynamic binding vertex influences. */
   MDefInfluence *dyninfluences;
-  /** Is this vertex bound or not?. */
+  /** Is this vertex bound or not? */
   int *dynverts;
   /** Size of the dynamic bind grid. */
   int dyngridsize;
   /** Total number of vertex influences. */
-  int totinfluence;
+  int influences_num;
   /** Offset of the dynamic bind grid. */
   float dyncellmin[3];
   /** Width of dynamic bind cell. */
@@ -972,10 +1077,11 @@ typedef struct MeshDeformModifierData {
   float *bindcos;
 
   /* runtime */
-  void (*bindfunc)(struct MeshDeformModifierData *mmd,
+  void (*bindfunc)(struct Object *object,
+                   struct MeshDeformModifierData *mmd,
                    struct Mesh *cagemesh,
                    float *vertexcos,
-                   int totvert,
+                   int verts_num,
                    float cagemat[4][4]);
 } MeshDeformModifierData;
 
@@ -1001,6 +1107,7 @@ typedef struct ParticleSystemModifierData {
   int totdmvert, totdmedge, totdmface;
   short flag;
   char _pad[2];
+  void *_pad1;
 } ParticleSystemModifierData;
 
 typedef enum {
@@ -1034,9 +1141,10 @@ typedef struct ParticleInstanceModifierData {
   float rotation, random_rotation;
   float particle_amount, particle_offset;
   /** MAX_CUSTOMDATA_LAYER_NAME. */
-  char index_layer_name[64];
+  char index_layer_name[68];
   /** MAX_CUSTOMDATA_LAYER_NAME. */
-  char value_layer_name[64];
+  char value_layer_name[68];
+  void *_pad1;
 } ParticleInstanceModifierData;
 
 typedef enum {
@@ -1056,10 +1164,14 @@ typedef struct ExplodeModifierData {
   short flag, vgroup;
   float protect;
   /** MAX_CUSTOMDATA_LAYER_NAME. */
-  char uvname[64];
+  char uvname[68];
+  char _pad1[4];
+  void *_pad2;
 } ExplodeModifierData;
 
 typedef struct MultiresModifierData {
+  DNA_DEFINE_CXX_METHODS(MultiresModifierData)
+
   ModifierData modifier;
 
   char lvl, sculptlvl, renderlvl, totlvl;
@@ -1080,15 +1192,16 @@ typedef enum {
   eMultiresModifierFlag_UseSculptBaseMesh = (1 << 4),
 } MultiresModifierFlag;
 
-/* DEPRECATED, only used for versioning. */
+/** DEPRECATED: only used for versioning. */
 typedef struct FluidsimModifierData {
   ModifierData modifier;
 
   /** Definition is in DNA_object_fluidsim_types.h. */
   struct FluidsimSettings *fss;
+  void *_pad1;
 } FluidsimModifierData;
 
-/* DEPRECATED, only used for versioning. */
+/** DEPRECATED: only used for versioning. */
 typedef struct SmokeModifierData {
   ModifierData modifier;
 
@@ -1104,7 +1217,7 @@ typedef struct ShrinkwrapModifierData {
   struct Object *target;
   /** Additional shrink target. */
   struct Object *auxTarget;
-  /** Optional vertexgroup name, MAX_VGROUP_NAME. */
+  /** Optional vertex-group name, #MAX_VGROUP_NAME. */
   char vgroup_name[64];
   /** Distance offset to keep from mesh/projection point. */
   float keepDist;
@@ -1119,15 +1232,16 @@ typedef struct ShrinkwrapModifierData {
   /** Axis to project over. */
   char projAxis;
 
-  /** If using projection over vertex normal this controls the level of subsurface that must be
-   * done before getting the vertex coordinates and normal
+  /**
+   * If using projection over vertex normal this controls the level of subsurface that must be
+   * done before getting the vertex coordinates and normal.
    */
   char subsurfLevels;
 
   char _pad[2];
 } ShrinkwrapModifierData;
 
-/* Shrinkwrap->shrinkType */
+/** #ShrinkwrapModifierData.shrinkType */
 enum {
   MOD_SHRINKWRAP_NEAREST_SURFACE = 0,
   MOD_SHRINKWRAP_PROJECT = 1,
@@ -1135,7 +1249,7 @@ enum {
   MOD_SHRINKWRAP_TARGET_PROJECT = 3,
 };
 
-/* Shrinkwrap->shrinkMode */
+/** #ShrinkwrapModifierData.shrinkMode */
 enum {
   /** Move vertex to the surface of the target object (keepDist towards original position) */
   MOD_SHRINKWRAP_ON_SURFACE = 0,
@@ -1149,11 +1263,11 @@ enum {
   MOD_SHRINKWRAP_ABOVE_SURFACE = 4,
 };
 
-/* Shrinkwrap->shrinkOpts */
+/** #ShrinkwrapModifierData.shrinkOpts */
 enum {
-  /** allow shrinkwrap to move the vertex in the positive direction of axis */
+  /** Allow shrink-wrap to move the vertex in the positive direction of axis. */
   MOD_SHRINKWRAP_PROJECT_ALLOW_POS_DIR = (1 << 0),
-  /** allow shrinkwrap to move the vertex in the negative direction of axis */
+  /** Allow shrink-wrap to move the vertex in the negative direction of axis. */
   MOD_SHRINKWRAP_PROJECT_ALLOW_NEG_DIR = (1 << 1),
 
   /** ignore vertex moves if a vertex ends projected on a front face of the target */
@@ -1173,7 +1287,7 @@ enum {
 #define MOD_SHRINKWRAP_CULL_TARGET_MASK \
   (MOD_SHRINKWRAP_CULL_TARGET_FRONTFACE | MOD_SHRINKWRAP_CULL_TARGET_BACKFACE)
 
-/* Shrinkwrap->projAxis */
+/** #ShrinkwrapModifierData.projAxis */
 enum {
   /** projection over normal is used if no axis is selected */
   MOD_SHRINKWRAP_PROJECT_OVER_NORMAL = 0,
@@ -1187,7 +1301,7 @@ typedef struct SimpleDeformModifierData {
 
   /** Object to control the origin of modifier space coordinates. */
   struct Object *origin;
-  /** Optional vertexgroup name, MAX_VGROUP_NAME. */
+  /** Optional vertex-group name, #MAX_VGROUP_NAME. */
   char vgroup_name[64];
   /** Factors to control simple deforms. */
   float factor;
@@ -1202,9 +1316,10 @@ typedef struct SimpleDeformModifierData {
   char deform_axis;
   char flag;
 
+  void *_pad1;
 } SimpleDeformModifierData;
 
-/* SimpleDeform->flag */
+/** #SimpleDeformModifierData.flag */
 enum {
   MOD_SIMPLEDEFORM_FLAG_INVERT_VGROUP = (1 << 0),
 };
@@ -1229,7 +1344,7 @@ typedef struct ShapeKeyModifierData {
 typedef struct SolidifyModifierData {
   ModifierData modifier;
 
-  /** Name of vertex group to use, MAX_VGROUP_NAME. */
+  /** Name of vertex group to use, #MAX_VGROUP_NAME. */
   char defgrp_name[64];
   char shell_defgrp_name[64];
   char rim_defgrp_name[64];
@@ -1310,6 +1425,7 @@ typedef struct ScrewModifierData {
   short flag;
   char axis;
   char _pad[5];
+  void *_pad1;
 } ScrewModifierData;
 
 enum {
@@ -1367,8 +1483,8 @@ typedef struct OceanModifierData {
   /** FILE_MAX. */
   char cachepath[1024];
   /** MAX_CUSTOMDATA_LAYER_NAME. */
-  char foamlayername[64];
-  char spraylayername[64];
+  char foamlayername[68];
+  char spraylayername[68];
   char cached;
   char geometry_mode;
 
@@ -1409,15 +1525,18 @@ enum {
 
 typedef struct WarpModifierData {
   ModifierData modifier;
-  /* keep in sync with MappingInfoModifierData */
+
+  /* Keep in sync with #MappingInfoModifierData. */
+
   struct Tex *texture;
   struct Object *map_object;
   char map_bone[64];
   /** MAX_CUSTOMDATA_LAYER_NAME. */
-  char uvlayer_name[64];
+  char uvlayer_name[68];
+  char _pad1[4];
   int uvlayer_tmp;
   int texmapping;
-  /* end MappingInfoModifierData */
+  /* End #MappingInfoModifierData. */
 
   struct Object *object_from;
   struct Object *object_to;
@@ -1427,21 +1546,23 @@ typedef struct WarpModifierData {
   char bone_to[64];
 
   struct CurveMapping *curfalloff;
-  /** Optional vertexgroup name, MAX_VGROUP_NAME. */
+  /** Optional vertex-group name, #MAX_VGROUP_NAME. */
   char defgrp_name[64];
   float strength;
   float falloff_radius;
   char flag;
   char falloff_type;
-  char _pad[6];
+  char _pad2[6];
+  void *_pad3;
 } WarpModifierData;
 
-/* WarpModifierData->flag */
+/** #WarpModifierData.flag */
 enum {
   MOD_WARP_VOLUME_PRESERVE = (1 << 0),
   MOD_WARP_INVERT_VGROUP = (1 << 1),
 };
 
+/** \note same as #HookModifierFalloff. */
 typedef enum {
   eWarp_Falloff_None = 0,
   eWarp_Falloff_Curve = 1,
@@ -1458,7 +1579,7 @@ typedef enum {
 typedef struct WeightVGEditModifierData {
   ModifierData modifier;
 
-  /** Name of vertex group to edit. MAX_VGROUP_NAME. */
+  /** Name of vertex group to edit. #MAX_VGROUP_NAME. */
   char defgrp_name[64];
 
   /** Using MOD_WVG_EDIT_* flags. */
@@ -1469,7 +1590,7 @@ typedef struct WeightVGEditModifierData {
   float default_weight;
 
   /* Mapping stuff. */
-  /** The custom mapping curve!. */
+  /** The custom mapping curve. */
   struct CurveMapping *cmap_curve;
 
   /* The add/remove vertices weight thresholds. */
@@ -1478,11 +1599,11 @@ typedef struct WeightVGEditModifierData {
   /* Masking options. */
   /** The global "influence", if no vgroup nor tex is used as mask. */
   float mask_constant;
-  /** Name of mask vertex group from which to get weight factors. MAX_VGROUP_NAME. */
+  /** Name of mask vertex group from which to get weight factors. #MAX_VGROUP_NAME. */
   char mask_defgrp_name[64];
 
   /* Texture masking. */
-  /** Which channel to use as weightf. */
+  /** Which channel to use as weight/mask. */
   int mask_tex_use_channel;
   /** The texture. */
   struct Tex *mask_texture;
@@ -1493,13 +1614,13 @@ typedef struct WeightVGEditModifierData {
   /** How to map the texture (using MOD_DISP_MAP_* enums). */
   int mask_tex_mapping;
   /** Name of the UV map. MAX_CUSTOMDATA_LAYER_NAME. */
-  char mask_tex_uvlayer_name[64];
+  char mask_tex_uvlayer_name[68];
 
   /* Padding... */
-  char _pad0[4];
+  void *_pad1;
 } WeightVGEditModifierData;
 
-/* WeightVGEdit flags. */
+/** #WeightVGEdit.edit_flags */
 enum {
   MOD_WVG_EDIT_WEIGHTS_NORMALIZE = (1 << 0),
   MOD_WVG_INVERT_FALLOFF = (1 << 1),
@@ -1513,9 +1634,9 @@ enum {
 typedef struct WeightVGMixModifierData {
   ModifierData modifier;
 
-  /** Name of vertex group to modify/weight. MAX_VGROUP_NAME. */
+  /** Name of vertex group to modify/weight. #MAX_VGROUP_NAME. */
   char defgrp_name_a[64];
-  /** Name of other vertex group to mix in. MAX_VGROUP_NAME. */
+  /** Name of other vertex group to mix in. #MAX_VGROUP_NAME. */
   char defgrp_name_b[64];
   /** Default weight value for first vgroup. */
   float default_weight_a;
@@ -1531,7 +1652,7 @@ typedef struct WeightVGMixModifierData {
   /* Masking options. */
   /** The global "influence", if no vgroup nor tex is used as mask. */
   float mask_constant;
-  /** Name of mask vertex group from which to get weight factors. MAX_VGROUP_NAME. */
+  /** Name of mask vertex group from which to get weight factors. #MAX_VGROUP_NAME. */
   char mask_defgrp_name[64];
 
   /* Texture masking. */
@@ -1543,18 +1664,19 @@ typedef struct WeightVGMixModifierData {
   struct Object *mask_tex_map_obj;
   /** Name of the map bone. */
   char mask_tex_map_bone[64];
-  /** How to map the texture!. */
+  /** How to map the texture. */
   int mask_tex_mapping;
   /** Name of the UV map. MAX_CUSTOMDATA_LAYER_NAME. */
-  char mask_tex_uvlayer_name[64];
+  char mask_tex_uvlayer_name[68];
+  char _pad1[4];
 
   char flag;
 
   /* Padding... */
-  char _pad1[3];
+  char _pad2[3];
 } WeightVGMixModifierData;
 
-/* How second vgroup's weights affect first ones. */
+/** #WeightVGMixModifierData.mix_mode (how second vgroup's weights affect first ones). */
 enum {
   /** Second weights replace weights. */
   MOD_WVG_MIX_SET = 1,
@@ -1570,9 +1692,13 @@ enum {
   MOD_WVG_MIX_DIF = 6,
   /** Average of both weights. */
   MOD_WVG_MIX_AVG = 7,
+  /** Minimum of both weights. */
+  MOD_WVG_MIX_MIN = 8,
+  /** Maximum of both weights. */
+  MOD_WVG_MIX_MAX = 9,
 };
 
-/* What vertices to affect. */
+/** #WeightVGMixModifierData.mix_set (what vertices to affect). */
 enum {
   /** Affect all vertices. */
   MOD_WVG_SET_ALL = 1,
@@ -1586,7 +1712,7 @@ enum {
   MOD_WVG_SET_AND = 5,
 };
 
-/* WeightVGMix->flag */
+/** #WeightVGMixModifierData.flag */
 enum {
   MOD_WVG_MIX_INVERT_VGROUP_MASK = (1 << 0),
   MOD_WVG_MIX_WEIGHTS_NORMALIZE = (1 << 1),
@@ -1597,15 +1723,16 @@ enum {
 typedef struct WeightVGProximityModifierData {
   ModifierData modifier;
 
-  /** Name of vertex group to modify/weight. MAX_VGROUP_NAME. */
+  /** Name of vertex group to modify/weight. #MAX_VGROUP_NAME. */
   char defgrp_name[64];
 
   /* Mapping stuff. */
-  /** The custom mapping curve!. */
+  /** The custom mapping curve. */
   struct CurveMapping *cmap_curve;
 
-  /* Proximity modes. */
+  /** Modes of proximity weighting. */
   int proximity_mode;
+  /** Options for proximity weighting. */
   int proximity_flags;
 
   /* Target object from which to calculate vertices distances. */
@@ -1614,7 +1741,7 @@ typedef struct WeightVGProximityModifierData {
   /* Masking options. */
   /** The global "influence", if no vgroup nor tex is used as mask. */
   float mask_constant;
-  /** Name of mask vertex group from which to get weight factors. MAX_VGROUP_NAME. */
+  /** Name of mask vertex group from which to get weight factors. #MAX_VGROUP_NAME. */
   char mask_defgrp_name[64];
 
   /* Texture masking. */
@@ -1626,29 +1753,31 @@ typedef struct WeightVGProximityModifierData {
   struct Object *mask_tex_map_obj;
   /** Name of the map bone. */
   char mask_tex_map_bone[64];
-  /** How to map the texture!. */
+  /** How to map the texture. */
   int mask_tex_mapping;
   /** Name of the UV Map. MAX_CUSTOMDATA_LAYER_NAME. */
-  char mask_tex_uvlayer_name[64];
+  char mask_tex_uvlayer_name[68];
+  char _pad1[4];
 
   /** Distances mapping to 0.0/1.0 weights. */
   float min_dist, max_dist;
 
   /* Put here to avoid breaking existing struct... */
-  /** Using MOD_WVG_MAPPING_* enums. */
+  /**
+   * Mapping modes (using MOD_WVG_MAPPING_* enums). */
   short falloff_type;
 
   /* Padding... */
   char _pad0[2];
 } WeightVGProximityModifierData;
 
-/* Modes of proximity weighting. */
+/** #WeightVGProximityModifierData.proximity_mode */
 enum {
   MOD_WVG_PROXIMITY_OBJECT = 1,   /* source vertex to other location */
   MOD_WVG_PROXIMITY_GEOMETRY = 2, /* source vertex to other geometry */
 };
 
-/* Flags options for proximity weighting. */
+/** #WeightVGProximityModifierData.proximity_flags */
 enum {
   /* Use nearest vertices of target obj, in MOD_WVG_PROXIMITY_GEOMETRY mode. */
   MOD_WVG_PROXIMITY_GEOM_VERTS = (1 << 0),
@@ -1658,11 +1787,12 @@ enum {
   MOD_WVG_PROXIMITY_GEOM_FACES = (1 << 2),
   MOD_WVG_PROXIMITY_INVERT_VGROUP_MASK = (1 << 3),
   MOD_WVG_PROXIMITY_INVERT_FALLOFF = (1 << 4),
-  MOD_WVG_PROXIMITY_WEIGHTS_NORMALIZE = (1 << 3),
+  MOD_WVG_PROXIMITY_WEIGHTS_NORMALIZE = (1 << 5),
 };
 
 /* Defines common to all WeightVG modifiers. */
-/* Mapping modes. */
+
+/** #WeightVGProximityModifierData.falloff_type */
 enum {
   MOD_WVG_MAPPING_NONE = 0,
   MOD_WVG_MAPPING_CURVE = 1,
@@ -1676,7 +1806,7 @@ enum {
   MOD_WVG_MAPPING_STEP = 9,   /* Median Step. */
 };
 
-/* Tex channel to be used as mask. */
+/** #WeightVGProximityModifierData.mask_tex_use_channel */
 enum {
   MOD_WVG_MASK_TEX_USE_INT = 1,
   MOD_WVG_MASK_TEX_USE_RED = 2,
@@ -1698,13 +1828,13 @@ typedef struct DynamicPaintModifierData {
   char _pad[4];
 } DynamicPaintModifierData;
 
-/* Dynamic paint modifier flags */
+/** #DynamicPaintModifierData.type */
 enum {
   MOD_DYNAMICPAINT_TYPE_CANVAS = (1 << 0),
   MOD_DYNAMICPAINT_TYPE_BRUSH = (1 << 1),
 };
 
-/* Remesh modifier */
+/** Remesh modifier. */
 typedef enum eRemeshModifierFlags {
   MOD_REMESH_FLOOD_FILL = (1 << 0),
   MOD_REMESH_SMOOTH_SHADING = (1 << 1),
@@ -1743,7 +1873,7 @@ typedef struct RemeshModifierData {
   float adaptivity;
 } RemeshModifierData;
 
-/* Skin modifier */
+/** Skin modifier. */
 typedef struct SkinModifierData {
   ModifierData modifier;
 
@@ -1756,19 +1886,19 @@ typedef struct SkinModifierData {
   char _pad[2];
 } SkinModifierData;
 
-/* SkinModifierData.symmetry_axes */
+/** #SkinModifierData.symmetry_axes */
 enum {
   MOD_SKIN_SYMM_X = (1 << 0),
   MOD_SKIN_SYMM_Y = (1 << 1),
   MOD_SKIN_SYMM_Z = (1 << 2),
 };
 
-/* SkinModifierData.flag */
+/** #SkinModifierData.flag */
 enum {
   MOD_SKIN_SMOOTH_SHADING = 1,
 };
 
-/* Triangulate modifier */
+/** Triangulate modifier. */
 typedef struct TriangulateModifierData {
   ModifierData modifier;
 
@@ -1778,7 +1908,7 @@ typedef struct TriangulateModifierData {
   int min_vertices;
 } TriangulateModifierData;
 
-/* TriangulateModifierData.flag */
+/** #TriangulateModifierData.flag */
 enum {
 #ifdef DNA_DEPRECATED_ALLOW
   MOD_TRIANGULATE_BEAUTY = (1 << 0), /* deprecated */
@@ -1786,18 +1916,19 @@ enum {
   MOD_TRIANGULATE_KEEP_CUSTOMLOOP_NORMALS = 1 << 1,
 };
 
-/* Triangulate methods - NGons */
+/** #TriangulateModifierData.ngon_method triangulate method (N-gons). */
 enum {
   MOD_TRIANGULATE_NGON_BEAUTY = 0,
   MOD_TRIANGULATE_NGON_EARCLIP = 1,
 };
 
-/* Triangulate methods - Quads */
+/** #TriangulateModifierData.quad_method triangulate method (quads). */
 enum {
   MOD_TRIANGULATE_QUAD_BEAUTY = 0,
   MOD_TRIANGULATE_QUAD_FIXED = 1,
   MOD_TRIANGULATE_QUAD_ALTERNATE = 2,
   MOD_TRIANGULATE_QUAD_SHORTEDGE = 3,
+  MOD_TRIANGULATE_QUAD_LONGEDGE = 4,
 };
 
 typedef struct LaplacianSmoothModifierData {
@@ -1805,12 +1936,12 @@ typedef struct LaplacianSmoothModifierData {
 
   float lambda, lambda_border;
   char _pad1[4];
-  /** MAX_VGROUP_NAME. */
+  /** #MAX_VGROUP_NAME. */
   char defgrp_name[64];
   short flag, repeat;
 } LaplacianSmoothModifierData;
 
-/* Smooth modifier flags */
+/** #LaplacianSmoothModifierData.flag */
 enum {
   MOD_LAPLACIANSMOOTH_X = (1 << 1),
   MOD_LAPLACIANSMOOTH_Y = (1 << 2),
@@ -1821,9 +1952,13 @@ enum {
 };
 
 typedef struct CorrectiveSmoothDeltaCache {
-  /* delta's between the original positions and the smoothed positions */
+  /**
+   * Delta's between the original positions and the smoothed positions,
+   * calculated loop-tangent and which is accumulated into the vertex it uses.
+   * (run-time only).
+   */
   float (*deltas)[3];
-  unsigned int totverts;
+  unsigned int deltas_num;
 
   /* Value of settings when creating the cache.
    * These are used to check if the cache should be recomputed. */
@@ -1848,7 +1983,7 @@ typedef struct CorrectiveSmoothModifierData {
   char smooth_type, rest_source;
   char _pad[6];
 
-  /** MAX_VGROUP_NAME. */
+  /** #MAX_VGROUP_NAME. */
   char defgrp_name[64];
 
   /* runtime-only cache */
@@ -1865,7 +2000,7 @@ enum {
   MOD_CORRECTIVESMOOTH_RESTSOURCE_BIND = 1,
 };
 
-/* Corrective Smooth modifier flags */
+/** #CorrectiveSmoothModifierData.flag */
 enum {
   MOD_CORRECTIVESMOOTH_INVERT_VGROUP = (1 << 0),
   MOD_CORRECTIVESMOOTH_ONLY_SMOOTH = (1 << 1),
@@ -1893,18 +2028,19 @@ typedef struct UVWarpModifierData {
   /** Optional name of bone target, MAX_ID_NAME-2. */
   char bone_dst[64];
 
-  /** Optional vertexgroup name, MAX_VGROUP_NAME. */
+  /** Optional vertex-group name, #MAX_VGROUP_NAME. */
   char vgroup_name[64];
   /** MAX_CUSTOMDATA_LAYER_NAME. */
-  char uvlayer_name[64];
+  char uvlayer_name[68];
+  char _pad[4];
 } UVWarpModifierData;
 
-/* UVWarp modifier flags */
+/** #UVWarpModifierData.flag */
 enum {
   MOD_UVWARP_INVERT_VGROUP = 1 << 0,
 };
 
-/* cache modifier */
+/** Mesh cache modifier. */
 typedef struct MeshCacheModifierData {
   ModifierData modifier;
 
@@ -1923,6 +2059,7 @@ typedef struct MeshCacheModifierData {
 
   float factor;
   char deform_mode;
+  char defgrp_name[64];
   char _pad[7];
 
   /* play_mode == MOD_MESHCACHE_PLAY_CFEA */
@@ -1938,6 +2075,11 @@ typedef struct MeshCacheModifierData {
   /** FILE_MAX. */
   char filepath[1024];
 } MeshCacheModifierData;
+
+/** #MeshCacheModifierData.flag */
+enum {
+  MOD_MESHCACHE_INVERT_VERTEX_GROUP = 1 << 0,
+};
 
 enum {
   MOD_MESHCACHE_TYPE_MDD = 1,
@@ -1966,11 +2108,17 @@ enum {
   MOD_MESHCACHE_PLAY_EVAL = 1,
 };
 
+enum {
+  MOD_MESHCACHE_FLIP_AXIS_X = 1 << 0,
+  MOD_MESHCACHE_FLIP_AXIS_Y = 1 << 1,
+  MOD_MESHCACHE_FLIP_AXIS_Z = 1 << 2,
+};
+
 typedef struct LaplacianDeformModifierData {
   ModifierData modifier;
-  /** MAX_VGROUP_NAME. */
+  /** #MAX_VGROUP_NAME. */
   char anchor_grp_name[64];
-  int total_verts, repeat;
+  int verts_num, repeat;
   float *vertexco;
   /** Runtime only. */
   void *cache_system;
@@ -1979,16 +2127,18 @@ typedef struct LaplacianDeformModifierData {
 
 } LaplacianDeformModifierData;
 
-/* Laplacian Deform modifier flags */
+/** #LaplacianDeformModifierData.flag */
 enum {
   MOD_LAPLACIANDEFORM_BIND = 1 << 0,
   MOD_LAPLACIANDEFORM_INVERT_VGROUP = 1 << 1,
 };
 
-/* many of these options match 'solidify' */
+/**
+ * \note many of these options match 'solidify'.
+ */
 typedef struct WireframeModifierData {
   ModifierData modifier;
-  /** MAX_VGROUP_NAME. */
+  /** #MAX_VGROUP_NAME. */
   char defgrp_name[64];
   float offset;
   float offset_fac;
@@ -2012,7 +2162,7 @@ typedef struct WeldModifierData {
 
   /* The limit below which to merge vertices. */
   float merge_dist;
-  /* Name of vertex group to use to mask, MAX_VGROUP_NAME. */
+  /** Name of vertex group to use to mask, #MAX_VGROUP_NAME. */
   char defgrp_name[64];
 
   char mode;
@@ -2020,13 +2170,13 @@ typedef struct WeldModifierData {
   char _pad[2];
 } WeldModifierData;
 
-/* WeldModifierData->flag */
+/** #WeldModifierData.flag */
 enum {
   MOD_WELD_INVERT_VGROUP = (1 << 0),
   MOD_WELD_LOOSE_EDGES = (1 << 1),
 };
 
-/* #WeldModifierData.mode */
+/** #WeldModifierData.mode */
 enum {
   MOD_WELD_MODE_ALL = 0,
   MOD_WELD_MODE_CONNECTED = 1,
@@ -2037,10 +2187,10 @@ typedef struct DataTransferModifierData {
 
   struct Object *ob_source;
 
-  /** See DT_TYPE_ enum in ED_object.h. */
+  /** See DT_TYPE_ enum in ED_object.hh. */
   int data_types;
 
-  /* See MREMAP_MODE_ enum in BKE_mesh_mapping.h */
+  /* See MREMAP_MODE_ enum in BKE_mesh_mapping.hh */
   int vmap_mode;
   int emap_mode;
   int lmap_mode;
@@ -2052,21 +2202,22 @@ typedef struct DataTransferModifierData {
 
   char _pad1[4];
 
-  /** DT_MULTILAYER_INDEX_MAX; See DT_FROMLAYERS_ enum in ED_object.h. */
-  int layers_select_src[4];
-  /** DT_MULTILAYER_INDEX_MAX; See DT_TOLAYERS_ enum in ED_object.h. */
-  int layers_select_dst[4];
+  /** DT_MULTILAYER_INDEX_MAX; See DT_FROMLAYERS_ enum in ED_object.hh. */
+  int layers_select_src[5];
+  /** DT_MULTILAYER_INDEX_MAX; See DT_TOLAYERS_ enum in ED_object.hh. */
+  int layers_select_dst[5];
 
-  /** See CDT_MIX_ enum in BKE_customdata.h. */
+  /** See CDT_MIX_ enum in BKE_customdata.hh. */
   int mix_mode;
   float mix_factor;
-  /** MAX_VGROUP_NAME. */
+  /** #MAX_VGROUP_NAME. */
   char defgrp_name[64];
 
   int flags;
+  void *_pad2;
 } DataTransferModifierData;
 
-/* DataTransferModifierData.flags */
+/** #DataTransferModifierData.flags */
 enum {
   MOD_DATATRANSFER_OBSRC_TRANSFORM = 1 << 0,
   MOD_DATATRANSFER_MAP_MAXDIST = 1 << 1,
@@ -2079,10 +2230,10 @@ enum {
   MOD_DATATRANSFER_USE_POLY = 1u << 31,
 };
 
-/* Set Split Normals modifier */
+/** Set Split Normals modifier. */
 typedef struct NormalEditModifierData {
   ModifierData modifier;
-  /** MAX_VGROUP_NAME. */
+  /** #MAX_VGROUP_NAME. */
   char defgrp_name[64];
   /** Source of normals, or center of ellipsoid. */
   struct Object *target;
@@ -2094,32 +2245,29 @@ typedef struct NormalEditModifierData {
   float mix_limit;
   float offset[3];
   char _pad0[4];
+  void *_pad1;
 } NormalEditModifierData;
 
-/* NormalEditModifierData.mode */
+/** #NormalEditModifierData.mode */
 enum {
   MOD_NORMALEDIT_MODE_RADIAL = 0,
   MOD_NORMALEDIT_MODE_DIRECTIONAL = 1,
 };
 
-/* NormalEditModifierData.flags */
+/** #NormalEditModifierData.flags */
 enum {
   MOD_NORMALEDIT_INVERT_VGROUP = (1 << 0),
   MOD_NORMALEDIT_USE_DIRECTION_PARALLEL = (1 << 1),
   MOD_NORMALEDIT_NO_POLYNORS_FIX = (1 << 2),
 };
 
-/* NormalEditModifierData.mix_mode */
+/** #NormalEditModifierData.mix_mode */
 enum {
   MOD_NORMALEDIT_MIX_COPY = 0,
   MOD_NORMALEDIT_MIX_ADD = 1,
   MOD_NORMALEDIT_MIX_SUB = 2,
   MOD_NORMALEDIT_MIX_MUL = 3,
 };
-
-typedef struct MeshCacheVertexVelocity {
-  float vel[3];
-} MeshCacheVertexVelocity;
 
 typedef struct MeshSeqCacheModifierData {
   ModifierData modifier;
@@ -2136,27 +2284,9 @@ typedef struct MeshSeqCacheModifierData {
   /* Runtime. */
   struct CacheReader *reader;
   char reader_object_path[1024];
-
-  /* Vertex velocities read from the cache. The velocities are not automatically read during
-   * modifier execution, and therefore have to manually be read when needed. This is only used
-   * through the RNA for now. */
-  struct MeshCacheVertexVelocity *vertex_velocities;
-
-  /* The number of vertices of the Alembic mesh, set when the modifier is executed. */
-  int num_vertices;
-
-  /* Time (in frames or seconds) between two velocity samples. Automatically computed to
-   * scale the velocity vectors at render time for generating proper motion blur data. */
-  float velocity_delta;
-
-  /* Caches the scene time (in seconds) used to lookup data in the Alembic archive when the
-   * modifier was last executed. Used to access Alembic samples through the RNA. */
-  float last_lookup_time;
-
-  int _pad1;
 } MeshSeqCacheModifierData;
 
-/* MeshSeqCacheModifierData.read_flag */
+/** #MeshSeqCacheModifierData.read_flag */
 enum {
   MOD_MESHSEQ_READ_VERT = (1 << 0),
   MOD_MESHSEQ_READ_POLY = (1 << 1),
@@ -2167,11 +2297,14 @@ enum {
    * the mesh topology changes, but this heuristic sometimes fails. In these cases, users can
    * disable interpolation with this flag. */
   MOD_MESHSEQ_INTERPOLATE_VERTICES = (1 << 4),
+
+  /* Read animated custom attributes from point cache files. */
+  MOD_MESHSEQ_READ_ATTRIBUTES = (1 << 5),
 };
 
 typedef struct SDefBind {
   unsigned int *vert_inds;
-  unsigned int numverts;
+  unsigned int verts_num;
   int mode;
   float *vert_weights;
   float normal_dist;
@@ -2180,7 +2313,7 @@ typedef struct SDefBind {
 
 typedef struct SDefVert {
   SDefBind *binds;
-  unsigned int numbinds;
+  unsigned int binds_num;
   unsigned int vertex_idx;
 } SDefVert;
 
@@ -2192,15 +2325,22 @@ typedef struct SurfaceDeformModifierData {
   struct Object *target;
   /** Vertex bind data. */
   SDefVert *verts;
+  void *_pad1;
   float falloff;
-  unsigned int num_mesh_verts, num_bind_verts, numpoly;
+  /* Number of vertices on the deformed mesh upon the bind process. */
+  unsigned int mesh_verts_num;
+  /* Number of vertices in the `verts` array of this modifier. */
+  unsigned int bind_verts_num;
+  /* Number of vertices and polygons on the target mesh upon bind process. */
+  unsigned int target_verts_num, target_polys_num;
   int flags;
   float mat[4][4];
   float strength;
   char defgrp_name[64];
+  int _pad2;
 } SurfaceDeformModifierData;
 
-/* Surface Deform modifier flags */
+/** Surface Deform modifier flags. */
 enum {
   /* This indicates "do bind on next modifier evaluation" as well as "is bound". */
   MOD_SDEF_BIND = (1 << 0),
@@ -2209,17 +2349,17 @@ enum {
   MOD_SDEF_SPARSE_BIND = (1 << 2),
 };
 
-/* Surface Deform vertex bind modes */
+/** Surface Deform vertex bind modes. */
 enum {
-  MOD_SDEF_MODE_LOOPTRI = 0,
-  MOD_SDEF_MODE_NGON = 1,
+  MOD_SDEF_MODE_CORNER_TRIS = 0,
+  MOD_SDEF_MODE_NGONS = 1,
   MOD_SDEF_MODE_CENTROID = 2,
 };
 
 typedef struct WeightedNormalModifierData {
   ModifierData modifier;
 
-  /** MAX_VGROUP_NAME. */
+  /** #MAX_VGROUP_NAME. */
   char defgrp_name[64];
   char mode, flag;
   short weight;
@@ -2229,14 +2369,14 @@ typedef struct WeightedNormalModifierData {
 /* Name/id of the generic PROP_INT cdlayer storing face weights. */
 #define MOD_WEIGHTEDNORMALS_FACEWEIGHT_CDLAYER_ID "__mod_weightednormals_faceweight"
 
-/* WeightedNormalModifierData.mode */
+/** #WeightedNormalModifierData.mode */
 enum {
   MOD_WEIGHTEDNORMAL_MODE_FACE = 0,
   MOD_WEIGHTEDNORMAL_MODE_ANGLE = 1,
   MOD_WEIGHTEDNORMAL_MODE_FACE_ANGLE = 2,
 };
 
-/* WeightedNormalModifierData.flag */
+/** #WeightedNormalModifierData.flag */
 enum {
   MOD_WEIGHTEDNORMAL_KEEP_SHARP = (1 << 0),
   MOD_WEIGHTEDNORMAL_INVERT_VGROUP = (1 << 1),
@@ -2251,15 +2391,164 @@ typedef struct NodesModifierSettings {
   struct IDProperty *properties;
 } NodesModifierSettings;
 
+/**
+ * Maps a name (+ optional library name) to a data-block. The name can be stored on disk and is
+ * remapped to the data-block when the data is loaded.
+ *
+ * At run-time, #BakeDataBlockID is used to pair up the data-block and library name.
+ */
+typedef struct NodesModifierDataBlock {
+  /**
+   * Name of the data-block. Can be empty in which case the name of the `id` below is used.
+   * This only needs to be set manually when the name stored on disk does not exist in the .blend
+   * file anymore, because e.g. the ID has been renamed.
+   */
+  char *id_name;
+  /**
+   * Name of the library the ID is in. Can be empty when the ID is not linked or when `id_name` is
+   * empty as well and thus the names from the `id` below are used.
+   */
+  char *lib_name;
+  /** ID that this is mapped to. */
+  struct ID *id;
+  /** Type of ID that is referenced by this mapping. */
+  int id_type;
+  char _pad[4];
+} NodesModifierDataBlock;
+
+typedef struct NodesModifierBakeFile {
+  const char *name;
+  /* May be null if the file is empty. */
+  PackedFile *packed_file;
+
+#ifdef __cplusplus
+  blender::Span<std::byte> data() const
+  {
+    if (this->packed_file) {
+      return blender::Span{static_cast<const std::byte *>(this->packed_file->data),
+                           this->packed_file->size};
+    }
+    return {};
+  }
+#endif
+} NodesModifierBakeFile;
+
+/**
+ * A packed bake. The format is the same as if the bake was stored on disk.
+ */
+typedef struct NodesModifierPackedBake {
+  int meta_files_num;
+  int blob_files_num;
+  NodesModifierBakeFile *meta_files;
+  NodesModifierBakeFile *blob_files;
+} NodesModifierPackedBake;
+
+typedef struct NodesModifierBake {
+  /** An id that references a nested node in the node tree. Also see #bNestedNodeRef. */
+  int id;
+  /** #NodesModifierBakeFlag. */
+  uint32_t flag;
+  /** #NodesModifierBakeMode. */
+  uint8_t bake_mode;
+  /** #NodesModifierBakeTarget. */
+  int8_t bake_target;
+  char _pad[6];
+  /**
+   * Directory where the baked data should be stored. This is only used when
+   * `NODES_MODIFIER_BAKE_CUSTOM_PATH` is set.
+   */
+  char *directory;
+  /**
+   * Frame range for the simulation and baking that is used if
+   * `NODES_MODIFIER_BAKE_CUSTOM_SIMULATION_FRAME_RANGE` is set.
+   */
+  int frame_start;
+  int frame_end;
+
+  /**
+   * Maps data-block names to actual data-blocks, so that names stored in caches or on disk can be
+   * remapped to actual IDs on load. The mapping also makes sure that IDs referenced by baked data
+   * are not automatically removed because they are not referenced anymore. Furthermore, it allows
+   * the modifier to add all required IDs to the dependency graph before actually loading the baked
+   * data.
+   */
+  int data_blocks_num;
+  int active_data_block;
+  NodesModifierDataBlock *data_blocks;
+  NodesModifierPackedBake *packed;
+
+  void *_pad2;
+  int64_t bake_size;
+} NodesModifierBake;
+
+typedef struct NodesModifierPanel {
+  /** ID of the corresponding panel from #bNodeTreeInterfacePanel::identifier. */
+  int id;
+  /** #NodesModifierPanelFlag. */
+  uint32_t flag;
+} NodesModifierPanel;
+
+typedef enum NodesModifierPanelFlag {
+  NODES_MODIFIER_PANEL_OPEN = 1 << 0,
+} NodesModifierPanelFlag;
+
+typedef enum NodesModifierBakeFlag {
+  NODES_MODIFIER_BAKE_CUSTOM_SIMULATION_FRAME_RANGE = 1 << 0,
+  NODES_MODIFIER_BAKE_CUSTOM_PATH = 1 << 1,
+} NodesModifierBakeFlag;
+
+typedef enum NodesModifierBakeTarget {
+  NODES_MODIFIER_BAKE_TARGET_INHERIT = 0,
+  NODES_MODIFIER_BAKE_TARGET_PACKED = 1,
+  NODES_MODIFIER_BAKE_TARGET_DISK = 2,
+} NodesModifierBakeTarget;
+
+typedef enum NodesModifierBakeMode {
+  NODES_MODIFIER_BAKE_MODE_ANIMATION = 0,
+  NODES_MODIFIER_BAKE_MODE_STILL = 1,
+} NodesModifierBakeMode;
+
+typedef enum GeometryNodesModifierPanel {
+  NODES_MODIFIER_PANEL_OUTPUT_ATTRIBUTES = 0,
+  NODES_MODIFIER_PANEL_MANAGE = 1,
+  NODES_MODIFIER_PANEL_BAKE = 2,
+  NODES_MODIFIER_PANEL_NAMED_ATTRIBUTES = 3,
+  NODES_MODIFIER_PANEL_BAKE_DATA_BLOCKS = 4,
+  NODES_MODIFIER_PANEL_WARNINGS = 5,
+} GeometryNodesModifierPanel;
+
 typedef struct NodesModifierData {
   ModifierData modifier;
   struct bNodeTree *node_group;
   struct NodesModifierSettings settings;
+  /**
+   * Directory where baked simulation states are stored. This may be relative to the .blend file.
+   */
+  char *bake_directory;
+  /** NodesModifierFlag. */
+  int8_t flag;
+  /** #NodesModifierBakeTarget. */
+  int8_t bake_target;
 
-  /* Contains logged information from the last evaluation. This can be used to help the user to
-   * debug a node tree. */
-  void *runtime_eval_log;
+  char _pad[2];
+  int bakes_num;
+  NodesModifierBake *bakes;
+
+  char _pad2[4];
+  int panels_num;
+  NodesModifierPanel *panels;
+
+  NodesModifierRuntimeHandle *runtime;
+
+#ifdef __cplusplus
+  NodesModifierBake *find_bake(int id);
+  const NodesModifierBake *find_bake(int id) const;
+#endif
 } NodesModifierData;
+
+typedef enum NodesModifierFlag {
+  NODES_MODIFIER_HIDE_DATABLOCK_SELECTOR = (1 << 0),
+} NodesModifierFlag;
 
 typedef struct MeshToVolumeModifierData {
   ModifierData modifier;
@@ -2275,20 +2564,14 @@ typedef struct MeshToVolumeModifierData {
    * different. */
   int voxel_amount;
 
-  /** If true, every cell in the enclosed volume gets a density. Otherwise, the interior_band_width
-   * is used. */
-  char fill_volume;
-  char _pad1[3];
-
-  /** Band widths are in object space. */
   float interior_band_width;
-  float exterior_band_width;
 
   float density;
   char _pad2[4];
+  void *_pad3;
 } MeshToVolumeModifierData;
 
-/* MeshToVolumeModifierData->resolution_mode */
+/** #MeshToVolumeModifierData.resolution_mode */
 typedef enum MeshToVolumeModifierResolutionMode {
   MESH_TO_VOLUME_RESOLUTION_MODE_VOXEL_AMOUNT = 0,
   MESH_TO_VOLUME_RESOLUTION_MODE_VOXEL_SIZE = 1,
@@ -2306,7 +2589,7 @@ typedef struct VolumeDisplaceModifierData {
   float texture_sample_radius;
 } VolumeDisplaceModifierData;
 
-/* VolumeDisplaceModifierData->texture_map_mode */
+/** #VolumeDisplaceModifierData.texture_map_mode */
 enum {
   MOD_VOLUME_DISPLACE_MAP_LOCAL = 0,
   MOD_VOLUME_DISPLACE_MAP_GLOBAL = 1,
@@ -2332,6 +2615,7 @@ typedef struct VolumeToMeshModifierData {
 
   /** MAX_NAME */
   char grid_name[64];
+  void *_pad1;
 } VolumeToMeshModifierData;
 
 /** VolumeToMeshModifierData->resolution_mode */
@@ -2346,6 +2630,899 @@ typedef enum VolumeToMeshFlag {
   VOLUME_TO_MESH_USE_SMOOTH_SHADE = 1 << 0,
 } VolumeToMeshFlag;
 
+/**
+ * Common influence data for grease pencil modifiers.
+ * Not all parts may be used by all modifier types.
+ */
+typedef struct GreasePencilModifierInfluenceData {
+  /** GreasePencilModifierInfluenceFlag */
+  int flag;
+  char _pad1[4];
+  /** Filter by layer name. */
+  char layer_name[64];
+  /** Filter by stroke material. */
+  struct Material *material;
+  /** Filter by layer pass. */
+  int layer_pass;
+  /** Filter by material pass. */
+  int material_pass;
+  /** #MAX_VGROUP_NAME. */
+  char vertex_group_name[64];
+  struct CurveMapping *custom_curve;
+  void *_pad2;
+} GreasePencilModifierInfluenceData;
+
+typedef enum GreasePencilModifierInfluenceFlag {
+  GREASE_PENCIL_INFLUENCE_INVERT_LAYER_FILTER = (1 << 0),
+  GREASE_PENCIL_INFLUENCE_USE_LAYER_PASS_FILTER = (1 << 1),
+  GREASE_PENCIL_INFLUENCE_INVERT_LAYER_PASS_FILTER = (1 << 2),
+  GREASE_PENCIL_INFLUENCE_INVERT_MATERIAL_FILTER = (1 << 3),
+  GREASE_PENCIL_INFLUENCE_USE_MATERIAL_PASS_FILTER = (1 << 4),
+  GREASE_PENCIL_INFLUENCE_INVERT_MATERIAL_PASS_FILTER = (1 << 5),
+  GREASE_PENCIL_INFLUENCE_INVERT_VERTEX_GROUP = (1 << 6),
+  GREASE_PENCIL_INFLUENCE_USE_CUSTOM_CURVE = (1 << 7),
+} GreasePencilModifierInfluenceFlag;
+
+typedef struct GreasePencilOpacityModifierData {
+  ModifierData modifier;
+  GreasePencilModifierInfluenceData influence;
+  /** GreasePencilOpacityModifierFlag */
+  int flag;
+  /** GreasePencilModifierColorMode */
+  char color_mode;
+  char _pad1[3];
+  float color_factor;
+  float hardness_factor;
+  void *_pad2;
+} GreasePencilOpacityModifierData;
+
+/** Which attributes are affected by color modifiers. */
+typedef enum GreasePencilModifierColorMode {
+  MOD_GREASE_PENCIL_COLOR_STROKE = 0,
+  MOD_GREASE_PENCIL_COLOR_FILL = 1,
+  MOD_GREASE_PENCIL_COLOR_BOTH = 2,
+  MOD_GREASE_PENCIL_COLOR_HARDNESS = 3,
+} GreasePencilModifierColorMode;
+
+typedef enum GreasePencilOpacityModifierFlag {
+  /* Use vertex group as opacity factors instead of influence. */
+  MOD_GREASE_PENCIL_OPACITY_USE_WEIGHT_AS_FACTOR = (1 << 0),
+  /* Set the opacity for every point in a stroke, otherwise multiply existing opacity. */
+  MOD_GREASE_PENCIL_OPACITY_USE_UNIFORM_OPACITY = (1 << 1),
+} GreasePencilOpacityModifierFlag;
+
+typedef struct GreasePencilSubdivModifierData {
+  ModifierData modifier;
+  GreasePencilModifierInfluenceData influence;
+  /** #GreasePencilSubdivideType. */
+  int type;
+  /** Level of subdivisions, will generate 2^level segments. */
+  int level;
+
+  char _pad[8];
+  void *_pad1;
+} GreasePencilSubdivModifierData;
+
+typedef enum GreasePencilSubdivideType {
+  MOD_GREASE_PENCIL_SUBDIV_CATMULL = 0,
+  MOD_GREASE_PENCIL_SUBDIV_SIMPLE = 1,
+} GreasePencilSubdivideType;
+
+typedef struct GreasePencilColorModifierData {
+  ModifierData modifier;
+  GreasePencilModifierInfluenceData influence;
+  /** GreasePencilModifierColorMode */
+  char color_mode;
+  char _pad1[3];
+  /** HSV factors. */
+  float hsv[3];
+  void *_pad2;
+} GreasePencilColorModifierData;
+
+typedef struct GreasePencilTintModifierData {
+  ModifierData modifier;
+  GreasePencilModifierInfluenceData influence;
+  /** GreasePencilTintModifierFlag */
+  short flag;
+  /** GreasePencilModifierColorMode */
+  char color_mode;
+  /** GreasePencilTintModifierMode */
+  char tint_mode;
+  float factor;
+  /** Influence distance from the gradient object. */
+  float radius;
+  /** Simple tint color. */
+  float color[3];
+  /** Object for gradient direction. */
+  struct Object *object;
+  /** Color ramp for the gradient. */
+  struct ColorBand *color_ramp;
+  void *_pad;
+} GreasePencilTintModifierData;
+
+typedef enum GreasePencilTintModifierMode {
+  MOD_GREASE_PENCIL_TINT_UNIFORM = 0,
+  MOD_GREASE_PENCIL_TINT_GRADIENT = 1,
+} GreasePencilTintModifierMode;
+
+typedef enum GreasePencilTintModifierFlag {
+  /* Use vertex group as factors instead of influence. */
+  MOD_GREASE_PENCIL_TINT_USE_WEIGHT_AS_FACTOR = (1 << 0),
+} GreasePencilTintModifierFlag;
+
+/* Enum definitions for length modifier stays in the old DNA for the moment. */
+typedef struct GreasePencilSmoothModifierData {
+  ModifierData modifier;
+  GreasePencilModifierInfluenceData influence;
+  /** `eGreasePencilSmooth_Flag. */
+  int flag;
+  /** Factor of smooth. */
+  float factor;
+  /** How many times apply smooth. */
+  int step;
+  char _pad[4];
+  void *_pad1;
+} GreasePencilSmoothModifierData;
+
+typedef enum eGreasePencilSmooth_Flag {
+  MOD_GREASE_PENCIL_SMOOTH_MOD_LOCATION = (1 << 0),
+  MOD_GREASE_PENCIL_SMOOTH_MOD_STRENGTH = (1 << 1),
+  MOD_GREASE_PENCIL_SMOOTH_MOD_THICKNESS = (1 << 2),
+  MOD_GREASE_PENCIL_SMOOTH_MOD_UV = (1 << 3),
+  MOD_GREASE_PENCIL_SMOOTH_KEEP_SHAPE = (1 << 4),
+  MOD_GREASE_PENCIL_SMOOTH_SMOOTH_ENDS = (1 << 5),
+} eGreasePencilSmooth_Flag;
+
+typedef struct GreasePencilOffsetModifierData {
+  ModifierData modifier;
+  GreasePencilModifierInfluenceData influence;
+  /** GreasePencilOffsetModifierFlag */
+  int flag;
+  /** GreasePencilOffsetModifierMode */
+  int offset_mode;
+  /** Global offset. */
+  float loc[3];
+  float rot[3];
+  float scale[3];
+  /** Offset per stroke. */
+  float stroke_loc[3];
+  float stroke_rot[3];
+  float stroke_scale[3];
+  int seed;
+  int stroke_step;
+  int stroke_start_offset;
+  char _pad1[4];
+  void *_pad2;
+} GreasePencilOffsetModifierData;
+
+typedef enum GreasePencilOffsetModifierFlag {
+  MOD_GREASE_PENCIL_OFFSET_UNIFORM_RANDOM_SCALE = (1 << 0),
+} GreasePencilOffsetModifierFlag;
+
+typedef enum GreasePencilOffsetModifierMode {
+  MOD_GREASE_PENCIL_OFFSET_RANDOM = 0,
+  MOD_GREASE_PENCIL_OFFSET_LAYER = 1,
+  MOD_GREASE_PENCIL_OFFSET_MATERIAL = 2,
+  MOD_GREASE_PENCIL_OFFSET_STROKE = 3,
+} GreasePencilOffsetModifierMode;
+
+typedef struct GreasePencilNoiseModifierData {
+  ModifierData modifier;
+  GreasePencilModifierInfluenceData influence;
+
+  /** For convenience of versioning, these flags are kept in `eNoiseGpencil_Flag`. */
+  int flag;
+
+  /** Factor of noise. */
+  float factor;
+  float factor_strength;
+  float factor_thickness;
+  float factor_uvs;
+  /** Noise Frequency scaling */
+  float noise_scale;
+  float noise_offset;
+  short noise_mode;
+  char _pad[2];
+  /** How many frames before recalculate randoms. */
+  int step;
+  /** Random seed */
+  int seed;
+
+  void *_pad1;
+} GreasePencilNoiseModifierData;
+
+typedef struct GreasePencilMirrorModifierData {
+  ModifierData modifier;
+  GreasePencilModifierInfluenceData influence;
+  struct Object *object;
+  /** #GreasePencilMirrorModifierFlag */
+  int flag;
+  char _pad[4];
+} GreasePencilMirrorModifierData;
+
+typedef enum GreasePencilMirrorModifierFlag {
+  MOD_GREASE_PENCIL_MIRROR_AXIS_X = (1 << 0),
+  MOD_GREASE_PENCIL_MIRROR_AXIS_Y = (1 << 1),
+  MOD_GREASE_PENCIL_MIRROR_AXIS_Z = (1 << 2),
+} GreasePencilMirrorModifierFlag;
+
+typedef struct GreasePencilThickModifierData {
+  ModifierData modifier;
+  GreasePencilModifierInfluenceData influence;
+  /** #GreasePencilThicknessModifierFlag */
+  int flag;
+  /** Relative thickness factor. */
+  float thickness_fac;
+  /** Absolute thickness override. */
+  float thickness;
+  char _pad[4];
+  void *_pad1;
+} GreasePencilThickModifierData;
+
+typedef enum GreasePencilThicknessModifierFlag {
+  MOD_GREASE_PENCIL_THICK_NORMALIZE = (1 << 0),
+  MOD_GREASE_PENCIL_THICK_WEIGHT_FACTOR = (1 << 1),
+} GreasePencilThicknessModifierFlag;
+
+typedef struct GreasePencilLatticeModifierData {
+  ModifierData modifier;
+  GreasePencilModifierInfluenceData influence;
+  struct Object *object;
+  float strength;
+  char _pad[4];
+} GreasePencilLatticeModifierData;
+
+typedef struct GreasePencilDashModifierSegment {
+  char name[64];
+  int dash;
+  int gap;
+  float radius;
+  float opacity;
+  int mat_nr;
+  /** #GreasePencilDashModifierFlag */
+  int flag;
+} GreasePencilDashModifierSegment;
+
+typedef struct GreasePencilDashModifierData {
+  ModifierData modifier;
+  GreasePencilModifierInfluenceData influence;
+
+  GreasePencilDashModifierSegment *segments_array;
+  int segments_num;
+  int segment_active_index;
+
+  int dash_offset;
+  char _pad[4];
+
 #ifdef __cplusplus
-}
+  blender::Span<GreasePencilDashModifierSegment> segments() const;
+  blender::MutableSpan<GreasePencilDashModifierSegment> segments();
 #endif
+} GreasePencilDashModifierData;
+
+typedef enum GreasePencilDashModifierFlag {
+  MOD_GREASE_PENCIL_DASH_USE_CYCLIC = (1 << 0),
+} GreasePencilDashModifierFlag;
+
+typedef struct GreasePencilMultiModifierData {
+  ModifierData modifier;
+  GreasePencilModifierInfluenceData influence;
+
+  /* #GreasePencilMultiplyModifierFlag */
+  int flag;
+
+  int duplications;
+  float distance;
+  /* -1:inner 0:middle 1:outer */
+  float offset;
+
+  float fading_center;
+  float fading_thickness;
+  float fading_opacity;
+
+  int _pad0;
+
+  void *_pad;
+} GreasePencilMultiModifierData;
+
+typedef enum GreasePencilMultiplyModifierFlag {
+  /* GP_MULTIPLY_ENABLE_ANGLE_SPLITTING = (1 << 1),  Deprecated. */
+  MOD_GREASE_PENCIL_MULTIPLY_ENABLE_FADING = (1 << 2),
+} GreasePencilMultiplyModifierFlag;
+
+typedef struct GreasePencilLengthModifierData {
+  ModifierData modifier;
+  GreasePencilModifierInfluenceData influence;
+  int flag;
+  float start_fac, end_fac;
+  float rand_start_fac, rand_end_fac, rand_offset;
+  float overshoot_fac;
+  /** (first element is the index) random values. */
+  int seed;
+  /** How many frames before recalculate randoms. */
+  int step;
+  /** #eLengthGpencil_Type. */
+  int mode;
+  char _pad[4];
+  /* Curvature parameters. */
+  float point_density;
+  float segment_influence;
+  float max_angle;
+
+  void *_pad1;
+} GreasePencilLengthModifierData;
+
+typedef struct GreasePencilWeightAngleModifierData {
+  ModifierData modifier;
+  GreasePencilModifierInfluenceData influence;
+  /** #GreasePencilWeightAngleModifierFlag */
+  int flag;
+  float min_weight;
+  /** Axis. */
+  int16_t axis;
+  /** #GreasePencilWeightAngleModifierSpace */
+  int16_t space;
+  /** Angle */
+  float angle;
+  /** Weights output to this vertex group, can be the same as source group. */
+  char target_vgname[64];
+
+  void *_pad;
+} GreasePencilWeightAngleModifierData;
+
+typedef enum GreasePencilWeightAngleModifierFlag {
+  MOD_GREASE_PENCIL_WEIGHT_ANGLE_MULTIPLY_DATA = (1 << 5),
+  MOD_GREASE_PENCIL_WEIGHT_ANGLE_INVERT_OUTPUT = (1 << 6),
+} GreasePencilWeightAngleModifierFlag;
+
+typedef enum GreasePencilWeightAngleModifierSpace {
+  MOD_GREASE_PENCIL_WEIGHT_ANGLE_SPACE_LOCAL = 0,
+  MOD_GREASE_PENCIL_WEIGHT_ANGLE_SPACE_WORLD = 1,
+} GreasePencilWeightAngleModifierSpace;
+
+typedef struct GreasePencilArrayModifierData {
+  ModifierData modifier;
+  GreasePencilModifierInfluenceData influence;
+  struct Object *object;
+  int count;
+  /** #GreasePencilArrayModifierFlag */
+  int flag;
+  float offset[3];
+  float shift[3];
+
+  float rnd_offset[3];
+  float rnd_rot[3];
+  float rnd_scale[3];
+
+  char _pad[4];
+  /** (first element is the index) random values. (?) */
+  int seed;
+
+  /* Replacement material index. */
+  int mat_rpl;
+} GreasePencilArrayModifierData;
+
+typedef enum GreasePencilArrayModifierFlag {
+  MOD_GREASE_PENCIL_ARRAY_USE_OFFSET = (1 << 7),
+  MOD_GREASE_PENCIL_ARRAY_USE_RELATIVE = (1 << 8),
+  MOD_GREASE_PENCIL_ARRAY_USE_OB_OFFSET = (1 << 9),
+  MOD_GREASE_PENCIL_ARRAY_UNIFORM_RANDOM_SCALE = (1 << 10),
+} GreasePencilArrayModifierFlag;
+
+typedef struct GreasePencilWeightProximityModifierData {
+  ModifierData modifier;
+  GreasePencilModifierInfluenceData influence;
+
+  /* #GreasePencilWeightProximityFlag. */
+  int flag;
+  char target_vgname[64];
+  float min_weight;
+
+  float dist_start;
+  float dist_end;
+
+  struct Object *object;
+} GreasePencilWeightProximityModifierData;
+
+typedef enum GreasePencilWeightProximityFlag {
+  MOD_GREASE_PENCIL_WEIGHT_PROXIMITY_INVERT_OUTPUT = (1 << 0),
+  MOD_GREASE_PENCIL_WEIGHT_PROXIMITY_MULTIPLY_DATA = (1 << 1),
+} GreasePencilWeightProximityFlag;
+
+typedef struct GreasePencilHookModifierData {
+  ModifierData modifier;
+  GreasePencilModifierInfluenceData influence;
+
+  struct Object *object;
+  /** Optional name of bone target, MAX_ID_NAME-2. */
+  char subtarget[64];
+  char _pad[4];
+
+  /** #GreasePencilHookFlag. */
+  int flag;
+  /** #GreasePencilHookFalloff. */
+  char falloff_type;
+  char _pad1[3];
+  /** Matrix making current transform unmodified. */
+  float parentinv[4][4];
+  /** Visualization of hook. */
+  float cent[3];
+  /** If not zero, falloff is distance where influence zero. */
+  float falloff;
+  float force;
+} GreasePencilHookModifierData;
+
+typedef enum GreasePencilHookFlag {
+  MOD_GREASE_PENCIL_HOOK_UNIFORM_SPACE = (1 << 0),
+} GreasePencilHookFlag;
+
+typedef enum GreasePencilHookFalloff {
+  MOD_GREASE_PENCIL_HOOK_Falloff_None = 0,
+  MOD_GREASE_PENCIL_HOOK_Falloff_Curve = 1,
+  MOD_GREASE_PENCIL_HOOK_Falloff_Sharp = 2,
+  MOD_GREASE_PENCIL_HOOK_Falloff_Smooth = 3,
+  MOD_GREASE_PENCIL_HOOK_Falloff_Root = 4,
+  MOD_GREASE_PENCIL_HOOK_Falloff_Linear = 5,
+  MOD_GREASE_PENCIL_HOOK_Falloff_Const = 6,
+  MOD_GREASE_PENCIL_HOOK_Falloff_Sphere = 7,
+  MOD_GREASE_PENCIL_HOOK_Falloff_InvSquare = 8,
+} GreasePencilHookFalloff;
+
+/* This enum is for modifier internal state only. */
+typedef enum eGreasePencilLineartFlags {
+  /* These two moved to #eLineartMainFlags to keep consistent with flag variable purpose. */
+  /* LINEART_GPENCIL_INVERT_SOURCE_VGROUP = (1 << 0), */
+  /* LINEART_GPENCIL_MATCH_OUTPUT_VGROUP = (1 << 1), */
+  LINEART_GPENCIL_BINARY_WEIGHTS = (1
+                                    << 2) /* Deprecated, this is removed for lack of use case. */,
+  LINEART_GPENCIL_IS_BAKED = (1 << 3),
+  LINEART_GPENCIL_USE_CACHE = (1 << 4),
+  LINEART_GPENCIL_OFFSET_TOWARDS_CUSTOM_CAMERA = (1 << 5),
+  LINEART_GPENCIL_INVERT_COLLECTION = (1 << 6),
+  LINEART_GPENCIL_INVERT_SILHOUETTE_FILTER = (1 << 7),
+} eGreasePencilLineartFlags;
+
+typedef enum GreasePencilLineartModifierSource {
+  LINEART_SOURCE_COLLECTION = 0,
+  LINEART_SOURCE_OBJECT = 1,
+  LINEART_SOURCE_SCENE = 2,
+} GreasePencilLineartModifierSource;
+
+typedef enum GreasePencilLineartModifierShadowFilter {
+  /* These options need to be ordered in this way because those latter options requires line art to
+   * run a few extra stages. Having those values set up this way will allow
+   * #BKE_gpencil_get_lineart_modifier_limits() to find out maximum stages needed in multiple
+   * cached line art modifiers. */
+  LINEART_SHADOW_FILTER_NONE = 0,
+  LINEART_SHADOW_FILTER_ILLUMINATED = 1,
+  LINEART_SHADOW_FILTER_SHADED = 2,
+  LINEART_SHADOW_FILTER_ILLUMINATED_ENCLOSED_SHAPES = 3,
+} GreasePencilLineartModifierShadowFilter;
+
+/* This enum is for modifier internal state only. */
+typedef enum eLineArtGPencilModifierFlags {
+  /* These two moved to #eLineartMainFlags to keep consistent with flag variable purpose. */
+  /* MOD_LINEART_INVERT_SOURCE_VGROUP = (1 << 0), */
+  /* MOD_LINEART_MATCH_OUTPUT_VGROUP = (1 << 1), */
+  MOD_LINEART_BINARY_WEIGHTS = (1 << 2) /* Deprecated, this is removed for lack of use case. */,
+  MOD_LINEART_IS_BAKED = (1 << 3),
+  MOD_LINEART_USE_CACHE = (1 << 4),
+  MOD_LINEART_OFFSET_TOWARDS_CUSTOM_CAMERA = (1 << 5),
+  MOD_LINEART_INVERT_COLLECTION = (1 << 6),
+  MOD_LINEART_INVERT_SILHOUETTE_FILTER = (1 << 7),
+} eLineArtGPencilModifierFlags;
+
+typedef enum GreasePencilLineartMaskSwitches {
+  MOD_LINEART_MATERIAL_MASK_ENABLE = (1 << 0),
+  /** When set, material mask bit comparisons are done with bit wise "AND" instead of "OR". */
+  MOD_LINEART_MATERIAL_MASK_MATCH = (1 << 1),
+  MOD_LINEART_INTERSECTION_MATCH = (1 << 2),
+} GreasePencilLineartMaskSwitches;
+
+typedef enum eGreasePencilLineartMaskSwitches {
+  LINEART_GPENCIL_MATERIAL_MASK_ENABLE = (1 << 0),
+  /** When set, material mask bit comparisons are done with bit wise "AND" instead of "OR". */
+  LINEART_GPENCIL_MATERIAL_MASK_MATCH = (1 << 1),
+  LINEART_GPENCIL_INTERSECTION_MATCH = (1 << 2),
+} eGreasePencilLineartMaskSwitches;
+
+typedef enum eGreasePencilLineartSilhouetteFilter {
+  LINEART_SILHOUETTE_FILTER_NONE = 0,
+  LINEART_SILHOUETTE_FILTER_GROUP = (1 << 0),
+  LINEART_SILHOUETTE_FILTER_INDIVIDUAL = (1 << 1),
+} eGreasePencilLineartSilhouetteFilter;
+
+struct LineartCache;
+
+typedef struct GreasePencilLineartModifierData {
+  ModifierData modifier;
+
+  uint16_t edge_types; /* line type enable flags, bits in eLineartEdgeFlag */
+
+  /** Object or Collection, from #eGreasePencilLineartSource. */
+  char source_type;
+
+  char use_multiple_levels;
+  short level_start;
+  short level_end;
+
+  struct Object *source_camera;
+  struct Object *light_contour_object;
+
+  struct Object *source_object;
+  struct Collection *source_collection;
+
+  struct Material *target_material;
+  char target_layer[64];
+
+  /**
+   * These two variables are to pass on vertex group information from mesh to strokes.
+   * `vgname` specifies which vertex groups our strokes from source_vertex_group will go to.
+   */
+  char source_vertex_group[64];
+  char vgname[64];
+
+  /* Camera focal length is divided by (1 + over-scan), before calculation, which give a wider FOV,
+   * this doesn't change coordinates range internally (-1, 1), but makes the calculated frame
+   * bigger than actual output. This is for the easier shifting calculation. A value of 0.5 means
+   * the "internal" focal length become 2/3 of the actual camera. */
+  float overscan;
+
+  /* Values for point light and directional (sun) light. */
+  /* For point light, fov always gonna be 120 deg horizontal, with 3 "cameras" covering 360 deg. */
+  float shadow_camera_fov;
+  float shadow_camera_size;
+  float shadow_camera_near;
+  float shadow_camera_far;
+
+  float opacity;
+  short thickness;
+
+  unsigned char mask_switches; /* #eGreasePencilLineartMaskSwitches */
+  unsigned char material_mask_bits;
+  unsigned char intersection_mask;
+
+  unsigned char shadow_selection;
+  unsigned char silhouette_selection;
+  char _pad[1];
+
+  /** `0..1` range for cosine angle */
+  float crease_threshold;
+
+  /** `0..PI` angle, for splitting strokes at sharp points. */
+  float angle_splitting_threshold;
+
+  /** Strength for smoothing jagged chains. */
+  float chain_smooth_tolerance;
+
+  /* CPU mode */
+  float chaining_image_threshold;
+
+  /* eLineartMainFlags, for one time calculation. */
+  int calculation_flags;
+
+  /* #eGreasePencilLineartFlags, modifier internal state. */
+  int flags;
+
+  /* Move strokes towards camera to avoid clipping while preserve depth for the viewport. */
+  float stroke_depth_offset;
+
+  /* Runtime data. */
+
+  /* Because we can potentially only compute features lines once per modifier stack (Use Cache), we
+   * need to have these override values to ensure that we have the data we need is computed and
+   * stored in the cache. */
+  char level_start_override;
+  char level_end_override;
+  short edge_types_override;
+  char shadow_selection_override;
+  char shadow_use_silhouette_override;
+
+  char _pad2[6];
+
+  /* Shared cache will only be on the first line art modifier in the stack, and will exist until
+   * the end of modifier stack evaluation. If the object has line art modifiers, this variable is
+   * then initialized in #grease_pencil_evaluate_modifiers(). */
+  struct LineartCache *shared_cache;
+
+  /* Cache for single execution of line art, when LINEART_GPENCIL_USE_CACHE is enabled, this is a
+   * reference to first_lineart->shared_cache, otherwise it holds its own cache.  */
+  struct LineartCache *cache;
+
+  /* Keep a pointer to the render buffer so we can call destroy from #ModifierData. */
+  struct LineartData *la_data_ptr;
+
+  /* Points to a `LineartModifierRuntime`, which includes the object dependency list. */
+  struct LineartModifierRuntime *runtime;
+} GreasePencilLineartModifierData;
+
+typedef struct GreasePencilArmatureModifierData {
+  ModifierData modifier;
+  GreasePencilModifierInfluenceData influence;
+
+  struct Object *object;
+  /** #eArmature_DeformFlag. */
+  short deformflag;
+  char _pad[6];
+} GreasePencilArmatureModifierData;
+
+typedef struct GreasePencilTimeModifierSegment {
+  char name[64];
+  int segment_start;
+  int segment_end;
+  int segment_mode;
+  int segment_repeat;
+} GreasePencilTimeModifierSegment;
+
+typedef struct GreasePencilTimeModifierData {
+  ModifierData modifier;
+  GreasePencilModifierInfluenceData influence;
+  /** #GreasePencilTimeModifierFlag */
+  int flag;
+  int offset;
+  /** Animation scale. */
+  float frame_scale;
+  int mode;
+  /** Start and end frame for custom range. */
+  int sfra, efra;
+
+  GreasePencilTimeModifierSegment *segments_array;
+  int segments_num;
+  int segment_active_index;
+
+#ifdef __cplusplus
+  blender::Span<GreasePencilTimeModifierSegment> segments() const;
+  blender::MutableSpan<GreasePencilTimeModifierSegment> segments();
+#endif
+} GreasePencilTimeModifierData;
+
+typedef enum GreasePencilTimeModifierFlag {
+  MOD_GREASE_PENCIL_TIME_KEEP_LOOP = (1 << 0),
+  MOD_GREASE_PENCIL_TIME_CUSTOM_RANGE = (1 << 1),
+} GreasePencilTimeModifierFlag;
+
+typedef enum GreasePencilTimeModifierMode {
+  MOD_GREASE_PENCIL_TIME_MODE_NORMAL = 0,
+  MOD_GREASE_PENCIL_TIME_MODE_REVERSE = 1,
+  MOD_GREASE_PENCIL_TIME_MODE_FIX = 2,
+  MOD_GREASE_PENCIL_TIME_MODE_PINGPONG = 3,
+  MOD_GREASE_PENCIL_TIME_MODE_CHAIN = 4,
+} GreasePencilTimeModifierMode;
+
+typedef enum GreasePencilTimeModifierSegmentMode {
+  MOD_GREASE_PENCIL_TIME_SEG_MODE_NORMAL = 0,
+  MOD_GREASE_PENCIL_TIME_SEG_MODE_REVERSE = 1,
+  MOD_GREASE_PENCIL_TIME_SEG_MODE_PINGPONG = 2,
+} GreasePencilTimeModifierSegmentMode;
+
+typedef struct GreasePencilEnvelopeModifierData {
+  ModifierData modifier;
+  GreasePencilModifierInfluenceData influence;
+  /* #GreasePencilEnvelopeModifierMode. */
+  int mode;
+  /** Material for the new strokes. */
+  int mat_nr;
+  /** Thickness multiplier for the new strokes. */
+  float thickness;
+  /** Strength multiplier for the new strokes. */
+  float strength;
+  /** Number of points to skip over. */
+  int skip;
+  /* Length of the envelope effect. */
+  int spread;
+} GreasePencilEnvelopeModifierData;
+
+/* Texture->mode */
+typedef enum GreasePencilEnvelopeModifierMode {
+  MOD_GREASE_PENCIL_ENVELOPE_DEFORM = 0,
+  MOD_GREASE_PENCIL_ENVELOPE_SEGMENTS = 1,
+  MOD_GREASE_PENCIL_ENVELOPE_FILLS = 2,
+} GreasePencilEnvelopeModifierMode;
+
+typedef struct GreasePencilOutlineModifierData {
+  ModifierData modifier;
+  GreasePencilModifierInfluenceData influence;
+
+  /** Target stroke origin. */
+  struct Object *object;
+  /** #GreasePencilOutlineModifierFlag. */
+  int flag;
+  /** Thickness. */
+  int thickness;
+  /** Sample Length. */
+  float sample_length;
+  /** Subdivisions. */
+  int subdiv;
+  /** Material for outline. */
+  struct Material *outline_material;
+} GreasePencilOutlineModifierData;
+
+typedef enum GreasePencilOutlineModifierFlag {
+  MOD_GREASE_PENCIL_OUTLINE_KEEP_SHAPE = (1 << 0),
+} GreasePencilOutlineModifierFlag;
+
+typedef struct GreasePencilShrinkwrapModifierData {
+  ModifierData modifier;
+  GreasePencilModifierInfluenceData influence;
+
+  /** Shrink target. */
+  struct Object *target;
+  /** Additional shrink target. */
+  struct Object *aux_target;
+  /** Distance offset to keep from mesh/projection point. */
+  float keep_dist;
+  /** Shrink type projection. */
+  short shrink_type;
+  /** Shrink options. */
+  char shrink_opts;
+  /** Shrink to surface mode. */
+  char shrink_mode;
+  /** Limit the projection ray cast. */
+  float proj_limit;
+  /** Axis to project over. */
+  char proj_axis;
+
+  /**
+   * If using projection over vertex normal this controls the level of subsurface that must be
+   * done before getting the vertex coordinates and normal.
+   */
+  char subsurf_levels;
+  char _pad[2];
+  /** Factor of smooth. */
+  float smooth_factor;
+  /** How many times apply smooth. */
+  int smooth_step;
+
+  /** Runtime only. */
+  struct ShrinkwrapTreeData *cache_data;
+} GreasePencilShrinkwrapModifierData;
+
+typedef struct GreasePencilBuildModifierData {
+  ModifierData modifier;
+  GreasePencilModifierInfluenceData influence;
+  /**
+   * If GP_BUILD_RESTRICT_TIME is set,
+   * the defines the frame range where GP frames are considered.
+   */
+  float start_frame;
+  float end_frame;
+
+  /** Start time added on top of the drawing frame number */
+  float start_delay;
+  float length;
+
+  /** #GreasePencilBuildFlag. */
+  short flag;
+
+  /** #GreasePencilBuildMode. */
+  short mode;
+  /** #GreasePencilBuildTransition. */
+  short transition;
+
+  /**
+   * #GreasePencilBuildTimeAlignment.
+   * For the "Concurrent" mode, when should "shorter" strips start/end.
+   */
+  short time_alignment;
+
+  /** Speed factor for #GP_BUILD_TIMEMODE_DRAWSPEED. */
+  float speed_fac;
+  /** Maximum time gap between strokes for #GP_BUILD_TIMEMODE_DRAWSPEED. */
+  float speed_maxgap;
+  /** GreasePencilBuildTimeMode. */
+  short time_mode;
+  char _pad[6];
+
+  /** Build origin control object. */
+  struct Object *object;
+
+  /** Factor of the stroke (used instead of frame evaluation). */
+  float percentage_fac;
+
+  /** Weight fading at the end of the stroke. */
+  float fade_fac;
+  /** Target vertex-group name, #MAX_VGROUP_NAME. */
+  char target_vgname[64];
+  /** Fading strength of opacity and thickness */
+  float fade_opacity_strength;
+  float fade_thickness_strength;
+} GreasePencilBuildModifierData;
+
+typedef enum GreasePencilBuildMode {
+  /* Strokes are shown one by one until all have appeared */
+  MOD_GREASE_PENCIL_BUILD_MODE_SEQUENTIAL = 0,
+  /* All strokes start at the same time */
+  MOD_GREASE_PENCIL_BUILD_MODE_CONCURRENT = 1,
+  /* Only the new strokes are built */
+  MOD_GREASE_PENCIL_BUILD_MODE_ADDITIVE = 2,
+} GreasePencilBuildMode;
+
+typedef enum GreasePencilBuildTransition {
+  /* Show in forward order */
+  MOD_GREASE_PENCIL_BUILD_TRANSITION_GROW = 0,
+  /* Hide in reverse order */
+  MOD_GREASE_PENCIL_BUILD_TRANSITION_SHRINK = 1,
+  /* Hide in forward order */
+  MOD_GREASE_PENCIL_BUILD_TRANSITION_VANISH = 2,
+} GreasePencilBuildTransition;
+
+typedef enum GreasePencilBuildTimeAlignment {
+  /* All strokes start at same time */
+  MOD_GREASE_PENCIL_BUILD_TIMEALIGN_START = 0,
+  /* All strokes end at same time */
+  MOD_GREASE_PENCIL_BUILD_TIMEALIGN_END = 1,
+
+  /* TODO: Random Offsets, Stretch-to-Fill */
+} GreasePencilBuildTimeAlignment;
+
+typedef enum GreasePencilBuildTimeMode {
+  /** Use a number of frames build. */
+  MOD_GREASE_PENCIL_BUILD_TIMEMODE_FRAMES = 0,
+  /** Use manual percentage to build. */
+  MOD_GREASE_PENCIL_BUILD_TIMEMODE_PERCENTAGE = 1,
+  /** Use factor of recorded speed to build. */
+  MOD_GREASE_PENCIL_BUILD_TIMEMODE_DRAWSPEED = 2,
+} GreasePencilBuildTimeMode;
+
+typedef enum GreasePencilBuildFlag {
+  /* Restrict modifier to only operating between the nominated frames */
+  MOD_GREASE_PENCIL_BUILD_RESTRICT_TIME = (1 << 0),
+  MOD_GREASE_PENCIL_BUILD_USE_FADING = (1 << 14),
+} GreasePencilBuildFlag;
+
+typedef struct GreasePencilSimplifyModifierData {
+  ModifierData modifier;
+  GreasePencilModifierInfluenceData influence;
+
+  /** #GreasePencilSimplifyModifierMode. */
+  short mode;
+  char _pad[4];
+  /** Every n vertex to keep. */
+  short step;
+  float factor;
+  /** For sampling. */
+  float length;
+  float sharp_threshold;
+
+  /** Merge distance */
+  float distance;
+} GreasePencilSimplifyModifierData;
+
+typedef enum GreasePencilSimplifyModifierMode {
+  MOD_GREASE_PENCIL_SIMPLIFY_FIXED = 0,
+  MOD_GREASE_PENCIL_SIMPLIFY_ADAPTIVE = 1,
+  MOD_GREASE_PENCIL_SIMPLIFY_SAMPLE = 2,
+  MOD_GREASE_PENCIL_SIMPLIFY_MERGE = 3,
+} GreasePencilSimplifyModifierMode;
+
+typedef struct GreasePencilTextureModifierData {
+  ModifierData modifier;
+  GreasePencilModifierInfluenceData influence;
+  /* Offset value to add to uv_fac. */
+  float uv_offset;
+  float uv_scale;
+  float fill_rotation;
+  float fill_offset[2];
+  float fill_scale;
+  /* Custom index for passes. */
+  int layer_pass;
+  /* Texture fit options. */
+  short fit_method;
+  short mode;
+  /* Dot texture rotation. */
+  float alignment_rotation;
+  char _pad[4];
+} GreasePencilTextureModifierData;
+
+/* Texture->fit_method */
+typedef enum GreasePencilTextureModifierFit {
+  MOD_GREASE_PENCIL_TEXTURE_FIT_STROKE = 0,
+  MOD_GREASE_PENCIL_TEXTURE_CONSTANT_LENGTH = 1,
+} GreasePencilTextureModifierFit;
+
+/* Texture->mode */
+typedef enum GreasePencilTextureModifierMode {
+  MOD_GREASE_PENCIL_TEXTURE_STROKE = 0,
+  MOD_GREASE_PENCIL_TEXTURE_FILL = 1,
+  MOD_GREASE_PENCIL_TEXTURE_STROKE_AND_FILL = 2,
+} GreasePencilTextureModifierMode;

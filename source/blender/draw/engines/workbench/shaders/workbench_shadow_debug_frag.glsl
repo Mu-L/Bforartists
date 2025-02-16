@@ -1,19 +1,18 @@
+/* SPDX-FileCopyrightText: 2018-2022 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-out vec4 fragColor;
+#include "infos/workbench_shadow_info.hh"
 
-layout(location = 0) out vec4 materialData;
-layout(location = 1) out vec4 normalData;
-layout(location = 2) out uint objectId;
+FRAGMENT_SHADER_CREATE_INFO(workbench_shadow_debug)
 
 void main()
 {
-  const float a = 0.25;
+  const float a = 0.1;
 #ifdef SHADOW_PASS
-  materialData.rgb = gl_FrontFacing ? vec3(a, -a, 0.0) : vec3(-a, a, 0.0);
+  out_debug_color.rgb = gl_FrontFacing ? vec3(a, -a, 0.0) : vec3(-a, a, 0.0);
 #else
-  materialData.rgb = gl_FrontFacing ? vec3(a, a, -a) : vec3(-a, -a, a);
+  out_debug_color.rgb = gl_FrontFacing ? vec3(a, a, -a) : vec3(-a, -a, a);
 #endif
-  materialData.a = 0.0;
-  normalData = vec4(0.0);
-  objectId = 0u;
+  out_debug_color.a = a;
 }

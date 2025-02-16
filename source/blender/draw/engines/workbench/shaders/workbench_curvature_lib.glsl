@@ -1,5 +1,16 @@
+/* SPDX-FileCopyrightText: 2018-2023 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#pragma BLENDER_REQUIRE(workbench_data_lib.glsl)
+#pragma once
+
+#include "workbench_common_lib.glsl"
+
+#ifdef WORKBENCH_CURVATURE
+#  define USE_CURVATURE
+#endif
+
+#ifdef USE_CURVATURE
 
 float curvature_soft_clamp(float curvature, float control)
 {
@@ -45,3 +56,5 @@ void curvature_compute(vec2 uv,
     curvature = 2.0 * curvature_soft_clamp(normal_diff, world_data.curvature_ridge);
   }
 }
+
+#endif /* USE_CURVATURE */

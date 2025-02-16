@@ -1,114 +1,46 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2009-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup collada
  */
 
-#include <algorithm> /* std::find */
-#include <cmath>
 #include <cstdio>
 #include <cstdlib>
-#include <vector>
 
 #include "COLLADASWAsset.h"
-#include "COLLADASWBaseInputElement.h"
-#include "COLLADASWBindMaterial.h"
 #include "COLLADASWCamera.h"
-#include "COLLADASWColorOrTexture.h"
-#include "COLLADASWConstants.h"
-#include "COLLADASWEffectProfile.h"
-#include "COLLADASWImage.h"
-#include "COLLADASWInputList.h"
-#include "COLLADASWInstanceCamera.h"
-#include "COLLADASWInstanceController.h"
-#include "COLLADASWInstanceGeometry.h"
-#include "COLLADASWInstanceLight.h"
-#include "COLLADASWInstanceNode.h"
-#include "COLLADASWLibraryAnimations.h"
-#include "COLLADASWLibraryControllers.h"
-#include "COLLADASWLibraryEffects.h"
-#include "COLLADASWLibraryImages.h"
-#include "COLLADASWLibraryMaterials.h"
-#include "COLLADASWLibraryVisualScenes.h"
-#include "COLLADASWNode.h"
-#include "COLLADASWParamBase.h"
-#include "COLLADASWParamTemplate.h"
-#include "COLLADASWPrimitves.h"
-#include "COLLADASWSampler.h"
+#include "COLLADASWException.h"
 #include "COLLADASWScene.h"
-#include "COLLADASWSource.h"
-#include "COLLADASWSurfaceInitOption.h"
-#include "COLLADASWTechnique.h"
-#include "COLLADASWTexture.h"
-#include "COLLADASWVertices.h"
 
-#include "MEM_guardedalloc.h"
-
-#include "DNA_action_types.h"
-#include "DNA_anim_types.h"
-#include "DNA_armature_types.h"
-#include "DNA_collection_types.h"
-#include "DNA_curve_types.h"
-#include "DNA_image_types.h"
-#include "DNA_material_types.h"
-#include "DNA_mesh_types.h"
-#include "DNA_meshdata_types.h"
-#include "DNA_modifier_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
-#include "DNA_userdef_types.h"
 
 #include "BLI_fileops.h"
-#include "BLI_listbase.h"
-#include "BLI_math.h"
-#include "BLI_path_util.h"
+#include "BLI_path_utils.hh"
 #include "BLI_string.h"
-#include "BLI_utildefines.h"
 
-#include "BKE_action.h" /* pose functions */
 #include "BKE_animsys.h"
-#include "BKE_appdir.h"
-#include "BKE_armature.h"
+#include "BKE_appdir.hh"
 #include "BKE_blender_version.h"
-#include "BKE_customdata.h"
-#include "BKE_fcurve.h"
-#include "BKE_global.h"
-#include "BKE_image.h"
-#include "BKE_main.h"
-#include "BKE_material.h"
-#include "BKE_object.h"
-#include "BKE_scene.h"
+#include "BKE_customdata.hh"
+#include "BKE_fcurve.hh"
 
-#include "ED_keyframing.h"
+#include "ED_keyframing.hh"
 #ifdef WITH_BUILDINFO
 extern "C" char build_commit_date[];
 extern "C" char build_commit_time[];
 extern "C" char build_hash[];
 #endif
 
-#include "RNA_access.h"
+#include "RNA_access.hh"
 
 #include "DocumentExporter.h"
 #include "collada_internal.h"
 #include "collada_utils.h"
 
 /* can probably go after refactor is complete */
-#include "InstanceWriter.h"
-#include "TransformWriter.h"
 
 #include "AnimationExporter.h"
 #include "ArmatureExporter.h"
@@ -123,7 +55,7 @@ extern "C" char build_hash[];
 
 #include <cerrno>
 
-char *bc_CustomData_get_layer_name(const struct CustomData *data, int type, int n)
+const char *bc_CustomData_get_layer_name(const CustomData *data, const eCustomDataType type, int n)
 {
   int layer_index = CustomData_get_layer_index(data, type);
   if (layer_index < 0) {
@@ -133,7 +65,7 @@ char *bc_CustomData_get_layer_name(const struct CustomData *data, int type, int 
   return data->layers[layer_index + n].name;
 }
 
-char *bc_CustomData_get_active_layer_name(const CustomData *data, int type)
+const char *bc_CustomData_get_active_layer_name(const CustomData *data, const eCustomDataType type)
 {
   /* get the layer index of the active layer of type */
   int layer_index = CustomData_get_active_layer_index(data, type);
@@ -159,7 +91,7 @@ static COLLADABU::NativeString make_temp_filepath(const char *name, const char *
     name = "untitled";
   }
 
-  BLI_join_dirfile(tempfile, sizeof(tempfile), BKE_tempdir_session(), name);
+  BLI_path_join(tempfile, sizeof(tempfile), BKE_tempdir_session(), name);
 
   if (extension) {
     BLI_path_extension_ensure(tempfile, FILE_MAX, extension);
@@ -179,13 +111,21 @@ int DocumentExporter::exportCurrentScene()
   Scene *sce = blender_context.get_scene();
   bContext *C = blender_context.get_context();
 
-  PointerRNA sceneptr, unit_settings;
+  PointerRNA unit_settings;
   PropertyRNA *system; /* unused, *scale; */
 
   clear_global_id_map();
 
   COLLADABU::NativeString native_filename = make_temp_filepath(nullptr, ".dae");
-  COLLADASW::StreamWriter *writer = new COLLADASW::StreamWriter(native_filename);
+  COLLADASW::StreamWriter *writer;
+  try {
+    writer = new COLLADASW::StreamWriter(native_filename);
+  }
+  catch (COLLADASW::StreamWriterException &e) {
+    e.printMessage();
+    fprintf(stderr, "Collada: No Objects will be exported.\n");
+    return 1;
+  }
 
   /* open <collada> */
   writer->startDocument();
@@ -193,7 +133,7 @@ int DocumentExporter::exportCurrentScene()
   /* <asset> */
   COLLADASW::Asset asset(writer);
 
-  RNA_id_pointer_create(&(sce->id), &sceneptr);
+  PointerRNA sceneptr = RNA_id_pointer_create(&sce->id);
   unit_settings = RNA_pointer_get(&sceneptr, "unit_settings");
   system = RNA_struct_find_property(&unit_settings, "system");
   // scale = RNA_struct_find_property(&unit_settings, "scale_length");
@@ -240,15 +180,14 @@ int DocumentExporter::exportCurrentScene()
   asset.getContributor().mAuthor = "Blender User";
   char version_buf[128];
 #ifdef WITH_BUILDINFO
-  BLI_snprintf(version_buf,
-               sizeof(version_buf),
-               "Blender %s commit date:%s, commit time:%s, hash:%s",
-               BKE_blender_version_string(),
-               build_commit_date,
-               build_commit_time,
-               build_hash);
+  SNPRINTF(version_buf,
+           "Blender %s commit date:%s, commit time:%s, hash:%s",
+           BKE_blender_version_string(),
+           build_commit_date,
+           build_commit_time,
+           build_hash);
 #else
-  BLI_snprintf(version_buf, sizeof(version_buf), "Blender %s", BKE_blender_version_string());
+  SNPRINTF(version_buf, "Blender %s", BKE_blender_version_string());
 #endif
   asset.getContributor().mAuthoringTool = version_buf;
   asset.add();
@@ -287,8 +226,8 @@ int DocumentExporter::exportCurrentScene()
   /* <library_controllers> */
   ArmatureExporter arm_exporter(blender_context, writer, this->export_settings);
   ControllerExporter controller_exporter(blender_context, writer, this->export_settings);
-  if (bc_has_object_type(export_set, OB_ARMATURE) ||
-      this->export_settings.get_include_shapekeys()) {
+  if (bc_has_object_type(export_set, OB_ARMATURE) || this->export_settings.get_include_shapekeys())
+  {
     controller_exporter.export_controllers();
   }
 
@@ -315,16 +254,12 @@ int DocumentExporter::exportCurrentScene()
 
   /* Finally move the created document into place */
   fprintf(stdout, "Collada export to: %s\n", this->export_settings.get_filepath());
-  int status = BLI_rename(native_filename.c_str(), this->export_settings.get_filepath());
+  int status = BLI_rename_overwrite(native_filename.c_str(), this->export_settings.get_filepath());
   if (status != 0) {
     status = BLI_copy(native_filename.c_str(), this->export_settings.get_filepath());
     BLI_delete(native_filename.c_str(), false, false);
   }
   return status;
-}
-
-void DocumentExporter::exportScenes(const char *filename)
-{
 }
 
 /*

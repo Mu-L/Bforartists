@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup Alembic
@@ -21,7 +9,11 @@
 #include "abc_axis_conversion.h"
 
 #include "BLI_assert.h"
-#include "BLI_math_geom.h"
+#include "BLI_math_matrix.h"
+#include "BLI_math_rotation.h"
+#include "BLI_math_vector.h"
+
+#include "BKE_object_types.hh"
 
 #include "DNA_object_types.h"
 
@@ -75,8 +67,6 @@ void create_swapped_rotation_matrix(float rot_x_mat[3][3],
 }  // namespace
    // alembicvoidcreate_swapped_rotation_matrix(floatrot_x_mat[3][3],floatrot_y_mat[3][3],floatrot_z_mat[3][3],constfloateuler[3],AbcAxisSwapModemode)
 
-/* Convert matrix from Z=up to Y=up or vice versa.
- * Use yup_mat = zup_mat for in-place conversion. */
 void copy_m44_axis_swap(float dst_mat[4][4], float src_mat[4][4], AbcAxisSwapMode mode)
 {
   float dst_rot[3][3], src_rot[3][3], dst_scale_mat[4][4];
@@ -139,8 +129,6 @@ void copy_m44_axis_swap(float dst_mat[4][4], float src_mat[4][4], AbcAxisSwapMod
   mul_m4_m4m4(dst_mat, dst_mat, dst_scale_mat);
 }
 
-/* Recompute transform matrix of object in new coordinate system
- * (from Z-Up to Y-Up). */
 void create_transform_matrix(Object *obj,
                              float r_yup_mat[4][4],
                              AbcMatrixMode mode,
@@ -152,15 +140,16 @@ void create_transform_matrix(Object *obj,
   if (mode == ABC_MATRIX_LOCAL && obj->parent) {
     /* Note that this produces another matrix than the local matrix, due to
      * constraints and modifiers as well as the obj->parentinv matrix. */
-    invert_m4_m4(obj->parent->imat, obj->parent->obmat);
-    mul_m4_m4m4(zup_mat, obj->parent->imat, obj->obmat);
+    invert_m4_m4(obj->parent->runtime->world_to_object.ptr(),
+                 obj->parent->object_to_world().ptr());
+    mul_m4_m4m4(zup_mat, obj->parent->world_to_object().ptr(), obj->object_to_world().ptr());
   }
   else {
-    copy_m4_m4(zup_mat, obj->obmat);
+    copy_m4_m4(zup_mat, obj->object_to_world().ptr());
   }
 
   if (proxy_from) {
-    mul_m4_m4m4(zup_mat, proxy_from->obmat, zup_mat);
+    mul_m4_m4m4(zup_mat, proxy_from->object_to_world().ptr(), zup_mat);
   }
 
   copy_m44_axis_swap(r_yup_mat, zup_mat, ABC_YUP_FROM_ZUP);

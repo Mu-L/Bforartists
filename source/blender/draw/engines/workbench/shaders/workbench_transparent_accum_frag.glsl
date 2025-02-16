@@ -1,21 +1,21 @@
+/* SPDX-FileCopyrightText: 2020-2023 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#pragma BLENDER_REQUIRE(common_view_lib.glsl)
-#pragma BLENDER_REQUIRE(workbench_shader_interface_lib.glsl)
-#pragma BLENDER_REQUIRE(workbench_common_lib.glsl)
-#pragma BLENDER_REQUIRE(workbench_image_lib.glsl)
-#pragma BLENDER_REQUIRE(workbench_matcap_lib.glsl)
-#pragma BLENDER_REQUIRE(workbench_world_light_lib.glsl)
+#include "infos/workbench_prepass_info.hh"
 
-/* Revealage is actually stored in transparentAccum alpha channel.
- * This is a workaround to older hardware not having separate blend equation per render target. */
-layout(location = 0) out vec4 transparentAccum;
-layout(location = 1) out vec4 revealageAccum;
+FRAGMENT_SHADER_CREATE_INFO(workbench_prepass)
+FRAGMENT_SHADER_CREATE_INFO(workbench_transparent_accum)
+FRAGMENT_SHADER_CREATE_INFO(workbench_lighting_matcap)
 
-/* Note: Blending will be skipped on objectId because output is a non-normalized integer buffer. */
-layout(location = 2) out uint objectId;
+#include "draw_view_lib.glsl"
+#include "workbench_common_lib.glsl"
+#include "workbench_image_lib.glsl"
+#include "workbench_matcap_lib.glsl"
+#include "workbench_world_light_lib.glsl"
 
 /* Special function only to be used with calculate_transparent_weight(). */
-float linear_zdepth(float depth, vec4 viewvecs[2], mat4 proj_mat)
+float linear_zdepth(float depth, mat4 proj_mat)
 {
   if (proj_mat[3][3] == 0.0) {
     float d = 2.0 * depth - 1.0;
@@ -23,7 +23,8 @@ float linear_zdepth(float depth, vec4 viewvecs[2], mat4 proj_mat)
   }
   else {
     /* Return depth from near plane. */
-    return depth * viewvecs[1].z;
+    float z_delta = -2.0 / proj_mat[2][2];
+    return depth * z_delta;
   }
 }
 
@@ -31,9 +32,9 @@ float linear_zdepth(float depth, vec4 viewvecs[2], mat4 proj_mat)
  * McGuire and Bavoil, Weighted Blended Order-Independent Transparency, Journal of
  * Computer Graphics Techniques (JCGT), vol. 2, no. 2, 122–141, 2013
  */
-float calculate_transparent_weight(void)
+float calculate_transparent_weight()
 {
-  float z = linear_zdepth(gl_FragCoord.z, ViewVecs, ProjectionMatrix);
+  float z = linear_zdepth(gl_FragCoord.z, drw_view.winmat);
 #if 0
   /* Eq 10 : Good for surfaces with varying opacity (like particles) */
   float a = min(1.0, alpha * 10.0) + 0.01;
@@ -55,35 +56,37 @@ float calculate_transparent_weight(void)
 
 void main()
 {
-  /* Normal and Incident vector are in viewspace. Lighting is evaluated in viewspace. */
+  /* Normal and Incident vector are in view-space. Lighting is evaluated in view-space. */
   vec2 uv_viewport = gl_FragCoord.xy * world_data.viewport_size_inv;
-  vec3 I = get_view_vector_from_screen_uv(uv_viewport);
+  vec3 vP = drw_point_screen_to_view(vec3(uv_viewport, 0.5));
+  vec3 I = drw_view_incident_vector(vP);
   vec3 N = normalize(normal_interp);
 
   vec3 color = color_interp;
 
-#ifdef V3D_SHADING_TEXTURE_COLOR
+#ifdef WORKBENCH_COLOR_TEXTURE
   color = workbench_image_color(uv_interp);
 #endif
 
-#ifdef V3D_LIGHTING_MATCAP
-  vec3 shaded_color = get_matcap_lighting(color, N, I);
+#ifdef WORKBENCH_LIGHTING_MATCAP
+  vec3 shaded_color = get_matcap_lighting(matcap_tx, color, N, I);
 #endif
 
-#ifdef V3D_LIGHTING_STUDIO
-  vec3 shaded_color = get_world_lighting(color, roughness, metallic, N, I);
+#ifdef WORKBENCH_LIGHTING_STUDIO
+  vec3 shaded_color = get_world_lighting(color, _roughness, metallic, N, I);
 #endif
 
-#ifdef V3D_LIGHTING_FLAT
+#ifdef WORKBENCH_LIGHTING_FLAT
   vec3 shaded_color = color;
 #endif
 
-  shaded_color *= get_shadow(N);
+  shaded_color *= get_shadow(N, forceShadowing);
 
   /* Listing 4 */
-  float weight = calculate_transparent_weight() * alpha_interp;
-  transparentAccum = vec4(shaded_color * weight, alpha_interp);
-  revealageAccum = vec4(weight);
+  float alpha = alpha_interp * world_data.xray_alpha;
+  float weight = calculate_transparent_weight() * alpha;
+  out_transparent_accum = vec4(shaded_color * weight, alpha);
+  out_revealage_accum = vec4(weight);
 
-  objectId = uint(object_id);
+  out_object_id = uint(object_id);
 }

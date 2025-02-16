@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup balembic
@@ -21,18 +9,17 @@
 #include "abc_writer_hair.h"
 #include "intern/abc_axis_conversion.h"
 
-#include <cstdio>
-
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
-#include "DNA_modifier_types.h"
 #include "DNA_object_types.h"
 
-#include "BLI_math_geom.h"
+#include "BLI_math_matrix.h"
+#include "BLI_math_vector.h"
 
-#include "BKE_customdata.h"
-#include "BKE_mesh.h"
-#include "BKE_mesh_runtime.h"
+#include "BKE_customdata.hh"
+#include "BKE_mesh_legacy_convert.hh"
+#include "BKE_mesh_runtime.hh"
+#include "BKE_object.hh"
 #include "BKE_particle.h"
 
 #include "CLG_log.h"
@@ -76,9 +63,11 @@ bool ABCHairWriter::check_is_animated(const HierarchyContext & /*context*/) cons
 
 void ABCHairWriter::do_write(HierarchyContext &context)
 {
-  Scene *scene_eval = DEG_get_evaluated_scene(args_.depsgraph);
-  Mesh *mesh = mesh_get_eval_final(args_.depsgraph, scene_eval, context.object, &CD_MASK_MESH);
-  BKE_mesh_tessface_ensure(mesh);
+  const Mesh *mesh = BKE_object_get_evaluated_mesh(context.object);
+  if (!mesh) {
+    return;
+  }
+  BKE_mesh_tessface_ensure(const_cast<Mesh *>(mesh));
 
   std::vector<Imath::V3f> verts;
   std::vector<int32_t> hvertices;
@@ -91,11 +80,13 @@ void ABCHairWriter::do_write(HierarchyContext &context)
     bool export_children = psys->childcache && part->childtype != 0;
 
     if (!export_children || part->draw & PART_DRAW_PARENT) {
-      write_hair_sample(context, mesh, verts, norm_values, uv_values, hvertices);
+      write_hair_sample(
+          context, const_cast<Mesh *>(mesh), verts, norm_values, uv_values, hvertices);
     }
 
     if (export_children) {
-      write_hair_child_sample(context, mesh, verts, norm_values, uv_values, hvertices);
+      write_hair_child_sample(
+          context, const_cast<Mesh *>(mesh), verts, norm_values, uv_values, hvertices);
     }
   }
 
@@ -131,11 +122,13 @@ void ABCHairWriter::write_hair_sample(const HierarchyContext &context,
 {
   /* Get untransformed vertices, there's a xform under the hair. */
   float inv_mat[4][4];
-  invert_m4_m4_safe(inv_mat, context.object->obmat);
+  invert_m4_m4_safe(inv_mat, context.object->object_to_world().ptr());
 
-  MTFace *mtface = mesh->mtface;
-  MFace *mface = mesh->mface;
-  MVert *mverts = mesh->mvert;
+  MTFace *mtface = (MTFace *)CustomData_get_layer_for_write(
+      &mesh->fdata_legacy, CD_MTFACE, mesh->totface_legacy);
+  const MFace *mface = (const MFace *)CustomData_get_layer(&mesh->fdata_legacy, CD_MFACE);
+  const Span<float3> positions = mesh->vert_positions();
+  const Span<float3> vert_normals = mesh->vert_normals();
 
   if ((!mtface || !mface) && !uv_warning_shown_) {
     std::fprintf(stderr,
@@ -162,9 +155,10 @@ void ABCHairWriter::write_hair_sample(const HierarchyContext &context,
     if (part->from == PART_FROM_FACE && mtface) {
       const int num = pa->num_dmcache >= 0 ? pa->num_dmcache : pa->num;
 
-      if (num < mesh->totface) {
-        /* TODO(Sybren): check whether the NULL check here and if(mface) are actually required */
-        MFace *face = mface == nullptr ? nullptr : &mface[num];
+      if (num < mesh->totface_legacy) {
+        /* TODO(Sybren): check whether the null check here and if(mface) are actually required
+         */
+        const MFace *face = mface == nullptr ? nullptr : &mface[num];
         MTFace *tface = mtface + num;
 
         if (mface) {
@@ -173,15 +167,25 @@ void ABCHairWriter::write_hair_sample(const HierarchyContext &context,
           psys_interpolate_uvs(tface, face->v4, pa->fuv, r_uv);
           uv_values.emplace_back(r_uv[0], r_uv[1]);
 
-          psys_interpolate_face(
-              mverts, face, tface, nullptr, mapfw, vec, normal, nullptr, nullptr, nullptr);
+          psys_interpolate_face(mesh,
+                                reinterpret_cast<const float(*)[3]>(positions.data()),
+                                reinterpret_cast<const float(*)[3]>(vert_normals.data()),
+                                face,
+                                tface,
+                                nullptr,
+                                mapfw,
+                                vec,
+                                normal,
+                                nullptr,
+                                nullptr,
+                                nullptr);
 
           copy_yup_from_zup(tmp_nor.getValue(), normal);
           norm_values.push_back(tmp_nor);
         }
       }
       else {
-        std::fprintf(stderr, "Particle to faces overflow (%d/%d)\n", num, mesh->totface);
+        std::fprintf(stderr, "Particle to faces overflow (%d/%d)\n", num, mesh->totface_legacy);
       }
     }
     else if (part->from == PART_FROM_VERT && mtface) {
@@ -189,10 +193,10 @@ void ABCHairWriter::write_hair_sample(const HierarchyContext &context,
       const int num = (pa->num_dmcache >= 0) ? pa->num_dmcache : pa->num;
 
       /* iterate over all faces to find a corresponding underlying UV */
-      for (int n = 0; n < mesh->totface; n++) {
-        MFace *face = &mface[n];
-        MTFace *tface = mtface + n;
-        unsigned int vtx[4];
+      for (int n = 0; n < mesh->totface_legacy; n++) {
+        const MFace *face = &mface[n];
+        const MTFace *tface = mtface + n;
+        uint vtx[4];
         vtx[0] = face->v1;
         vtx[1] = face->v2;
         vtx[2] = face->v3;
@@ -206,10 +210,7 @@ void ABCHairWriter::write_hair_sample(const HierarchyContext &context,
 
           if (vtx[o] == num) {
             uv_values.emplace_back(tface->uv[o][0], tface->uv[o][1]);
-
-            MVert *mv = mverts + vtx[o];
-
-            normal_short_to_float_v3(normal, mv->no);
+            copy_v3_v3(normal, vert_normals[vtx[o]]);
             copy_yup_from_zup(tmp_nor.getValue(), normal);
             norm_values.push_back(tmp_nor);
             found = true;
@@ -246,10 +247,13 @@ void ABCHairWriter::write_hair_child_sample(const HierarchyContext &context,
 {
   /* Get untransformed vertices, there's a xform under the hair. */
   float inv_mat[4][4];
-  invert_m4_m4_safe(inv_mat, context.object->obmat);
+  invert_m4_m4_safe(inv_mat, context.object->object_to_world().ptr());
 
-  MTFace *mtface = mesh->mtface;
-  MVert *mverts = mesh->mvert;
+  const MFace *mface = (const MFace *)CustomData_get_layer(&mesh->fdata_legacy, CD_MFACE);
+  MTFace *mtface = (MTFace *)CustomData_get_layer_for_write(
+      &mesh->fdata_legacy, CD_MTFACE, mesh->totface_legacy);
+  const Span<float3> positions = mesh->vert_positions();
+  const Span<float3> vert_normals = mesh->vert_normals();
 
   ParticleSystem *psys = context.particle_system;
   ParticleSettings *part = psys->part;
@@ -273,7 +277,7 @@ void ABCHairWriter::write_hair_child_sample(const HierarchyContext &context,
         continue;
       }
 
-      MFace *face = &mesh->mface[num];
+      const MFace *face = &mface[num];
       MTFace *tface = mtface + num;
 
       float r_uv[2], tmpnor[3], mapfw[4], vec[3];
@@ -281,8 +285,18 @@ void ABCHairWriter::write_hair_child_sample(const HierarchyContext &context,
       psys_interpolate_uvs(tface, face->v4, pc->fuv, r_uv);
       uv_values.emplace_back(r_uv[0], r_uv[1]);
 
-      psys_interpolate_face(
-          mverts, face, tface, nullptr, mapfw, vec, tmpnor, nullptr, nullptr, nullptr);
+      psys_interpolate_face(mesh,
+                            reinterpret_cast<const float(*)[3]>(positions.data()),
+                            reinterpret_cast<const float(*)[3]>(vert_normals.data()),
+                            face,
+                            tface,
+                            nullptr,
+                            mapfw,
+                            vec,
+                            tmpnor,
+                            nullptr,
+                            nullptr,
+                            nullptr);
 
       /* Convert Z-up to Y-up. */
       norm_values.emplace_back(tmpnor[0], tmpnor[2], -tmpnor[1]);

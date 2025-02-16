@@ -1,200 +1,94 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2021 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2021 by Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup draw
  */
 
-#include "draw_cache_extract_mesh_private.h"
+#include "extract_mesh.hh"
 
 namespace blender::draw {
 
-/* ---------------------------------------------------------------------- */
-/** \name Extract Face-dots Normal and edit flag
- * \{ */
 #define NOR_AND_FLAG_DEFAULT 0
 #define NOR_AND_FLAG_SELECT 1
 #define NOR_AND_FLAG_ACTIVE -1
 #define NOR_AND_FLAG_HIDDEN -2
 
-static void extract_fdots_nor_init(const MeshRenderData *mr,
-                                   struct MeshBatchCache *UNUSED(cache),
-                                   void *buf,
-                                   void *UNUSED(tls_data))
+template<typename GPUType>
+static void extract_face_dot_normals_mesh(const MeshRenderData &mr, MutableSpan<GPUType> normals)
 {
-  GPUVertBuf *vbo = static_cast<GPUVertBuf *>(buf);
-  static GPUVertFormat format = {0};
-  if (format.attr_len == 0) {
-    GPU_vertformat_attr_add(&format, "norAndFlag", GPU_COMP_I10, 4, GPU_FETCH_INT_TO_FLOAT_UNIT);
-  }
-
-  GPU_vertbuf_init_with_format(vbo, &format);
-  GPU_vertbuf_data_alloc(vbo, mr->poly_len);
+  convert_normals(mr.face_normals, normals);
+  const GPUType invalid_normal = convert_normal<GPUType>(float3(0));
+  threading::parallel_for(IndexRange(mr.faces_num), 4096, [&](const IndexRange range) {
+    for (const int i : range) {
+      const BMFace *face = bm_original_face_get(mr, i);
+      if (!face || BM_elem_flag_test(face, BM_ELEM_HIDDEN)) {
+        normals[i] = invalid_normal;
+        normals[i].w = NOR_AND_FLAG_HIDDEN;
+      }
+      else if (BM_elem_flag_test(face, BM_ELEM_SELECT)) {
+        normals[i].w = (face == mr.efa_act) ? NOR_AND_FLAG_ACTIVE : NOR_AND_FLAG_SELECT;
+      }
+    }
+  });
 }
 
-static void extract_fdots_nor_finish(const MeshRenderData *mr,
-                                     struct MeshBatchCache *UNUSED(cache),
-                                     void *buf,
-                                     void *UNUSED(data))
+template<typename GPUType>
+void extract_face_dot_normals_bm(const MeshRenderData &mr, MutableSpan<GPUType> normals)
 {
-  GPUVertBuf *vbo = static_cast<GPUVertBuf *>(buf);
-  static float invalid_normal[3] = {0.0f, 0.0f, 0.0f};
-  GPUPackedNormal *nor = (GPUPackedNormal *)GPU_vertbuf_get_data(vbo);
-  BMFace *efa;
-
-  /* Quicker than doing it for each loop. */
-  if (mr->extract_type == MR_EXTRACT_BMESH) {
-    for (int f = 0; f < mr->poly_len; f++) {
-      efa = BM_face_at_index(mr->bm, f);
-      const bool is_face_hidden = BM_elem_flag_test(efa, BM_ELEM_HIDDEN);
-      if (is_face_hidden || (mr->extract_type == MR_EXTRACT_MAPPED && mr->p_origindex &&
-                             mr->p_origindex[f] == ORIGINDEX_NONE)) {
-        nor[f] = GPU_normal_convert_i10_v3(invalid_normal);
-        nor[f].w = NOR_AND_FLAG_HIDDEN;
+  const GPUType invalid_normal = convert_normal<GPUType>(float3(0));
+  threading::parallel_for(IndexRange(mr.faces_num), 4096, [&](const IndexRange range) {
+    for (const int i : range) {
+      BMFace *face = BM_face_at_index(mr.bm, i);
+      if (BM_elem_flag_test(face, BM_ELEM_HIDDEN)) {
+        normals[i] = invalid_normal;
+        normals[i].w = NOR_AND_FLAG_HIDDEN;
       }
       else {
-        nor[f] = GPU_normal_convert_i10_v3(bm_face_no_get(mr, efa));
-        /* Select / Active Flag. */
-        nor[f].w = (BM_elem_flag_test(efa, BM_ELEM_SELECT) ?
-                        ((efa == mr->efa_act) ? NOR_AND_FLAG_ACTIVE : NOR_AND_FLAG_SELECT) :
-                        NOR_AND_FLAG_DEFAULT);
+        normals[i] = convert_normal<GPUType>(bm_face_no_get(mr, face));
+        normals[i].w = (BM_elem_flag_test(face, BM_ELEM_SELECT) ?
+                            ((face == mr.efa_act) ? NOR_AND_FLAG_ACTIVE : NOR_AND_FLAG_SELECT) :
+                            NOR_AND_FLAG_DEFAULT);
       }
+    }
+  });
+}
+
+void extract_face_dot_normals(const MeshRenderData &mr, const bool use_hq, gpu::VertBuf &vbo)
+{
+  if (use_hq) {
+    static GPUVertFormat format = {0};
+    if (format.attr_len == 0) {
+      GPU_vertformat_attr_add(&format, "norAndFlag", GPU_COMP_I16, 4, GPU_FETCH_INT_TO_FLOAT_UNIT);
+    }
+    GPU_vertbuf_init_with_format(vbo, format);
+    GPU_vertbuf_data_alloc(vbo, mr.faces_num);
+    MutableSpan vbo_data = vbo.data<short4>();
+
+    if (mr.extract_type == MeshExtractType::Mesh) {
+      extract_face_dot_normals_mesh(mr, vbo_data);
+    }
+    else {
+      extract_face_dot_normals_bm(mr, vbo_data);
     }
   }
   else {
-    for (int f = 0; f < mr->poly_len; f++) {
-      efa = bm_original_face_get(mr, f);
-      const bool is_face_hidden = efa && BM_elem_flag_test(efa, BM_ELEM_HIDDEN);
-      if (is_face_hidden || (mr->extract_type == MR_EXTRACT_MAPPED && mr->p_origindex &&
-                             mr->p_origindex[f] == ORIGINDEX_NONE)) {
-        nor[f] = GPU_normal_convert_i10_v3(invalid_normal);
-        nor[f].w = NOR_AND_FLAG_HIDDEN;
-      }
-      else {
-        nor[f] = GPU_normal_convert_i10_v3(bm_face_no_get(mr, efa));
-        /* Select / Active Flag. */
-        nor[f].w = (BM_elem_flag_test(efa, BM_ELEM_SELECT) ?
-                        ((efa == mr->efa_act) ? NOR_AND_FLAG_ACTIVE : NOR_AND_FLAG_SELECT) :
-                        NOR_AND_FLAG_DEFAULT);
-      }
+    static GPUVertFormat format = {0};
+    if (format.attr_len == 0) {
+      GPU_vertformat_attr_add(&format, "norAndFlag", GPU_COMP_I10, 4, GPU_FETCH_INT_TO_FLOAT_UNIT);
+    }
+    GPU_vertbuf_init_with_format(vbo, format);
+    GPU_vertbuf_data_alloc(vbo, mr.faces_num);
+    MutableSpan vbo_data = vbo.data<GPUPackedNormal>();
+
+    if (mr.extract_type == MeshExtractType::Mesh) {
+      extract_face_dot_normals_mesh(mr, vbo_data);
+    }
+    else {
+      extract_face_dot_normals_bm(mr, vbo_data);
     }
   }
 }
-
-constexpr MeshExtract create_extractor_fdots_nor()
-{
-  MeshExtract extractor = {nullptr};
-  extractor.init = extract_fdots_nor_init;
-  extractor.finish = extract_fdots_nor_finish;
-  extractor.data_type = MR_DATA_LOOP_NOR;
-  extractor.data_size = 0;
-  extractor.use_threading = false;
-  extractor.mesh_buffer_offset = offsetof(MeshBufferCache, vbo.fdots_nor);
-  return extractor;
-}
-
-/** \} */
-
-/* ---------------------------------------------------------------------- */
-/** \name Extract Face-dots High Quality Normal and edit flag
- * \{ */
-static void extract_fdots_nor_hq_init(const MeshRenderData *mr,
-                                      struct MeshBatchCache *UNUSED(cache),
-                                      void *buf,
-                                      void *UNUSED(tls_data))
-{
-  GPUVertBuf *vbo = static_cast<GPUVertBuf *>(buf);
-  static GPUVertFormat format = {0};
-  if (format.attr_len == 0) {
-    GPU_vertformat_attr_add(&format, "norAndFlag", GPU_COMP_I16, 4, GPU_FETCH_INT_TO_FLOAT_UNIT);
-  }
-
-  GPU_vertbuf_init_with_format(vbo, &format);
-  GPU_vertbuf_data_alloc(vbo, mr->poly_len);
-}
-
-static void extract_fdots_nor_hq_finish(const MeshRenderData *mr,
-                                        struct MeshBatchCache *UNUSED(cache),
-                                        void *buf,
-                                        void *UNUSED(data))
-{
-  GPUVertBuf *vbo = static_cast<GPUVertBuf *>(buf);
-  static float invalid_normal[3] = {0.0f, 0.0f, 0.0f};
-  short *nor = (short *)GPU_vertbuf_get_data(vbo);
-  BMFace *efa;
-
-  /* Quicker than doing it for each loop. */
-  if (mr->extract_type == MR_EXTRACT_BMESH) {
-    for (int f = 0; f < mr->poly_len; f++) {
-      efa = BM_face_at_index(mr->bm, f);
-      const bool is_face_hidden = BM_elem_flag_test(efa, BM_ELEM_HIDDEN);
-      if (is_face_hidden || (mr->extract_type == MR_EXTRACT_MAPPED && mr->p_origindex &&
-                             mr->p_origindex[f] == ORIGINDEX_NONE)) {
-        normal_float_to_short_v3(&nor[f * 4], invalid_normal);
-        nor[f * 4 + 3] = NOR_AND_FLAG_HIDDEN;
-      }
-      else {
-        normal_float_to_short_v3(&nor[f * 4], bm_face_no_get(mr, efa));
-        /* Select / Active Flag. */
-        nor[f * 4 + 3] = (BM_elem_flag_test(efa, BM_ELEM_SELECT) ?
-                              ((efa == mr->efa_act) ? NOR_AND_FLAG_ACTIVE : NOR_AND_FLAG_SELECT) :
-                              NOR_AND_FLAG_DEFAULT);
-      }
-    }
-  }
-  else {
-    for (int f = 0; f < mr->poly_len; f++) {
-      efa = bm_original_face_get(mr, f);
-      const bool is_face_hidden = efa && BM_elem_flag_test(efa, BM_ELEM_HIDDEN);
-      if (is_face_hidden || (mr->extract_type == MR_EXTRACT_MAPPED && mr->p_origindex &&
-                             mr->p_origindex[f] == ORIGINDEX_NONE)) {
-        normal_float_to_short_v3(&nor[f * 4], invalid_normal);
-        nor[f * 4 + 3] = NOR_AND_FLAG_HIDDEN;
-      }
-      else {
-        normal_float_to_short_v3(&nor[f * 4], bm_face_no_get(mr, efa));
-        /* Select / Active Flag. */
-        nor[f * 4 + 3] = (BM_elem_flag_test(efa, BM_ELEM_SELECT) ?
-                              ((efa == mr->efa_act) ? NOR_AND_FLAG_ACTIVE : NOR_AND_FLAG_SELECT) :
-                              NOR_AND_FLAG_DEFAULT);
-      }
-    }
-  }
-}
-
-constexpr MeshExtract create_extractor_fdots_nor_hq()
-{
-  MeshExtract extractor = {nullptr};
-  extractor.init = extract_fdots_nor_hq_init;
-  extractor.finish = extract_fdots_nor_hq_finish;
-  extractor.data_type = MR_DATA_LOOP_NOR;
-  extractor.data_size = 0;
-  extractor.use_threading = false;
-  extractor.mesh_buffer_offset = offsetof(MeshBufferCache, vbo.fdots_nor);
-  return extractor;
-}
-
-/** \} */
 
 }  // namespace blender::draw
-
-extern "C" {
-const MeshExtract extract_fdots_nor = blender::draw::create_extractor_fdots_nor();
-const MeshExtract extract_fdots_nor_hq = blender::draw::create_extractor_fdots_nor_hq();
-}

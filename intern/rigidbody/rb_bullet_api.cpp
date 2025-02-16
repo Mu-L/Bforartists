@@ -1,24 +1,9 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2013 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2013 Blender Foundation
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
- * \ingroup RigidBody
+ * \ingroup intern_rigidbody
  * \brief Rigid Body API implementation for Bullet
  */
 
@@ -50,22 +35,22 @@
  * -- Joshua Leung, June 2010
  */
 
-#include <errno.h>
-#include <stdio.h>
+#include <cerrno>
+#include <cstdio>
 
 #include "RBI_api.h"
 
-#include "btBulletDynamicsCommon.h"
+#include <btBulletDynamicsCommon.h>
 
-#include "LinearMath/btConvexHullComputer.h"
-#include "LinearMath/btMatrix3x3.h"
-#include "LinearMath/btScalar.h"
-#include "LinearMath/btTransform.h"
-#include "LinearMath/btVector3.h"
+#include <LinearMath/btConvexHullComputer.h>
+#include <LinearMath/btMatrix3x3.h>
+#include <LinearMath/btScalar.h>
+#include <LinearMath/btTransform.h>
+#include <LinearMath/btVector3.h>
 
-#include "BulletCollision/CollisionShapes/btScaledBvhTriangleMeshShape.h"
-#include "BulletCollision/Gimpact/btGImpactCollisionAlgorithm.h"
-#include "BulletCollision/Gimpact/btGImpactShape.h"
+#include <BulletCollision/CollisionShapes/btScaledBvhTriangleMeshShape.h>
+#include <BulletCollision/Gimpact/btGImpactCollisionAlgorithm.h>
+#include <BulletCollision/Gimpact/btGImpactShape.h>
 
 struct rbDynamicsWorld {
   btDiscreteDynamicsWorld *dynamicsWorld;
@@ -103,7 +88,7 @@ struct rbCollisionShape {
 };
 
 struct rbFilterCallback : public btOverlapFilterCallback {
-  virtual bool needBroadphaseCollision(btBroadphaseProxy *proxy0, btBroadphaseProxy *proxy1) const
+  bool needBroadphaseCollision(btBroadphaseProxy *proxy0, btBroadphaseProxy *proxy1) const override
   {
     rbRigidBody *rb0 = (rbRigidBody *)((btRigidBody *)proxy0->m_clientObject)->getUserPointer();
     rbRigidBody *rb1 = (rbRigidBody *)((btRigidBody *)proxy1->m_clientObject)->getUserPointer();
@@ -678,9 +663,9 @@ rbCollisionShape *RB_shape_new_box(float x, float y, float z)
 {
   rbCollisionShape *shape = new rbCollisionShape;
   shape->cshape = new btBoxShape(btVector3(x, y, z));
-  shape->mesh = NULL;
+  shape->mesh = nullptr;
   shape->compoundChilds = 0;
-  shape->compoundChildShapes = NULL;
+  shape->compoundChildShapes = nullptr;
   return shape;
 }
 
@@ -688,9 +673,9 @@ rbCollisionShape *RB_shape_new_sphere(float radius)
 {
   rbCollisionShape *shape = new rbCollisionShape;
   shape->cshape = new btSphereShape(radius);
-  shape->mesh = NULL;
+  shape->mesh = nullptr;
   shape->compoundChilds = 0;
-  shape->compoundChildShapes = NULL;
+  shape->compoundChildShapes = nullptr;
   return shape;
 }
 
@@ -698,9 +683,9 @@ rbCollisionShape *RB_shape_new_capsule(float radius, float height)
 {
   rbCollisionShape *shape = new rbCollisionShape;
   shape->cshape = new btCapsuleShapeZ(radius, height);
-  shape->mesh = NULL;
+  shape->mesh = nullptr;
   shape->compoundChilds = 0;
-  shape->compoundChildShapes = NULL;
+  shape->compoundChildShapes = nullptr;
   return shape;
 }
 
@@ -708,9 +693,9 @@ rbCollisionShape *RB_shape_new_cone(float radius, float height)
 {
   rbCollisionShape *shape = new rbCollisionShape;
   shape->cshape = new btConeShapeZ(radius, height);
-  shape->mesh = NULL;
+  shape->mesh = nullptr;
   shape->compoundChilds = 0;
-  shape->compoundChildShapes = NULL;
+  shape->compoundChildShapes = nullptr;
   return shape;
 }
 
@@ -718,16 +703,16 @@ rbCollisionShape *RB_shape_new_cylinder(float radius, float height)
 {
   rbCollisionShape *shape = new rbCollisionShape;
   shape->cshape = new btCylinderShapeZ(btVector3(radius, radius, height));
-  shape->mesh = NULL;
+  shape->mesh = nullptr;
   shape->compoundChilds = 0;
-  shape->compoundChildShapes = NULL;
+  shape->compoundChildShapes = nullptr;
   return shape;
 }
 
 /* Setup (Convex Hull) ------------ */
 
 rbCollisionShape *RB_shape_new_convex_hull(
-    float *verts, int stride, int count, float margin, bool *can_embed)
+    const float *verts, int stride, int count, float margin, bool *can_embed)
 {
   btConvexHullComputer hull_computer = btConvexHullComputer();
 
@@ -742,9 +727,9 @@ rbCollisionShape *RB_shape_new_convex_hull(
                                                         hull_computer.vertices.size());
 
   shape->cshape = hull_shape;
-  shape->mesh = NULL;
+  shape->mesh = nullptr;
   shape->compoundChilds = 0;
-  shape->compoundChildShapes = NULL;
+  shape->compoundChildShapes = nullptr;
   return shape;
 }
 
@@ -810,18 +795,18 @@ rbCollisionShape *RB_shape_new_trimesh(rbMeshData *mesh)
   shape->cshape = new btScaledBvhTriangleMeshShape(unscaledShape, btVector3(1.0f, 1.0f, 1.0f));
   shape->mesh = mesh;
   shape->compoundChilds = 0;
-  shape->compoundChildShapes = NULL;
+  shape->compoundChildShapes = nullptr;
   return shape;
 }
 
 void RB_shape_trimesh_update(rbCollisionShape *shape,
-                             float *vertices,
+                             const float *vertices,
                              int num_verts,
                              int vert_stride,
-                             float min[3],
-                             float max[3])
+                             const float min[3],
+                             const float max[3])
 {
-  if (shape->mesh == NULL || num_verts != shape->mesh->num_vertices) {
+  if (shape->mesh == nullptr || num_verts != shape->mesh->num_vertices) {
     return;
   }
 
@@ -853,7 +838,7 @@ rbCollisionShape *RB_shape_new_gimpact_mesh(rbMeshData *mesh)
   shape->cshape = gimpactShape;
   shape->mesh = mesh;
   shape->compoundChilds = 0;
-  shape->compoundChildShapes = NULL;
+  shape->compoundChildShapes = nullptr;
   return shape;
 }
 
@@ -865,9 +850,9 @@ rbCollisionShape *RB_shape_new_compound()
   btCompoundShape *compoundShape = new btCompoundShape();
 
   shape->cshape = compoundShape;
-  shape->mesh = NULL;
+  shape->mesh = nullptr;
   shape->compoundChilds = 0;
-  shape->compoundChildShapes = NULL;
+  shape->compoundChildShapes = nullptr;
   return shape;
 }
 
@@ -911,7 +896,7 @@ void RB_shape_delete(rbCollisionShape *shape)
   for (int i = 0; i < shape->compoundChilds; i++) {
     RB_shape_delete(shape->compoundChildShapes[i]);
   }
-  if (shape->compoundChildShapes != NULL) {
+  if (shape->compoundChildShapes != nullptr) {
     free(shape->compoundChildShapes);
   }
 
@@ -955,8 +940,8 @@ static void make_constraint_transforms(btTransform &transform1,
                                        btTransform &transform2,
                                        btRigidBody *body1,
                                        btRigidBody *body2,
-                                       float pivot[3],
-                                       float orn[4])
+                                       const float pivot[3],
+                                       const float orn[4])
 {
   btTransform pivot_transform = btTransform();
   pivot_transform.setIdentity();
@@ -967,7 +952,7 @@ static void make_constraint_transforms(btTransform &transform1,
   transform2 = body2->getWorldTransform().inverse() * pivot_transform;
 }
 
-rbConstraint *RB_constraint_new_point(float pivot[3], rbRigidBody *rb1, rbRigidBody *rb2)
+rbConstraint *RB_constraint_new_point(const float pivot[3], rbRigidBody *rb1, rbRigidBody *rb2)
 {
   btRigidBody *body1 = rb1->body;
   btRigidBody *body2 = rb2->body;
@@ -1135,6 +1120,13 @@ rbConstraint *RB_constraint_new_motor(float pivot[3],
 void RB_constraint_delete(rbConstraint *con)
 {
   btTypedConstraint *constraint = reinterpret_cast<btTypedConstraint *>(con);
+
+  /* If the constraint has disabled collisions between the bodies, those bodies
+   * will have a pointer back to the constraint. We need to remove the constraint
+   * from each body to avoid dereferencing the deleted constraint later (#91369) */
+  constraint->getRigidBodyA().removeConstraintRef(constraint);
+  constraint->getRigidBodyB().removeConstraintRef(constraint);
+
   delete constraint;
 }
 

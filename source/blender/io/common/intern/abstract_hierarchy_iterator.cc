@@ -1,34 +1,17 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2019 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2019 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "IO_abstract_hierarchy_iterator.h"
 #include "dupli_parent_finder.hh"
 
-#include <climits>
-#include <cstdio>
-#include <iostream>
-#include <sstream>
 #include <string>
 
-#include "BKE_anim_data.h"
-#include "BKE_duplilist.h"
-#include "BKE_key.h"
-#include "BKE_object.h"
+#include <fmt/core.h>
+
+#include "BKE_anim_data.hh"
+#include "BKE_duplilist.hh"
+#include "BKE_key.hh"
+#include "BKE_object.hh"
 #include "BKE_particle.h"
 
 #include "BLI_assert.h"
@@ -42,7 +25,7 @@
 #include "DNA_particle_types.h"
 #include "DNA_rigidbody_types.h"
 
-#include "DEG_depsgraph_query.h"
+#include "DEG_depsgraph_query.hh"
 
 namespace blender::io {
 
@@ -77,6 +60,14 @@ void HierarchyContext::mark_as_not_instanced()
   original_export_path.clear();
 }
 
+bool HierarchyContext::is_prototype() const
+{
+  /* The context is for a prototype if it's for a duplisource or
+   * for a duplicated object that was designated to be a prototype
+   * because the original was not included in the export.*/
+  return is_duplisource || (duplicator != nullptr && !is_instance());
+}
+
 bool HierarchyContext::is_object_visible(const enum eEvaluationMode evaluation_mode) const
 {
   const bool is_dupli = duplicator != nullptr;
@@ -100,9 +91,7 @@ bool HierarchyContext::is_object_visible(const enum eEvaluationMode evaluation_m
   return (visibility & OB_VISIBLE_SELF) != 0;
 }
 
-EnsuredWriter::EnsuredWriter() : writer_(nullptr), newly_created_(false)
-{
-}
+EnsuredWriter::EnsuredWriter() : writer_(nullptr), newly_created_(false) {}
 
 EnsuredWriter::EnsuredWriter(AbstractHierarchyWriter *writer, bool newly_created)
     : writer_(writer), newly_created_(newly_created)
@@ -139,7 +128,7 @@ AbstractHierarchyWriter *EnsuredWriter::operator->()
 
 bool AbstractHierarchyWriter::check_is_animated(const HierarchyContext &context) const
 {
-  const Object *object = context.object;
+  Object *object = context.object;
 
   if (BKE_animdata_id_is_animated(static_cast<ID *>(object->data))) {
     return true;
@@ -177,8 +166,8 @@ bool AbstractHierarchyWriter::check_has_deforming_physics(const HierarchyContext
   return rbo != nullptr && rbo->type == RBO_TYPE_ACTIVE && (rbo->flag & RBO_FLAG_USE_DEFORM) != 0;
 }
 
-AbstractHierarchyIterator::AbstractHierarchyIterator(Depsgraph *depsgraph)
-    : depsgraph_(depsgraph), export_subset_({true, true})
+AbstractHierarchyIterator::AbstractHierarchyIterator(Main *bmain, Depsgraph *depsgraph)
+    : bmain_(bmain), depsgraph_(depsgraph), export_subset_({true, true})
 {
 }
 
@@ -187,9 +176,9 @@ AbstractHierarchyIterator::~AbstractHierarchyIterator()
   /* release_writers() cannot be called here directly, as it calls into the pure-virtual
    * release_writer() function. By the time this destructor is called, the subclass that implements
    * that pure-virtual function is already destructed. */
-  BLI_assert(
-      writers_.empty() ||
-      !"release_writers() should be called before the AbstractHierarchyIterator goes out of scope");
+  BLI_assert_msg(
+      writers_.empty(),
+      "release_writers() should be called before the AbstractHierarchyIterator goes out of scope");
 }
 
 void AbstractHierarchyIterator::iterate_and_write()
@@ -247,46 +236,53 @@ void AbstractHierarchyIterator::debug_print_export_graph(const ExportGraph &grap
     const Object *const duplicator = parent_info.duplicated_by;
 
     if (duplicator != nullptr) {
-      printf("    DU %s (as dupped by %s):\n",
-             export_parent == nullptr ? "-null-" : (export_parent->id.name + 2),
-             duplicator->id.name + 2);
+      fmt::println("    DU {} (as dupped by {}):",
+                   export_parent == nullptr ? "-null-" : (export_parent->id.name + 2),
+                   duplicator->id.name + 2);
     }
     else {
-      printf("    OB %s:\n", export_parent == nullptr ? "-null-" : (export_parent->id.name + 2));
+      fmt::println("    OB {}:",
+                   export_parent == nullptr ? "-null-" : (export_parent->id.name + 2));
     }
 
     total_graph_size += map_iter.second.size();
     for (HierarchyContext *child_ctx : map_iter.second) {
       if (child_ctx->duplicator == nullptr) {
-        printf("       - %s%s%s\n",
-               child_ctx->export_name.c_str(),
-               child_ctx->weak_export ? " (weak)" : "",
-               child_ctx->original_export_path.empty() ?
-                   "" :
-                   (std::string("ref ") + child_ctx->original_export_path).c_str());
+        fmt::println("       - {}{}{}",
+                     child_ctx->export_name.c_str(),
+                     child_ctx->weak_export ? " (weak)" : "",
+                     child_ctx->original_export_path.empty() ?
+                         "" :
+                         (std::string("ref ") + child_ctx->original_export_path).c_str());
       }
       else {
-        printf("       - %s (dup by %s%s) %s\n",
-               child_ctx->export_name.c_str(),
-               child_ctx->duplicator->id.name + 2,
-               child_ctx->weak_export ? ", weak" : "",
-               child_ctx->original_export_path.empty() ?
-                   "" :
-                   (std::string("ref ") + child_ctx->original_export_path).c_str());
+        fmt::println("       - {} (dup by {}{}) {}",
+                     child_ctx->export_name.c_str(),
+                     child_ctx->duplicator->id.name + 2,
+                     child_ctx->weak_export ? ", weak" : "",
+                     child_ctx->original_export_path.empty() ?
+                         "" :
+                         (std::string("ref ") + child_ctx->original_export_path).c_str());
       }
     }
   }
-  printf("    (Total graph size: %zu objects)\n", total_graph_size);
+  fmt::println("    (Total graph size: {} objects)", total_graph_size);
 }
 
 void AbstractHierarchyIterator::export_graph_construct()
 {
   Scene *scene = DEG_get_evaluated_scene(depsgraph_);
 
-  DEG_OBJECT_ITER_BEGIN (depsgraph_,
-                         object,
-                         DEG_ITER_OBJECT_FLAG_LINKED_DIRECTLY |
-                             DEG_ITER_OBJECT_FLAG_LINKED_VIA_SET) {
+  /* Add a "null" root node with no children immediately for the case where the top-most node in
+   * the scene is not being exported and a root node otherwise wouldn't get added. */
+  ExportGraph::key_type root_node_id = ObjectIdentifier::for_real_object(nullptr);
+  export_graph_[root_node_id] = ExportChildren();
+
+  DEGObjectIterSettings deg_iter_settings{};
+  deg_iter_settings.depsgraph = depsgraph_;
+  deg_iter_settings.flags = DEG_ITER_OBJECT_FLAG_LINKED_DIRECTLY |
+                            DEG_ITER_OBJECT_FLAG_LINKED_VIA_SET;
+  DEG_OBJECT_ITER_BEGIN (&deg_iter_settings, object) {
     /* Non-instanced objects always have their object-parent as export-parent. */
     const bool weak_export = mark_as_weak_export(object);
     visit_object(object, object->parent, weak_export);
@@ -417,6 +413,7 @@ void AbstractHierarchyIterator::visit_object(Object *object,
 {
   HierarchyContext *context = new HierarchyContext();
   context->object = object;
+  context->is_object_data_context = false;
   context->export_name = get_object_name(object);
   context->export_parent = export_parent;
   context->duplicator = nullptr;
@@ -425,8 +422,9 @@ void AbstractHierarchyIterator::visit_object(Object *object,
   context->export_path = "";
   context->original_export_path = "";
   context->higher_up_export_path = "";
+  context->is_duplisource = false;
 
-  copy_m4_m4(context->matrix_world, object->obmat);
+  copy_m4_m4(context->matrix_world, object->object_to_world().ptr());
 
   ExportGraph::key_type graph_index = determine_graph_index_object(context);
   context_update_for_graph_index(context, graph_index);
@@ -457,27 +455,31 @@ void AbstractHierarchyIterator::visit_dupli_object(DupliObject *dupli_object,
 {
   HierarchyContext *context = new HierarchyContext();
   context->object = dupli_object->ob;
+  context->is_object_data_context = false;
   context->duplicator = duplicator;
   context->persistent_id = PersistentID(dupli_object);
   context->weak_export = false;
   context->export_path = "";
   context->original_export_path = "";
-  context->export_path = "";
   context->animation_check_include_parent = false;
+  context->is_duplisource = false;
 
   copy_m4_m4(context->matrix_world, dupli_object->mat);
 
   /* Construct export name for the dupli-instance. */
-  std::stringstream export_name_stream;
-  export_name_stream << get_object_name(context->object) << "-"
-                     << context->persistent_id.as_object_name_suffix();
-  context->export_name = make_valid_name(export_name_stream.str());
+  std::string export_name = get_object_name(context->object) + "-" +
+                            context->persistent_id.as_object_name_suffix();
+  context->export_name = make_valid_name(export_name);
 
   ExportGraph::key_type graph_index = determine_graph_index_dupli(
       context, dupli_object, dupli_parent_finder);
   context_update_for_graph_index(context, graph_index);
 
   export_graph_[graph_index].insert(context);
+
+  if (dupli_object->ob) {
+    this->duplisources_.insert(&dupli_object->ob->id);
+  }
 }
 
 AbstractHierarchyIterator::ExportGraph::key_type AbstractHierarchyIterator::
@@ -498,6 +500,12 @@ void AbstractHierarchyIterator::context_update_for_graph_index(
 {
   /* Update the HierarchyContext so that it is consistent with the graph index. */
   context->export_parent = graph_index.object;
+
+  /* If the parent type is such that it cannot be exported (at least not currently to USD or
+   * Alembic), always check the parent for animation. */
+  const short partype = context->object->partype & PARTYPE;
+  context->animation_check_include_parent |= ELEM(partype, PARBONE, PARVERT1, PARVERT3, PARSKEL);
+
   if (context->export_parent != context->object->parent) {
     /* The parent object in Blender is NOT used as the export parent. This means
      * that the world transform of this object can be influenced by objects that
@@ -535,10 +543,14 @@ void AbstractHierarchyIterator::determine_export_paths(const HierarchyContext *p
   }
 }
 
-void AbstractHierarchyIterator::determine_duplication_references(
-    const HierarchyContext *parent_context, std::string indent)
+bool AbstractHierarchyIterator::determine_duplication_references(
+    const HierarchyContext *parent_context, const std::string &indent)
 {
   ExportChildren children = graph_children(parent_context);
+
+  /* Will be set to true if any child contexts are instances that were designated
+   * as proxies for the original prototype.*/
+  bool contains_proxy_prototype = false;
 
   for (HierarchyContext *context : children) {
     if (context->duplicator != nullptr) {
@@ -549,6 +561,7 @@ void AbstractHierarchyIterator::determine_duplication_references(
         /* The original was not found, so mark this instance as "the original". */
         context->mark_as_not_instanced();
         duplisource_export_path_[source_id] = context->export_path;
+        contains_proxy_prototype = true;
       }
       else {
         context->mark_as_instance_of(it->second);
@@ -567,9 +580,26 @@ void AbstractHierarchyIterator::determine_duplication_references(
         }
       }
     }
+    else {
+      /* Determine is this context is for an instance prototype. */
+      ID *id = &context->object->id;
+      if (duplisources_.find(id) != duplisources_.end()) {
+        context->is_duplisource = true;
+      }
+    }
 
-    determine_duplication_references(context, indent + "  ");
+    if (determine_duplication_references(context, indent + "  ")) {
+      /* A descendant was designated a prototype proxy. If the current context
+       * is an instance, we must change it to a prototype proxy as well. */
+      if (context->is_instance()) {
+        context->mark_as_not_instanced();
+        ID *source_id = &context->object->id;
+        duplisource_export_path_[source_id] = context->export_path;
+      }
+      contains_proxy_prototype = true;
+    }
   }
+  return contains_proxy_prototype;
 }
 
 void AbstractHierarchyIterator::make_writers(const HierarchyContext *parent_context)
@@ -608,13 +638,15 @@ void AbstractHierarchyIterator::make_writers(const HierarchyContext *parent_cont
       transform_writer->write(*context);
     }
 
-    if (!context->weak_export) {
+    if (!context->weak_export && include_data_writers(context)) {
       make_writers_particle_systems(context);
       make_writer_object_data(context);
     }
 
-    /* Recurse into this object's children. */
-    make_writers(context);
+    if (include_child_writers(context)) {
+      /* Recurse into this object's children. */
+      make_writers(context);
+    }
   }
 
   /* TODO(Sybren): iterate over all unused writers and call unused_during_iteration() or something.
@@ -625,10 +657,16 @@ HierarchyContext AbstractHierarchyIterator::context_for_object_data(
     const HierarchyContext *object_context) const
 {
   HierarchyContext data_context = *object_context;
+  data_context.is_object_data_context = true;
   data_context.higher_up_export_path = object_context->export_path;
   data_context.export_name = get_object_data_name(data_context.object);
   data_context.export_path = path_concatenate(data_context.higher_up_export_path,
                                               data_context.export_name);
+
+  ExportGraph::key_type object_key = ObjectIdentifier::for_hierarchy_context(&data_context);
+  ExportGraph::const_iterator iter = export_graph_.find(object_key);
+  data_context.is_parent = iter != export_graph_.end() ? (iter->second.size() > 0) : false;
+
   return data_context;
 }
 
@@ -682,6 +720,15 @@ void AbstractHierarchyIterator::make_writers_particle_systems(
         writer = ensure_writer(&hair_context, &AbstractHierarchyIterator::create_hair_writer);
         break;
       case PART_EMITTER:
+      case PART_FLUID_FLIP:
+      case PART_FLUID_SPRAY:
+      case PART_FLUID_BUBBLE:
+      case PART_FLUID_FOAM:
+      case PART_FLUID_TRACER:
+      case PART_FLUID_SPRAYFOAM:
+      case PART_FLUID_SPRAYBUBBLE:
+      case PART_FLUID_FOAMBUBBLE:
+      case PART_FLUID_SPRAYFOAMBUBBLE:
         writer = ensure_writer(&hair_context, &AbstractHierarchyIterator::create_particle_writer);
         break;
     }
@@ -747,8 +794,13 @@ bool AbstractHierarchyIterator::mark_as_weak_export(const Object * /*object*/) c
 }
 bool AbstractHierarchyIterator::should_visit_dupli_object(const DupliObject *dupli_object) const
 {
-  /* Removing dupli_object->no_draw hides things like custom bone shapes. */
-  return !dupli_object->no_draw;
+  /* Do not visit dupli objects if their `no_draw` flag is set (things like custom bone shapes) or
+   * if they are meta-balls. */
+  if (dupli_object->no_draw || dupli_object->ob->type == OB_MBALL) {
+    return false;
+  }
+
+  return true;
 }
 
 }  // namespace blender::io

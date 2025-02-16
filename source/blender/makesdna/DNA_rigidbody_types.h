@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2013 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2013 Blender Foundation
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
@@ -27,10 +12,6 @@
 #include "DNA_listBase.h"
 #include "DNA_object_force_types.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 struct Collection;
 
 struct EffectorWeights;
@@ -38,7 +19,7 @@ struct EffectorWeights;
 /* ******************************** */
 /* RigidBody World */
 
-/* Container for data shared by original and evaluated copies of RigidBodyWorld */
+/** Container for data shared by original and evaluated copies of #RigidBodyWorld. */
 typedef struct RigidBodyWorld_Shared {
   /* cache */
   struct PointCache *pointcache;
@@ -90,7 +71,7 @@ typedef struct RigidBodyWorld {
   float time_scale;
 } RigidBodyWorld;
 
-/* Flags for RigidBodyWorld */
+/** RigidBodyWorld.flag */
 typedef enum eRigidBodyWorld_Flag {
   /* should sim world be skipped when evaluating (user setting) */
   RBW_FLAG_MUTED = (1 << 0),
@@ -103,10 +84,10 @@ typedef enum eRigidBodyWorld_Flag {
 /* ******************************** */
 /* RigidBody Object */
 
-/* Container for data that is shared among CoW copies.
+/* Container for data that is shared among evaluated copies.
  *
  * This is placed in a separate struct so that, for example, the physics_shape
- * pointer can be replaced without having to update all CoW copies. */
+ * pointer can be replaced without having to update all evaluated copies. */
 #
 #
 typedef struct RigidBodyOb_Shared {
@@ -170,7 +151,7 @@ typedef struct RigidBodyOb {
   struct RigidBodyOb_Shared *shared;
 } RigidBodyOb;
 
-/* Participation types for RigidBodyOb */
+/** #RigidBodyOb.type */
 typedef enum eRigidBodyOb_Type {
   /* active geometry participant in simulation. is directly controlled by sim */
   RBO_TYPE_ACTIVE = 0,
@@ -178,7 +159,7 @@ typedef enum eRigidBodyOb_Type {
   RBO_TYPE_PASSIVE = 1,
 } eRigidBodyOb_Type;
 
-/* Flags for RigidBodyOb */
+/** #RigidBodyOb.flag */
 typedef enum eRigidBodyOb_Flag {
   /* rigidbody is kinematic (controlled by the animation system) */
   RBO_FLAG_KINEMATIC = (1 << 0),
@@ -198,7 +179,7 @@ typedef enum eRigidBodyOb_Flag {
   RBO_FLAG_USE_DEFORM = (1 << 7),
 } eRigidBodyOb_Flag;
 
-/* RigidBody Collision Shape */
+/** Rigid Body Collision Shape. */
 typedef enum eRigidBody_Shape {
   /** Simple box (i.e. bounding box). */
   RB_SHAPE_BOX = 0,
@@ -221,11 +202,11 @@ typedef enum eRigidBody_Shape {
 } eRigidBody_Shape;
 
 typedef enum eRigidBody_MeshSource {
-  /* base mesh */
+  /** Base mesh. */
   RBO_MESH_BASE = 0,
-  /* only deformations */
+  /** Only deformations. */
   RBO_MESH_DEFORM = 1,
-  /* final derived mesh */
+  /** Final evaluated mesh. */
   RBO_MESH_FINAL = 2,
 } eRigidBody_MeshSource;
 
@@ -304,7 +285,7 @@ typedef struct RigidBodyCon {
   void *physics_constraint;
 } RigidBodyCon;
 
-/* Participation types for RigidBodyOb */
+/** Participation types for #RigidBodyOb.type */
 typedef enum eRigidBodyCon_Type {
   /** lets bodies rotate around a specified point */
   RBC_TYPE_POINT = 0,
@@ -333,13 +314,13 @@ typedef enum eRigidBodyCon_Type {
   RBC_TYPE_MOTOR = 11,
 } eRigidBodyCon_Type;
 
-/* Spring implementation type for RigidBodyOb */
+/** Spring implementation type for RigidBodyOb. */
 typedef enum eRigidBodyCon_SpringType {
   RBC_SPRING_TYPE1 = 0, /* btGeneric6DofSpringConstraint */
   RBC_SPRING_TYPE2 = 1, /* btGeneric6DofSpring2Constraint */
 } eRigidBodyCon_SpringType;
 
-/* Flags for RigidBodyCon */
+/** #RigidBodyCon.flag */
 typedef enum eRigidBodyCon_Flag {
   /* constraint influences rigid body motion */
   RBC_FLAG_ENABLED = (1 << 0),
@@ -372,7 +353,3 @@ typedef enum eRigidBodyCon_Flag {
 } eRigidBodyCon_Flag;
 
 /* ******************************** */
-
-#ifdef __cplusplus
-}
-#endif

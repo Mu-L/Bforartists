@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
@@ -22,7 +10,6 @@
 
 #include "DNA_vec_defaults.h"
 
-/* Struct members on own line. */
 /* clang-format off */
 
 /* -------------------------------------------------------------------- */
@@ -37,7 +24,6 @@
  \
     .constinv = _DNA_DEFAULT_UNIT_M4, \
     .parentinv = _DNA_DEFAULT_UNIT_M4, \
-    .obmat = _DNA_DEFAULT_UNIT_M4, \
  \
     .scale = {1, 1, 1}, \
     .dscale = {1, 1, 1}, \
@@ -51,6 +37,7 @@
     .drotAngle = 0, \
     .quat = _DNA_DEFAULT_UNIT_QT, \
     .dquat = _DNA_DEFAULT_UNIT_QT, \
+    .flag = OB_FLAG_USE_SIMULATION_CACHE, \
     .protectflag = OB_LOCK_ROT4D, \
  \
     .dt = OB_TEXTURE, \

@@ -1,8 +1,11 @@
+/* SPDX-FileCopyrightText: 2023 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
+
 #include "testing/testing.h"
 
-#include "BLI_math.h"
-#include "BLI_utildefines.h"
-#include "bmesh.h"
+#include "BLI_math_vector.h"
+#include "bmesh.hh"
 
 TEST(bmesh_core, BMVertCreate)
 {
@@ -10,9 +13,9 @@ TEST(bmesh_core, BMVertCreate)
   BMVert *bv1, *bv2, *bv3;
   const float co1[3] = {1.0f, 2.0f, 0.0f};
 
-  BMeshCreateParams bm_params;
-  bm_params.use_toolflags = true;
-  bm = BM_mesh_create(&bm_mesh_allocsize_default, &bm_params);
+  BMeshCreateParams bmesh_create_params{};
+  bmesh_create_params.use_toolflags = true;
+  bm = BM_mesh_create(&bm_mesh_allocsize_default, &bmesh_create_params);
   EXPECT_EQ(bm->totvert, 0);
   /* make a custom layer so we can see if it is copied properly */
   BM_data_layer_add(bm, &bm->vdata, CD_PROP_FLOAT);
@@ -22,7 +25,7 @@ TEST(bmesh_core, BMVertCreate)
   EXPECT_EQ(bv1->co[1], 2.0f);
   EXPECT_EQ(bv1->co[2], 0.0f);
   EXPECT_TRUE(is_zero_v3(bv1->no));
-  EXPECT_EQ(bv1->head.htype, (char)BM_VERT);
+  EXPECT_EQ(bv1->head.htype, char(BM_VERT));
   EXPECT_EQ(bv1->head.hflag, 0);
   EXPECT_EQ(bv1->head.api_flag, 0);
   bv2 = BM_vert_create(bm, nullptr, nullptr, BM_CREATE_NOP);

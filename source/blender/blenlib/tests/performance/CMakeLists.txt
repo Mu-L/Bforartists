@@ -1,30 +1,25 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2014-2024 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# The Original Code is Copyright (C) 2014, Blender Foundation
-# All rights reserved.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(INC
   .
   ..
+  ../..
 )
 
-setup_libdirs()
-include_directories(${INC})
+set(INC_SYS
+)
 
-BLENDER_TEST_PERFORMANCE(BLI_ghash_performance "bf_blenlib")
-BLENDER_TEST_PERFORMANCE(BLI_task_performance "bf_blenlib")
+set(LIB
+  PRIVATE bf_blenlib
+  PRIVATE bf::dna
+  PRIVATE PRIVATE bf::intern::guardedalloc
+  PRIVATE bf::intern::atomic
+)
+
+set(SRC
+  BLI_map_performance_test.cc
+)
+
+blender_add_test_performance_executable(BLI_map_performance "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")

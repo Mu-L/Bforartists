@@ -1,7 +1,12 @@
+/* SPDX-FileCopyrightText: 2020-2023 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-out vec2 uvs;
-out vec2 pixcoord;
-out vec4 offset[3];
+#include "infos/gpencil_info.hh"
+
+VERTEX_SHADER_CREATE_INFO(gpencil_antialiasing_stage_1)
+
+#include "gpu_shader_smaa_lib.glsl"
 
 void main()
 {

@@ -1,21 +1,9 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2006-2022 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
- * \ingroup memutil
+ * \ingroup intern_memutil
  */
 
 #ifndef __MEM_CACHELIMITER_H__
@@ -54,8 +42,6 @@
  */
 
 #include "MEM_Allocator.h"
-#include <list>
-#include <queue>
 #include <vector>
 
 template<class T> class MEM_CacheLimiter;
@@ -72,7 +58,7 @@ bool MEM_CacheLimiter_is_disabled(void);
 template<class T> class MEM_CacheLimiterHandle {
  public:
   explicit MEM_CacheLimiterHandle(T *data_, MEM_CacheLimiter<T> *parent_)
-      : data(data_), refcount(0), parent(parent_)
+      : data(data_), parent(parent_)
   {
   }
 
@@ -131,16 +117,16 @@ template<class T> class MEM_CacheLimiterHandle {
   friend class MEM_CacheLimiter<T>;
 
   T *data;
-  int refcount;
+  int refcount = 0;
   int pos;
   MEM_CacheLimiter<T> *parent;
 };
 
 template<class T> class MEM_CacheLimiter {
  public:
-  typedef size_t (*MEM_CacheLimiter_DataSize_Func)(void *data);
-  typedef int (*MEM_CacheLimiter_ItemPriority_Func)(void *item, int default_priority);
-  typedef bool (*MEM_CacheLimiter_ItemDestroyable_Func)(void *item);
+  using MEM_CacheLimiter_DataSize_Func = size_t (*)(void *);
+  using MEM_CacheLimiter_ItemPriority_Func = int (*)(void *, int);
+  using MEM_CacheLimiter_ItemDestroyable_Func = bool (*)(void *);
 
   MEM_CacheLimiter(MEM_CacheLimiter_DataSize_Func data_size_func) : data_size_func(data_size_func)
   {
@@ -208,8 +194,9 @@ template<class T> class MEM_CacheLimiter {
     while (!queue.empty() && mem_in_use > max) {
       MEM_CacheElementPtr elem = get_least_priority_destroyable_element();
 
-      if (!elem)
+      if (!elem) {
         break;
+      }
 
       if (data_size_func) {
         cur_size = data_size_func(elem->get()->get_data());
@@ -235,7 +222,7 @@ template<class T> class MEM_CacheLimiter {
      * doesn't make much sense because we'll iterate it all to get
      * least priority element anyway.
      */
-    if (item_priority_func == NULL) {
+    if (item_priority_func == nullptr) {
       queue[handle->pos] = queue.back();
       queue[handle->pos]->pos = handle->pos;
       queue.pop_back();
@@ -255,9 +242,9 @@ template<class T> class MEM_CacheLimiter {
   }
 
  private:
-  typedef MEM_CacheLimiterHandle<T> *MEM_CacheElementPtr;
-  typedef std::vector<MEM_CacheElementPtr, MEM_Allocator<MEM_CacheElementPtr>> MEM_CacheQueue;
-  typedef typename MEM_CacheQueue::iterator iterator;
+  using MEM_CacheElementPtr = MEM_CacheLimiterHandle<T> *;
+  using MEM_CacheQueue = std::vector<MEM_CacheElementPtr, MEM_Allocator<MEM_CacheElementPtr>>;
+  using iterator = typename MEM_CacheQueue::iterator;
 
   /* Check whether element can be destroyed when enforcing cache limits */
   bool can_destroy_element(MEM_CacheElementPtr &elem)
@@ -267,24 +254,27 @@ template<class T> class MEM_CacheLimiter {
       return false;
     }
     if (item_destroyable_func) {
-      if (!item_destroyable_func(elem->get()->get_data()))
+      if (!item_destroyable_func(elem->get()->get_data())) {
         return false;
+      }
     }
     return true;
   }
 
-  MEM_CacheElementPtr get_least_priority_destroyable_element(void)
+  MEM_CacheElementPtr get_least_priority_destroyable_element()
   {
-    if (queue.empty())
+    if (queue.empty()) {
       return NULL;
+    }
 
     MEM_CacheElementPtr best_match_elem = NULL;
 
     if (!item_priority_func) {
       for (iterator it = queue.begin(); it != queue.end(); it++) {
         MEM_CacheElementPtr elem = *it;
-        if (!can_destroy_element(elem))
+        if (!can_destroy_element(elem)) {
           continue;
+        }
         best_match_elem = elem;
         break;
       }
@@ -296,12 +286,13 @@ template<class T> class MEM_CacheLimiter {
       for (i = 0; i < queue.size(); i++) {
         MEM_CacheElementPtr elem = queue[i];
 
-        if (!can_destroy_element(elem))
+        if (!can_destroy_element(elem)) {
           continue;
+        }
 
-        /* by default 0 means highest priority element */
-        /* casting a size type to int is questionable,
-           but unlikely to cause problems */
+        /* By default 0 means highest priority element. */
+        /* Casting a size type to int is questionable,
+         * but unlikely to cause problems. */
         int priority = -((int)(queue.size()) - i - 1);
         priority = item_priority_func(elem->get()->get_data(), priority);
 

@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup balembic
@@ -20,7 +8,6 @@
 
 #include "abc_reader_nurbs.h"
 #include "abc_axis_conversion.h"
-#include "abc_reader_transform.h"
 #include "abc_util.h"
 
 #include "MEM_guardedalloc.h"
@@ -29,10 +16,11 @@
 #include "DNA_object_types.h"
 
 #include "BLI_listbase.h"
-#include "BLI_string.h"
 
-#include "BKE_curve.h"
-#include "BKE_object.h"
+#include "BLT_translation.hh"
+
+#include "BKE_curve.hh"
+#include "BKE_object.hh"
 
 using Alembic::AbcGeom::FloatArraySamplePtr;
 using Alembic::AbcGeom::kWrapExisting;
@@ -71,6 +59,26 @@ bool AbcNurbsReader::valid() const
   return true;
 }
 
+bool AbcNurbsReader::accepts_object_type(
+    const Alembic::AbcCoreAbstract::v12::ObjectHeader &alembic_header,
+    const Object *const ob,
+    const char **r_err_str) const
+{
+  if (!Alembic::AbcGeom::INuPatch::matches(alembic_header)) {
+    *r_err_str = RPT_(
+        "Object type mismatch, Alembic object path pointed to NURBS when importing, but not any "
+        "more");
+    return false;
+  }
+
+  if (ob->type != OB_CURVES_LEGACY) {
+    *r_err_str = RPT_("Object type mismatch, Alembic object path points to NURBS");
+    return false;
+  }
+
+  return true;
+}
+
 static bool set_knots(const FloatArraySamplePtr &knots, float *&nu_knots)
 {
   if (!knots || knots->size() < 2) {
@@ -90,7 +98,7 @@ static bool set_knots(const FloatArraySamplePtr &knots, float *&nu_knots)
 
 void AbcNurbsReader::readObjectData(Main *bmain, const Alembic::Abc::ISampleSelector &sample_sel)
 {
-  Curve *cu = static_cast<Curve *>(BKE_curve_add(bmain, "abc_curve", OB_SURF));
+  Curve *cu = BKE_curve_add(bmain, m_data_name.c_str(), OB_SURF);
   cu->actvert = CU_ACT_NONE;
 
   std::vector<std::pair<INuPatchSchema, IObject>>::iterator it;
@@ -179,8 +187,6 @@ void AbcNurbsReader::readObjectData(Main *bmain, const Alembic::Abc::ISampleSele
 
     BLI_addtail(BKE_curve_nurbs_get(cu), nu);
   }
-
-  BLI_strncpy(cu->id.name + 2, m_data_name.c_str(), m_data_name.size() + 1);
 
   m_object = BKE_object_add_only_object(bmain, OB_SURF, m_object_name.c_str());
   m_object->data = cu;

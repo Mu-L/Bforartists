@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2008-2022 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -28,7 +16,9 @@
 
 #include "../geometry/GeomUtils.h"
 
-#include "BKE_global.h"
+#include "BLI_sys_types.h"
+
+#include "BKE_global.hh"
 
 using namespace std;
 
@@ -80,7 +70,7 @@ void SilhouetteGeomEngine::setTransform(const real iModelViewMatrix[4][4],
                                         const int iViewport[4],
                                         real iFocal)
 {
-  unsigned int i, j;
+  uint i, j;
   _translation[0] = iModelViewMatrix[3][0];
   _translation[1] = iModelViewMatrix[3][1];
   _translation[2] = iModelViewMatrix[3][2];
@@ -102,7 +92,7 @@ void SilhouetteGeomEngine::setTransform(const real iModelViewMatrix[4][4],
   for (i = 0; i < 4; i++) {
     for (j = 0; j < 4; j++) {
       _transform[i][j] = 0;
-      for (unsigned int k = 0; k < 4; k++) {
+      for (uint k = 0; k < 4; k++) {
         _transform[i][j] += _projectionMatrix[i][k] * _modelViewMatrix[k][j];
       }
     }

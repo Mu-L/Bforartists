@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2001-2002 NaN Holding BV. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 /** \file
  * \ingroup DNA
  */
@@ -24,10 +9,6 @@
 
 #include "DNA_ID.h"
 #include "DNA_defs.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 struct Ipo;
 struct PackedFile;
@@ -67,6 +48,7 @@ typedef struct bSound {
   /** Runtime only, always reset in readfile. */
   short tags;
   char _pad[4];
+  double offset_time;
 
   /* Unused currently. */
   // int type;
@@ -91,7 +73,13 @@ typedef struct bSound {
   /** Spin-lock for asynchronous loading of sounds. */
   void *spinlock;
   /* XXX unused currently (SOUND_TYPE_LIMITER) */
-  /* float start, end; */
+  // float start, end;
+
+  /* Description of Audio channels, as of #eSoundChannels. */
+  int audio_channels;
+
+  int samplerate;
+
 } bSound;
 
 /* XXX unused currently */
@@ -120,7 +108,3 @@ enum {
   SOUND_TAGS_WAVEFORM_NO_RELOAD = 1 << 0,
   SOUND_TAGS_WAVEFORM_LOADING = (1 << 6),
 };
-
-#ifdef __cplusplus
-}
-#endif

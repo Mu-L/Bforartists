@@ -1,22 +1,87 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "NOD_math_functions.hh"
 
 namespace blender::nodes {
+
+static const mf::MultiFunction *get_base_multi_function(const bNode &node)
+{
+  const int mode = node.custom1;
+  const mf::MultiFunction *base_fn = nullptr;
+
+  try_dispatch_float_math_fl_to_fl(
+      mode, [&](auto devi_fn, auto function, const FloatMathOperationInfo &info) {
+        static auto fn = mf::build::SI1_SO<float, float>(
+            info.title_case_name.c_str(), function, devi_fn);
+        base_fn = &fn;
+      });
+  if (base_fn != nullptr) {
+    return base_fn;
+  }
+
+  try_dispatch_float_math_fl_fl_to_fl(
+      mode, [&](auto devi_fn, auto function, const FloatMathOperationInfo &info) {
+        static auto fn = mf::build::SI2_SO<float, float, float>(
+            info.title_case_name.c_str(), function, devi_fn);
+        base_fn = &fn;
+      });
+  if (base_fn != nullptr) {
+    return base_fn;
+  }
+
+  try_dispatch_float_math_fl_fl_fl_to_fl(
+      mode, [&](auto devi_fn, auto function, const FloatMathOperationInfo &info) {
+        static auto fn = mf::build::SI3_SO<float, float, float, float>(
+            info.title_case_name.c_str(), function, devi_fn);
+        base_fn = &fn;
+      });
+  if (base_fn != nullptr) {
+    return base_fn;
+  }
+
+  return nullptr;
+}
+
+class ClampWrapperFunction : public mf::MultiFunction {
+ private:
+  const mf::MultiFunction &fn_;
+
+ public:
+  ClampWrapperFunction(const mf::MultiFunction &fn) : fn_(fn)
+  {
+    this->set_signature(&fn.signature());
+  }
+
+  void call(const IndexMask &mask, mf::Params params, mf::Context context) const override
+  {
+    fn_.call(mask, params, context);
+
+    /* Assumes the output parameter is the last one. */
+    const int output_param_index = this->param_amount() - 1;
+    /* This has actually been initialized in the call above. */
+    MutableSpan<float> results = params.uninitialized_single_output<float>(output_param_index);
+
+    mask.foreach_index_optimized<int>([&](const int i) {
+      float &value = results[i];
+      CLAMP(value, 0.0f, 1.0f);
+    });
+  }
+};
+
+void node_math_build_multi_function(NodeMultiFunctionBuilder &builder)
+{
+  const mf::MultiFunction *base_function = get_base_multi_function(builder.node());
+
+  const bool clamp_output = builder.node().custom2 != 0;
+  if (clamp_output) {
+    builder.construct_and_set_matching_fn<ClampWrapperFunction>(*base_function);
+  }
+  else {
+    builder.set_matching_fn(base_function);
+  }
+}
 
 const FloatMathOperationInfo *get_float_math_operation_info(const int operation)
 {
@@ -65,6 +130,8 @@ const FloatMathOperationInfo *get_float_math_operation_info(const int operation)
       RETURN_OPERATION_INFO("Greater Than", "math_greater_than");
     case NODE_MATH_MODULO:
       RETURN_OPERATION_INFO("Modulo", "math_modulo");
+    case NODE_MATH_FLOORED_MODULO:
+      RETURN_OPERATION_INFO("Floored Modulo", "math_floored_modulo");
     case NODE_MATH_ABSOLUTE:
       RETURN_OPERATION_INFO("Absolute", "math_absolute");
     case NODE_MATH_ARCTAN2:
@@ -127,17 +194,17 @@ const FloatMathOperationInfo *get_float_compare_operation_info(const int operati
   ((void)0)
 
   switch (operation) {
-    case NODE_FLOAT_COMPARE_LESS_THAN:
+    case NODE_COMPARE_LESS_THAN:
       RETURN_OPERATION_INFO("Less Than", "math_less_than");
-    case NODE_FLOAT_COMPARE_LESS_EQUAL:
+    case NODE_COMPARE_LESS_EQUAL:
       RETURN_OPERATION_INFO("Less Than or Equal", "math_less_equal");
-    case NODE_FLOAT_COMPARE_GREATER_THAN:
+    case NODE_COMPARE_GREATER_THAN:
       RETURN_OPERATION_INFO("Greater Than", "math_greater_than");
-    case NODE_FLOAT_COMPARE_GREATER_EQUAL:
+    case NODE_COMPARE_GREATER_EQUAL:
       RETURN_OPERATION_INFO("Greater Than or Equal", "math_greater_equal");
-    case NODE_FLOAT_COMPARE_EQUAL:
+    case NODE_COMPARE_EQUAL:
       RETURN_OPERATION_INFO("Equal", "math_equal");
-    case NODE_FLOAT_COMPARE_NOT_EQUAL:
+    case NODE_COMPARE_NOT_EQUAL:
       RETURN_OPERATION_INFO("Not Equal", "math_not_equal");
   }
 

@@ -1,8 +1,15 @@
-void node_volume_absorption(vec4 color, float density, out Closure result)
+/* SPDX-FileCopyrightText: 2019-2022 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
+
+void node_volume_absorption(vec4 color, float density, float weight, out Closure result)
 {
-#ifdef VOLUMETRICS
-  result = Closure((1.0 - color.rgb) * density, vec3(0.0), vec3(0.0), 0.0);
-#else
-  result = CLOSURE_DEFAULT;
-#endif
+  color = max(color, vec4(0.0));
+  density = max(density, 0.0);
+
+  ClosureVolumeAbsorption volume_absorption_data;
+  volume_absorption_data.weight = weight;
+  volume_absorption_data.absorption = (1.0 - color.rgb) * density;
+
+  result = closure_eval(volume_absorption_data);
 }

@@ -1,12 +1,17 @@
+# SPDX-FileCopyrightText: 2018-2022 Blender Authors
+#
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 # ############################################################
 # Importing - Same For All Render Layer Tests
 # ############################################################
 
 import unittest
-import os
-import sys
 
-from view_layer_common import *
+from view_layer_common import (
+    ViewLayerTesting,
+    setup_extra_arguments,
+)
 
 
 # ############################################################
@@ -43,7 +48,7 @@ class UnitTesting(ViewLayerTesting):
         # instance the group
         empty = bpy.data.objects.new("Empty", None)
         bpy.context.scene_collection.objects.link(empty)
-        layer_collection = bpy.context.layer_collection
+        _layer_collection = bpy.context.layer_collection
         empty.instance_type = 'GROUP'
         empty.instance_collection = group
 

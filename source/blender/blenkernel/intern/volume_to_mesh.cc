@@ -1,31 +1,16 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
+#include <fmt/format.h>
 #include <vector>
 
-#include "BLI_float3.hh"
+#include "BLI_math_vector_types.hh"
 #include "BLI_span.hh"
-#include "BLI_utildefines.h"
 
-#include "DNA_mesh_types.h"
-#include "DNA_meshdata_types.h"
-#include "DNA_volume_types.h"
-
-#include "BKE_mesh.h"
-#include "BKE_volume.h"
+#include "BKE_mesh.hh"
+#include "BKE_volume_grid.hh"
+#include "BKE_volume_openvdb.hh"
 
 #ifdef WITH_OPENVDB
 #  include <openvdb/tools/GridTransformer.h>
@@ -33,6 +18,8 @@
 #endif
 
 #include "BKE_volume_to_mesh.hh"
+
+#include "BLT_translation.hh"
 
 namespace blender::bke {
 
@@ -46,6 +33,7 @@ struct VolumeToMeshOp {
   std::vector<openvdb::Vec3s> verts;
   std::vector<openvdb::Vec3I> tris;
   std::vector<openvdb::Vec4I> quads;
+  std::string error;
 
   template<typename GridType> bool operator()()
   {
@@ -110,10 +98,18 @@ struct VolumeToMeshOp {
 
   template<typename GridType> void grid_to_mesh(const GridType &grid)
   {
-    openvdb::tools::volumeToMesh(
-        grid, this->verts, this->tris, this->quads, this->threshold, this->adaptivity);
+    try {
+      openvdb::tools::volumeToMesh(
+          grid, this->verts, this->tris, this->quads, this->threshold, this->adaptivity);
+    }
+    catch (const std::exception &e) {
+      this->error = fmt::format(fmt::runtime(TIP_("OpenVDB error: {}")), e.what());
+      this->verts.clear();
+      this->tris.clear();
+      this->quads.clear();
+    }
 
-    /* Better align generated mesh with volume (see T85312). */
+    /* Better align generated mesh with volume (see #85312). */
     openvdb::Vec3s offset = grid.voxelSize() / 2.0f;
     for (openvdb::Vec3s &position : this->verts) {
       position += offset;
@@ -121,46 +117,53 @@ struct VolumeToMeshOp {
   }
 };
 
-static Mesh *new_mesh_from_openvdb_data(Span<openvdb::Vec3s> verts,
-                                        Span<openvdb::Vec3I> tris,
-                                        Span<openvdb::Vec4I> quads)
+void fill_mesh_from_openvdb_data(const Span<openvdb::Vec3s> vdb_verts,
+                                 const Span<openvdb::Vec3I> vdb_tris,
+                                 const Span<openvdb::Vec4I> vdb_quads,
+                                 const int vert_offset,
+                                 const int face_offset,
+                                 const int loop_offset,
+                                 MutableSpan<float3> vert_positions,
+                                 MutableSpan<int> face_offsets,
+                                 MutableSpan<int> corner_verts)
 {
-  const int tot_loops = 3 * tris.size() + 4 * quads.size();
-  const int tot_polys = tris.size() + quads.size();
-
-  Mesh *mesh = BKE_mesh_new_nomain(verts.size(), 0, 0, tot_loops, tot_polys);
-
   /* Write vertices. */
-  for (const int i : verts.index_range()) {
-    const blender::float3 co = blender::float3(verts[i].asV());
-    copy_v3_v3(mesh->mvert[i].co, co);
-  }
+  vert_positions.slice(vert_offset, vdb_verts.size()).copy_from(vdb_verts.cast<float3>());
 
   /* Write triangles. */
-  for (const int i : tris.index_range()) {
-    mesh->mpoly[i].loopstart = 3 * i;
-    mesh->mpoly[i].totloop = 3;
+  for (const int i : vdb_tris.index_range()) {
+    face_offsets[face_offset + i] = loop_offset + 3 * i;
     for (int j = 0; j < 3; j++) {
       /* Reverse vertex order to get correct normals. */
-      mesh->mloop[3 * i + j].v = tris[i][2 - j];
+      corner_verts[loop_offset + 3 * i + j] = vert_offset + vdb_tris[i][2 - j];
     }
   }
 
   /* Write quads. */
-  const int poly_offset = tris.size();
-  const int loop_offset = tris.size() * 3;
-  for (const int i : quads.index_range()) {
-    mesh->mpoly[poly_offset + i].loopstart = loop_offset + 4 * i;
-    mesh->mpoly[poly_offset + i].totloop = 4;
+  const int quad_offset = face_offset + vdb_tris.size();
+  const int quad_loop_offset = loop_offset + vdb_tris.size() * 3;
+  for (const int i : vdb_quads.index_range()) {
+    face_offsets[quad_offset + i] = quad_loop_offset + 4 * i;
     for (int j = 0; j < 4; j++) {
       /* Reverse vertex order to get correct normals. */
-      mesh->mloop[loop_offset + 4 * i + j].v = quads[i][3 - j];
+      corner_verts[quad_loop_offset + 4 * i + j] = vert_offset + vdb_quads[i][3 - j];
     }
   }
+}
 
-  BKE_mesh_calc_edges(mesh, false, false);
-  BKE_mesh_calc_normals(mesh);
-  return mesh;
+bke::VolumeToMeshDataResult volume_to_mesh_data(const openvdb::GridBase &grid,
+                                                const VolumeToMeshResolution &resolution,
+                                                const float threshold,
+                                                const float adaptivity)
+{
+  const VolumeGridType grid_type = bke::volume_grid::get_type(grid);
+
+  VolumeToMeshOp to_mesh_op{grid, resolution, threshold, adaptivity};
+  if (!BKE_volume_grid_type_operation(grid_type, to_mesh_op)) {
+    return {};
+  }
+  return {{std::move(to_mesh_op.verts), std::move(to_mesh_op.tris), std::move(to_mesh_op.quads)},
+          to_mesh_op.error};
 }
 
 Mesh *volume_to_mesh(const openvdb::GridBase &grid,
@@ -168,14 +171,37 @@ Mesh *volume_to_mesh(const openvdb::GridBase &grid,
                      const float threshold,
                      const float adaptivity)
 {
-  const VolumeGridType grid_type = BKE_volume_grid_type_openvdb(grid);
+  using namespace blender::bke;
+  const OpenVDBMeshData mesh_data =
+      volume_to_mesh_data(grid, resolution, threshold, adaptivity).data;
 
-  VolumeToMeshOp to_mesh_op{grid, resolution, threshold, adaptivity};
-  if (!BKE_volume_grid_type_operation(grid_type, to_mesh_op)) {
-    return nullptr;
-  }
+  const int tot_loops = 3 * mesh_data.tris.size() + 4 * mesh_data.quads.size();
+  const int tot_faces = mesh_data.tris.size() + mesh_data.quads.size();
+  Mesh *mesh = BKE_mesh_new_nomain(mesh_data.verts.size(), 0, tot_faces, tot_loops);
 
-  return new_mesh_from_openvdb_data(to_mesh_op.verts, to_mesh_op.tris, to_mesh_op.quads);
+  fill_mesh_from_openvdb_data(mesh_data.verts,
+                              mesh_data.tris,
+                              mesh_data.quads,
+                              0,
+                              0,
+                              0,
+                              mesh->vert_positions_for_write(),
+                              mesh->face_offsets_for_write(),
+                              mesh->corner_verts_for_write());
+
+  mesh_calc_edges(*mesh, false, false);
+  mesh_smooth_set(*mesh, false);
+
+  mesh->tag_overlapping_none();
+
+  return mesh;
+}
+
+Mesh *volume_grid_to_mesh(const openvdb::GridBase &grid,
+                          const float threshold,
+                          const float adaptivity)
+{
+  return volume_to_mesh(grid, {VOLUME_TO_MESH_RESOLUTION_MODE_GRID}, threshold, adaptivity);
 }
 
 #endif /* WITH_OPENVDB */

@@ -1,9 +1,10 @@
 # Bforartists
 
-Note that the nightlies produced by Github Actions are without Cuda and Optix!
+Note that the nightlies produced by Github Actions are not meant for productive work. They miss CUDA and OptiX. And will most likely not work. The purpose of the nightlies is to  show that the code compiles. Please have a look at the download section at our page. The devbuilds there are working versions.
 
-[![Ubuntu](https://github.com/Bforartists/Bforartists/actions/workflows/all_in_one_dir.yml/badge.svg)](https://github.com/Bforartists/Bforartists/actions/workflows/all_in_one_dir.yml)
-[![Mac](https://github.com/Bforartists/Bforartists/actions/workflows/mac.yml/badge.svg)](https://github.com/Bforartists/Bforartists/actions/workflows/mac.yml)
+[![Linux](https://github.com/Bforartists/Bforartists/actions/workflows/linux.yml/badge.svg)](https://github.com/Bforartists/Bforartists/actions/workflows/linux.yml)
+[![macOS](https://github.com/Bforartists/Bforartists/actions/workflows/mac.yml/badge.svg)](https://github.com/Bforartists/Bforartists/actions/workflows/mac.yml)
+[![Windows](https://github.com/Bforartists/Bforartists/actions/workflows/windows.yml/badge.svg)](https://github.com/Bforartists/Bforartists/actions/workflows/windows.yml)
 
 Bforartists is a fork of the popular 3D software Blender, with the goal to improve the graphical UI, and to increase the usability.
 
@@ -15,20 +16,22 @@ Please use the tracker to add issues, bug reports and requests. The tracker can 
 
 Why choose Bforartists, and not Blender? Because our UI  is streamlined, cleaner, better organized, has colored icons, left aligned text, and much more of all those things that makes a good UI and the life easier. Bforartists is fully compatible with Blender. You can use both asides to make yourself a picture. The files are transferable. So try it, you loose nothing.
 
-The main Differences between Bforartists 2 and Blender 2.8x are:
+The main Differences between Bforartists and Blender are:
 
 - An own keymap, which is reduced to just the necessary hotkeys and a navigation that can be purely done by mouse.
 - Cleaned up User Interface. Lots of not necessary double, triple or even more equal menu entries removed.
 - Extended User Interface. Lots of formerly hotkey only tools have a menu entry now.
 - Rearranged User Interface. Some things are better accessible now, some are not so much in the way anymore.
+- Improved defaults.
 - Colored and as double as much icons than Blender.
-- A configurable Toolbar with icon buttons.
+- Configurable UI Elements like the Toolbar, with icon buttons.
+- Tabs in the toolshelf.
 - Improved Layouts.
 - Left aligned checkboxes and text where possible.
 - Better Tooltips.
 - Better readable standard theme.
 - Some neat addons to improve usability, like the reset 3D View addon or the Set Dimensions addon with which you can scale in world coordinates in edit mode.
-- And lots more small details like not so much confirm dialogs.
+- And lots more small details like not so much confirm dialogs. Or that we have resurrected the tabs in the tool shelf to allow quicker access to the tools.
 
 A detailed list of the changes can be found in the release notes: www.bforartists.de/wiki/release-notes
 

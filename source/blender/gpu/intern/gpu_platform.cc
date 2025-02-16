@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2005 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2005 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup gpu
@@ -28,8 +13,10 @@
 
 #include "BLI_dynstr.h"
 #include "BLI_string.h"
+#include "BLI_string_utils.hh"
+#include "BLI_vector.hh"
 
-#include "GPU_platform.h"
+#include "GPU_platform.hh"
 
 #include "gpu_platform_private.hh"
 
@@ -60,8 +47,8 @@ static char *create_key(eGPUSupportLevel support_level,
 
   char *support_key = BLI_dynstr_get_cstring(ds);
   BLI_dynstr_free(ds);
-  BLI_str_replace_char(support_key, '\n', ' ');
-  BLI_str_replace_char(support_key, '\r', ' ');
+  BLI_string_replace_char(support_key, '\n', ' ');
+  BLI_string_replace_char(support_key, '\r', ' ');
   return support_key;
 }
 
@@ -72,8 +59,8 @@ static char *create_gpu_name(const char *vendor, const char *renderer, const cha
 
   char *gpu_name = BLI_dynstr_get_cstring(ds);
   BLI_dynstr_free(ds);
-  BLI_str_replace_char(gpu_name, '\n', ' ');
-  BLI_str_replace_char(gpu_name, '\r', ' ');
+  BLI_string_replace_char(gpu_name, '\n', ' ');
+  BLI_string_replace_char(gpu_name, '\r', ' ');
   return gpu_name;
 }
 
@@ -81,9 +68,11 @@ void GPUPlatformGlobal::init(eGPUDeviceType gpu_device,
                              eGPUOSType os_type,
                              eGPUDriverType driver_type,
                              eGPUSupportLevel gpu_support_level,
+                             eGPUBackendType backend,
                              const char *vendor_str,
                              const char *renderer_str,
-                             const char *version_str)
+                             const char *version_str,
+                             GPUArchitectureType arch_type)
 {
   this->clear();
 
@@ -94,11 +83,17 @@ void GPUPlatformGlobal::init(eGPUDeviceType gpu_device,
   this->driver = driver_type;
   this->support_level = gpu_support_level;
 
-  this->vendor = BLI_strdup(vendor_str);
-  this->renderer = BLI_strdup(renderer_str);
-  this->version = BLI_strdup(version_str);
-  this->support_key = create_key(gpu_support_level, vendor_str, renderer_str, version_str);
-  this->gpu_name = create_gpu_name(vendor_str, renderer_str, version_str);
+  const char *vendor = vendor_str ? vendor_str : "UNKNOWN";
+  const char *renderer = renderer_str ? renderer_str : "UNKNOWN";
+  const char *version = version_str ? version_str : "UNKNOWN";
+
+  this->vendor = BLI_strdup(vendor);
+  this->renderer = BLI_strdup(renderer);
+  this->version = BLI_strdup(version);
+  this->support_key = create_key(gpu_support_level, vendor, renderer, version);
+  this->gpu_name = create_gpu_name(vendor, renderer, version);
+  this->backend = backend;
+  this->architecture_type = arch_type;
 }
 
 void GPUPlatformGlobal::clear()
@@ -108,6 +103,7 @@ void GPUPlatformGlobal::clear()
   MEM_SAFE_FREE(version);
   MEM_SAFE_FREE(support_key);
   MEM_SAFE_FREE(gpu_name);
+  devices.clear_and_shrink();
   initialized = false;
 }
 
@@ -127,41 +123,60 @@ eGPUSupportLevel GPU_platform_support_level()
   return GPG.support_level;
 }
 
-const char *GPU_platform_vendor(void)
+const char *GPU_platform_vendor()
 {
   BLI_assert(GPG.initialized);
   return GPG.vendor;
 }
 
-const char *GPU_platform_renderer(void)
+const char *GPU_platform_renderer()
 {
   BLI_assert(GPG.initialized);
   return GPG.renderer;
 }
 
-const char *GPU_platform_version(void)
+const char *GPU_platform_version()
 {
   BLI_assert(GPG.initialized);
   return GPG.version;
 }
 
-const char *GPU_platform_support_level_key(void)
+const char *GPU_platform_support_level_key()
 {
   BLI_assert(GPG.initialized);
   return GPG.support_key;
 }
 
-const char *GPU_platform_gpu_name(void)
+const char *GPU_platform_gpu_name()
 {
   BLI_assert(GPG.initialized);
   return GPG.gpu_name;
 }
 
-/* GPU Types */
-bool GPU_type_matches(eGPUDeviceType device, eGPUOSType os, eGPUDriverType driver)
+GPUArchitectureType GPU_platform_architecture()
 {
   BLI_assert(GPG.initialized);
-  return (GPG.device & device) && (GPG.os & os) && (GPG.driver & driver);
+  return GPG.architecture_type;
+}
+
+bool GPU_type_matches(eGPUDeviceType device, eGPUOSType os, eGPUDriverType driver)
+{
+  return GPU_type_matches_ex(device, os, driver, GPU_BACKEND_ANY);
+}
+
+bool GPU_type_matches_ex(eGPUDeviceType device,
+                         eGPUOSType os,
+                         eGPUDriverType driver,
+                         eGPUBackendType backend)
+{
+  BLI_assert(GPG.initialized);
+  return (GPG.device & device) && (GPG.os & os) && (GPG.driver & driver) &&
+         (GPG.backend & backend);
+}
+
+blender::Span<GPUDevice> GPU_platform_devices_list()
+{
+  return GPG.devices.as_span();
 }
 
 /** \} */

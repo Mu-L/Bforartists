@@ -1,49 +1,35 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2013 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2013 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup depsgraph
  */
 
-#include "intern/node/deg_node_component.h"
+#include "intern/node/deg_node_component.hh"
 
 #include <cstdio>
 #include <cstring> /* required for STREQ later on. */
 
 #include "BLI_ghash.h"
-#include "BLI_hash.hh"
 #include "BLI_utildefines.h"
 
 #include "DNA_object_types.h"
 
-#include "BKE_action.h"
+#include "BKE_action.hh"
 
-#include "intern/node/deg_node_factory.h"
-#include "intern/node/deg_node_id.h"
-#include "intern/node/deg_node_operation.h"
+#include "intern/node/deg_node_factory.hh"
+#include "intern/node/deg_node_id.hh"
+#include "intern/node/deg_node_operation.hh"
 
 namespace blender::deg {
 
 /* *********** */
 /* Outer Nodes */
 
-/* Standard Component Methods ============================= */
+/* -------------------------------------------------------------------- */
+/** \name Standard Component Methods
+ * \{ */
 
 ComponentNode::OperationIDKey::OperationIDKey()
     : opcode(OperationCode::OPERATION), name(""), name_tag(-1)
@@ -60,20 +46,20 @@ ComponentNode::OperationIDKey::OperationIDKey(OperationCode opcode, const char *
 {
 }
 
-string ComponentNode::OperationIDKey::identifier() const
+std::string ComponentNode::OperationIDKey::identifier() const
 {
-  const string codebuf = to_string(static_cast<int>(opcode));
+  const std::string codebuf = std::to_string(int(opcode));
   return "OperationIDKey(" + codebuf + ", " + name + ")";
 }
 
 bool ComponentNode::OperationIDKey::operator==(const OperationIDKey &other) const
 {
-  return (opcode == other.opcode) && (STREQ(name, other.name)) && (name_tag == other.name_tag);
+  return (opcode == other.opcode) && STREQ(name, other.name) && (name_tag == other.name_tag);
 }
 
 uint64_t ComponentNode::OperationIDKey::hash() const
 {
-  const int opcode_as_int = static_cast<int>(opcode);
+  const int opcode_as_int = int(opcode);
   return BLI_ghashutil_combine_hash(
       name_tag,
       BLI_ghashutil_combine_hash(BLI_ghashutil_uinthash(opcode_as_int),
@@ -81,16 +67,18 @@ uint64_t ComponentNode::OperationIDKey::hash() const
 }
 
 ComponentNode::ComponentNode()
-    : entry_operation(nullptr), exit_operation(nullptr), affects_directly_visible(false)
+    : entry_operation(nullptr),
+      exit_operation(nullptr),
+      possibly_affects_visible_id(false),
+      affects_visible_id(false)
 {
   operations_map = new Map<ComponentNode::OperationIDKey, OperationNode *>();
 }
 
-/* Initialize 'component' node - from pointer data given */
 void ComponentNode::init(const ID * /*id*/, const char * /*subdata*/)
 {
   /* hook up eval context? */
-  // XXX: maybe this needs a special API?
+  /* XXX: maybe this needs a special API? */
 }
 
 /* Free 'component' node */
@@ -100,12 +88,13 @@ ComponentNode::~ComponentNode()
   delete operations_map;
 }
 
-string ComponentNode::identifier() const
+std::string ComponentNode::identifier() const
 {
-  const string idname = this->owner->name;
-  const string typebuf = "" + to_string(static_cast<int>(type)) + ")";
-  return typebuf + name + " : " + idname +
-         "( affects_directly_visible: " + (affects_directly_visible ? "true" : "false") + ")";
+  const std::string type_name = type_get_factory(type)->type_name();
+  const std::string name_part = name[0] ? (std::string(" '") + name + "'") : "";
+
+  return "[" + type_name + "]" + name_part + " : " +
+         "(affects_visible_id: " + (affects_visible_id ? "true" : "false") + ")";
 }
 
 OperationNode *ComponentNode::find_operation(OperationIDKey key) const
@@ -117,7 +106,8 @@ OperationNode *ComponentNode::find_operation(OperationIDKey key) const
   else {
     for (OperationNode *op_node : operations) {
       if (op_node->opcode == key.opcode && op_node->name_tag == key.name_tag &&
-          STREQ(op_node->name.c_str(), key.name)) {
+          STREQ(op_node->name.c_str(), key.name))
+      {
         node = op_node;
         break;
       }
@@ -178,7 +168,7 @@ OperationNode *ComponentNode::add_operation(const DepsEvalOperationCb &op,
     op_node = (OperationNode *)factory->create_node(this->owner->id_orig, "", name);
 
     /* register opnode in this component's operation set */
-    OperationIDKey key(opcode, name, name_tag);
+    OperationIDKey key(opcode, op_node->name.c_str(), name_tag);
     operations_map->add(key, op_node);
 
     /* Set back-link. */
@@ -230,14 +220,13 @@ void ComponentNode::clear_operations()
 
 void ComponentNode::tag_update(Depsgraph *graph, eUpdateSource source)
 {
-  OperationNode *entry_op = get_entry_operation();
-  if (entry_op != nullptr && entry_op->flag & DEPSOP_FLAG_NEEDS_UPDATE) {
-    return;
-  }
+  /* Note that the node might already be tagged for an update due invisible state of the node
+   * during previous dependency evaluation. Here the node gets re-tagged, so we need to give
+   * the evaluated clues that evaluation needs to happen again. */
   for (OperationNode *op_node : operations) {
     op_node->tag_update(graph, source);
   }
-  // It is possible that tag happens before finalization.
+  /* It is possible that tag happens before finalization. */
   if (operations_map != nullptr) {
     for (OperationNode *op_node : operations_map->values()) {
       op_node->tag_update(graph, source);
@@ -297,9 +286,12 @@ void ComponentNode::finalize_build(Depsgraph * /*graph*/)
   operations_map = nullptr;
 }
 
-/* Bone Component ========================================= */
+/** \} */
 
-/* Initialize 'bone component' node - from pointer data given */
+/* -------------------------------------------------------------------- */
+/** \name Bone Component
+ * \{ */
+
 void BoneComponentNode::init(const ID *id, const char *subdata)
 {
   /* generic component-node... */
@@ -315,36 +307,46 @@ void BoneComponentNode::init(const ID *id, const char *subdata)
   this->pchan = BKE_pose_channel_find_name(object->pose, subdata);
 }
 
-/* Register all components. =============================== */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Register All Components
+ * \{ */
 
 DEG_COMPONENT_NODE_DEFINE(Animation, ANIMATION, ID_RECALC_ANIMATION);
 /* TODO(sergey): Is this a correct tag? */
 DEG_COMPONENT_NODE_DEFINE(BatchCache, BATCH_CACHE, ID_RECALC_SHADING);
 DEG_COMPONENT_NODE_DEFINE(Bone, BONE, ID_RECALC_GEOMETRY);
 DEG_COMPONENT_NODE_DEFINE(Cache, CACHE, 0);
-DEG_COMPONENT_NODE_DEFINE(CopyOnWrite, COPY_ON_WRITE, ID_RECALC_COPY_ON_WRITE);
+DEG_COMPONENT_NODE_DEFINE(CopyOnWrite, COPY_ON_EVAL, ID_RECALC_SYNC_TO_EVAL);
 DEG_COMPONENT_NODE_DEFINE(ImageAnimation, IMAGE_ANIMATION, 0);
 DEG_COMPONENT_NODE_DEFINE(Geometry, GEOMETRY, ID_RECALC_GEOMETRY);
 DEG_COMPONENT_NODE_DEFINE(LayerCollections, LAYER_COLLECTIONS, 0);
-DEG_COMPONENT_NODE_DEFINE(Parameters, PARAMETERS, 0);
+DEG_COMPONENT_NODE_DEFINE(Parameters, PARAMETERS, ID_RECALC_PARAMETERS);
 DEG_COMPONENT_NODE_DEFINE(Particles, PARTICLE_SYSTEM, ID_RECALC_GEOMETRY);
 DEG_COMPONENT_NODE_DEFINE(ParticleSettings, PARTICLE_SETTINGS, 0);
 DEG_COMPONENT_NODE_DEFINE(PointCache, POINT_CACHE, 0);
 DEG_COMPONENT_NODE_DEFINE(Pose, EVAL_POSE, ID_RECALC_GEOMETRY);
-DEG_COMPONENT_NODE_DEFINE(Proxy, PROXY, ID_RECALC_GEOMETRY);
 DEG_COMPONENT_NODE_DEFINE(Sequencer, SEQUENCER, 0);
 DEG_COMPONENT_NODE_DEFINE(Shading, SHADING, ID_RECALC_SHADING);
-DEG_COMPONENT_NODE_DEFINE(ShadingParameters, SHADING_PARAMETERS, ID_RECALC_SHADING);
 DEG_COMPONENT_NODE_DEFINE(Transform, TRANSFORM, ID_RECALC_TRANSFORM);
 DEG_COMPONENT_NODE_DEFINE(ObjectFromLayer, OBJECT_FROM_LAYER, 0);
-DEG_COMPONENT_NODE_DEFINE(Dupli, DUPLI, 0);
+DEG_COMPONENT_NODE_DEFINE(Hierarchy, HIERARCHY, 0);
+DEG_COMPONENT_NODE_DEFINE(Instancing, INSTANCING, 0);
 DEG_COMPONENT_NODE_DEFINE(Synchronization, SYNCHRONIZATION, 0);
 DEG_COMPONENT_NODE_DEFINE(Audio, AUDIO, 0);
 DEG_COMPONENT_NODE_DEFINE(Armature, ARMATURE, 0);
 DEG_COMPONENT_NODE_DEFINE(GenericDatablock, GENERIC_DATABLOCK, 0);
-DEG_COMPONENT_NODE_DEFINE(Simulation, SIMULATION, 0);
+DEG_COMPONENT_NODE_DEFINE(Scene, SCENE, 0);
+DEG_COMPONENT_NODE_DEFINE(Visibility, VISIBILITY, 0);
+DEG_COMPONENT_NODE_DEFINE(NTreeOutput, NTREE_OUTPUT, ID_RECALC_NTREE_OUTPUT);
+DEG_COMPONENT_NODE_DEFINE(NTreeGeometryPreprocess, NTREE_GEOMETRY_PREPROCESS, 0);
 
-/* Node Types Register =================================== */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Node Types Register
+ * \{ */
 
 void deg_register_component_depsnodes()
 {
@@ -352,7 +354,7 @@ void deg_register_component_depsnodes()
   register_node_typeinfo(&DNTI_BONE);
   register_node_typeinfo(&DNTI_CACHE);
   register_node_typeinfo(&DNTI_BATCH_CACHE);
-  register_node_typeinfo(&DNTI_COPY_ON_WRITE);
+  register_node_typeinfo(&DNTI_COPY_ON_EVAL);
   register_node_typeinfo(&DNTI_GEOMETRY);
   register_node_typeinfo(&DNTI_LAYER_COLLECTIONS);
   register_node_typeinfo(&DNTI_PARAMETERS);
@@ -360,19 +362,23 @@ void deg_register_component_depsnodes()
   register_node_typeinfo(&DNTI_PARTICLE_SETTINGS);
   register_node_typeinfo(&DNTI_POINT_CACHE);
   register_node_typeinfo(&DNTI_IMAGE_ANIMATION);
-  register_node_typeinfo(&DNTI_PROXY);
   register_node_typeinfo(&DNTI_EVAL_POSE);
   register_node_typeinfo(&DNTI_SEQUENCER);
   register_node_typeinfo(&DNTI_SHADING);
-  register_node_typeinfo(&DNTI_SHADING_PARAMETERS);
   register_node_typeinfo(&DNTI_TRANSFORM);
   register_node_typeinfo(&DNTI_OBJECT_FROM_LAYER);
-  register_node_typeinfo(&DNTI_DUPLI);
+  register_node_typeinfo(&DNTI_HIERARCHY);
+  register_node_typeinfo(&DNTI_INSTANCING);
   register_node_typeinfo(&DNTI_SYNCHRONIZATION);
   register_node_typeinfo(&DNTI_AUDIO);
   register_node_typeinfo(&DNTI_ARMATURE);
   register_node_typeinfo(&DNTI_GENERIC_DATABLOCK);
-  register_node_typeinfo(&DNTI_SIMULATION);
+  register_node_typeinfo(&DNTI_SCENE);
+  register_node_typeinfo(&DNTI_VISIBILITY);
+  register_node_typeinfo(&DNTI_NTREE_OUTPUT);
+  register_node_typeinfo(&DNTI_NTREE_GEOMETRY_PREPROCESS);
 }
+
+/** \} */
 
 }  // namespace blender::deg

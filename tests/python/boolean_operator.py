@@ -1,22 +1,6 @@
-# ##### BEGIN GPL LICENSE BLOCK #####
+# SPDX-FileCopyrightText: 2020-2022 Blender Authors
 #
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ##### END GPL LICENSE BLOCK #####
-
-# <pep8 compliant>
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 # To run all tests, use
 # BLENDER_VERBOSE=1 blender path/to/bool_regression.blend --python path/to/boolean_operator.py -- --run-all-tests
@@ -29,38 +13,38 @@ import os
 import sys
 
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
-from modules.mesh_test import MeshTest, OperatorSpecEditMode, RunTest
+from modules.mesh_test import SpecMeshTest, OperatorSpecEditMode, RunTest
 
 
 def main():
     tests = [
 
-        MeshTest('Cubecube_intersect_union', 'Cubecube', 'Cubecube_result_1',
-                 [OperatorSpecEditMode('intersect_boolean',
-                                       {'operation': 'UNION', 'solver': 'FAST'}, 'FACE', {0, 1, 2, 3, 4, 5}, )]),
-        MeshTest('Cubecube_intersect_intersect', 'Cubecube', 'Cubecube_result_2',
-                 [OperatorSpecEditMode('intersect_boolean', {'operation': 'INTERSECT', 'solver': 'FAST'}, 'FACE', {0, 1, 2, 3, 4, 5}, )]),
-        MeshTest('Cubecube_intersect_difference', 'Cubecube', 'Cubecube_result_3',
-                 [OperatorSpecEditMode('intersect_boolean', {'operation': 'DIFFERENCE', 'solver': 'FAST'}, 'FACE',
-                                       {0, 1, 2, 3, 4, 5}, )]),
-        MeshTest('Cubecube_intersect_cut', 'Cubecube', 'Cubecube_result_4', [OperatorSpecEditMode('intersect',
-                                                                                                  {'separate_mode': 'CUT', 'solver': 'FAST'}, 'FACE', {0, 1, 2, 3, 4, 5}, )]),
-        MeshTest('Cubecube_intersect_all', 'Cubecube', 'Cubecube_result_5',
-                 [OperatorSpecEditMode('intersect',
-                                       {'separate_mode': 'ALL', 'solver': 'FAST'}, 'FACE', {0, 1, 2, 3, 4, 5}, )]),
-        MeshTest('Cubecube_intersect_none', 'Cubecube', 'Cubecube_result_6',
-                 [OperatorSpecEditMode('intersect',
-                                       {'separate_mode': 'NONE', 'solver': 'FAST'}, 'FACE', {0, 1, 2, 3, 4, 5}, )]),
-        MeshTest('Cubecube_intersect_select_none', 'Cubecube',
-                 'Cubecube_result_7',
-                 [OperatorSpecEditMode('intersect',
-                                       {'mode': 'SELECT', 'separate_mode': 'NONE', 'solver': 'FAST'}, 'FACE',
-                                       {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}, )]),
-        MeshTest('Cubecone_intersect_union', 'Cubecone', 'Cubecone_result_1',
-                 [OperatorSpecEditMode('intersect_boolean',
-                                       {'operation': 'UNION', 'solver': 'FAST'}, 'FACE', {6, 7, 8, 9, 10}, )]),
-        MeshTest('Cubecones_intersect_union', 'Cubecones', 'Cubecones_result_1',
-                 [OperatorSpecEditMode('intersect_boolean', {'operation': 'UNION', 'solver': 'FAST'}, 'FACE', {0, 1, 2, 3, 4, 5}, )]),
+        SpecMeshTest('Cubecube_intersect_union', 'Cubecube', 'Cubecube_result_1',
+                     [OperatorSpecEditMode('intersect_boolean',
+                                           {'operation': 'UNION', 'solver': 'FAST'}, 'FACE', {0, 1, 2, 3, 4, 5}, )]),
+        SpecMeshTest('Cubecube_intersect_intersect', 'Cubecube', 'Cubecube_result_2',
+                     [OperatorSpecEditMode('intersect_boolean', {'operation': 'INTERSECT', 'solver': 'FAST'}, 'FACE', {0, 1, 2, 3, 4, 5}, )]),
+        SpecMeshTest('Cubecube_intersect_difference', 'Cubecube', 'Cubecube_result_3',
+                     [OperatorSpecEditMode('intersect_boolean', {'operation': 'DIFFERENCE', 'solver': 'FAST'}, 'FACE',
+                                           {0, 1, 2, 3, 4, 5}, )]),
+        SpecMeshTest('Cubecube_intersect_cut', 'Cubecube', 'Cubecube_result_4', [OperatorSpecEditMode('intersect',
+                                                                                                      {'separate_mode': 'CUT', 'solver': 'FAST'}, 'FACE', {0, 1, 2, 3, 4, 5}, )]),
+        SpecMeshTest('Cubecube_intersect_all', 'Cubecube', 'Cubecube_result_5',
+                     [OperatorSpecEditMode('intersect',
+                                           {'separate_mode': 'ALL', 'solver': 'FAST'}, 'FACE', {0, 1, 2, 3, 4, 5}, )]),
+        SpecMeshTest('Cubecube_intersect_none', 'Cubecube', 'Cubecube_result_6',
+                     [OperatorSpecEditMode('intersect',
+                                           {'separate_mode': 'NONE', 'solver': 'FAST'}, 'FACE', {0, 1, 2, 3, 4, 5}, )]),
+        SpecMeshTest('Cubecube_intersect_select_none', 'Cubecube',
+                     'Cubecube_result_7',
+                     [OperatorSpecEditMode('intersect',
+                                           {'mode': 'SELECT', 'separate_mode': 'NONE', 'solver': 'FAST'}, 'FACE',
+                                           {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}, )]),
+        SpecMeshTest('Cubecone_intersect_union', 'Cubecone', 'Cubecone_result_1',
+                     [OperatorSpecEditMode('intersect_boolean',
+                                           {'operation': 'UNION', 'solver': 'FAST'}, 'FACE', {6, 7, 8, 9, 10}, )]),
+        SpecMeshTest('Cubecones_intersect_union', 'Cubecones', 'Cubecones_result_1',
+                     [OperatorSpecEditMode('intersect_boolean', {'operation': 'UNION', 'solver': 'FAST'}, 'FACE', {0, 1, 2, 3, 4, 5}, )]),
 
     ]
 

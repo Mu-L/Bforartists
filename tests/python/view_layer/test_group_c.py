@@ -1,12 +1,17 @@
+# SPDX-FileCopyrightText: 2017-2022 Blender Authors
+#
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 # ############################################################
 # Importing - Same For All Render Layer Tests
 # ############################################################
 
 import unittest
-import os
-import sys
 
-from view_layer_common import *
+from view_layer_common import (
+    ViewLayerTesting,
+    setup_extra_arguments,
+)
 
 
 # ############################################################
@@ -41,7 +46,7 @@ class UnitTesting(ViewLayerTesting):
         bpy.context.view_layer.update()
 
         # create group
-        group = mom_layer_collection.create_group()
+        _group = mom_layer_collection.create_group()
 
         # update depsgraph
         bpy.context.view_layer.update()

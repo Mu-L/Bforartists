@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2010-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup collada
@@ -25,24 +13,21 @@
 
 #include "DNA_action_types.h"
 #include "DNA_meshdata_types.h"
-#include "DNA_modifier_types.h"
 
-#include "BKE_action.h"
-#include "BKE_armature.h"
-#include "BKE_deform.h"
-#include "BKE_global.h"
-#include "BKE_idprop.h"
-#include "BKE_lib_id.h"
-#include "BKE_mesh.h"
+#include "BKE_action.hh"
+#include "BKE_armature.hh"
+#include "BKE_deform.hh"
+#include "BKE_key.hh"
+#include "BKE_lib_id.hh"
+#include "BKE_mesh.hh"
 
-#include "ED_armature.h"
+#include "ED_armature.hh"
 
 #include "BLI_listbase.h"
+#include "BLI_math_matrix.h"
 
-#include "ArmatureExporter.h"
 #include "ControllerExporter.h"
 #include "GeometryExporter.h"
-#include "SceneExporter.h"
 
 #include "collada_utils.h"
 
@@ -60,7 +45,7 @@ void ControllerExporter::write_bone_URLs(COLLADASW::InstanceController &ins,
     ins.addSkeleton(COLLADABU::URI(COLLADABU::Utils::EMPTY_STRING, node_id));
   }
   else {
-    for (Bone *child = (Bone *)bone->childbase.first; child; child = child->next) {
+    LISTBASE_FOREACH (Bone *, child, &bone->childbase) {
       write_bone_URLs(ins, ob_arm, child);
     }
   }
@@ -76,14 +61,13 @@ bool ControllerExporter::add_instance_controller(Object *ob)
   COLLADASW::InstanceController ins(mSW);
   ins.setUrl(COLLADASW::URI(COLLADABU::Utils::EMPTY_STRING, controller_id));
 
-  Mesh *me = (Mesh *)ob->data;
-  if (!me->dvert) {
+  Mesh *mesh = (Mesh *)ob->data;
+  if (mesh->deform_verts().is_empty()) {
     return false;
   }
 
   /* write root bone URLs */
-  Bone *bone;
-  for (bone = (Bone *)arm->bonebase.first; bone; bone = bone->next) {
+  LISTBASE_FOREACH (Bone *, bone, &arm->bonebase) {
     write_bone_URLs(ins, ob_arm, bone);
   }
 
@@ -161,8 +145,6 @@ std::string ControllerExporter::get_controller_id(Key *key, Object *ob)
   return translate_id(id_name(ob)) + MORPH_CONTROLLER_ID_SUFFIX;
 }
 
-/* ob should be of type OB_MESH
- * both args are required */
 void ControllerExporter::export_skin_controller(Object *ob, Object *ob_arm)
 {
   /* joint names
@@ -171,20 +153,20 @@ void ControllerExporter::export_skin_controller(Object *ob, Object *ob_arm)
 
   /* input:
    * joint names: ob -> vertex group names
-   * vertex group weights: me->dvert -> groups -> index, weight */
+   * vertex group weights: mesh->dvert -> groups -> index, weight */
 
   bool use_instantiation = this->export_settings.get_use_object_instantiation();
-  Mesh *me;
+  Mesh *mesh;
 
-  if (((Mesh *)ob->data)->dvert == nullptr) {
+  if (((Mesh *)ob->data)->deform_verts().is_empty()) {
     return;
   }
 
-  me = bc_get_mesh_copy(blender_context,
-                        ob,
-                        this->export_settings.get_export_mesh_type(),
-                        this->export_settings.get_apply_modifiers(),
-                        this->export_settings.get_triangulate());
+  mesh = bc_get_mesh_copy(blender_context,
+                          ob,
+                          this->export_settings.get_export_mesh_type(),
+                          this->export_settings.get_apply_modifiers(),
+                          this->export_settings.get_triangulate());
 
   std::string controller_name = id_name(ob_arm);
   std::string controller_id = get_controller_id(ob_arm, ob);
@@ -219,9 +201,10 @@ void ControllerExporter::export_skin_controller(Object *ob, Object *ob_arm)
       }
     }
 
+    const MDeformVert *dvert = mesh->deform_verts().data();
     int oob_counter = 0;
-    for (i = 0; i < me->totvert; i++) {
-      MDeformVert *vert = &me->dvert[i];
+    for (i = 0; i < mesh->verts_num; i++) {
+      const MDeformVert *vert = &dvert[i];
       std::map<int, float> jw;
 
       /* We're normalizing the weights later */
@@ -269,11 +252,11 @@ void ControllerExporter::export_skin_controller(Object *ob, Object *ob_arm)
     }
   }
 
-  std::string weights_source_id = add_weights_source(me, controller_id, weights);
+  std::string weights_source_id = add_weights_source(mesh, controller_id, weights);
   add_joints_element(defbase, joints_source_id, inv_bind_mat_source_id);
   add_vertex_weights_element(weights_source_id, joints_source_id, vcounts, joints);
 
-  BKE_id_free(nullptr, me);
+  BKE_id_free(nullptr, mesh);
 
   closeSkin();
   closeController();
@@ -282,13 +265,13 @@ void ControllerExporter::export_skin_controller(Object *ob, Object *ob_arm)
 void ControllerExporter::export_morph_controller(Object *ob, Key *key)
 {
   bool use_instantiation = this->export_settings.get_use_object_instantiation();
-  Mesh *me;
+  Mesh *mesh;
 
-  me = bc_get_mesh_copy(blender_context,
-                        ob,
-                        this->export_settings.get_export_mesh_type(),
-                        this->export_settings.get_apply_modifiers(),
-                        this->export_settings.get_triangulate());
+  mesh = bc_get_mesh_copy(blender_context,
+                          ob,
+                          this->export_settings.get_export_mesh_type(),
+                          this->export_settings.get_apply_modifiers(),
+                          this->export_settings.get_triangulate());
 
   std::string controller_name = id_name(ob) + "-morph";
   std::string controller_id = get_controller_id(key, ob);
@@ -313,7 +296,7 @@ void ControllerExporter::export_morph_controller(Object *ob, Key *key)
                        COLLADASW::URI(COLLADABU::Utils::EMPTY_STRING, morph_weights_id)));
   targets.add();
 
-  BKE_id_free(nullptr, me);
+  BKE_id_free(nullptr, mesh);
 
   /* support for animations
    * can also try the base element and param alternative */
@@ -333,7 +316,7 @@ std::string ControllerExporter::add_morph_targets(Key *key, Object *ob)
   source.setAccessorStride(1);
 
   COLLADASW::SourceBase::ParameterNameList &param = source.getParameterNameList();
-  param.push_back("IDREF");
+  param.emplace_back("IDREF");
 
   source.prepareToAppendValues();
 
@@ -361,7 +344,7 @@ std::string ControllerExporter::add_morph_weights(Key *key, Object *ob)
   source.setAccessorStride(1);
 
   COLLADASW::SourceBase::ParameterNameList &param = source.getParameterNameList();
-  param.push_back("MORPH_WEIGHT");
+  param.emplace_back("MORPH_WEIGHT");
 
   source.prepareToAppendValues();
 
@@ -377,7 +360,6 @@ std::string ControllerExporter::add_morph_weights(Key *key, Object *ob)
   return source_id;
 }
 
-/* Added to implement support for animations. */
 void ControllerExporter::add_weight_extras(Key *key)
 {
   /* can also try the base element and param alternative */
@@ -422,7 +404,7 @@ void ControllerExporter::add_bind_shape_mat(Object *ob)
     bc_add_global_transform(f_obmat, export_settings.get_global_transform());
   }
 
-  // UnitConverter::mat4_to_dae_double(bind_mat, ob->obmat);
+  // UnitConverter::mat4_to_dae_double(bind_mat, ob->object_to_world().ptr());
   UnitConverter::mat4_to_dae_double(bind_mat, f_obmat);
   if (this->export_settings.get_limit_precision()) {
     BCMatrix::sanitize(bind_mat, LIMITTED_PRECISION);
@@ -438,8 +420,7 @@ std::string ControllerExporter::add_joints_source(Object *ob_arm,
   std::string source_id = controller_id + JOINTS_SOURCE_ID_SUFFIX;
 
   int totjoint = 0;
-  bDeformGroup *def;
-  for (def = (bDeformGroup *)defbase->first; def; def = def->next) {
+  LISTBASE_FOREACH (bDeformGroup *, def, defbase) {
     if (is_bone_defgroup(ob_arm, def)) {
       totjoint++;
     }
@@ -452,11 +433,11 @@ std::string ControllerExporter::add_joints_source(Object *ob_arm,
   source.setAccessorStride(1);
 
   COLLADASW::SourceBase::ParameterNameList &param = source.getParameterNameList();
-  param.push_back("JOINT");
+  param.emplace_back("JOINT");
 
   source.prepareToAppendValues();
 
-  for (def = (bDeformGroup *)defbase->first; def; def = def->next) {
+  LISTBASE_FOREACH (bDeformGroup *, def, defbase) {
     Bone *bone = get_bone_from_defgroup(ob_arm, def);
     if (bone) {
       source.appendValues(get_joint_sid(bone));
@@ -475,7 +456,7 @@ std::string ControllerExporter::add_inv_bind_mats_source(Object *ob_arm,
   std::string source_id = controller_id + BIND_POSES_SOURCE_ID_SUFFIX;
 
   int totjoint = 0;
-  for (bDeformGroup *def = (bDeformGroup *)defbase->first; def; def = def->next) {
+  LISTBASE_FOREACH (bDeformGroup *, def, defbase) {
     if (is_bone_defgroup(ob_arm, def)) {
       totjoint++;
     }
@@ -489,7 +470,7 @@ std::string ControllerExporter::add_inv_bind_mats_source(Object *ob_arm,
 
   source.setParameterTypeName(&COLLADASW::CSWC::CSW_VALUE_TYPE_FLOAT4x4);
   COLLADASW::SourceBase::ParameterNameList &param = source.getParameterNameList();
-  param.push_back("TRANSFORM");
+  param.emplace_back("TRANSFORM");
 
   source.prepareToAppendValues();
 
@@ -507,7 +488,7 @@ std::string ControllerExporter::add_inv_bind_mats_source(Object *ob_arm,
     BKE_pose_where_is(depsgraph, scene, ob_arm);
   }
 
-  for (bDeformGroup *def = (bDeformGroup *)defbase->first; def; def = def->next) {
+  LISTBASE_FOREACH (bDeformGroup *, def, defbase) {
     if (is_bone_defgroup(ob_arm, def)) {
       bPoseChannel *pchan = BKE_pose_channel_find_name(pose, def->name);
 
@@ -539,7 +520,7 @@ std::string ControllerExporter::add_inv_bind_mats_source(Object *ob_arm,
       }
 
       /* make world-space matrix (bind_mat is armature-space) */
-      mul_m4_m4m4(world, ob_arm->obmat, bind_mat);
+      mul_m4_m4m4(world, ob_arm->object_to_world().ptr(), bind_mat);
 
       if (!has_bindmat) {
         if (export_settings.get_apply_global_orientation()) {
@@ -580,7 +561,7 @@ bool ControllerExporter::is_bone_defgroup(Object *ob_arm, const bDeformGroup *de
   return get_bone_from_defgroup(ob_arm, def) != nullptr;
 }
 
-std::string ControllerExporter::add_weights_source(Mesh *me,
+std::string ControllerExporter::add_weights_source(Mesh *mesh,
                                                    const std::string &controller_id,
                                                    const std::list<float> &weights)
 {
@@ -593,7 +574,7 @@ std::string ControllerExporter::add_weights_source(Mesh *me,
   source.setAccessorStride(1);
 
   COLLADASW::SourceBase::ParameterNameList &param = source.getParameterNameList();
-  param.push_back("WEIGHT");
+  param.emplace_back("WEIGHT");
 
   source.prepareToAppendValues();
 

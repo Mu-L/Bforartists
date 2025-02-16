@@ -1,115 +1,219 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#include "BLI_math_matrix.h"
+#include "BLI_math_euler.hh"
+#include "BLI_math_matrix.hh"
 
-#include "UI_interface.h"
-#include "UI_resources.h"
+#include "BKE_geometry_set_instances.hh"
+#include "BKE_instances.hh"
+
+#include "DNA_object_types.h"
+
+#include "NOD_rna_define.hh"
+
+#include "UI_interface.hh"
+#include "UI_resources.hh"
+
+#include "DEG_depsgraph_query.hh"
+
+#include "GEO_transform.hh"
+
+#include "BLT_translation.hh"
 
 #include "node_geometry_util.hh"
 
-static bNodeSocketTemplate geo_node_object_info_in[] = {
-    {SOCK_OBJECT, N_("Object"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, PROP_NONE, SOCK_HIDE_LABEL},
-    {-1, ""},
-};
+namespace blender::nodes::node_geo_object_info_cc {
 
-static bNodeSocketTemplate geo_node_object_info_out[] = {
-    {SOCK_VECTOR, N_("Location")},
-    {SOCK_VECTOR, N_("Rotation")},
-    {SOCK_VECTOR, N_("Scale")},
-    {SOCK_GEOMETRY, N_("Geometry")},
-    {-1, ""},
-};
+NODE_STORAGE_FUNCS(NodeGeometryObjectInfo)
 
-static void geo_node_object_info_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+static void node_declare(NodeDeclarationBuilder &b)
 {
-  uiItemR(layout, ptr, "transform_space", UI_ITEM_R_EXPAND, nullptr, ICON_NONE);
+  b.add_input<decl::Object>("Object").hide_label();
+  b.add_input<decl::Bool>("As Instance")
+      .description(
+          "Output the entire object as single instance. "
+          "This allows instancing non-geometry object types");
+  b.add_output<decl::Matrix>("Transform")
+      .description(
+          "Transformation matrix containing the location, rotation and scale of the object");
+  b.add_output<decl::Vector>("Location");
+  b.add_output<decl::Rotation>("Rotation");
+  b.add_output<decl::Vector>("Scale");
+  b.add_output<decl::Geometry>("Geometry");
 }
 
-namespace blender::nodes {
-static void geo_node_object_info_exec(GeoNodeExecParams params)
+static void node_layout(uiLayout *layout, bContext * /*C*/, PointerRNA *ptr)
 {
-  const bNode &bnode = params.node();
-  NodeGeometryObjectInfo *node_storage = (NodeGeometryObjectInfo *)bnode.storage;
-  const bool transform_space_relative = (node_storage->transform_space ==
+  uiItemR(layout, ptr, "transform_space", UI_ITEM_R_EXPAND, std::nullopt, ICON_NONE);
+}
+
+static void node_geo_exec(GeoNodeExecParams params)
+{
+  const NodeGeometryObjectInfo &storage = node_storage(params.node());
+  const bool transform_space_relative = (storage.transform_space ==
                                          GEO_NODE_TRANSFORM_SPACE_RELATIVE);
 
   Object *object = params.get_input<Object *>("Object");
 
-  float3 location = {0, 0, 0};
-  float3 rotation = {0, 0, 0};
-  float3 scale = {0, 0, 0};
-  GeometrySet geometry_set;
-
   const Object *self_object = params.self_object();
+  if (object == nullptr) {
+    params.set_default_remaining_outputs();
+    return;
+  }
 
-  if (object != nullptr) {
-    float transform[4][4];
-    mul_m4_m4m4(transform, self_object->imat, object->obmat);
+  const bool self_transform_evaluated = DEG_object_transform_is_evaluated(*self_object);
+  const bool object_transform_evaluated = DEG_object_transform_is_evaluated(*object);
+  const bool object_geometry_evaluated = DEG_object_geometry_is_evaluated(*object);
 
-    float quaternion[4];
-    if (transform_space_relative) {
-      mat4_decompose(location, quaternion, scale, transform);
+  float4x4 output_transform = float4x4::identity();
+  bool show_transform_error = false;
+  if (transform_space_relative) {
+    if (self_transform_evaluated && object_transform_evaluated) {
+      output_transform = self_object->world_to_object() * object->object_to_world();
     }
     else {
-      mat4_decompose(location, quaternion, scale, object->obmat);
-    }
-    quat_to_eul(rotation, quaternion);
-
-    if (object != self_object) {
-      InstancesComponent &instances = geometry_set.get_component_for_write<InstancesComponent>();
-      const int handle = instances.add_reference(*object);
-
-      if (transform_space_relative) {
-        instances.add_instance(handle, transform);
-      }
-      else {
-        float unit_transform[4][4];
-        unit_m4(unit_transform);
-        instances.add_instance(handle, unit_transform);
-      }
+      show_transform_error = true;
     }
   }
+  else {
+    if (object_transform_evaluated) {
+      output_transform = object->object_to_world();
+    }
+    else {
+      show_transform_error = true;
+    }
+  }
+  if (show_transform_error) {
+    params.error_message_add(
+        NodeWarningType::Error,
+        TIP_("Can't access object's transforms because it's not evaluated yet. "
+             "This can happen when there is a dependency cycle"));
+  }
+  float3 location, scale;
+  math::Quaternion rotation;
+  math::to_loc_rot_scale_safe<true>(output_transform, location, rotation, scale);
 
   params.set_output("Location", location);
   params.set_output("Rotation", rotation);
   params.set_output("Scale", scale);
+  params.set_output("Transform", output_transform);
+
+  if (!params.output_is_required("Geometry")) {
+    return;
+  }
+  /* Compare by `orig_id` because objects may be copied into separate depsgraphs. */
+  if (DEG_get_original_id(&object->id) == DEG_get_original_id(const_cast<ID *>(&self_object->id)))
+  {
+    params.error_message_add(
+        NodeWarningType::Error,
+        params.user_data()->call_data->operator_data ?
+            TIP_("Geometry cannot be retrieved from the edited object itself") :
+            TIP_("Geometry cannot be retrieved from the modifier object"));
+    params.set_default_remaining_outputs();
+    return;
+  }
+  BLI_assert(object != self_object);
+
+  if (!object_geometry_evaluated) {
+    params.error_message_add(NodeWarningType::Error,
+                             TIP_("Can't access object's geometry because it's not evaluated yet. "
+                                  "This can happen when there is a dependency cycle"));
+    params.set_default_remaining_outputs();
+    return;
+  }
+
+  std::optional<float4x4> geometry_transform;
+  if (transform_space_relative) {
+    if (!self_transform_evaluated || !object_transform_evaluated) {
+      params.error_message_add(
+          NodeWarningType::Error,
+          TIP_("Can't access object's transforms because it's not evaluated yet. "
+               "This can happen when there is a dependency cycle"));
+      params.set_default_remaining_outputs();
+      return;
+    }
+    geometry_transform = self_object->world_to_object() * object->object_to_world();
+  }
+
+  GeometrySet geometry_set;
+  if (params.get_input<bool>("As Instance")) {
+    std::unique_ptr<bke::Instances> instances = std::make_unique<bke::Instances>();
+    const int handle = instances->add_reference(*object);
+    if (transform_space_relative) {
+      instances->add_instance(handle, *geometry_transform);
+    }
+    else {
+      instances->add_instance(handle, float4x4::identity());
+    }
+    geometry_set = GeometrySet::from_instances(instances.release());
+  }
+  else {
+    geometry_set = bke::object_get_evaluated_geometry_set(*object);
+    if (transform_space_relative) {
+      geometry::transform_geometry(geometry_set, *geometry_transform);
+    }
+  }
+
+  geometry_set.name = object->id.name + 2;
   params.set_output("Geometry", geometry_set);
 }
 
-static void geo_node_object_info_node_init(bNodeTree *UNUSED(tree), bNode *node)
+static void node_node_init(bNodeTree * /*tree*/, bNode *node)
 {
-  NodeGeometryObjectInfo *data = (NodeGeometryObjectInfo *)MEM_callocN(
-      sizeof(NodeGeometryObjectInfo), __func__);
+  NodeGeometryObjectInfo *data = MEM_cnew<NodeGeometryObjectInfo>(__func__);
   data->transform_space = GEO_NODE_TRANSFORM_SPACE_ORIGINAL;
   node->storage = data;
 }
 
-}  // namespace blender::nodes
-
-void register_node_type_geo_object_info()
+static void node_rna(StructRNA *srna)
 {
-  static bNodeType ntype;
+  static const EnumPropertyItem rna_node_geometry_object_info_transform_space_items[] = {
+      {GEO_NODE_TRANSFORM_SPACE_ORIGINAL,
+       "ORIGINAL",
+       0,
+       "Original",
+       "Output the geometry relative to the input object transform, and the location, rotation "
+       "and "
+       "scale relative to the world origin"},
+      {GEO_NODE_TRANSFORM_SPACE_RELATIVE,
+       "RELATIVE",
+       0,
+       "Relative",
+       "Bring the input object geometry, location, rotation and scale into the modified object, "
+       "maintaining the relative position between the two objects in the scene"},
+      {0, nullptr, 0, nullptr, nullptr},
+  };
 
-  geo_node_type_base(&ntype, GEO_NODE_OBJECT_INFO, "Object Info", NODE_CLASS_INPUT, 0);
-  node_type_socket_templates(&ntype, geo_node_object_info_in, geo_node_object_info_out);
-  node_type_init(&ntype, blender::nodes::geo_node_object_info_node_init);
-  node_type_storage(
-      &ntype, "NodeGeometryObjectInfo", node_free_standard_storage, node_copy_standard_storage);
-  ntype.geometry_node_execute = blender::nodes::geo_node_object_info_exec;
-  ntype.draw_buttons = geo_node_object_info_layout;
-  nodeRegisterType(&ntype);
+  PropertyRNA *prop = RNA_def_node_enum(srna,
+                                        "transform_space",
+                                        "Transform Space",
+                                        "The transformation of the vector and geometry outputs",
+                                        rna_node_geometry_object_info_transform_space_items,
+                                        NOD_storage_enum_accessors(transform_space),
+                                        GEO_NODE_TRANSFORM_SPACE_ORIGINAL);
+  RNA_def_property_update_runtime(prop, rna_Node_update_relations);
 }
+
+static void node_register()
+{
+  static blender::bke::bNodeType ntype;
+
+  geo_node_type_base(&ntype, "GeometryNodeObjectInfo", GEO_NODE_OBJECT_INFO);
+  ntype.ui_name = "Object Info";
+  ntype.ui_description = "Retrieve information from an object";
+  ntype.enum_name_legacy = "OBJECT_INFO";
+  ntype.nclass = NODE_CLASS_INPUT;
+  ntype.initfunc = node_node_init;
+  blender::bke::node_type_storage(
+      &ntype, "NodeGeometryObjectInfo", node_free_standard_storage, node_copy_standard_storage);
+  ntype.geometry_node_execute = node_geo_exec;
+  ntype.draw_buttons = node_layout;
+  ntype.declare = node_declare;
+  blender::bke::node_register_type(&ntype);
+
+  node_rna(ntype.rna_ext.srna);
+}
+NOD_REGISTER_NODE(node_register)
+
+}  // namespace blender::nodes::node_geo_object_info_cc

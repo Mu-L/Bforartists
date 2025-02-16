@@ -1,19 +1,6 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2018-2023 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 # --env-system-scripts allows to run without the install target.
 
@@ -23,7 +10,7 @@
 # and don't give deterministic results
 set(USE_EXPERIMENTAL_TESTS FALSE)
 
-set(TEST_SRC_DIR ${CMAKE_SOURCE_DIR}/../lib/tests)
+set(TEST_SRC_DIR ${CMAKE_SOURCE_DIR}/tests/data)
 set(TEST_OUT_DIR ${CMAKE_BINARY_DIR}/tests)
 
 # ugh, any better way to do this on testing only?
@@ -36,12 +23,12 @@ execute_process(COMMAND ${CMAKE_COMMAND} -E make_directory ${TEST_OUT_DIR})
 # all calls to blender use this
 if(APPLE)
   if(${CMAKE_GENERATOR} MATCHES "Xcode")
-    set(TEST_BLENDER_EXE_PARAMS --background -noaudio --factory-startup --debug-memory --debug-exit-on-error)
+    set(TEST_BLENDER_EXE_PARAMS --background --factory-startup --debug-memory --debug-exit-on-error)
   else()
-    set(TEST_BLENDER_EXE_PARAMS --background -noaudio --factory-startup --debug-memory --debug-exit-on-error --env-system-scripts ${CMAKE_SOURCE_DIR}/release/scripts)
+    set(TEST_BLENDER_EXE_PARAMS --background --factory-startup --debug-memory --debug-exit-on-error --env-system-scripts ${CMAKE_SOURCE_DIR}/scripts)
   endif()
 else()
-  set(TEST_BLENDER_EXE_PARAMS --background -noaudio --factory-startup --debug-memory --debug-exit-on-error --env-system-scripts ${CMAKE_SOURCE_DIR}/release/scripts)
+  set(TEST_BLENDER_EXE_PARAMS --background --factory-startup --debug-memory --debug-exit-on-error --env-system-scripts ${CMAKE_SOURCE_DIR}/scripts)
 endif()
 
 # for testing with valgrind prefix: valgrind --track-origins=yes --error-limit=no
@@ -52,7 +39,7 @@ endif()
 # GENERAL PYTHON CORRECTNESS TESTS
 macro(COLLADA_TEST module test_name blend_file)
   add_test(
-    NAME collada_${module}_${test_name}
+    NAME bf_io_collada_${module}_${test_name}
     COMMAND "$<TARGET_FILE:bforartists>" ${TEST_BLENDER_EXE_PARAMS} ${TEST_SRC_DIR}/collada/${module}/${blend_file}
     --python ${CMAKE_CURRENT_LIST_DIR}/${module}/test_${module}_${test_name}.py --
     --testdir ${TEST_SRC_DIR}/collada/${module}
@@ -62,5 +49,5 @@ endmacro()
 # Tests are disabled because they only work on Windows
 # Tests will be redone completely to work reliable
 #
-# COLLADA_TEST(mesh simple mesh_simple.blend)
-# COLLADA_TEST(animation simple suzannes_parent_inverse.blend)
+# collada_test(mesh simple mesh_simple.blend)
+# collada_test(animation simple suzannes_parent_inverse.blend)

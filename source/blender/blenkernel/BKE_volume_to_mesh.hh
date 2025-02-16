@@ -1,18 +1,11 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
+
+#pragma once
+
+#include "BLI_math_vector_types.hh"
+#include "BLI_span.hh"
 
 #include "DNA_modifier_types.h"
 
@@ -33,10 +26,56 @@ struct VolumeToMeshResolution {
 };
 
 #ifdef WITH_OPENVDB
-struct Mesh *volume_to_mesh(const openvdb::GridBase &grid,
-                            const VolumeToMeshResolution &resolution,
-                            const float threshold,
-                            const float adaptivity);
+
+/**
+ * The result of converting a volume grid to mesh data, in the format used by the OpenVDB API.
+ */
+struct OpenVDBMeshData {
+  std::vector<openvdb::Vec3s> verts;
+  std::vector<openvdb::Vec3I> tris;
+  std::vector<openvdb::Vec4I> quads;
+  bool is_empty() const
+  {
+    return verts.empty();
+  }
+};
+
+Mesh *volume_to_mesh(const openvdb::GridBase &grid,
+                     const VolumeToMeshResolution &resolution,
+                     float threshold,
+                     float adaptivity);
+
+Mesh *volume_grid_to_mesh(const openvdb::GridBase &grid, float threshold, float adaptivity);
+
+struct VolumeToMeshDataResult {
+  OpenVDBMeshData data;
+  std::string error;
+};
+
+/**
+ * Convert an OpenVDB volume grid to corresponding mesh data: vertex positions and quad and
+ * triangle indices.
+ */
+VolumeToMeshDataResult volume_to_mesh_data(const openvdb::GridBase &grid,
+                                           const VolumeToMeshResolution &resolution,
+                                           float threshold,
+                                           float adaptivity);
+
+/**
+ * Convert mesh data from the format provided by OpenVDB into Blender's #Mesh data structure.
+ * This can be used to add mesh data from a grid into an existing mesh rather than merging multiple
+ * meshes later on.
+ */
+void fill_mesh_from_openvdb_data(Span<openvdb::Vec3s> vdb_verts,
+                                 Span<openvdb::Vec3I> vdb_tris,
+                                 Span<openvdb::Vec4I> vdb_quads,
+                                 int vert_offset,
+                                 int face_offset,
+                                 int loop_offset,
+                                 MutableSpan<float3> vert_positions,
+                                 MutableSpan<int> face_offsets,
+                                 MutableSpan<int> corner_verts);
+
 #endif
 
 }  // namespace blender::bke

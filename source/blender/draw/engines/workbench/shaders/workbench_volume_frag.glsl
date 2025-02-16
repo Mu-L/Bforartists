@@ -1,39 +1,19 @@
+/* SPDX-FileCopyrightText: 2018-2023 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#pragma BLENDER_REQUIRE(common_math_lib.glsl)
-#pragma BLENDER_REQUIRE(common_view_lib.glsl)
-#pragma BLENDER_REQUIRE(gpu_shader_common_obinfos_lib.glsl)
-#pragma BLENDER_REQUIRE(workbench_data_lib.glsl)
-#pragma BLENDER_REQUIRE(workbench_common_lib.glsl)
+#include "infos/workbench_volume_info.hh"
 
-uniform sampler2D depthBuffer;
+FRAGMENT_SHADER_CREATE_INFO(workbench_volume)
+FRAGMENT_SHADER_CREATE_INFO(workbench_volume_slice)
+FRAGMENT_SHADER_CREATE_INFO(workbench_volume_coba)
+FRAGMENT_SHADER_CREATE_INFO(workbench_volume_cubic)
+FRAGMENT_SHADER_CREATE_INFO(workbench_volume_smoke)
 
-uniform sampler3D densityTexture;
-uniform sampler3D shadowTexture;
-uniform sampler3D flameTexture;
-uniform usampler3D flagTexture;
-uniform sampler1D flameColorTexture;
-uniform sampler1D transferTexture;
-uniform mat4 volumeObjectToTexture;
-
-uniform int samplesLen = 256;
-uniform float noiseOfs = 0.0;
-uniform float stepLength;   /* Step length in local space. */
-uniform float densityScale; /* Simple Opacity multiplicator. */
-uniform float gridScale;    /* Multiplicator for grid scaling. */
-uniform vec3 activeColor;
-
-uniform float slicePosition;
-uniform int sliceAxis; /* -1 is no slice, 0 is X, 1 is Y, 2 is Z. */
-
-uniform bool showPhi = false;
-uniform bool showFlags = false;
-uniform bool showPressure = false;
-
-#ifdef VOLUME_SLICE
-in vec3 localPos;
-#endif
-
-out vec4 fragColor;
+#include "draw_model_lib.glsl"
+#include "draw_view_lib.glsl"
+#include "gpu_shader_math_vector_lib.glsl"
+#include "workbench_common_lib.glsl"
 
 float phase_function_isotropic()
 {
@@ -47,7 +27,7 @@ float line_unit_box_intersect_dist(vec3 lineorigin, vec3 linedirection)
   vec3 firstplane = (vec3(1.0) - lineorigin) / linedirection;
   vec3 secondplane = (vec3(-1.0) - lineorigin) / linedirection;
   vec3 furthestplane = min(firstplane, secondplane);
-  return max_v3(furthestplane);
+  return reduce_max(furthestplane);
 }
 
 #define sample_trilinear(ima, co) texture(ima, co)
@@ -62,7 +42,7 @@ vec4 sample_tricubic(sampler3D ima, vec3 co)
   vec3 f = co - tc;
   vec3 f2 = f * f;
   vec3 f3 = f2 * f;
-  /* Bspline coefs (optimized) */
+  /* Bspline coefficients (optimized). */
   vec3 w3 = f3 / 6.0;
   vec3 w0 = -w3 + f2 * 0.5 - f * 0.5 + 1.0 / 6.0;
   vec3 w1 = f3 * 0.5 - f2 + 2.0 / 3.0;
@@ -126,7 +106,7 @@ vec4 flag_to_color(uint flag)
   if (bool(flag & uint(16))) {
     color.rgb += vec3(0.9, 0.3, 0.0); /* orange */
   }
-  if (color.rgb == vec3(0.0)) {
+  if (is_zero(color.rgb)) {
     color.rgb += vec3(0.5, 0.0, 0.0); /* medium red */
   }
   return color;
@@ -214,13 +194,15 @@ void eval_volume_step(inout vec3 Lscat, float extinction, float step_len, out fl
 }
 
 #define P(x) ((x + 0.5) * (1.0 / 16.0))
-const vec4 dither_mat[4] = vec4[4](vec4(P(0.0), P(8.0), P(2.0), P(10.0)),
-                                   vec4(P(12.0), P(4.0), P(14.0), P(6.0)),
-                                   vec4(P(3.0), P(11.0), P(1.0), P(9.0)),
-                                   vec4(P(15.0), P(7.0), P(13.0), P(5.0)));
 
 vec4 volume_integration(vec3 ray_ori, vec3 ray_dir, float ray_inc, float ray_max, float step_len)
 {
+  /* NOTE: Constant array declared inside function scope to reduce shader core thread memory
+   * pressure on Apple Silicon. */
+  const vec4 dither_mat[4] = float4_array(vec4(P(0.0), P(8.0), P(2.0), P(10.0)),
+                                          vec4(P(12.0), P(4.0), P(14.0), P(6.0)),
+                                          vec4(P(3.0), P(11.0), P(1.0), P(9.0)),
+                                          vec4(P(15.0), P(7.0), P(13.0), P(5.0)));
   /* Start with full transmittance and no scattered light. */
   vec3 final_scattering = vec3(0.0);
   float final_transmittance = 1.0;
@@ -239,6 +221,12 @@ vec4 volume_integration(vec3 ray_ori, vec3 ray_dir, float ray_inc, float ray_max
     /* accumulate and also take into account the transmittance from previous steps */
     final_scattering += final_transmittance * Lscat;
     final_transmittance *= Tr;
+
+    if (final_transmittance <= 0.01) {
+      /* Early out */
+      final_transmittance = 0.0;
+      break;
+    }
   }
 
   return vec4(final_scattering, final_transmittance);
@@ -246,11 +234,27 @@ vec4 volume_integration(vec3 ray_ori, vec3 ray_dir, float ray_inc, float ray_max
 
 void main()
 {
+  uint stencil = texelFetch(stencil_tx, ivec2(gl_FragCoord.xy), 0).r;
+  const uint in_front_stencil_bits = 1u << 1;
+  if (do_depth_test && (stencil & in_front_stencil_bits) != 0) {
+    /* Don't draw on top of "in front" objects. */
+    discard;
+    return;
+  }
+
 #ifdef VOLUME_SLICE
   /* Manual depth test. TODO: remove. */
   float depth = texelFetch(depthBuffer, ivec2(gl_FragCoord.xy), 0).r;
-  if (gl_FragCoord.z >= depth) {
+  if (do_depth_test && gl_FragCoord.z >= depth) {
+    /* NOTE: In the Metal API, prior to Metal 2.3, Discard is not an explicit return and can
+     * produce undefined behavior. This is especially prominent with derivatives if control-flow
+     * divergence is present.
+     *
+     * Adding a return call eliminates undefined behavior and a later out-of-bounds read causing
+     * a crash on AMD platforms.
+     * This behavior can also affect OpenGL on certain devices. */
     discard;
+    return;
   }
 
   vec3 Lscat;
@@ -261,20 +265,20 @@ void main()
   fragColor = vec4(Lscat, Tr);
 #else
   vec2 screen_uv = gl_FragCoord.xy / vec2(textureSize(depthBuffer, 0).xy);
-  bool is_persp = ProjectionMatrix[3][3] == 0.0;
+  bool is_persp = drw_view.winmat[3][3] == 0.0;
 
   vec3 volume_center = ModelMatrix[3].xyz;
 
-  float depth = texelFetch(depthBuffer, ivec2(gl_FragCoord.xy), 0).r;
+  float depth = do_depth_test ? texelFetch(depthBuffer, ivec2(gl_FragCoord.xy), 0).r : 1.0;
   float depth_end = min(depth, gl_FragCoord.z);
-  vec3 vs_ray_end = get_view_space_from_depth(screen_uv, depth_end);
-  vec3 vs_ray_ori = get_view_space_from_depth(screen_uv, 0.0);
+  vec3 vs_ray_end = drw_point_screen_to_view(vec3(screen_uv, depth_end));
+  vec3 vs_ray_ori = drw_point_screen_to_view(vec3(screen_uv, 0.0));
   vec3 vs_ray_dir = (is_persp) ? (vs_ray_end - vs_ray_ori) : vec3(0.0, 0.0, -1.0);
   vs_ray_dir /= abs(vs_ray_dir.z);
 
-  vec3 ls_ray_dir = point_view_to_object(vs_ray_ori + vs_ray_dir);
-  vec3 ls_ray_ori = point_view_to_object(vs_ray_ori);
-  vec3 ls_ray_end = point_view_to_object(vs_ray_end);
+  vec3 ls_ray_dir = drw_point_view_to_object(vs_ray_ori + vs_ray_dir);
+  vec3 ls_ray_ori = drw_point_view_to_object(vs_ray_ori);
+  vec3 ls_ray_end = drw_point_view_to_object(vs_ray_end);
 
 #  ifdef VOLUME_SMOKE
   ls_ray_dir = (OrcoTexCoFactors[0].xyz + ls_ray_dir * OrcoTexCoFactors[1].xyz) * 2.0 - 1.0;
@@ -300,6 +304,7 @@ void main()
     /* Start is further away than the end.
      * That means no volume is intersected. */
     discard;
+    return;
   }
 
   fragColor = volume_integration(ls_ray_ori,
@@ -309,6 +314,6 @@ void main()
                                  length(vs_ray_dir) * stepLength);
 #endif
 
-  /* Convert transmitance to alpha so we can use premul blending. */
+  /* Convert transmittance to alpha so we can use pre-multiply blending. */
   fragColor.a = 1.0 - fragColor.a;
 }

@@ -1,20 +1,8 @@
-// Copyright 2018 Blender Foundation. All rights reserved.
-//
-// This program is free software; you can redistribute it and/or
-// modify it under the terms of the GNU General Public License
-// as published by the Free Software Foundation; either version 2
-// of the License, or (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program; if not, write to the Free Software Foundation,
-// Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-//
-// Author: Sergey Sharybin
+/* SPDX-FileCopyrightText: 2018 Blender Foundation
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
+ * Author: Sergey Sharybin. */
 
 #ifndef OPENSUBDIV_BASE_TYPE_CONVERT_H_
 #define OPENSUBDIV_BASE_TYPE_CONVERT_H_
@@ -26,12 +14,11 @@
 #include <opensubdiv/sdc/options.h>
 #include <opensubdiv/sdc/types.h>
 
-#include "opensubdiv_capi_type.h"
+#include "opensubdiv_capi_type.hh"
 
 struct OpenSubdiv_Converter;
 
-namespace blender {
-namespace opensubdiv {
+namespace blender::opensubdiv {
 
 // Convert scheme type from C-API enum to an OpenSubdiv native enum.
 OpenSubdiv::Sdc::SchemeType getSchemeTypeFromCAPI(OpenSubdiv_SchemeType type);
@@ -48,7 +35,6 @@ OpenSubdiv_FVarLinearInterpolation getCAPIFVarLinearInterpolationFromOSD(
 OpenSubdiv::Sdc::Options::VtxBoundaryInterpolation getVtxBoundaryInterpolationFromCAPI(
     OpenSubdiv_VtxBoundaryInterpolation boundary_interpolation);
 
-}  // namespace opensubdiv
-}  // namespace blender
+}  // namespace blender::opensubdiv
 
 #endif  // OPENSUBDIV_BASE_TYPE_CONVERT_H_

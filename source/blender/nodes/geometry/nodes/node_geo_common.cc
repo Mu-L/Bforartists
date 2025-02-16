@@ -1,50 +1,47 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#include "BKE_node.h"
+#include "BKE_node.hh"
 
-#include "NOD_geometry.h"
+#include "NOD_geometry.hh"
 
-#include "NOD_common.h"
+#include "NOD_common.hh"
 #include "node_common.h"
 #include "node_geometry_util.hh"
 
-void register_node_type_geo_group(void)
-{
-  static bNodeType ntype;
+#include "RNA_access.hh"
 
-  node_type_base_custom(&ntype, "GeometryNodeGroup", "Group", NODE_CLASS_GROUP, 0);
-  ntype.type = NODE_GROUP;
+namespace blender::nodes {
+
+static void register_node_type_geo_group()
+{
+  static blender::bke::bNodeType ntype;
+
+  bke::node_type_base_custom(&ntype, "GeometryNodeGroup", "Group", "GROUP", NODE_CLASS_GROUP);
+  ntype.enum_name_legacy = "GROUP";
+  ntype.type_legacy = NODE_GROUP;
   ntype.poll = geo_node_poll_default;
   ntype.poll_instance = node_group_poll_instance;
   ntype.insert_link = node_insert_link_default;
-  ntype.update_internal_links = node_update_internal_links_default;
+  ntype.ui_class = node_group_ui_class;
+  ntype.ui_description_fn = node_group_ui_description;
   ntype.rna_ext.srna = RNA_struct_find("GeometryNodeGroup");
   BLI_assert(ntype.rna_ext.srna != nullptr);
   RNA_struct_blender_type_set(ntype.rna_ext.srna, &ntype);
 
-  node_type_socket_templates(&ntype, nullptr, nullptr);
-  node_type_size(&ntype, 140, 60, 400);
-  node_type_label(&ntype, node_group_label);
-  node_type_group_update(&ntype, node_group_update);
+  bke::node_type_size(
+      &ntype, GROUP_NODE_DEFAULT_WIDTH, GROUP_NODE_MIN_WIDTH, GROUP_NODE_MAX_WIDTH);
+  ntype.labelfunc = node_group_label;
+  ntype.declare = node_group_declare;
 
-  nodeRegisterType(&ntype);
+  blender::bke::node_register_type(&ntype);
 }
+NOD_REGISTER_NODE(register_node_type_geo_group)
 
-void register_node_type_geo_custom_group(bNodeType *ntype)
+}  // namespace blender::nodes
+
+void register_node_type_geo_custom_group(blender::bke::bNodeType *ntype)
 {
   /* These methods can be overridden but need a default implementation otherwise. */
   if (ntype->poll == nullptr) {
@@ -53,7 +50,5 @@ void register_node_type_geo_custom_group(bNodeType *ntype)
   if (ntype->insert_link == nullptr) {
     ntype->insert_link = node_insert_link_default;
   }
-  if (ntype->update_internal_links == nullptr) {
-    ntype->update_internal_links = node_update_internal_links_default;
-  }
+  ntype->declare = blender::nodes::node_group_declare;
 }

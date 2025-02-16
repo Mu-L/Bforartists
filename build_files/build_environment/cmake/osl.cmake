@@ -1,116 +1,158 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2017-2022 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 if(WIN32)
   set(OSL_CMAKE_CXX_STANDARD_LIBRARIES "kernel32${LIBEXT} user32${LIBEXT} gdi32${LIBEXT} winspool${LIBEXT} shell32${LIBEXT} ole32${LIBEXT} oleaut32${LIBEXT} uuid${LIBEXT} comdlg32${LIBEXT} advapi32${LIBEXT} psapi${LIBEXT}")
+  set(OSL_CMAKE_LINKER_FLAGS)
   set(OSL_FLEX_BISON -DFLEX_EXECUTABLE=${LIBDIR}/flexbison/win_flex.exe -DBISON_EXECUTABLE=${LIBDIR}/flexbison/win_bison.exe)
-  set(OSL_SIMD_FLAGS -DOIIO_NOSIMD=1 -DOIIO_SIMD=sse2)
-  SET(OSL_PLATFORM_FLAGS -DLINKSTATIC=ON)
 else()
   set(OSL_CMAKE_CXX_STANDARD_LIBRARIES)
-  set(OSL_FLEX_BISON)
-  set(OSL_OPENIMAGEIO_LIBRARY "${LIBDIR}/openimageio/lib/${LIBPREFIX}OpenImageIO${LIBEXT};${LIBDIR}/openimageio/lib/${LIBPREFIX}OpenImageIO_Util${LIBEXT};${LIBDIR}/png/lib/${LIBPREFIX}png16${LIBEXT};${LIBDIR}/jpg/lib/${LIBPREFIX}jpeg${LIBEXT};${LIBDIR}/tiff/lib/${LIBPREFIX}tiff${LIBEXT};${LIBDIR}/openexr/lib/${LIBPREFIX}IlmImf${OPENEXR_VERSION_POSTFIX}${LIBEXT}")
-  SET(OSL_PLATFORM_FLAGS)
+  # llvm-config will add -lmxl2. Make sure it can be found and that no system
+  # library is used instead.
+  set(OSL_CMAKE_LINKER_FLAGS "-L${LIBDIR}/xml2/lib")
+  set(OSL_OPENIMAGEIO_LIBRARY "${LIBDIR}/openimageio/lib/OpenImageIO${SHAREDLIBEXT};${LIBDIR}/openexr/lib/IlmImf${OPENEXR_VERSION_POSTFIX}${SHAREDLIBEXT}")
+
+  if(APPLE)
+    # Explicitly specify Homebrew path, so we don't use the old system one.
+    if(BLENDER_PLATFORM_ARM)
+      set(OSL_FLEX_BISON -DBISON_EXECUTABLE=/opt/homebrew/opt/bison/bin/bison)
+    else()
+      set(OSL_FLEX_BISON -DBISON_EXECUTABLE=/usr/local/opt/bison/bin/bison)
+    endif()
+  else()
+    set(OSL_FLEX_BISON)
+  endif()
 endif()
 
-set(OSL_ILMBASE_CUSTOM_LIBRARIES "${LIBDIR}/openexr/lib/Imath${OPENEXR_VERSION_POSTFIX}.lib^^${LIBDIR}/openexr/lib/Half{OPENEXR_VERSION_POSTFIX}.lib^^${LIBDIR}/openexr/lib/IlmThread${OPENEXR_VERSION_POSTFIX}.lib^^${LIBDIR}/openexr/lib/Iex${OPENEXR_VERSION_POSTFIX}.lib")
-
 set(OSL_EXTRA_ARGS
-  -DBoost_COMPILER:STRING=${BOOST_COMPILER_STRING}
-  -DBoost_USE_MULTITHREADED=ON
-  -DBoost_USE_STATIC_LIBS=ON
-  -DBoost_USE_STATIC_RUNTIME=OFF
-  -DBOOST_ROOT=${LIBDIR}/boost
-  -DBOOST_LIBRARYDIR=${LIBDIR}/boost/lib/
-  -DBoost_NO_SYSTEM_PATHS=ON
-  -DBoost_NO_BOOST_CMAKE=ON
-  -DOpenEXR_ROOT=${LIBDIR}/openexr/
-  -DIlmBase_ROOT=${LIBDIR}/openexr/
-  -DILMBASE_INCLUDE_DIR=${LIBDIR}/openexr/include/
-  -DOPENEXR_HALF_LIBRARY=${LIBDIR}/openexr/lib/${LIBPREFIX}Half${OPENEXR_VERSION_POSTFIX}${LIBEXT}
-  -DOPENEXR_IMATH_LIBRARY=${LIBDIR}/openexr/lib/${LIBPREFIX}Imath${OPENEXR_VERSION_POSTFIX}${LIBEXT}
-  -DOPENEXR_ILMTHREAD_LIBRARY=${LIBDIR}/openexr/lib/${LIBPREFIX}IlmThread${OPENEXR_VERSION_POSTFIX}${LIBEXT}
-  -DOPENEXR_IEX_LIBRARY=${LIBDIR}/openexr/lib/${LIBPREFIX}Iex${OPENEXR_VERSION_POSTFIX}${LIBEXT}
-  -DOPENEXR_INCLUDE_DIR=${LIBDIR}/openexr/include/
-  -DOPENEXR_ILMIMF_LIBRARY=${LIBDIR}/openexr/lib/${LIBPREFIX}IlmImf${OPENEXR_VERSION_POSTFIX}${LIBEXT}
   -DOpenImageIO_ROOT=${LIBDIR}/openimageio/
   -DOSL_BUILD_TESTS=OFF
-  -DOSL_BUILD_MATERIALX=OFF
   -DZLIB_LIBRARY=${LIBDIR}/zlib/lib/${ZLIB_LIBRARY}
   -DZLIB_INCLUDE_DIR=${LIBDIR}/zlib/include/
   ${OSL_FLEX_BISON}
   -DCMAKE_CXX_STANDARD_LIBRARIES=${OSL_CMAKE_CXX_STANDARD_LIBRARIES}
-  -DBUILD_SHARED_LIBS=OFF
-  ${OSL_PLATFORM_FLAGS}
+  -DCMAKE_EXE_LINKER_FLAGS=${OSL_CMAKE_LINKER_FLAGS}
+  -DCMAKE_SHARED_LINKER_FLAGS=${OSL_CMAKE_LINKER_FLAGS}
+  -DBUILD_SHARED_LIBS=ON
+  -DLINKSTATIC=OFF
   -DOSL_BUILD_PLUGINS=OFF
   -DSTOP_ON_WARNING=OFF
   -DUSE_LLVM_BITCODE=OFF
   -DLLVM_ROOT=${LIBDIR}/llvm/
-  -DLLVM_DIRECTORY=${LIBDIR}/llvm/
+  -DLLVM_STATIC=ON
   -DUSE_PARTIO=OFF
   -DUSE_QT=OFF
-  -DUSE_Qt5=OFF
   -DINSTALL_DOCS=OFF
-  ${OSL_SIMD_FLAGS}
   -Dpugixml_ROOT=${LIBDIR}/pugixml
-  -DUSE_PYTHON=OFF
+  -DUSE_PYTHON=ON
+  -DImath_ROOT=${LIBDIR}/imath
+  -DCMAKE_DEBUG_POSTFIX=_d
+  -Dpybind11_ROOT=${LIBDIR}/pybind11
+  -DPython_ROOT=${LIBDIR}/python
+  -DPython_EXECUTABLE=${PYTHON_BINARY}
+  -DPython3_EXECUTABLE=${PYTHON_BINARY}
+  -Dlibdeflate_DIR=${LIBDIR}/deflate/lib/cmake/libdeflate
 )
 
-# Apple arm64 uses LLVM 11, LLVM 10+ requires C++14
-if (APPLE AND "${CMAKE_OSX_ARCHITECTURES}" STREQUAL "arm64")
-  list(APPEND OSL_EXTRA_ARGS -DCMAKE_CXX_STANDARD=14)
+if(NOT APPLE)
+  list(APPEND OSL_EXTRA_ARGS -DOSL_USE_OPTIX=ON -DCUDA_TARGET_ARCH=sm_50)
 endif()
 
 ExternalProject_Add(external_osl
   URL file://${PACKAGE_DIR}/${OSL_FILE}
   DOWNLOAD_DIR ${DOWNLOAD_DIR}
+  CMAKE_GENERATOR ${PLATFORM_ALT_GENERATOR}
   LIST_SEPARATOR ^^
   URL_HASH ${OSL_HASH_TYPE}=${OSL_HASH}
   PREFIX ${BUILD_DIR}/osl
-  PATCH_COMMAND ${PATCH_CMD} -p 1 -d ${BUILD_DIR}/osl/src/external_osl < ${PATCH_DIR}/osl.diff
-  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${LIBDIR}/osl -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} ${DEFAULT_CMAKE_FLAGS} ${OSL_EXTRA_ARGS}
+
+  PATCH_COMMAND ${PATCH_CMD} -p 1 -d
+    ${BUILD_DIR}/osl/src/external_osl <
+    ${PATCH_DIR}/osl.diff
+
+  CMAKE_ARGS
+    -DCMAKE_INSTALL_PREFIX=${LIBDIR}/osl
+    -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+    ${DEFAULT_CMAKE_FLAGS}
+    ${OSL_EXTRA_ARGS}
+
   INSTALL_DIR ${LIBDIR}/osl
 )
 
 add_dependencies(
   external_osl
-  external_boost
   ll
   external_openexr
   external_zlib
-  external_flexbison
   external_openimageio
   external_pugixml
+  external_python
+  external_pybind11
 )
+if(WIN32)
+  add_dependencies(
+    external_osl
+    external_flexbison
+  )
+elseif(UNIX AND NOT APPLE)
+  add_dependencies(
+    external_osl
+    external_flex
+  )
+endif()
 
 if(WIN32)
   if(BUILD_MODE STREQUAL Release)
     ExternalProject_Add_Step(external_osl after_install
-      COMMAND ${CMAKE_COMMAND} -E copy_directory ${LIBDIR}/osl/ ${HARVEST_TARGET}/osl
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${LIBDIR}/osl/
+        ${HARVEST_TARGET}/osl
+
       DEPENDEES install
     )
   endif()
   if(BUILD_MODE STREQUAL Debug)
     ExternalProject_Add_Step(external_osl after_install
-      COMMAND ${CMAKE_COMMAND} -E copy ${LIBDIR}/osl/lib/oslcomp.lib ${HARVEST_TARGET}/osl/lib/oslcomp_d.lib
-      COMMAND ${CMAKE_COMMAND} -E copy ${LIBDIR}/osl/lib/oslexec.lib ${HARVEST_TARGET}/osl/lib/oslexec_d.lib
-      COMMAND ${CMAKE_COMMAND} -E copy ${LIBDIR}/osl/lib/oslquery.lib ${HARVEST_TARGET}/osl/lib/oslquery_d.lib
+      COMMAND ${CMAKE_COMMAND} -E copy
+        ${LIBDIR}/osl/lib/oslcomp_d.lib
+        ${HARVEST_TARGET}/osl/lib/oslcomp_d.lib
+      COMMAND ${CMAKE_COMMAND} -E copy
+        ${LIBDIR}/osl/lib/oslexec_d.lib
+        ${HARVEST_TARGET}/osl/lib/oslexec_d.lib
+      COMMAND ${CMAKE_COMMAND} -E copy
+        ${LIBDIR}/osl/lib/oslquery_d.lib
+        ${HARVEST_TARGET}/osl/lib/oslquery_d.lib
+      COMMAND ${CMAKE_COMMAND} -E copy
+        ${LIBDIR}/osl/lib/oslnoise_d.lib
+        ${HARVEST_TARGET}/osl/lib/oslnoise_d.lib
+      COMMAND ${CMAKE_COMMAND} -E copy
+        ${LIBDIR}/osl/bin/oslcomp_d.dll
+        ${HARVEST_TARGET}/osl/bin/oslcomp_d.dll
+      COMMAND ${CMAKE_COMMAND} -E copy
+        ${LIBDIR}/osl/bin/oslexec_d.dll
+        ${HARVEST_TARGET}/osl/bin/oslexec_d.dll
+      COMMAND ${CMAKE_COMMAND} -E copy
+        ${LIBDIR}/osl/bin/oslquery_d.dll
+        ${HARVEST_TARGET}/osl/bin/oslquery_d.dll
+      COMMAND ${CMAKE_COMMAND} -E copy
+        ${LIBDIR}/osl/bin/oslnoise_d.dll
+        ${HARVEST_TARGET}/osl/bin/oslnoise_d.dll
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${LIBDIR}/osl/lib/python${PYTHON_SHORT_VERSION}/
+        ${HARVEST_TARGET}/osl/lib/python${PYTHON_SHORT_VERSION}_debug/
+
       DEPENDEES install
     )
   endif()
+else()
+  harvest_rpath_bin(external_osl osl/bin osl/bin "oslc")
+  harvest(external_osl osl/include osl/include "*.h")
+  harvest_rpath_lib(external_osl osl/lib osl/lib "*${SHAREDLIBEXT}*")
+  harvest(external_osl osl/share/OSL/shaders osl/share/OSL/shaders "*.h")
+  harvest_rpath_python(external_osl
+    osl/lib/python${PYTHON_SHORT_VERSION}
+    python/lib/python${PYTHON_SHORT_VERSION}
+    "*"
+  )
 endif()

@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2004-2005 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2004-2005 by Blender Foundation
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
@@ -26,10 +11,6 @@
 #include "DNA_ID.h"
 #include "DNA_defs.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 struct Ipo;
 
 typedef struct FluidVertexVelocity {
@@ -37,7 +18,7 @@ typedef struct FluidVertexVelocity {
 } FluidVertexVelocity;
 
 typedef struct FluidsimSettings {
-  /** For fast RNA access. */
+  /** DEPRECATED. For fast RNA access. */
   struct FluidsimModifierData *fmd;
   /* threadcont the calculation is done with */
   int threads;
@@ -79,12 +60,14 @@ typedef struct FluidsimSettings {
   /* gravity strength */
   float iniVelx, iniVely, iniVelz;
 
-  /* store output path, and file prefix for baked fluid surface */
-  /* strlens; 256= FILE_MAXFILE, 768= FILE_MAXDIR */
+  /**
+   * Store output path, and file prefix for baked fluid surface.
+   * String length; 256= #FILE_MAXFILE, 768= #FILE_MAXDIR.
+   */
   char surfdataPath[1024];
 
   /* store start coords of axis aligned bounding box together with size */
-  /* values are inited during derived mesh display */
+  /* values are initialized during derived mesh display. */
   float bbStart[3], bbSize[3];
 
   /* animated params */
@@ -139,42 +122,21 @@ typedef struct FluidsimSettings {
   float animRate;
 } FluidsimSettings;
 
-/* ob->fluidsimSettings defines */
-#define OB_FLUIDSIM_ENABLE 1
-#define OB_FLUIDSIM_DOMAIN 2
-#define OB_FLUIDSIM_FLUID 4
-#define OB_FLUIDSIM_OBSTACLE 8
-#define OB_FLUIDSIM_INFLOW 16
-#define OB_FLUIDSIM_OUTFLOW 32
-#define OB_FLUIDSIM_PARTICLE 64
-#define OB_FLUIDSIM_CONTROL 128
+/** #Object::fluidsimSettings */
+enum {
+  OB_FLUIDSIM_ENABLE = 1,
+  OB_FLUIDSIM_DOMAIN = 1 << 1,
+  OB_FLUIDSIM_FLUID = 1 << 2,
+  OB_FLUIDSIM_OBSTACLE = 1 << 3,
+  OB_FLUIDSIM_INFLOW = 1 << 4,
+  OB_FLUIDSIM_OUTFLOW = 1 << 5,
+  OB_FLUIDSIM_PARTICLE = 1 << 6,
+  OB_FLUIDSIM_CONTROL = 1 << 7,
+};
 
-#define OB_TYPEFLAG_START 7
-#define OB_FSGEO_THIN (1 << (OB_TYPEFLAG_START + 1))
-#define OB_FSBND_NOSLIP (1 << (OB_TYPEFLAG_START + 2))
-#define OB_FSBND_PARTSLIP (1 << (OB_TYPEFLAG_START + 3))
-#define OB_FSBND_FREESLIP (1 << (OB_TYPEFLAG_START + 4))
-#define OB_FSINFLOW_LOCALCOORD (1 << (OB_TYPEFLAG_START + 5))
-
-/* surface generation flag (part of enabling chapter 6 of
- * "Free Surface Flows with Moving and Deforming Objects for LBM") */
-#define OB_FSSG_NOOBS (1 << (OB_TYPEFLAG_START + 6))
-
-// guiDisplayMode particle flags
-#define OB_FSDOM_GEOM 1
-#define OB_FSDOM_PREVIEW 2
-#define OB_FSDOM_FINAL 3
-#define OB_FSPART_BUBBLE (1 << 1)
-#define OB_FSPART_DROP (1 << 2)
-#define OB_FSPART_NEWPART (1 << 3)
-#define OB_FSPART_FLOAT (1 << 4)
-#define OB_FSPART_TRACER (1 << 5)
-
-// new fluid bit flags for fss->flags
-#define OB_FLUIDSIM_REVERSE (1 << 0)
-#define OB_FLUIDSIM_ACTIVE (1 << 1)
-#define OB_FLUIDSIM_OVERRIDE_TIME (1 << 2)
-
-#ifdef __cplusplus
-}
-#endif
+/** #FluidsimSettings::flags. */
+enum {
+  OB_FLUIDSIM_REVERSE = 1 << 0,
+  OB_FLUIDSIM_ACTIVE = 1 << 1,
+  OB_FLUIDSIM_OVERRIDE_TIME = 1 << 2,
+};

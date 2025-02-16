@@ -1,10 +1,10 @@
+/* SPDX-FileCopyrightText: 2018-2022 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-uniform vec4 color;
-uniform float scale;
+#include "infos/gpu_shader_2D_area_borders_info.hh"
 
-in vec2 uv;
-
-out vec4 fragColor;
+FRAGMENT_SHADER_CREATE_INFO(gpu_shader_2D_area_borders)
 
 void main()
 {

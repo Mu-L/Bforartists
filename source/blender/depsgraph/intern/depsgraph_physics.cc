@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2018 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2018 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup depsgraph
@@ -23,32 +8,29 @@
  * Physics utilities for effectors and collision.
  */
 
-#include "intern/depsgraph_physics.h"
+#include "intern/depsgraph_physics.hh"
 
-#include "MEM_guardedalloc.h"
-
-#include "BLI_compiler_compat.h"
 #include "BLI_listbase.h"
 
 #include "BKE_collision.h"
 #include "BKE_effect.h"
-#include "BKE_modifier.h"
+#include "BKE_modifier.hh"
 
 #include "DNA_collection_types.h"
 #include "DNA_object_force_types.h"
 #include "DNA_object_types.h"
 
-#include "DEG_depsgraph_build.h"
-#include "DEG_depsgraph_physics.h"
-#include "DEG_depsgraph_query.h"
+#include "DEG_depsgraph_build.hh"
+#include "DEG_depsgraph_physics.hh"
+#include "DEG_depsgraph_query.hh"
 
-#include "depsgraph.h"
+#include "depsgraph.hh"
 
 namespace deg = blender::deg;
 
 /*************************** Evaluation Query API *****************************/
 
-static ePhysicsRelationType modifier_to_relation_type(unsigned int modifier_type)
+static ePhysicsRelationType modifier_to_relation_type(uint modifier_type)
 {
   switch (modifier_type) {
     case eModifierType_Collision:
@@ -88,7 +70,7 @@ ListBase *DEG_get_effector_relations(const Depsgraph *graph, Collection *collect
 
 ListBase *DEG_get_collision_relations(const Depsgraph *graph,
                                       Collection *collection,
-                                      unsigned int modifier_type)
+                                      uint modifier_type)
 {
   const deg::Depsgraph *deg_graph = reinterpret_cast<const deg::Depsgraph *>(graph);
   const ePhysicsRelationType type = modifier_to_relation_type(modifier_type);
@@ -107,7 +89,7 @@ ListBase *DEG_get_collision_relations(const Depsgraph *graph,
 void DEG_add_collision_relations(DepsNodeHandle *handle,
                                  Object *object,
                                  Collection *collection,
-                                 unsigned int modifier_type,
+                                 uint modifier_type,
                                  DEG_CollobjFilterFunction filter_function,
                                  const char *name)
 {
@@ -120,7 +102,8 @@ void DEG_add_collision_relations(DepsNodeHandle *handle,
       continue;
     }
     if (filter_function == nullptr ||
-        filter_function(ob1, BKE_modifiers_findby_type(ob1, (ModifierType)modifier_type))) {
+        filter_function(ob1, BKE_modifiers_findby_type(ob1, (ModifierType)modifier_type)))
+    {
       DEG_add_object_pointcache_relation(handle, ob1, DEG_OB_COMP_TRANSFORM, name);
       DEG_add_object_pointcache_relation(handle, ob1, DEG_OB_COMP_GEOMETRY, name);
     }
@@ -150,7 +133,8 @@ void DEG_add_forcefield_relations(DepsNodeHandle *handle,
     DEG_add_object_pointcache_relation(handle, relation->ob, DEG_OB_COMP_TRANSFORM, name);
 
     if (relation->psys || ELEM(relation->pd->shape, PFIELD_SHAPE_SURFACE, PFIELD_SHAPE_POINTS) ||
-        relation->pd->forcefield == PFIELD_GUIDE) {
+        relation->pd->forcefield == PFIELD_GUIDE)
+    {
       /* TODO(sergey): Consider going more granular with more dedicated
        * particle system operation. */
       DEG_add_object_pointcache_relation(handle, relation->ob, DEG_OB_COMP_GEOMETRY, name);
@@ -190,13 +174,11 @@ ListBase *build_effector_relations(Depsgraph *graph, Collection *collection)
   ID *collection_id = object_id_safe(collection);
   return hash->lookup_or_add_cb(collection_id, [&]() {
     ::Depsgraph *depsgraph = reinterpret_cast<::Depsgraph *>(graph);
-    return BKE_effector_relations_create(depsgraph, graph->view_layer, collection);
+    return BKE_effector_relations_create(depsgraph, graph->scene, graph->view_layer, collection);
   });
 }
 
-ListBase *build_collision_relations(Depsgraph *graph,
-                                    Collection *collection,
-                                    unsigned int modifier_type)
+ListBase *build_collision_relations(Depsgraph *graph, Collection *collection, uint modifier_type)
 {
   const ePhysicsRelationType type = modifier_to_relation_type(modifier_type);
   Map<const ID *, ListBase *> *hash = graph->physics_relations[type];

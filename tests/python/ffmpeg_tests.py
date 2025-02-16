@@ -1,23 +1,7 @@
 #!/usr/bin/env python3
-# ##### BEGIN GPL LICENSE BLOCK #####
+# SPDX-FileCopyrightText: 2018-2022 Blender Authors
 #
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ##### END GPL LICENSE BLOCK #####
-
-# <pep8 compliant>
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 import argparse
 import pathlib
@@ -40,7 +24,7 @@ class AbstractFFmpegSequencerTest(AbstractFFmpegTest):
         return \
             "import bpy; " \
             "bpy.context.scene.sequence_editor_create(); " \
-            "strip = bpy.context.scene.sequence_editor.sequences.new_movie(" \
+            "strip = bpy.context.scene.sequence_editor.strips.new_movie(" \
             "'test_movie', %r, channel=1, frame_start=1); " \
             "print(f'fps:{strip.fps}'); " \
             "print(f'duration:{strip.frame_final_duration}'); " % movie.as_posix()
@@ -99,6 +83,11 @@ class FPSDetectionTest(AbstractFFmpegSequencerTest):
         self.assertEqual(
             self.get_movie_file_duration('T54834.ogg'),
             50)
+
+    def test_T126866(self):
+        self.assertEqual(
+            self.get_movie_file_duration('T126866.mp4'),
+            361)
 
 
 if __name__ == '__main__':

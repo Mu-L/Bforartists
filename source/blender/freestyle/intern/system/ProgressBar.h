@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -23,9 +11,7 @@
 
 #include <string>
 
-#ifdef WITH_CXX_GUARDEDALLOC
-#  include "MEM_guardedalloc.h"
-#endif
+#include "MEM_guardedalloc.h"
 
 using namespace std;
 
@@ -39,9 +25,7 @@ class ProgressBar {
     _progress = 0;
   }
 
-  virtual ~ProgressBar()
-  {
-  }
+  virtual ~ProgressBar() {}
 
   virtual void reset()
   {
@@ -49,12 +33,12 @@ class ProgressBar {
     _progress = 0;
   }
 
-  virtual void setTotalSteps(unsigned n)
+  virtual void setTotalSteps(uint n)
   {
     _numtotalsteps = n;
   }
 
-  virtual void setProgress(unsigned i)
+  virtual void setProgress(uint i)
   {
     _progress = i;
   }
@@ -65,12 +49,12 @@ class ProgressBar {
   }
 
   /** accessors */
-  inline unsigned int getTotalSteps() const
+  inline uint getTotalSteps() const
   {
     return _numtotalsteps;
   }
 
-  inline unsigned int getProgress() const
+  inline uint getProgress() const
   {
     return _progress;
   }
@@ -81,13 +65,11 @@ class ProgressBar {
   }
 
  protected:
-  unsigned _numtotalsteps;
-  unsigned _progress;
+  uint _numtotalsteps;
+  uint _progress;
   string _label;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:ProgressBar")
-#endif
 };
 
 } /* namespace Freestyle */

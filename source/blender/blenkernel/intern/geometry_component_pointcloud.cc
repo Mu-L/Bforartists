@@ -1,33 +1,25 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "DNA_pointcloud_types.h"
 
-#include "BKE_attribute_access.hh"
 #include "BKE_geometry_set.hh"
-#include "BKE_lib_id.h"
-#include "BKE_pointcloud.h"
+#include "BKE_lib_id.hh"
+#include "BKE_pointcloud.hh"
 
 #include "attribute_access_intern.hh"
+
+namespace blender::bke {
 
 /* -------------------------------------------------------------------- */
 /** \name Geometry Component Implementation
  * \{ */
 
-PointCloudComponent::PointCloudComponent() : GeometryComponent(GEO_COMPONENT_TYPE_POINT_CLOUD)
+PointCloudComponent::PointCloudComponent() : GeometryComponent(Type::PointCloud) {}
+
+PointCloudComponent::PointCloudComponent(PointCloud *pointcloud, GeometryOwnershipType ownership)
+    : GeometryComponent(Type::PointCloud), pointcloud_(pointcloud), ownership_(ownership)
 {
 }
 
@@ -36,19 +28,19 @@ PointCloudComponent::~PointCloudComponent()
   this->clear();
 }
 
-GeometryComponent *PointCloudComponent::copy() const
+GeometryComponentPtr PointCloudComponent::copy() const
 {
   PointCloudComponent *new_component = new PointCloudComponent();
   if (pointcloud_ != nullptr) {
-    new_component->pointcloud_ = BKE_pointcloud_copy_for_eval(pointcloud_, false);
+    new_component->pointcloud_ = BKE_pointcloud_copy_for_eval(pointcloud_);
     new_component->ownership_ = GeometryOwnershipType::Owned;
   }
-  return new_component;
+  return GeometryComponentPtr(new_component);
 }
 
 void PointCloudComponent::clear()
 {
-  BLI_assert(this->is_mutable());
+  BLI_assert(this->is_mutable() || this->is_expired());
   if (pointcloud_ != nullptr) {
     if (ownership_ == GeometryOwnershipType::Owned) {
       BKE_id_free(nullptr, pointcloud_);
@@ -62,7 +54,6 @@ bool PointCloudComponent::has_pointcloud() const
   return pointcloud_ != nullptr;
 }
 
-/* Clear the component and replace it with the new point cloud. */
 void PointCloudComponent::replace(PointCloud *pointcloud, GeometryOwnershipType ownership)
 {
   BLI_assert(this->is_mutable());
@@ -71,8 +62,6 @@ void PointCloudComponent::replace(PointCloud *pointcloud, GeometryOwnershipType 
   ownership_ = ownership;
 }
 
-/* Return the point cloud and clear the component. The caller takes over responsibility for freeing
- * the point cloud (if the component was responsible before). */
 PointCloud *PointCloudComponent::release()
 {
   BLI_assert(this->is_mutable());
@@ -81,22 +70,16 @@ PointCloud *PointCloudComponent::release()
   return pointcloud;
 }
 
-/* Get the point cloud from this component. This method can be used by multiple threads at the same
- * time. Therefore, the returned point cloud should not be modified. No ownership is transferred.
- */
-const PointCloud *PointCloudComponent::get_for_read() const
+const PointCloud *PointCloudComponent::get() const
 {
   return pointcloud_;
 }
 
-/* Get the point cloud from this component. This method can only be used when the component is
- * mutable, i.e. it is not shared. The returned point cloud can be modified. No ownership is
- * transferred. */
 PointCloud *PointCloudComponent::get_for_write()
 {
   BLI_assert(this->is_mutable());
   if (ownership_ == GeometryOwnershipType::ReadOnly) {
-    pointcloud_ = BKE_pointcloud_copy_for_eval(pointcloud_, false);
+    pointcloud_ = BKE_pointcloud_copy_for_eval(pointcloud_);
     ownership_ = GeometryOwnershipType::Owned;
   }
   return pointcloud_;
@@ -116,104 +99,41 @@ void PointCloudComponent::ensure_owns_direct_data()
 {
   BLI_assert(this->is_mutable());
   if (ownership_ != GeometryOwnershipType::Owned) {
-    pointcloud_ = BKE_pointcloud_copy_for_eval(pointcloud_, false);
+    if (pointcloud_) {
+      pointcloud_ = BKE_pointcloud_copy_for_eval(pointcloud_);
+    }
     ownership_ = GeometryOwnershipType::Owned;
   }
 }
 
+void PointCloudComponent::count_memory(MemoryCounter &memory) const
+{
+  if (pointcloud_) {
+    pointcloud_->count_memory(memory);
+  }
+}
+
 /** \} */
+
+}  // namespace blender::bke
+
+namespace blender::bke {
 
 /* -------------------------------------------------------------------- */
 /** \name Attribute Access
  * \{ */
 
-int PointCloudComponent::attribute_domain_size(const AttributeDomain domain) const
+std::optional<AttributeAccessor> PointCloudComponent::attributes() const
 {
-  if (pointcloud_ == nullptr) {
-    return 0;
-  }
-  if (domain != ATTR_DOMAIN_POINT) {
-    return 0;
-  }
-  return pointcloud_->totpoint;
+  return AttributeAccessor(pointcloud_, pointcloud_attribute_accessor_functions());
 }
 
-namespace blender::bke {
-
-template<typename T>
-static GVArrayPtr make_array_read_attribute(const void *data, const int domain_size)
+std::optional<MutableAttributeAccessor> PointCloudComponent::attributes_for_write()
 {
-  return std::make_unique<fn::GVArray_For_Span<T>>(Span<T>((const T *)data, domain_size));
-}
-
-template<typename T>
-static GVMutableArrayPtr make_array_write_attribute(void *data, const int domain_size)
-{
-  return std::make_unique<fn::GVMutableArray_For_MutableSpan<T>>(
-      MutableSpan<T>((T *)data, domain_size));
-}
-
-/**
- * In this function all the attribute providers for a point cloud component are created. Most data
- * in this function is statically allocated, because it does not change over time.
- */
-static ComponentAttributeProviders create_attribute_providers_for_point_cloud()
-{
-  static auto update_custom_data_pointers = [](GeometryComponent &component) {
-    PointCloudComponent &pointcloud_component = static_cast<PointCloudComponent &>(component);
-    PointCloud *pointcloud = pointcloud_component.get_for_write();
-    if (pointcloud != nullptr) {
-      BKE_pointcloud_update_customdata_pointers(pointcloud);
-    }
-  };
-  static CustomDataAccessInfo point_access = {
-      [](GeometryComponent &component) -> CustomData * {
-        PointCloudComponent &pointcloud_component = static_cast<PointCloudComponent &>(component);
-        PointCloud *pointcloud = pointcloud_component.get_for_write();
-        return pointcloud ? &pointcloud->pdata : nullptr;
-      },
-      [](const GeometryComponent &component) -> const CustomData * {
-        const PointCloudComponent &pointcloud_component = static_cast<const PointCloudComponent &>(
-            component);
-        const PointCloud *pointcloud = pointcloud_component.get_for_read();
-        return pointcloud ? &pointcloud->pdata : nullptr;
-      },
-      update_custom_data_pointers};
-
-  static BuiltinCustomDataLayerProvider position("position",
-                                                 ATTR_DOMAIN_POINT,
-                                                 CD_PROP_FLOAT3,
-                                                 CD_PROP_FLOAT3,
-                                                 BuiltinAttributeProvider::NonCreatable,
-                                                 BuiltinAttributeProvider::Writable,
-                                                 BuiltinAttributeProvider::NonDeletable,
-                                                 point_access,
-                                                 make_array_read_attribute<float3>,
-                                                 make_array_write_attribute<float3>,
-                                                 nullptr);
-  static BuiltinCustomDataLayerProvider radius("radius",
-                                               ATTR_DOMAIN_POINT,
-                                               CD_PROP_FLOAT,
-                                               CD_PROP_FLOAT,
-                                               BuiltinAttributeProvider::Creatable,
-                                               BuiltinAttributeProvider::Writable,
-                                               BuiltinAttributeProvider::Deletable,
-                                               point_access,
-                                               make_array_read_attribute<float>,
-                                               make_array_write_attribute<float>,
-                                               nullptr);
-  static CustomDataAttributeProvider point_custom_data(ATTR_DOMAIN_POINT, point_access);
-  return ComponentAttributeProviders({&position, &radius}, {&point_custom_data});
-}
-
-}  // namespace blender::bke
-
-const blender::bke::ComponentAttributeProviders *PointCloudComponent::get_attribute_providers()
-    const
-{
-  static blender::bke::ComponentAttributeProviders providers =
-      blender::bke::create_attribute_providers_for_point_cloud();
-  return &providers;
+  PointCloud *pointcloud = this->get_for_write();
+  return MutableAttributeAccessor(pointcloud, pointcloud_attribute_accessor_functions());
 }
 
 /** \} */
+
+}  // namespace blender::bke

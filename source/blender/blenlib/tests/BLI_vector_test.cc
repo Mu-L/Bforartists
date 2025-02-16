@@ -1,10 +1,13 @@
-/* Apache License, Version 2.0 */
+/* SPDX-FileCopyrightText: 2023 Blender Authors
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "BLI_exception_safety_test_utils.hh"
-#include "BLI_strict_flags.h"
 #include "BLI_vector.hh"
 #include "testing/testing.h"
 #include <forward_list>
+
+#include "BLI_strict_flags.h" /* IWYU pragma: keep. Keep last. */
 
 namespace blender::tests {
 
@@ -77,27 +80,27 @@ struct TestListValue {
   int value;
 };
 
-TEST(vector, ListBaseConstructor)
-{
-  TestListValue *value1 = new TestListValue{nullptr, nullptr, 4};
-  TestListValue *value2 = new TestListValue{nullptr, nullptr, 5};
-  TestListValue *value3 = new TestListValue{nullptr, nullptr, 6};
+// TEST(vector, ListBaseConstructor)
+// {
+//   TestListValue *value1 = new TestListValue{nullptr, nullptr, 4};
+//   TestListValue *value2 = new TestListValue{nullptr, nullptr, 5};
+//   TestListValue *value3 = new TestListValue{nullptr, nullptr, 6};
 
-  ListBase list = {nullptr, nullptr};
-  BLI_addtail(&list, value1);
-  BLI_addtail(&list, value2);
-  BLI_addtail(&list, value3);
-  Vector<TestListValue *> vec(list);
+//   ListBase list = {nullptr, nullptr};
+//   BLI_addtail(&list, value1);
+//   BLI_addtail(&list, value2);
+//   BLI_addtail(&list, value3);
+//   Vector<TestListValue *> vec(list);
 
-  EXPECT_EQ(vec.size(), 3);
-  EXPECT_EQ(vec[0]->value, 4);
-  EXPECT_EQ(vec[1]->value, 5);
-  EXPECT_EQ(vec[2]->value, 6);
+//   EXPECT_EQ(vec.size(), 3);
+//   EXPECT_EQ(vec[0]->value, 4);
+//   EXPECT_EQ(vec[1]->value, 5);
+//   EXPECT_EQ(vec[2]->value, 6);
 
-  delete value1;
-  delete value2;
-  delete value3;
-}
+//   delete value1;
+//   delete value2;
+//   delete value3;
+// }
 
 TEST(vector, IteratorConstructor)
 {
@@ -264,7 +267,8 @@ TEST(vector, AppendAndGetIndex)
   EXPECT_EQ(vec.append_and_get_index(10), 1);
   EXPECT_EQ(vec.append_and_get_index(10), 2);
   vec.append(10);
-  EXPECT_EQ(vec.append_and_get_index(10), 4);
+  int value = 10;
+  EXPECT_EQ(vec.append_and_get_index(value), 4);
 }
 
 TEST(vector, AppendNonDuplicates)
@@ -316,7 +320,7 @@ TEST(vector, BecomeLarge)
   }
   EXPECT_EQ(vec.size(), 100);
   for (int i = 0; i < 100; i++) {
-    EXPECT_EQ(vec[i], static_cast<int>(i * 5));
+    EXPECT_EQ(vec[i], int(i * 5));
   }
 }
 
@@ -415,7 +419,28 @@ TEST(vector, Remove)
   vec.remove(1);
   EXPECT_TRUE(std::equal(vec.begin(), vec.end(), Span<int>({2}).begin()));
   vec.remove(0);
-  EXPECT_TRUE(std::equal(vec.begin(), vec.end(), Span<int>({}).begin()));
+  EXPECT_EQ(vec.begin(), vec.end());
+}
+
+TEST(vector, RemoveIf)
+{
+  Vector<int> vec = {1, 2, 3, 4, 5, 6, 7, 8};
+  const int64_t removed = vec.remove_if([](const int x) { return x % 2 == 0; });
+  EXPECT_EQ(vec.size() + removed, 8);
+  const Vector<int> expected_vec = {1, 3, 5, 7};
+  EXPECT_EQ(vec.size(), expected_vec.size());
+  EXPECT_EQ_ARRAY(vec.data(), expected_vec.data(), size_t(vec.size()));
+}
+
+TEST(vector, RemoveIfNonTrivialDestructible)
+{
+  Vector<Vector<int, 0, GuardedAllocator>> vec;
+  for ([[maybe_unused]] const int64_t i : IndexRange(10)) {
+    /* This test relies on leak detection to run after tests. */
+    vec.append(Vector<int, 0, GuardedAllocator>(100));
+  }
+  vec.remove_if([&](const auto & /*value*/) { return true; });
+  EXPECT_TRUE(vec.is_empty());
 }
 
 TEST(vector, ExtendSmallVector)
@@ -443,10 +468,76 @@ TEST(vector, ExtendArray)
   EXPECT_EQ(a[1], 4);
 }
 
+TEST(vector, ExtendMoveFromSmallVector)
+{
+  Vector<Vector<uint64_t, 0>> a = {
+      {1, 2, 3, 4, 5},
+      {6, 7, 8},
+  };
+  Vector<Vector<uint64_t, 0>> b = {
+      {9, 10, 11, 12},
+      {13, 14, 15, 16},
+  };
+  const Vector<Vector<uint64_t, 0>> c = {
+      {1, 2, 3, 4, 5},
+      {6, 7, 8},
+      {9, 10, 11, 12},
+      {13, 14, 15, 16},
+  };
+
+  a.extend(std::move(b));
+
+  EXPECT_EQ(a, c);
+  EXPECT_TRUE(b.is_empty());
+}
+
+TEST(vector, ExtendMoveFromUniquePtrVector)
+{
+  Vector<int *> ptr_vec;
+
+  Vector<std::unique_ptr<int>> a;
+  a.append(std::make_unique<int>(0));
+  a.append(std::make_unique<int>(1));
+  a.append(std::make_unique<int>(2));
+
+  for (std::unique_ptr<int> &i : a) {
+    ptr_vec.append(i.get());
+  }
+
+  Vector<std::unique_ptr<int>> b;
+  b.append(std::make_unique<int>(7));
+  b.append(std::make_unique<int>(8));
+  b.append(std::make_unique<int>(9));
+  b.append(std::make_unique<int>(20));
+
+  for (std::unique_ptr<int> &i : b) {
+    ptr_vec.append(i.get());
+  }
+
+  ASSERT_EQ(a.size(), 3);
+  ASSERT_EQ(b.size(), 4);
+
+  a.extend(std::move(b));
+
+  std::array<int, 7> values = {0, 1, 2, 7, 8, 9, 20};
+
+  ASSERT_EQ(size_t(a.size()), values.size());
+  ASSERT_TRUE(b.is_empty());
+  ASSERT_EQ(a.size(), ptr_vec.size());
+
+  for (int64_t i = 0; i < a.size(); i++) {
+    ASSERT_EQ(*a[i], values[size_t(i)]);
+    ASSERT_EQ(a[i].get(), ptr_vec[i]);
+  }
+}
+
 TEST(vector, Last)
 {
   Vector<int> a{3, 5, 7};
   EXPECT_EQ(a.last(), 7);
+  EXPECT_EQ(a.last(0), 7);
+  EXPECT_EQ(a.last(1), 5);
+  EXPECT_EQ(a.last(2), 3);
 }
 
 TEST(vector, AppendNTimes)
@@ -476,6 +567,7 @@ TEST(vector, UniquePtrValue)
   vec.remove_and_reorder(0);
   vec.remove(0);
   EXPECT_EQ(vec.size(), 1);
+  EXPECT_EQ(vec.append_and_get_index(std::make_unique<int>(4)), 1);
 
   UNUSED_VARS(a, b);
 }
@@ -488,17 +580,11 @@ class TypeConstructMock {
   bool copy_assigned = false;
   bool move_assigned = false;
 
-  TypeConstructMock() : default_constructed(true)
-  {
-  }
+  TypeConstructMock() : default_constructed(true) {}
 
-  TypeConstructMock(const TypeConstructMock &UNUSED(other)) : copy_constructed(true)
-  {
-  }
+  TypeConstructMock(const TypeConstructMock & /*other*/) : copy_constructed(true) {}
 
-  TypeConstructMock(TypeConstructMock &&UNUSED(other)) noexcept : move_constructed(true)
-  {
-  }
+  TypeConstructMock(TypeConstructMock && /*other*/) noexcept : move_constructed(true) {}
 
   TypeConstructMock &operator=(const TypeConstructMock &other)
   {
@@ -630,7 +716,7 @@ TEST(vector, OveralignedValues)
   Vector<AlignedBuffer<1, 512>, 2> vec;
   for (int i = 0; i < 100; i++) {
     vec.append({});
-    EXPECT_EQ((uintptr_t)&vec.last() % 512, 0);
+    EXPECT_EQ(uintptr_t(&vec.last()) % 512, 0);
   }
 }
 
@@ -706,6 +792,17 @@ TEST(vector, Prepend)
   vec.prepend({7, 8});
   EXPECT_EQ(vec.size(), 5);
   EXPECT_EQ_ARRAY(vec.data(), Span({7, 8, 1, 2, 3}).data(), 5);
+}
+
+TEST(vector, PrependString)
+{
+  std::string s = "test";
+  Vector<std::string> vec;
+  vec.prepend(s);
+  vec.prepend(std::move(s));
+  EXPECT_EQ(vec.size(), 2);
+  EXPECT_EQ(vec[0], "test");
+  EXPECT_EQ(vec[1], "test");
 }
 
 TEST(vector, ReverseIterator)
@@ -832,6 +929,95 @@ TEST(vector, RemoveChunkExceptions)
   vec[5].throw_during_move = true;
   EXPECT_ANY_THROW({ vec.remove(2, 3); });
   EXPECT_EQ(vec.size(), 7);
+}
+
+struct RecursiveType {
+  Vector<RecursiveType, 0> my_vector;
+};
+
+TEST(vector, RecursiveStructure)
+{
+  RecursiveType my_recursive_type;
+  my_recursive_type.my_vector.append({});
+}
+
+TEST(vector, FromRaw)
+{
+  VectorData<int, GuardedAllocator> data;
+  data.data = MEM_cnew_array<int>(30, __func__);
+  data.size = 10;
+  data.capacity = 30;
+
+  data.data[0] = 5;
+
+  Vector<int> vec{data};
+  EXPECT_EQ(vec.size(), 10);
+  EXPECT_EQ(vec.capacity(), 30);
+  EXPECT_EQ(vec[0], 5);
+}
+
+TEST(vector, FromRawEmpty)
+{
+  VectorData<int, GuardedAllocator> data;
+  Vector<int> vec{data};
+  EXPECT_TRUE(vec.is_empty());
+}
+
+TEST(vector, ReleaseEmptyInline)
+{
+  Vector<int> vec;
+  VectorData<int, GuardedAllocator> data = vec.release();
+  EXPECT_EQ(data.data, nullptr);
+}
+
+TEST(vector, ReleaseEmptyAllocated)
+{
+  Vector<int> vec;
+  vec.reserve(100);
+  const int *data_ptr = vec.data();
+  EXPECT_FALSE(vec.is_inline());
+
+  VectorData<int, GuardedAllocator> data = vec.release();
+  EXPECT_TRUE(vec.is_inline());
+
+  EXPECT_EQ(data.data, data_ptr);
+  EXPECT_NE(data.data, nullptr);
+  EXPECT_EQ(data.size, 0);
+  EXPECT_EQ(data.capacity, 100);
+  MEM_freeN(data.data);
+}
+
+TEST(vector, ReleaseNonEmptyInline)
+{
+  Vector<int> vec = {1, 2};
+  const int *inline_data_ptr = vec.data();
+  EXPECT_EQ(inline_data_ptr[0], 1);
+  EXPECT_TRUE(vec.is_inline());
+
+  VectorData<int, GuardedAllocator> data = vec.release();
+  EXPECT_TRUE(vec.is_inline());
+  EXPECT_TRUE(vec.is_empty());
+
+  EXPECT_NE(data.data, inline_data_ptr);
+  EXPECT_EQ(data.size, 2);
+  MEM_freeN(data.data);
+}
+
+TEST(vector, ReleaseAllocated)
+{
+  Vector<int> vec(50, 3);
+  const int *data_ptr = vec.data();
+  EXPECT_FALSE(vec.is_inline());
+  EXPECT_EQ(vec[0], 3);
+
+  VectorData<int, GuardedAllocator> data = vec.release();
+  EXPECT_TRUE(vec.is_inline());
+  EXPECT_TRUE(vec.is_empty());
+
+  EXPECT_EQ(data.data, data_ptr);
+  EXPECT_EQ(data.size, 50);
+  EXPECT_EQ(data.data[0], 3);
+  MEM_freeN(data.data);
 }
 
 }  // namespace blender::tests

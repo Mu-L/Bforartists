@@ -1,26 +1,18 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup spoutliner
  */
 
-#include "DNA_listBase.h"
+#include "BLT_translation.hh"
 
-#include "../outliner_intern.h"
+#include "BKE_library.hh"
+
+#include "DNA_ID.h"
+
+#include "../outliner_intern.hh"
 
 #include "tree_element_id_library.hh"
 
@@ -32,9 +24,21 @@ TreeElementIDLibrary::TreeElementIDLibrary(TreeElement &legacy_te, Library &libr
   legacy_te.name = library.filepath;
 }
 
-bool TreeElementIDLibrary::isExpandValid() const
+StringRefNull TreeElementIDLibrary::get_warning() const
 {
-  return true;
+  Library &library = reinterpret_cast<Library &>(id_);
+
+  if (library.runtime->tag & LIBRARY_TAG_RESYNC_REQUIRED) {
+    return RPT_(
+        "Contains linked library overrides that need to be resynced, updating the library is "
+        "recommended");
+  }
+
+  if (library.id.tag & ID_TAG_MISSING) {
+    return RPT_("Missing library");
+  }
+
+  return {};
 }
 
 }  // namespace blender::ed::outliner

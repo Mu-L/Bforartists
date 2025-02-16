@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup collada
@@ -20,12 +8,9 @@
 
 #pragma once
 
-#include "COLLADAFWColorOrTexture.h"
 #include "COLLADAFWFloatOrDoubleArray.h"
-#include "COLLADAFWGeometry.h"
-#include "COLLADAFWMeshPrimitive.h"
 #include "COLLADAFWTypes.h"
-#include "COLLADASWEffectProfile.h"
+#include "COLLADASWColorOrTexture.h"
 
 #include <algorithm>
 #include <map>
@@ -43,33 +28,32 @@
 #include "DNA_scene_types.h"
 #include "DNA_texture_types.h"
 
-#include "RNA_access.h"
+#include "RNA_access.hh"
 
 #include "BLI_linklist.h"
-#include "BLI_string.h"
-#include "BLI_utildefines.h"
 
-#include "BKE_context.h"
-#include "BKE_idprop.h"
-#include "BKE_main.h"
-#include "BKE_node.h"
-#include "BKE_object.h"
-#include "BKE_scene.h"
-
-#include "DEG_depsgraph_query.h"
+#include "BKE_context.hh"
+#include "BKE_main.hh"
+#include "BKE_node.hh"
+#include "BKE_object.hh"
+#include "BKE_scene.hh"
 
 #include "BCSampleData.h"
 #include "BlenderContext.h"
 #include "ExportSettings.h"
-#include "ImportSettings.h"
 #include "collada_internal.h"
 
 constexpr int LIMITTED_PRECISION = 6;
 
-typedef std::map<COLLADAFW::UniqueId, Image *> UidImageMap;
-typedef std::map<std::string, Image *> KeyImageMap;
-typedef std::map<COLLADAFW::TextureMapId, std::vector<MTex *>> TexIndexTextureArrayMap;
-typedef std::set<Object *> BCObjectSet;
+using UidImageMap = std::map<COLLADAFW::UniqueId, Image *>;
+using KeyImageMap = std::map<std::string, Image *>;
+using TexIndexTextureArrayMap = std::map<COLLADAFW::TextureMapId, std::vector<MTex *>>;
+using BCObjectSet = std::set<Object *>;
+
+namespace COLLADAFW {
+class Node;
+}
+class ExtraTags;
 
 extern void bc_update_scene(BlenderContext &blender_context, float ctime);
 
@@ -77,43 +61,44 @@ extern void bc_update_scene(BlenderContext &blender_context, float ctime);
 
 std::vector<bAction *> bc_getSceneActions(const bContext *C, Object *ob, bool all_actions);
 
-/* Action helpers */
+/* Action and Animdata helpers */
 
+/* Return Object's Action or nullptr. */
 inline bAction *bc_getSceneObjectAction(Object *ob)
 {
-  return (ob->adt && ob->adt->action) ? ob->adt->action : NULL;
+  return (ob->adt && ob->adt->action) ? ob->adt->action : nullptr;
 }
 
-/* Returns Light Action or NULL */
-inline bAction *bc_getSceneLightAction(Object *ob)
+/* Return Light's AnimData or nullptr. */
+inline AnimData *bc_getSceneLightAnimData(Object *ob)
 {
   if (ob->type != OB_LAMP) {
-    return NULL;
+    return nullptr;
   }
 
   Light *lamp = (Light *)ob->data;
-  return (lamp->adt && lamp->adt->action) ? lamp->adt->action : NULL;
+  return lamp->adt;
 }
 
-/* Return Camera Action or NULL */
-inline bAction *bc_getSceneCameraAction(Object *ob)
+/* Return Camera's AnimData or nullptr. */
+inline AnimData *bc_getSceneCameraAnimData(Object *ob)
 {
   if (ob->type != OB_CAMERA) {
-    return NULL;
+    return nullptr;
   }
 
-  Camera *camera = (Camera *)ob->data;
-  return (camera->adt && camera->adt->action) ? camera->adt->action : NULL;
+  const Camera *camera = (const Camera *)ob->data;
+  return camera->adt;
 }
 
-/* returns material action or NULL */
-inline bAction *bc_getSceneMaterialAction(Material *ma)
+/* Return Material's AnimData or nullptr. */
+inline AnimData *bc_getSceneMaterialAnimData(Material *ma)
 {
-  if (ma == NULL) {
-    return NULL;
+  if (ma == nullptr) {
+    return nullptr;
   }
 
-  return (ma->adt && ma->adt->action) ? ma->adt->action : NULL;
+  return ma->adt;
 }
 
 std::string bc_get_action_id(std::string action_name,
@@ -130,6 +115,13 @@ extern bool bc_validateConstraints(bConstraint *con);
 bool bc_set_parent(Object *ob, Object *par, bContext *C, bool is_parent_space = true);
 extern Object *bc_add_object(
     Main *bmain, Scene *scene, ViewLayer *view_layer, int type, const char *name);
+extern Object *bc_add_armature(COLLADAFW::Node *node,
+                               ExtraTags *node_extra_tags,
+                               Main *bmain,
+                               Scene *scene,
+                               ViewLayer *view_layer,
+                               int type,
+                               const char *name);
 extern Mesh *bc_get_mesh_copy(BlenderContext &blender_context,
                               Object *ob,
                               BC_export_mesh_type export_mesh_type,
@@ -139,14 +131,23 @@ extern Mesh *bc_get_mesh_copy(BlenderContext &blender_context,
 extern Object *bc_get_assigned_armature(Object *ob);
 extern bool bc_has_object_type(LinkNode *export_set, short obtype);
 
-extern char *bc_CustomData_get_layer_name(const CustomData *data, int type, int n);
-extern char *bc_CustomData_get_active_layer_name(const CustomData *data, int type);
+extern const char *bc_CustomData_get_layer_name(const CustomData *data,
+                                                eCustomDataType type,
+                                                int n);
+extern const char *bc_CustomData_get_active_layer_name(const CustomData *data,
+                                                       eCustomDataType type);
 
 extern void bc_bubble_sort_by_Object_name(LinkNode *export_set);
+/**
+ * Check if a bone is the top most exportable bone in the bone hierarchy.
+ * When deform_bones_only == false, then only bones with NO parent
+ * can be root bones. Otherwise the top most deform bones in the hierarchy
+ * are root bones.
+ */
 extern bool bc_is_root_bone(Bone *aBone, bool deform_bones_only);
 extern int bc_get_active_UVLayer(Object *ob);
 
-inline std::string bc_string_after(const std::string &s, const std::string probe)
+inline std::string bc_string_after(const std::string &s, const std::string &probe)
 {
   size_t i = s.rfind(probe);
   if (i != std::string::npos) {
@@ -155,7 +156,7 @@ inline std::string bc_string_after(const std::string &s, const std::string probe
   return s;
 }
 
-inline std::string bc_string_before(const std::string &s, const std::string probe)
+inline std::string bc_string_before(const std::string &s, const std::string &probe)
 {
   size_t i = s.find(probe);
   if (i != std::string::npos) {
@@ -195,17 +196,39 @@ extern std::string bc_replace_string(std::string data,
                                      const std::string &pattern,
                                      const std::string &replacement);
 extern std::string bc_url_encode(std::string data);
+/**
+ * Calculate a re-scale factor such that the imported scene's scale
+ * is preserved. I.e. 1 meter in the import will also be
+ * 1 meter in the current scene.
+ */
 extern void bc_match_scale(Object *ob, UnitConverter &bc_unit, bool scale_to_scene);
 extern void bc_match_scale(std::vector<Object *> *objects_done,
                            UnitConverter &bc_unit,
                            bool scale_to_scene);
 
+/**
+ * Convenience function to get only the needed components of a matrix.
+ */
 extern void bc_decompose(float mat[4][4], float *loc, float eul[3], float quat[4], float *size);
+/**
+ * Create rotation_quaternion from a delta rotation and a reference quat
+ *
+ * Input:
+ * mat_from: The rotation matrix before rotation
+ * mat_to  : The rotation matrix after rotation
+ * qref    : the quat corresponding to mat_from
+ *
+ * Output:
+ * rot     : the calculated result (quaternion).
+ */
 extern void bc_rotate_from_reference_quat(float quat_to[4],
                                           float quat_from[4],
                                           float mat_to[4][4]);
 
-extern void bc_triangulate_mesh(Mesh *me);
+extern void bc_triangulate_mesh(Mesh *mesh);
+/**
+ * A bone is a leaf when it has no children or all children are not connected.
+ */
 extern bool bc_is_leaf_bone(Bone *bone);
 extern EditBone *bc_get_edit_bone(bArmature *armature, char *name);
 extern int bc_set_layer(int bitfield, int layer, bool enable);
@@ -224,12 +247,34 @@ void bc_copy_v44_m4d(std::vector<std::vector<double>> &r, double (&a)[4][4]);
 void bc_sanitize_v3(double v[3], int precision);
 void bc_sanitize_v3(float v[3], int precision);
 
+/**
+ * Get a custom property when it exists.
+ * This function is also used to check if a property exists.
+ */
 extern IDProperty *bc_get_IDProperty(Bone *bone, std::string key);
 extern void bc_set_IDProperty(EditBone *ebone, const char *key, float value);
+/**
+ * Stores a 4*4 matrix as a custom bone property array of size 16.
+ */
 extern void bc_set_IDPropertyMatrix(EditBone *ebone, const char *key, float mat[4][4]);
 
+/**
+ * Read a custom bone property and convert to float
+ * Return def if the property does not exist.
+ */
 extern float bc_get_property(Bone *bone, std::string key, float def);
+/**
+ * Get a vector that is stored in 3 custom properties (used in Blender <= 2.78).
+ */
 extern void bc_get_property_vector(Bone *bone, std::string key, float val[3], const float def[3]);
+/**
+ * Read a custom bone property and convert to matrix
+ * Return true if conversion was successful
+ *
+ * Return false if:
+ * - the property does not exist
+ * - is not an array of size 16
+ */
 extern bool bc_get_property_matrix(Bone *bone, std::string key, float mat[4][4]);
 
 extern void bc_enable_fcurves(bAction *act, char *bone_name);
@@ -241,23 +286,29 @@ extern bool bc_has_animations(Object *ob);
 extern void bc_add_global_transform(Matrix &to_mat,
                                     const Matrix &from_mat,
                                     const BCMatrix &global_transform,
-                                    const bool invert = false);
+                                    bool invert = false);
 extern void bc_add_global_transform(Vector &to_vec,
                                     const Vector &from_vec,
                                     const BCMatrix &global_transform,
-                                    const bool invert = false);
+                                    bool invert = false);
 extern void bc_add_global_transform(Vector &to_vec,
                                     const BCMatrix &global_transform,
-                                    const bool invert = false);
+                                    bool invert = false);
 extern void bc_add_global_transform(Matrix &to_mat,
                                     const BCMatrix &global_transform,
-                                    const bool invert = false);
+                                    bool invert = false);
 extern void bc_apply_global_transform(Matrix &to_mat,
                                       const BCMatrix &global_transform,
-                                      const bool invert = false);
+                                      bool invert = false);
 extern void bc_apply_global_transform(Vector &to_vec,
                                       const BCMatrix &global_transform,
-                                      const bool invert = false);
+                                      bool invert = false);
+/**
+ * Check if custom information about bind matrix exists and modify the from_mat
+ * accordingly.
+ *
+ * \note This is old style for Blender <= 2.78 only kept for compatibility.
+ */
 extern void bc_create_restpose_mat(BCExportSettings &export_settings,
                                    Bone *bone,
                                    float to_mat[4][4],
@@ -315,7 +366,8 @@ class BoneExtended {
   float tail[3];
   float roll;
 
-  int bone_layers;
+  std::vector<std::string> bone_collections;
+
   int use_connect;
   bool has_custom_tail;
   bool has_custom_roll;
@@ -326,15 +378,14 @@ class BoneExtended {
   void set_name(char *aName);
   char *get_name();
 
-  void set_chain_length(const int aLength);
+  void set_chain_length(int aLength);
   int get_chain_length();
 
   void set_leaf_bone(bool state);
   bool is_leaf_bone();
 
-  void set_bone_layers(std::string layers, std::vector<std::string> &layer_labels);
-  int get_bone_layers();
-  static std::string get_bone_layers(int bitfield);
+  void set_bone_collections(std::vector<std::string> bone_collections);
+  const std::vector<std::string> &get_bone_collections();
 
   void set_roll(float roll);
   bool has_roll();
@@ -352,7 +403,7 @@ class BoneExtended {
  * std:string     : an armature name
  * BoneExtended * : a map that contains extra data for bones
  */
-typedef std::map<std::string, BoneExtended *> BoneExtensionMap;
+using BoneExtensionMap = std::map<std::string, BoneExtended *>;
 
 /*
  * A class to organize bone extension data for multiple Armatures.
@@ -364,6 +415,11 @@ class BoneExtensionManager {
   std::map<std::string, BoneExtensionMap *> extended_bone_maps;
 
  public:
+  /**
+   * This method creates a new extension map when needed.
+   * \note The ~BoneExtensionManager destructor takes care
+   * to delete the created maps when the manager is removed.
+   */
   BoneExtensionMap &getExtensionMap(bArmature *armature);
   ~BoneExtensionManager();
 };

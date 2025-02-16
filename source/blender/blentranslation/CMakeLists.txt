@@ -1,55 +1,47 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2008 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# The Original Code is Copyright (C) 2008, Blender Foundation
-# All rights reserved.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(INC
-  .
-  ../blenkernel
-  ../blenlib
-  ../imbuf
-  ../makesdna
+  PUBLIC .
   ../makesrna
-  ../../../intern/guardedalloc
-  ../../../intern/locale
 )
 
 set(INC_SYS
 )
 
 set(SRC
-  intern/blt_lang.c
-  intern/blt_translation.c
+  intern/blt_lang.cc
+  intern/blt_translation.cc
 
-  BLT_lang.h
-  BLT_translation.h
+  BLT_lang.hh
+  BLT_translation.hh
 )
 
+if(WITH_INTERNATIONAL)
+  list(APPEND SRC
+    intern/messages.cc
+    intern/messages.hh
+  )
+
+  if(APPLE)
+    list(APPEND SRC
+      intern/messages_apple.mm
+    )
+  endif()
+endif()
+
 set(LIB
-  bf_blenkernel
-  bf_blenlib
+  PRIVATE bf::blenkernel
+  PRIVATE bf::blenlib
+  PRIVATE bf::dna
+  PRIVATE bf::imbuf
+  PRIVATE bf::intern::clog
+  PRIVATE bf::intern::guardedalloc
 )
 
 if(WITH_INTERNATIONAL)
   add_definitions(-DWITH_INTERNATIONAL)
-  list(APPEND LIB
-    bf_intern_locale
-  )
 endif()
 
 if(WITH_PYTHON)
@@ -59,13 +51,12 @@ if(WITH_PYTHON)
   )
 endif()
 
-if(WIN32 OR APPLE)
-  if(WITH_INPUT_IME)
-    add_definitions(-DWITH_INPUT_IME)
-  endif()
+if(WITH_INPUT_IME)
+  add_definitions(-DWITH_INPUT_IME)
 endif()
 
 blender_add_lib(bf_blentranslation "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+add_library(bf::blentranslation ALIAS bf_blentranslation)
 
 if(WITH_INTERNATIONAL)
   add_subdirectory(msgfmt)

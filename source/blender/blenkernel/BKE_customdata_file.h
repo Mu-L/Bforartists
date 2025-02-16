@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -20,9 +8,7 @@
  * \ingroup bke
  */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <stddef.h>
 
 #define CDF_TYPE_IMAGE 0
 #define CDF_TYPE_MESH 1
@@ -39,23 +25,19 @@ void cdf_free(CDataFile *cdf);
 
 /* File read/write/remove */
 
-bool cdf_read_open(CDataFile *cdf, const char *filename);
-bool cdf_read_layer(CDataFile *cdf, CDataFileLayer *blay);
+bool cdf_read_open(CDataFile *cdf, const char *filepath);
+bool cdf_read_layer(CDataFile *cdf, const CDataFileLayer *blay);
 bool cdf_read_data(CDataFile *cdf, unsigned int size, void *data);
 void cdf_read_close(CDataFile *cdf);
 
-bool cdf_write_open(CDataFile *cdf, const char *filename);
+bool cdf_write_open(CDataFile *cdf, const char *filepath);
 bool cdf_write_layer(CDataFile *cdf, CDataFileLayer *blay);
-bool cdf_write_data(CDataFile *cdf, unsigned int size, void *data);
+bool cdf_write_data(CDataFile *cdf, unsigned int size, const void *data);
 void cdf_write_close(CDataFile *cdf);
 
-void cdf_remove(const char *filename);
+void cdf_remove(const char *filepath);
 
 /* Layers */
 
 CDataFileLayer *cdf_layer_find(CDataFile *cdf, int type, const char *name);
 CDataFileLayer *cdf_layer_add(CDataFile *cdf, int type, const char *name, size_t datasize);
-
-#ifdef __cplusplus
-}
-#endif

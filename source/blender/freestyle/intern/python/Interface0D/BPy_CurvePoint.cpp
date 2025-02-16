@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2004-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -23,51 +11,49 @@
 #include "../BPy_Convert.h"
 #include "../Interface0D/BPy_SVertex.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 using namespace Freestyle;
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
 /*----------------------CurvePoint methods----------------------------*/
 
-PyDoc_STRVAR(CurvePoint_doc,
-             "Class hierarchy: :class:`Interface0D` > :class:`CurvePoint`\n"
-             "\n"
-             "Class to represent a point of a curve.  A CurvePoint can be any point\n"
-             "of a 1D curve (it doesn't have to be a vertex of the curve).  Any\n"
-             ":class:`Interface1D` is built upon ViewEdges, themselves built upon\n"
-             "FEdges.  Therefore, a curve is basically a polyline made of a list of\n"
-             ":class:`SVertex` objects.  Thus, a CurvePoint is built by linearly\n"
-             "interpolating two :class:`SVertex` instances.  CurvePoint can be used\n"
-             "as virtual points while querying 0D information along a curve at a\n"
-             "given resolution.\n"
-             "\n"
-             ".. method:: __init__()\n"
-             "            __init__(brother)\n"
-             "            __init__(first_vertex, second_vertex, t2d)\n"
-             "            __init__(first_point, second_point, t2d)\n"
-             "\n"
-             "   Builds a CurvePoint using the default constructor, copy constructor,\n"
-             "   or one of the overloaded constructors. The over loaded constructors\n"
-             "   can either take two :class:`SVertex` or two :class:`CurvePoint`\n"
-             "   objects and an interpolation parameter\n"
-             "\n"
-             "   :arg brother: A CurvePoint object.\n"
-             "   :type brother: :class:`CurvePoint`\n"
-             "   :arg first_vertex: The first SVertex.\n"
-             "   :type first_vertex: :class:`SVertex`\n"
-             "   :arg second_vertex: The second SVertex.\n"
-             "   :type second_vertex: :class:`SVertex`\n"
-             "   :arg first_point: The first CurvePoint.\n"
-             "   :type first_point: :class:`CurvePoint`\n"
-             "   :arg second_point: The second CurvePoint.\n"
-             "   :type second_point: :class:`CurvePoint`\n"
-             "   :arg t2d: A 2D interpolation parameter used to linearly interpolate\n"
-             "             first_vertex and second_vertex or first_point and second_point.\n"
-             "   :type t2d: float\n");
+PyDoc_STRVAR(
+    /* Wrap. */
+    CurvePoint_doc,
+    "Class hierarchy: :class:`Interface0D` > :class:`CurvePoint`\n"
+    "\n"
+    "Class to represent a point of a curve. A CurvePoint can be any point\n"
+    "of a 1D curve (it doesn't have to be a vertex of the curve). Any\n"
+    ":class:`Interface1D` is built upon ViewEdges, themselves built upon\n"
+    "FEdges. Therefore, a curve is basically a polyline made of a list of\n"
+    ":class:`SVertex` objects. Thus, a CurvePoint is built by linearly\n"
+    "interpolating two :class:`SVertex` instances. CurvePoint can be used\n"
+    "as virtual points while querying 0D information along a curve at a\n"
+    "given resolution.\n"
+    "\n"
+    ".. method:: __init__()\n"
+    "            __init__(brother)\n"
+    "            __init__(first_vertex, second_vertex, t2d)\n"
+    "            __init__(first_point, second_point, t2d)\n"
+    "\n"
+    "   Builds a CurvePoint using the default constructor, copy constructor,\n"
+    "   or one of the overloaded constructors. The over loaded constructors\n"
+    "   can either take two :class:`SVertex` or two :class:`CurvePoint`\n"
+    "   objects and an interpolation parameter\n"
+    "\n"
+    "   :arg brother: A CurvePoint object.\n"
+    "   :type brother: :class:`CurvePoint`\n"
+    "   :arg first_vertex: The first SVertex.\n"
+    "   :type first_vertex: :class:`SVertex`\n"
+    "   :arg second_vertex: The second SVertex.\n"
+    "   :type second_vertex: :class:`SVertex`\n"
+    "   :arg first_point: The first CurvePoint.\n"
+    "   :type first_point: :class:`CurvePoint`\n"
+    "   :arg second_point: The second CurvePoint.\n"
+    "   :type second_point: :class:`CurvePoint`\n"
+    "   :arg t2d: A 2D interpolation parameter used to linearly interpolate\n"
+    "             first_vertex and second_vertex or first_point and second_point.\n"
+    "   :type t2d: float\n");
 
 static int CurvePoint_init(BPy_CurvePoint *self, PyObject *args, PyObject *kwds)
 {
@@ -94,7 +80,8 @@ static int CurvePoint_init(BPy_CurvePoint *self, PyObject *args, PyObject *kwds)
                                        &obj1,
                                        &SVertex_Type,
                                        &obj2,
-                                       &t2d)) {
+                                       &t2d))
+  {
     self->cp = new CurvePoint(((BPy_SVertex *)obj1)->sv, ((BPy_SVertex *)obj2)->sv, t2d);
   }
   else if ((void)PyErr_Clear(),
@@ -106,7 +93,8 @@ static int CurvePoint_init(BPy_CurvePoint *self, PyObject *args, PyObject *kwds)
                                        &obj1,
                                        &CurvePoint_Type,
                                        &obj2,
-                                       &t2d)) {
+                                       &t2d))
+  {
     CurvePoint *cp1 = ((BPy_CurvePoint *)obj1)->cp;
     CurvePoint *cp2 = ((BPy_CurvePoint *)obj2)->cp;
     if (!cp1 || cp1->A() == nullptr || cp1->B() == nullptr) {
@@ -132,12 +120,14 @@ static int CurvePoint_init(BPy_CurvePoint *self, PyObject *args, PyObject *kwds)
 
 /*----------------------CurvePoint get/setters ----------------------------*/
 
-PyDoc_STRVAR(CurvePoint_first_svertex_doc,
-             "The first SVertex upon which the CurvePoint is built.\n"
-             "\n"
-             ":type: :class:`SVertex`");
+PyDoc_STRVAR(
+    /* Wrap. */
+    CurvePoint_first_svertex_doc,
+    "The first SVertex upon which the CurvePoint is built.\n"
+    "\n"
+    ":type: :class:`SVertex`");
 
-static PyObject *CurvePoint_first_svertex_get(BPy_CurvePoint *self, void *UNUSED(closure))
+static PyObject *CurvePoint_first_svertex_get(BPy_CurvePoint *self, void * /*closure*/)
 {
   SVertex *A = self->cp->A();
   if (A) {
@@ -146,9 +136,7 @@ static PyObject *CurvePoint_first_svertex_get(BPy_CurvePoint *self, void *UNUSED
   Py_RETURN_NONE;
 }
 
-static int CurvePoint_first_svertex_set(BPy_CurvePoint *self,
-                                        PyObject *value,
-                                        void *UNUSED(closure))
+static int CurvePoint_first_svertex_set(BPy_CurvePoint *self, PyObject *value, void * /*closure*/)
 {
   if (!BPy_SVertex_Check(value)) {
     PyErr_SetString(PyExc_TypeError, "value must be an SVertex");
@@ -158,12 +146,14 @@ static int CurvePoint_first_svertex_set(BPy_CurvePoint *self,
   return 0;
 }
 
-PyDoc_STRVAR(CurvePoint_second_svertex_doc,
-             "The second SVertex upon which the CurvePoint is built.\n"
-             "\n"
-             ":type: :class:`SVertex`");
+PyDoc_STRVAR(
+    /* Wrap. */
+    CurvePoint_second_svertex_doc,
+    "The second SVertex upon which the CurvePoint is built.\n"
+    "\n"
+    ":type: :class:`SVertex`");
 
-static PyObject *CurvePoint_second_svertex_get(BPy_CurvePoint *self, void *UNUSED(closure))
+static PyObject *CurvePoint_second_svertex_get(BPy_CurvePoint *self, void * /*closure*/)
 {
   SVertex *B = self->cp->B();
   if (B) {
@@ -172,9 +162,7 @@ static PyObject *CurvePoint_second_svertex_get(BPy_CurvePoint *self, void *UNUSE
   Py_RETURN_NONE;
 }
 
-static int CurvePoint_second_svertex_set(BPy_CurvePoint *self,
-                                         PyObject *value,
-                                         void *UNUSED(closure))
+static int CurvePoint_second_svertex_set(BPy_CurvePoint *self, PyObject *value, void * /*closure*/)
 {
   if (!BPy_SVertex_Check(value)) {
     PyErr_SetString(PyExc_TypeError, "value must be an SVertex");
@@ -184,34 +172,38 @@ static int CurvePoint_second_svertex_set(BPy_CurvePoint *self,
   return 0;
 }
 
-PyDoc_STRVAR(CurvePoint_fedge_doc,
-             "Gets the FEdge for the two SVertices that given CurvePoints consists out of.\n"
-             "A shortcut for CurvePoint.first_svertex.get_fedge(CurvePoint.second_svertex).\n"
-             "\n"
-             ":type: :class:`FEdge`");
+PyDoc_STRVAR(
+    /* Wrap. */
+    CurvePoint_fedge_doc,
+    "Gets the FEdge for the two SVertices that given CurvePoints consists out of.\n"
+    "A shortcut for CurvePoint.first_svertex.get_fedge(CurvePoint.second_svertex).\n"
+    "\n"
+    ":type: :class:`FEdge`");
 
-static PyObject *CurvePoint_fedge_get(BPy_CurvePoint *self, void *UNUSED(closure))
+static PyObject *CurvePoint_fedge_get(BPy_CurvePoint *self, void * /*closure*/)
 {
   SVertex *A = self->cp->A();
   Interface0D *B = (Interface0D *)self->cp->B();
-  // B can be NULL under certain circumstances
+  // B can be nullptr under certain circumstances
   if (B) {
     return Any_BPy_Interface1D_from_Interface1D(*(A->getFEdge(*B)));
   }
   Py_RETURN_NONE;
 }
 
-PyDoc_STRVAR(CurvePoint_t2d_doc,
-             "The 2D interpolation parameter.\n"
-             "\n"
-             ":type: float");
+PyDoc_STRVAR(
+    /* Wrap. */
+    CurvePoint_t2d_doc,
+    "The 2D interpolation parameter.\n"
+    "\n"
+    ":type: float");
 
-static PyObject *CurvePoint_t2d_get(BPy_CurvePoint *self, void *UNUSED(closure))
+static PyObject *CurvePoint_t2d_get(BPy_CurvePoint *self, void * /*closure*/)
 {
   return PyFloat_FromDouble(self->cp->t2d());
 }
 
-static int CurvePoint_t2d_set(BPy_CurvePoint *self, PyObject *value, void *UNUSED(closure))
+static int CurvePoint_t2d_set(BPy_CurvePoint *self, PyObject *value, void * /*closure*/)
 {
   float scalar;
   if ((scalar = PyFloat_AsDouble(value)) == -1.0f && PyErr_Occurred()) {
@@ -239,48 +231,46 @@ static PyGetSetDef BPy_CurvePoint_getseters[] = {
 };
 
 /*-----------------------BPy_CurvePoint type definition ------------------------------*/
+
 PyTypeObject CurvePoint_Type = {
-    PyVarObject_HEAD_INIT(nullptr, 0) "CurvePoint", /* tp_name */
-    sizeof(BPy_CurvePoint),                         /* tp_basicsize */
-    0,                                              /* tp_itemsize */
-    nullptr,                                        /* tp_dealloc */
-    0,                                              /* tp_vectorcall_offset */
-    nullptr,                                        /* tp_getattr */
-    nullptr,                                        /* tp_setattr */
-    nullptr,                                        /* tp_reserved */
-    nullptr,                                        /* tp_repr */
-    nullptr,                                        /* tp_as_number */
-    nullptr,                                        /* tp_as_sequence */
-    nullptr,                                        /* tp_as_mapping */
-    nullptr,                                        /* tp_hash */
-    nullptr,                                        /* tp_call */
-    nullptr,                                        /* tp_str */
-    nullptr,                                        /* tp_getattro */
-    nullptr,                                        /* tp_setattro */
-    nullptr,                                        /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,       /* tp_flags */
-    CurvePoint_doc,                                 /* tp_doc */
-    nullptr,                                        /* tp_traverse */
-    nullptr,                                        /* tp_clear */
-    nullptr,                                        /* tp_richcompare */
-    0,                                              /* tp_weaklistoffset */
-    nullptr,                                        /* tp_iter */
-    nullptr,                                        /* tp_iternext */
-    nullptr,                                        /* tp_methods */
-    nullptr,                                        /* tp_members */
-    BPy_CurvePoint_getseters,                       /* tp_getset */
-    &Interface0D_Type,                              /* tp_base */
-    nullptr,                                        /* tp_dict */
-    nullptr,                                        /* tp_descr_get */
-    nullptr,                                        /* tp_descr_set */
-    0,                                              /* tp_dictoffset */
-    (initproc)CurvePoint_init,                      /* tp_init */
-    nullptr,                                        /* tp_alloc */
-    nullptr,                                        /* tp_new */
+    /*ob_base*/ PyVarObject_HEAD_INIT(nullptr, 0)
+    /*tp_name*/ "CurvePoint",
+    /*tp_basicsize*/ sizeof(BPy_CurvePoint),
+    /*tp_itemsize*/ 0,
+    /*tp_dealloc*/ nullptr,
+    /*tp_vectorcall_offset*/ 0,
+    /*tp_getattr*/ nullptr,
+    /*tp_setattr*/ nullptr,
+    /*tp_as_async*/ nullptr,
+    /*tp_repr*/ nullptr,
+    /*tp_as_number*/ nullptr,
+    /*tp_as_sequence*/ nullptr,
+    /*tp_as_mapping*/ nullptr,
+    /*tp_hash*/ nullptr,
+    /*tp_call*/ nullptr,
+    /*tp_str*/ nullptr,
+    /*tp_getattro*/ nullptr,
+    /*tp_setattro*/ nullptr,
+    /*tp_as_buffer*/ nullptr,
+    /*tp_flags*/ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    /*tp_doc*/ CurvePoint_doc,
+    /*tp_traverse*/ nullptr,
+    /*tp_clear*/ nullptr,
+    /*tp_richcompare*/ nullptr,
+    /*tp_weaklistoffset*/ 0,
+    /*tp_iter*/ nullptr,
+    /*tp_iternext*/ nullptr,
+    /*tp_methods*/ nullptr,
+    /*tp_members*/ nullptr,
+    /*tp_getset*/ BPy_CurvePoint_getseters,
+    /*tp_base*/ &Interface0D_Type,
+    /*tp_dict*/ nullptr,
+    /*tp_descr_get*/ nullptr,
+    /*tp_descr_set*/ nullptr,
+    /*tp_dictoffset*/ 0,
+    /*tp_init*/ (initproc)CurvePoint_init,
+    /*tp_alloc*/ nullptr,
+    /*tp_new*/ nullptr,
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////
-
-#ifdef __cplusplus
-}
-#endif

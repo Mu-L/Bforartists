@@ -1,25 +1,13 @@
 #!/usr/bin/env python3
-# ##### BEGIN GPL LICENSE BLOCK #####
+# SPDX-FileCopyrightText: 2018-2023 Blender Authors
 #
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ##### END GPL LICENSE BLOCK #####
-#
-# Call as follows:
-# python collada_mesh_simple.py --blender PATH_TO_BLENDER_EXE --testdir PATH_TO_SVN/lib/tests/collada/mesh
-#
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+"""
+Call as follows:
+python collada_mesh_simple.py --blender PATH_TO_BLENDER_EXE --testdir tests/data/collada/mesh
+"""
+
 import sys
 import bpy
 import argparse
@@ -45,7 +33,7 @@ def with_tempdir(wrapped):
     @functools.wraps(wrapped)
     def decorator(*args, **kwargs):
         dirname = tempfile.mkdtemp(prefix='blender-collada-test')
-        #print("Using tempdir %s" % dirname)
+        # print("Using tempdir %s" % dirname)
         try:
             retval = wrapped(*args, pathlib.Path(dirname), **kwargs)
         except:
@@ -119,7 +107,7 @@ class MeshExportTest(AbstractColladaTest):
         outfile = tempdir / Path("%s_out.dae" % test)
 
         bpy.ops.wm.collada_export(
-            filepath="%s" % str(outfile),
+            filepath=str(outfile),
             check_existing=True,
             filemode=8,
             display_type="DEFAULT",

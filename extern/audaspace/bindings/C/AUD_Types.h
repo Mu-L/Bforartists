@@ -73,7 +73,8 @@ typedef enum
 	AUD_CONTAINER_MP2,
 	AUD_CONTAINER_MP3,
 	AUD_CONTAINER_OGG,
-	AUD_CONTAINER_WAV
+	AUD_CONTAINER_WAV,
+	AUD_CONTAINER_AAC,
 } AUD_Container;
 
 /// Audio codecs for writers.
@@ -118,6 +119,15 @@ typedef enum
 	AUD_CHANNELS_SURROUND61 = 7,	/// 6.1 surround sound.
 	AUD_CHANNELS_SURROUND71 = 8	/// 7.1 surround sound.
 } AUD_Channels;
+
+/// Resampling algorithm and quality.
+typedef enum
+{
+	AUD_RESAMPLE_QUALITY_FASTEST = 0, /// Linear resample, very fast but lowest quality.
+	AUD_RESAMPLE_QUALITY_LOW     = 1, /// JOS resample at low quality preset.
+	AUD_RESAMPLE_QUALITY_MEDIUM  = 2, /// JOS resample at medium quality preset.
+	AUD_RESAMPLE_QUALITY_HIGH    = 3  /// JOS resample at high quality preset.
+} AUD_ResampleQuality;
 
 /**
  * The sample rate tells how many samples are played back within one second.
@@ -177,3 +187,16 @@ typedef struct
 	AUD_Specs specs;
 	float length;
 } AUD_SoundInfo;
+
+/// Specification of a sound source.
+typedef struct
+{
+	/// Start time in seconds.
+	double start;
+
+	/// Duration in seconds. May be estimated or 0 if unknown.
+	double duration;
+
+	/// Audio data parameters.
+	AUD_DeviceSpecs specs;
+} AUD_StreamInfo;

@@ -1,19 +1,18 @@
-# Apache License, Version 2.0
+# SPDX-FileCopyrightText: 2021-2023 Blender Authors
+#
+# SPDX-License-Identifier: Apache-2.0
 
 import fnmatch
 import json
 import pathlib
-import sys
 
 from dataclasses import dataclass, field
-from typing import Dict, List
 
 from .test import TestCollection
 
 
 def get_build_hash(args: None) -> str:
     import bpy
-    import sys
     build_hash = bpy.app.build_hash.decode('utf-8')
     return '' if build_hash == 'Unknown' else build_hash
 
@@ -25,6 +24,7 @@ class TestEntry:
     category: str = ''
     revision: str = ''
     git_hash: str = ''
+    environment: dict = field(default_factory=dict)
     executable: str = ''
     date: int = 0
     device_type: str = 'CPU'
@@ -32,10 +32,10 @@ class TestEntry:
     device_name: str = 'Unknown CPU'
     status: str = 'queued'
     error_msg: str = ''
-    output: Dict = field(default_factory=dict)
+    output: dict = field(default_factory=dict)
     benchmark_type: str = 'comparison'
 
-    def to_json(self) -> Dict:
+    def to_json(self) -> dict:
         json_dict = {}
         for field in self.__dataclass_fields__:
             json_dict[field] = getattr(self, field)
@@ -52,7 +52,6 @@ class TestQueue:
 
     def __init__(self, filepath: pathlib.Path):
         self.filepath = filepath
-        self.has_multiple_revisions_to_build = False
         self.has_multiple_categories = False
         self.entries = []
 
@@ -65,13 +64,16 @@ class TestQueue:
                 entry.from_json(json_entry)
                 self.entries.append(entry)
 
-    def rows(self, use_revision_columns: bool) -> List:
+    def rows(self, use_revision_columns: bool) -> list:
         # Generate rows of entries for printing and running.
-        entries = sorted(self.entries, key=lambda entry:
-            (entry.revision,
-             entry.device_id,
-             entry.category,
-             entry.test))
+        entries = sorted(
+            self.entries,
+            key=lambda entry: (
+                entry.revision,
+                entry.device_id,
+                entry.category,
+                entry.test,
+            ))
 
         if not use_revision_columns:
             # One entry per row.
@@ -89,12 +91,14 @@ class TestQueue:
 
             return [value for _, value in sorted(rows.items())]
 
-    def find(self, revision: str, test: str, category: str, device_id: str) -> Dict:
+    def find(self, revision: str, test: str, category: str, device_id: str) -> dict:
         for entry in self.entries:
-            if entry.revision == revision and \
-               entry.test == test and \
-               entry.category == category and \
-               entry.device_id == device_id:
+            if (
+                entry.revision == revision and
+                entry.test == test and
+                entry.category == category and
+                entry.device_id == device_id
+            ):
                 return entry
 
         return None
@@ -113,11 +117,13 @@ class TestConfig:
         self.name = name
         self.base_dir = env.base_dir / name
         self.logs_dir = self.base_dir / 'logs'
+        self.builds_dir = self.base_dir / 'builds'
 
         config = TestConfig._read_config_module(self.base_dir)
         self.tests = TestCollection(env,
                                     getattr(config, 'tests', ['*']),
-                                    getattr(config, 'categories', ['*']))
+                                    getattr(config, 'categories', ['*']),
+                                    getattr(config, 'background', False))
         self.revisions = getattr(config, 'revisions', {})
         self.builds = getattr(config, 'builds', {})
         self.queue = TestQueue(self.base_dir / 'results.json')
@@ -128,7 +134,7 @@ class TestConfig:
 
         self._update_queue(env)
 
-    def revision_names(self) -> List:
+    def revision_names(self) -> list:
         return sorted(list(self.revisions.keys()) + list(self.builds.keys()))
 
     def device_name(self, device_id: str) -> str:
@@ -146,7 +152,7 @@ class TestConfig:
         default_config += """tests = ['*']\n"""
         default_config += """categories = ['*']\n"""
         default_config += """builds = {\n"""
-        default_config += """    'master': '/home/user/blender-git/build/bin/blender',"""
+        default_config += """    'main': '/home/user/blender-git/build/bin/blender',"""
         default_config += """    '2.93': '/home/user/blender-2.93/blender',"""
         default_config += """}\n"""
         default_config += """revisions = {\n"""
@@ -157,10 +163,16 @@ class TestConfig:
             f.write(default_config)
 
     @staticmethod
-    def read_blender_executables(env, name) -> List:
+    def read_blender_executables(env, name) -> list:
         config = TestConfig._read_config_module(env.base_dir / name)
         builds = getattr(config, 'builds', {})
-        return [pathlib.Path(build) for build in builds.values()]
+        executables = []
+
+        for executable in builds.values():
+            executable, _ = TestConfig._split_environment_variables(executable)
+            executables.append(pathlib.Path(executable))
+
+        return executables
 
     @staticmethod
     def _read_config_module(base_dir: pathlib.Path) -> None:
@@ -171,7 +183,7 @@ class TestConfig:
         spec.loader.exec_module(mod)
         return mod
 
-    def _update_devices(self, env, device_filters: List) -> None:
+    def _update_devices(self, env, device_filters: list) -> None:
         # Find devices matching the filters.
         need_gpus = device_filters != ['CPU']
         machine = env.get_machine(need_gpus)
@@ -191,21 +203,17 @@ class TestConfig:
 
         # Get entries for specified commits, tags and branches.
         for revision_name, revision_commit in self.revisions.items():
+            revision_commit, environment = self._split_environment_variables(revision_commit)
             git_hash = env.resolve_git_hash(revision_commit)
             date = env.git_hash_date(git_hash)
-            entries += self._get_entries(revision_name, git_hash, '', date)
-
-        # Optimization to avoid rebuilds.
-        revisions_to_build = set()
-        for entry in entries:
-            if entry.status in ('queued', 'outdated'):
-                revisions_to_build.add(entry.git_hash)
-        self.queue.has_multiple_revisions_to_build = len(revisions_to_build) > 1
+            entries += self._get_entries(revision_name, git_hash, '', environment, date)
 
         # Get entries for revisions based on existing builds.
         for revision_name, executable in self.builds.items():
+            executable, environment = self._split_environment_variables(executable)
             executable_path = env._blender_executable_from_path(pathlib.Path(executable))
             if not executable_path:
+                import sys
                 sys.stderr.write(f'Error: build {executable} not found\n')
                 sys.exit(1)
 
@@ -214,7 +222,7 @@ class TestConfig:
             env.set_default_blender_executable()
 
             mtime = executable_path.stat().st_mtime
-            entries += self._get_entries(revision_name, git_hash, executable, mtime)
+            entries += self._get_entries(revision_name, git_hash, executable, environment, mtime)
 
         # Detect number of categories for more compact printing.
         categories = set()
@@ -229,6 +237,7 @@ class TestConfig:
                      revision_name: str,
                      git_hash: str,
                      executable: pathlib.Path,
+                     environment: str,
                      date: int) -> None:
         entries = []
         for test in self.tests.tests:
@@ -236,19 +245,24 @@ class TestConfig:
             test_category = test.category()
 
             for device in self.devices:
+                if not (test.use_device() or device.type == "CPU"):
+                    continue
+
                 entry = self.queue.find(revision_name, test_name, test_category, device.id)
                 if entry:
                     # Test if revision hash or executable changed.
                     if entry.git_hash != git_hash or \
                        entry.executable != executable or \
+                       entry.environment != environment or \
                        entry.benchmark_type != self.benchmark_type or \
                        entry.date != date:
                         # Update existing entry.
                         entry.git_hash = git_hash
+                        entry.environment = environment
                         entry.executable = executable
                         entry.benchmark_type = self.benchmark_type
                         entry.date = date
-                        if entry.status in ('done', 'failed'):
+                        if entry.status in {'done', 'failed'}:
                             entry.status = 'outdated'
                 else:
                     # Add new entry if it did not exist yet.
@@ -256,6 +270,7 @@ class TestConfig:
                         revision=revision_name,
                         git_hash=git_hash,
                         executable=executable,
+                        environment=environment,
                         date=date,
                         test=test_name,
                         category=test_category,
@@ -266,3 +281,10 @@ class TestConfig:
                 entries.append(entry)
 
         return entries
+
+    @staticmethod
+    def _split_environment_variables(revision):
+        if isinstance(revision, str):
+            return revision, {}
+        else:
+            return revision[0], revision[1]

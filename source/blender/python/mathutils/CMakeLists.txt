@@ -1,28 +1,9 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2023 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(INC
   .
-  ../../blenkernel
-  ../../blenlib
-  ../../bmesh
-  ../../depsgraph
-  ../../makesdna
-  ../../../../intern/guardedalloc
 )
 
 set(INC_SYS
@@ -30,33 +11,39 @@ set(INC_SYS
 )
 
 set(SRC
-  mathutils.c
-  mathutils_Color.c
-  mathutils_Euler.c
-  mathutils_Matrix.c
-  mathutils_Quaternion.c
-  mathutils_Vector.c
-  mathutils_bvhtree.c
-  mathutils_geometry.c
-  mathutils_interpolate.c
-  mathutils_kdtree.c
-  mathutils_noise.c
+  mathutils.cc
+  mathutils_Color.cc
+  mathutils_Euler.cc
+  mathutils_Matrix.cc
+  mathutils_Quaternion.cc
+  mathutils_Vector.cc
+  mathutils_bvhtree.cc
+  mathutils_geometry.cc
+  mathutils_interpolate.cc
+  mathutils_kdtree.cc
+  mathutils_noise.cc
 
-  mathutils.h
-  mathutils_Color.h
-  mathutils_Euler.h
-  mathutils_Matrix.h
-  mathutils_Quaternion.h
-  mathutils_Vector.h
-  mathutils_bvhtree.h
-  mathutils_geometry.h
-  mathutils_interpolate.h
-  mathutils_kdtree.h
-  mathutils_noise.h
+  mathutils.hh
+  mathutils_Color.hh
+  mathutils_Euler.hh
+  mathutils_Matrix.hh
+  mathutils_Quaternion.hh
+  mathutils_Vector.hh
+  mathutils_bvhtree.hh
+  mathutils_geometry.hh
+  mathutils_interpolate.hh
+  mathutils_kdtree.hh
+  mathutils_noise.hh
 )
 
 set(LIB
-  bf_blenlib
+  PRIVATE bf::blenkernel
+  PRIVATE bf::blenlib
+  PRIVATE bf::bmesh
+  PRIVATE bf::depsgraph
+  PRIVATE bf::dna
+  PRIVATE bf::imbuf
+  PRIVATE bf::intern::guardedalloc
   bf_python_ext
 
   ${PYTHON_LINKFLAGS}

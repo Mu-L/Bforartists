@@ -1,22 +1,7 @@
 #!/usr/bin/env python3
-
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2010-2023 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ***** END GPL LICENCE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 ######################################################
 # Importing modules
@@ -122,8 +107,8 @@ def Align(handle):
 
 class BlendFile:
     '''
-    Reads a blendfile and store the header, all the fileblocks, and catalogue
-    structs foound in the DNA fileblock
+    Reads a blend-file and store the header, all the file-blocks, and catalogue
+    structs found in the DNA file-block
 
     - BlendFile.Header  (BlendFileHeader instance)
     - BlendFile.Blocks  (list of BlendFileBlock instances)
@@ -248,7 +233,7 @@ class FileBlockHeader:
             self.SDNAIndex = 0
             self.Count = 0
             self.FileOffset = handle.tell()
-        #self.Code += ' ' * (4 - len(self.Code))
+        # self.Code += ' ' * (4 - len(self.Code))
         log.debug("found blend-file-block-fileheader {0} {1}".format(self.Code, self.FileOffset))
 
     def skip(self, handle):

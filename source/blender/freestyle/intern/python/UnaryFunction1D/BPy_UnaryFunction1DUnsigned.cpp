@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2008-2022 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -26,9 +14,7 @@
 
 #include "UnaryFunction1D_unsigned_int/BPy_QuantitativeInvisibilityF1D.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "BLI_sys_types.h"
 
 using namespace Freestyle;
 
@@ -45,14 +31,13 @@ int UnaryFunction1DUnsigned_Init(PyObject *module)
   if (PyType_Ready(&UnaryFunction1DUnsigned_Type) < 0) {
     return -1;
   }
-  Py_INCREF(&UnaryFunction1DUnsigned_Type);
-  PyModule_AddObject(module, "UnaryFunction1DUnsigned", (PyObject *)&UnaryFunction1DUnsigned_Type);
+  PyModule_AddObjectRef(
+      module, "UnaryFunction1DUnsigned", (PyObject *)&UnaryFunction1DUnsigned_Type);
 
   if (PyType_Ready(&QuantitativeInvisibilityF1D_Type) < 0) {
     return -1;
   }
-  Py_INCREF(&QuantitativeInvisibilityF1D_Type);
-  PyModule_AddObject(
+  PyModule_AddObjectRef(
       module, "QuantitativeInvisibilityF1D", (PyObject *)&QuantitativeInvisibilityF1D_Type);
 
   return 0;
@@ -60,7 +45,9 @@ int UnaryFunction1DUnsigned_Init(PyObject *module)
 
 //------------------------INSTANCE METHODS ----------------------------------
 
-static char UnaryFunction1DUnsigned___doc__[] =
+PyDoc_STRVAR(
+    /* Wrap. */
+    UnaryFunction1DUnsigned___doc__,
     "Class hierarchy: :class:`UnaryFunction1D` > :class:`UnaryFunction1DUnsigned`\n"
     "\n"
     "Base class for unary functions (functors) that work on\n"
@@ -73,7 +60,7 @@ static char UnaryFunction1DUnsigned___doc__[] =
     "   or the integration method given as an argument.\n"
     "\n"
     "   :arg integration_type: An integration method.\n"
-    "   :type integration_type: :class:`IntegrationType`\n";
+    "   :type integration_type: :class:`IntegrationType`\n");
 
 static int UnaryFunction1DUnsigned___init__(BPy_UnaryFunction1DUnsigned *self,
                                             PyObject *args,
@@ -83,16 +70,16 @@ static int UnaryFunction1DUnsigned___init__(BPy_UnaryFunction1DUnsigned *self,
   PyObject *obj = nullptr;
 
   if (!PyArg_ParseTupleAndKeywords(
-          args, kwds, "|O!", (char **)kwlist, &IntegrationType_Type, &obj)) {
+          args, kwds, "|O!", (char **)kwlist, &IntegrationType_Type, &obj))
+  {
     return -1;
   }
 
   if (!obj) {
-    self->uf1D_unsigned = new UnaryFunction1D<unsigned int>();
+    self->uf1D_unsigned = new UnaryFunction1D<uint>();
   }
   else {
-    self->uf1D_unsigned = new UnaryFunction1D<unsigned int>(
-        IntegrationType_from_BPy_IntegrationType(obj));
+    self->uf1D_unsigned = new UnaryFunction1D<uint>(IntegrationType_from_BPy_IntegrationType(obj));
   }
 
   self->uf1D_unsigned->py_uf1D = (PyObject *)self;
@@ -123,7 +110,7 @@ static PyObject *UnaryFunction1DUnsigned___call__(BPy_UnaryFunction1DUnsigned *s
     return nullptr;
   }
 
-  if (typeid(*(self->uf1D_unsigned)) == typeid(UnaryFunction1D<unsigned int>)) {
+  if (typeid(*(self->uf1D_unsigned)) == typeid(UnaryFunction1D<uint>)) {
     PyErr_SetString(PyExc_TypeError, "__call__ method not properly overridden");
     return nullptr;
   }
@@ -139,19 +126,21 @@ static PyObject *UnaryFunction1DUnsigned___call__(BPy_UnaryFunction1DUnsigned *s
 
 /*----------------------UnaryFunction1DUnsigned get/setters ----------------------------*/
 
-PyDoc_STRVAR(integration_type_doc,
-             "The integration method.\n"
-             "\n"
-             ":type: :class:`IntegrationType`");
+PyDoc_STRVAR(
+    /* Wrap. */
+    integration_type_doc,
+    "The integration method.\n"
+    "\n"
+    ":type: :class:`IntegrationType`");
 
-static PyObject *integration_type_get(BPy_UnaryFunction1DUnsigned *self, void *UNUSED(closure))
+static PyObject *integration_type_get(BPy_UnaryFunction1DUnsigned *self, void * /*closure*/)
 {
   return BPy_IntegrationType_from_IntegrationType(self->uf1D_unsigned->getIntegrationType());
 }
 
 static int integration_type_set(BPy_UnaryFunction1DUnsigned *self,
                                 PyObject *value,
-                                void *UNUSED(closure))
+                                void * /*closure*/)
 {
   if (!BPy_IntegrationType_Check(value)) {
     PyErr_SetString(PyExc_TypeError, "value must be an IntegrationType");
@@ -173,47 +162,44 @@ static PyGetSetDef BPy_UnaryFunction1DUnsigned_getseters[] = {
 /*-----------------------BPy_UnaryFunction1DUnsigned type definition ----------------------------*/
 
 PyTypeObject UnaryFunction1DUnsigned_Type = {
-    PyVarObject_HEAD_INIT(nullptr, 0) "UnaryFunction1DUnsigned", /* tp_name */
-    sizeof(BPy_UnaryFunction1DUnsigned),                         /* tp_basicsize */
-    0,                                                           /* tp_itemsize */
-    (destructor)UnaryFunction1DUnsigned___dealloc__,             /* tp_dealloc */
-    0,                                                           /* tp_vectorcall_offset */
-    nullptr,                                                     /* tp_getattr */
-    nullptr,                                                     /* tp_setattr */
-    nullptr,                                                     /* tp_reserved */
-    (reprfunc)UnaryFunction1DUnsigned___repr__,                  /* tp_repr */
-    nullptr,                                                     /* tp_as_number */
-    nullptr,                                                     /* tp_as_sequence */
-    nullptr,                                                     /* tp_as_mapping */
-    nullptr,                                                     /* tp_hash */
-    (ternaryfunc)UnaryFunction1DUnsigned___call__,               /* tp_call */
-    nullptr,                                                     /* tp_str */
-    nullptr,                                                     /* tp_getattro */
-    nullptr,                                                     /* tp_setattro */
-    nullptr,                                                     /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,                    /* tp_flags */
-    UnaryFunction1DUnsigned___doc__,                             /* tp_doc */
-    nullptr,                                                     /* tp_traverse */
-    nullptr,                                                     /* tp_clear */
-    nullptr,                                                     /* tp_richcompare */
-    0,                                                           /* tp_weaklistoffset */
-    nullptr,                                                     /* tp_iter */
-    nullptr,                                                     /* tp_iternext */
-    nullptr,                                                     /* tp_methods */
-    nullptr,                                                     /* tp_members */
-    BPy_UnaryFunction1DUnsigned_getseters,                       /* tp_getset */
-    &UnaryFunction1D_Type,                                       /* tp_base */
-    nullptr,                                                     /* tp_dict */
-    nullptr,                                                     /* tp_descr_get */
-    nullptr,                                                     /* tp_descr_set */
-    0,                                                           /* tp_dictoffset */
-    (initproc)UnaryFunction1DUnsigned___init__,                  /* tp_init */
-    nullptr,                                                     /* tp_alloc */
-    nullptr,                                                     /* tp_new */
+    /*ob_base*/ PyVarObject_HEAD_INIT(nullptr, 0)
+    /*tp_name*/ "UnaryFunction1DUnsigned",
+    /*tp_basicsize*/ sizeof(BPy_UnaryFunction1DUnsigned),
+    /*tp_itemsize*/ 0,
+    /*tp_dealloc*/ (destructor)UnaryFunction1DUnsigned___dealloc__,
+    /*tp_vectorcall_offset*/ 0,
+    /*tp_getattr*/ nullptr,
+    /*tp_setattr*/ nullptr,
+    /*tp_as_async*/ nullptr,
+    /*tp_repr*/ (reprfunc)UnaryFunction1DUnsigned___repr__,
+    /*tp_as_number*/ nullptr,
+    /*tp_as_sequence*/ nullptr,
+    /*tp_as_mapping*/ nullptr,
+    /*tp_hash*/ nullptr,
+    /*tp_call*/ (ternaryfunc)UnaryFunction1DUnsigned___call__,
+    /*tp_str*/ nullptr,
+    /*tp_getattro*/ nullptr,
+    /*tp_setattro*/ nullptr,
+    /*tp_as_buffer*/ nullptr,
+    /*tp_flags*/ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    /*tp_doc*/ UnaryFunction1DUnsigned___doc__,
+    /*tp_traverse*/ nullptr,
+    /*tp_clear*/ nullptr,
+    /*tp_richcompare*/ nullptr,
+    /*tp_weaklistoffset*/ 0,
+    /*tp_iter*/ nullptr,
+    /*tp_iternext*/ nullptr,
+    /*tp_methods*/ nullptr,
+    /*tp_members*/ nullptr,
+    /*tp_getset*/ BPy_UnaryFunction1DUnsigned_getseters,
+    /*tp_base*/ &UnaryFunction1D_Type,
+    /*tp_dict*/ nullptr,
+    /*tp_descr_get*/ nullptr,
+    /*tp_descr_set*/ nullptr,
+    /*tp_dictoffset*/ 0,
+    /*tp_init*/ (initproc)UnaryFunction1DUnsigned___init__,
+    /*tp_alloc*/ nullptr,
+    /*tp_new*/ nullptr,
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////
-
-#ifdef __cplusplus
-}
-#endif

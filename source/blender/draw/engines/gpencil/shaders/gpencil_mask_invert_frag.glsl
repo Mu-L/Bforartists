@@ -1,8 +1,10 @@
+/* SPDX-FileCopyrightText: 2020-2022 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-in vec4 uvcoordsvar;
+#include "infos/gpencil_info.hh"
 
-layout(location = 0) out vec4 fragColor;
-layout(location = 1) out vec4 fragRevealage;
+FRAGMENT_SHADER_CREATE_INFO(gpencil_mask_invert)
 
 void main()
 {

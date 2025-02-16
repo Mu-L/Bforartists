@@ -1,33 +1,19 @@
-// Copyright 2020 Blender Foundation. All rights reserved.
-//
-// This program is free software; you can redistribute it and/or
-// modify it under the terms of the GNU General Public License
-// as published by the Free Software Foundation; either version 2
-// of the License, or (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program; if not, write to the Free Software Foundation,
-// Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-//
-// Author: Sergey Sharybin
+/* SPDX-FileCopyrightText: 2020 Blender Foundation
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
+ * Author: Sergey Sharybin. */
 
 #ifndef OPENSUBDIV_MESH_TOPOLOGY_H_
 #define OPENSUBDIV_MESH_TOPOLOGY_H_
 
-#include <cstring>
+#include <vector>
 
 #include "internal/base/memory.h"
-#include "internal/base/type.h"
 
 struct OpenSubdiv_Converter;
 
-namespace blender {
-namespace opensubdiv {
+namespace blender::opensubdiv {
 
 // Simplified representation of mesh topology.
 // Only includes parts of actual mesh topology which is needed to perform
@@ -105,13 +91,13 @@ class MeshTopology {
                                 int num_expected_face_vertex_indices,
                                 const int *expected_face_vertex_indices) const;
   bool isFaceVertexIndicesEqual(int face_index,
-                                const vector<int> &expected_face_vertex_indices) const;
+                                const std::vector<int> &expected_face_vertex_indices) const;
 
   //////////////////////////////////////////////////////////////////////////////
   // Pipeline related.
 
   // This function is to be called when number of vertices, edges, faces, and
-  // face-verticies are known.
+  // face-vertices are known.
   //
   // Usually is called from the end of topology refiner factory's
   // resizeComponentTopology().
@@ -120,8 +106,12 @@ class MeshTopology {
   //////////////////////////////////////////////////////////////////////////////
   // Comparison.
 
-  // Check whether this topology refiner defines same topology as the given
-  // converter.
+  // Compare given topology with converter. Returns truth if topology
+  // matches given converter, false otherwise.
+  //
+  // This allows users to construct converter (which is supposed to be cheap)
+  // and compare with existing topology before going into more computationally
+  // complicated parts of subdivision process.
   bool isEqualToConverter(const OpenSubdiv_Converter *converter) const;
 
  protected:
@@ -154,26 +144,25 @@ class MeshTopology {
   };
 
   int num_vertices_;
-  vector<VertexTag> vertex_tags_;
+  std::vector<VertexTag> vertex_tags_;
 
   int num_edges_;
-  vector<Edge> edges_;
-  vector<EdgeTag> edge_tags_;
+  std::vector<Edge> edges_;
+  std::vector<EdgeTag> edge_tags_;
 
   int num_faces_;
 
-  // Continuous array of all verticies of all faces:
+  // Continuous array of all vertices of all faces:
   //  [vertex indices of face 0][vertex indices of face 1] .. [vertex indices of face n].
-  vector<int> face_vertex_indices_;
+  std::vector<int> face_vertex_indices_;
 
   // Indexed by face contains index within face_vertex_indices_ which corresponds
   // to the element which contains first vertex of the face.
-  vector<int> faces_first_vertex_index_;
+  std::vector<int> faces_first_vertex_index_;
 
   MEM_CXX_CLASS_ALLOC_FUNCS("MeshTopology");
 };
 
-}  // namespace opensubdiv
-}  // namespace blender
+}  // namespace blender::opensubdiv
 
 #endif  // OPENSUBDIV_MESH_TOPOLOGY_H_

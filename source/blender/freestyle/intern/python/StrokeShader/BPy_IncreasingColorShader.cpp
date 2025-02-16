@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2004-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -22,17 +10,15 @@
 
 #include "../../stroke/BasicStrokeShaders.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 using namespace Freestyle;
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
 //------------------------INSTANCE METHODS ----------------------------------
 
-static char IncreasingColorShader___doc__[] =
+PyDoc_STRVAR(
+    /* Wrap. */
+    IncreasingColorShader___doc__,
     "Class hierarchy: :class:`freestyle.types.StrokeShader` > :class:`IncreasingColorShader`\n"
     "\n"
     "[Color shader]\n"
@@ -61,12 +47,12 @@ static char IncreasingColorShader___doc__[] =
     "\n"
     ".. method:: shade(stroke)\n"
     "\n"
-    "   Assigns a varying color to the stroke.  The user specifies two\n"
-    "   colors A and B.  The stroke color will change linearly from A to B\n"
+    "   Assigns a varying color to the stroke. The user specifies two\n"
+    "   colors A and B. The stroke color will change linearly from A to B\n"
     "   between the first and the last vertex.\n"
     "\n"
     "   :arg stroke: A Stroke object.\n"
-    "   :type stroke: :class:`freestyle.types.Stroke`\n";
+    "   :type stroke: :class:`freestyle.types.Stroke`\n");
 
 static int IncreasingColorShader___init__(BPy_IncreasingColorShader *self,
                                           PyObject *args,
@@ -86,7 +72,8 @@ static int IncreasingColorShader___init__(BPy_IncreasingColorShader *self,
   float f1, f2, f3, f4, f5, f6, f7, f8;
 
   if (!PyArg_ParseTupleAndKeywords(
-          args, kwds, "ffffffff", (char **)kwlist, &f1, &f2, &f3, &f4, &f5, &f6, &f7, &f8)) {
+          args, kwds, "ffffffff", (char **)kwlist, &f1, &f2, &f3, &f4, &f5, &f6, &f7, &f8))
+  {
     return -1;
   }
   self->py_ss.ss = new StrokeShaders::IncreasingColorShader(f1, f2, f3, f4, f5, f6, f7, f8);
@@ -96,47 +83,44 @@ static int IncreasingColorShader___init__(BPy_IncreasingColorShader *self,
 /*-----------------------BPy_IncreasingColorShader type definition ------------------------------*/
 
 PyTypeObject IncreasingColorShader_Type = {
-    PyVarObject_HEAD_INIT(nullptr, 0) "IncreasingColorShader", /* tp_name */
-    sizeof(BPy_IncreasingColorShader),                         /* tp_basicsize */
-    0,                                                         /* tp_itemsize */
-    nullptr,                                                   /* tp_dealloc */
-    0,                                                         /* tp_vectorcall_offset */
-    nullptr,                                                   /* tp_getattr */
-    nullptr,                                                   /* tp_setattr */
-    nullptr,                                                   /* tp_reserved */
-    nullptr,                                                   /* tp_repr */
-    nullptr,                                                   /* tp_as_number */
-    nullptr,                                                   /* tp_as_sequence */
-    nullptr,                                                   /* tp_as_mapping */
-    nullptr,                                                   /* tp_hash */
-    nullptr,                                                   /* tp_call */
-    nullptr,                                                   /* tp_str */
-    nullptr,                                                   /* tp_getattro */
-    nullptr,                                                   /* tp_setattro */
-    nullptr,                                                   /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,                  /* tp_flags */
-    IncreasingColorShader___doc__,                             /* tp_doc */
-    nullptr,                                                   /* tp_traverse */
-    nullptr,                                                   /* tp_clear */
-    nullptr,                                                   /* tp_richcompare */
-    0,                                                         /* tp_weaklistoffset */
-    nullptr,                                                   /* tp_iter */
-    nullptr,                                                   /* tp_iternext */
-    nullptr,                                                   /* tp_methods */
-    nullptr,                                                   /* tp_members */
-    nullptr,                                                   /* tp_getset */
-    &StrokeShader_Type,                                        /* tp_base */
-    nullptr,                                                   /* tp_dict */
-    nullptr,                                                   /* tp_descr_get */
-    nullptr,                                                   /* tp_descr_set */
-    0,                                                         /* tp_dictoffset */
-    (initproc)IncreasingColorShader___init__,                  /* tp_init */
-    nullptr,                                                   /* tp_alloc */
-    nullptr,                                                   /* tp_new */
+    /*ob_base*/ PyVarObject_HEAD_INIT(nullptr, 0)
+    /*tp_name*/ "IncreasingColorShader",
+    /*tp_basicsize*/ sizeof(BPy_IncreasingColorShader),
+    /*tp_itemsize*/ 0,
+    /*tp_dealloc*/ nullptr,
+    /*tp_vectorcall_offset*/ 0,
+    /*tp_getattr*/ nullptr,
+    /*tp_setattr*/ nullptr,
+    /*tp_as_async*/ nullptr,
+    /*tp_repr*/ nullptr,
+    /*tp_as_number*/ nullptr,
+    /*tp_as_sequence*/ nullptr,
+    /*tp_as_mapping*/ nullptr,
+    /*tp_hash*/ nullptr,
+    /*tp_call*/ nullptr,
+    /*tp_str*/ nullptr,
+    /*tp_getattro*/ nullptr,
+    /*tp_setattro*/ nullptr,
+    /*tp_as_buffer*/ nullptr,
+    /*tp_flags*/ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    /*tp_doc*/ IncreasingColorShader___doc__,
+    /*tp_traverse*/ nullptr,
+    /*tp_clear*/ nullptr,
+    /*tp_richcompare*/ nullptr,
+    /*tp_weaklistoffset*/ 0,
+    /*tp_iter*/ nullptr,
+    /*tp_iternext*/ nullptr,
+    /*tp_methods*/ nullptr,
+    /*tp_members*/ nullptr,
+    /*tp_getset*/ nullptr,
+    /*tp_base*/ &StrokeShader_Type,
+    /*tp_dict*/ nullptr,
+    /*tp_descr_get*/ nullptr,
+    /*tp_descr_set*/ nullptr,
+    /*tp_dictoffset*/ 0,
+    /*tp_init*/ (initproc)IncreasingColorShader___init__,
+    /*tp_alloc*/ nullptr,
+    /*tp_new*/ nullptr,
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////
-
-#ifdef __cplusplus
-}
-#endif

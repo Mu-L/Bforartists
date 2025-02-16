@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2008-2022 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -25,6 +13,8 @@
 #include <cstdlib>  // for malloc and free
 
 #include "FitCurve.h"
+
+#include "BLI_sys_types.h"
 
 using namespace std;
 
@@ -59,7 +49,7 @@ static double V2SquaredLength(Vector2 *a)
 /* returns length of input vector */
 static double V2Length(Vector2 *a)
 {
-  return (sqrt(V2SquaredLength(a)));
+  return sqrt(V2SquaredLength(a));
 }
 
 static Vector2 *V2Scale(Vector2 *v, double newlen)
@@ -83,7 +73,7 @@ static double V2DistanceBetween2Points(Vector2 *a, Vector2 *b)
 {
   double dx = (*a)[0] - (*b)[0];
   double dy = (*a)[1] - (*b)[1];
-  return (sqrt((dx * dx) + (dy * dy)));
+  return sqrt((dx * dx) + (dy * dy));
 }
 
 /* return vector sum c = a+b */
@@ -287,7 +277,7 @@ static Vector2 BezierII(int degree, Vector2 *V, double t)
   Vector2 *Vtemp; /* Local copy of control points */
 
   /* Copy array */
-  Vtemp = (Vector2 *)malloc((unsigned)((degree + 1) * sizeof(Vector2)));
+  Vtemp = (Vector2 *)malloc(uint((degree + 1) * sizeof(Vector2)));
   for (i = 0; i <= degree; i++) {
     Vtemp[i] = V[i];
   }
@@ -390,7 +380,7 @@ static double *ChordLengthParameterize(Vector2 *d, int first, int last)
   int i;
   double *u; /* Parameterization */
 
-  u = (double *)malloc((unsigned)(last - first + 1) * sizeof(double));
+  u = (double *)malloc(uint(last - first + 1) * sizeof(double));
 
   u[0] = 0.0;
   for (i = first + 1; i <= last; i++) {

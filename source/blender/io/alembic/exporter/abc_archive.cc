@@ -1,40 +1,29 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2020 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2020 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "abc_archive.h"
 
 #include "BKE_blender_version.h"
-#include "BKE_main.h"
-#include "BKE_scene.h"
-
-#include "DEG_depsgraph_query.h"
+#include "BKE_main.hh"
 
 #include "DNA_scene_types.h"
 
-#include <Alembic/AbcCoreOgawa/All.h>
-#include <Alembic/AbcGeom/All.h>
+#include <Alembic/Abc/ArchiveInfo.h>
+#include <Alembic/Abc/ErrorHandler.h>
+#include <Alembic/Abc/Foundation.h>
+#include <Alembic/Abc/OArchive.h>
+#include <Alembic/AbcCoreAbstract/MetaData.h>
+#include <Alembic/AbcCoreAbstract/TimeSampling.h>
+#include <Alembic/AbcCoreAbstract/TimeSamplingType.h>
+#include <Alembic/AbcCoreOgawa/ReadWrite.h>
+#include <Alembic/AbcGeom/ArchiveBounds.h>
 
 #ifdef WIN32
-#  include "BLI_path_util.h"
+#  include "BLI_path_utils.hh"
 #  include "BLI_string.h"
 
-#  include "utfconv.h"
+#  include "utfconv.hh"
 #endif
 
 namespace blender::io::alembic {
@@ -51,7 +40,7 @@ static MetaData create_abc_metadata(const Main *bmain, double scene_fps)
 {
   MetaData abc_metadata;
 
-  std::string abc_user_description(bmain->name);
+  std::string abc_user_description(bmain->filepath);
   if (abc_user_description.empty()) {
     abc_user_description = "unknown";
   }
@@ -81,20 +70,20 @@ static MetaData create_abc_metadata(const Main *bmain, double scene_fps)
 }
 
 static OArchive *create_archive(std::ofstream *abc_ostream,
-                                const std::string &filename,
+                                const std::string &filepath,
                                 MetaData &abc_metadata)
 {
   /* Use stream to support unicode character paths on Windows. */
 #ifdef WIN32
-  char filename_cstr[FILE_MAX];
-  BLI_strncpy(filename_cstr, filename.c_str(), FILE_MAX);
+  char filepath_cstr[FILE_MAX];
+  BLI_strncpy(filepath_cstr, filepath.c_str(), FILE_MAX);
 
-  UTF16_ENCODE(filename_cstr);
-  std::wstring wstr(filename_cstr_16);
+  UTF16_ENCODE(filepath_cstr);
+  std::wstring wstr(filepath_cstr_16);
   abc_ostream->open(wstr.c_str(), std::ios::out | std::ios::binary);
-  UTF16_UN_ENCODE(filename_cstr);
+  UTF16_UN_ENCODE(filepath_cstr);
 #else
-  abc_ostream->open(filename, std::ios::out | std::ios::binary);
+  abc_ostream->open(filepath, std::ios::out | std::ios::binary);
 #endif
 
   ErrorHandler::Policy policy = ErrorHandler::kThrowPolicy;
@@ -119,7 +108,7 @@ static void get_shutter_samples(double scene_fps,
                                 bool time_relative,
                                 std::vector<double> &r_samples)
 {
-  int frame_offset = time_relative ? params.frame_start : 0;
+  double frame_offset = time_relative ? params.frame_start : 0.0;
   double time_factor = time_relative ? scene_fps : 1.0;
   double shutter_open = params.shutter_open;
   double shutter_close = params.shutter_close;
@@ -146,13 +135,13 @@ static TimeSamplingPtr create_time_sampling(double scene_fps,
 
   get_shutter_samples(scene_fps, params, nr_of_samples, true, samples);
 
-  TimeSamplingType ts(static_cast<uint32_t>(samples.size()), 1.0 / scene_fps);
+  TimeSamplingType ts(uint32_t(samples.size()), 1.0 / scene_fps);
   return TimeSamplingPtr(new TimeSampling(ts, samples));  // NOLINT: modernize-make-shared
 }
 
 static void get_frames(double scene_fps,
                        const AlembicExportParams &params,
-                       unsigned int nr_of_samples,
+                       uint nr_of_samples,
                        std::set<double> &r_frames)
 {
   /* Get one set of shutter samples, then add those around each frame to export. */
@@ -171,14 +160,14 @@ static void get_frames(double scene_fps,
 ABCArchive::ABCArchive(const Main *bmain,
                        const Scene *scene,
                        AlembicExportParams params,
-                       std::string filename)
+                       const std::string &filepath)
     : archive(nullptr)
 {
   double scene_fps = FPS;
   MetaData abc_metadata = create_abc_metadata(bmain, scene_fps);
 
   /* Create the Archive. */
-  archive = create_archive(&abc_ostream_, filename, abc_metadata);
+  archive = create_archive(&abc_ostream_, filepath, abc_metadata);
 
   /* Create time samples for transforms and shapes. */
   TimeSamplingPtr ts_xform;

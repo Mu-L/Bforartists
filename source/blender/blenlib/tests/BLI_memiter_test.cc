@@ -1,4 +1,6 @@
-/* Apache License, Version 2.0 */
+/* SPDX-FileCopyrightText: 2023 Blender Authors
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "testing/testing.h"
 
@@ -6,6 +8,7 @@
 
 #include "BLI_array_utils.h"
 #include "BLI_memiter.h"
+#include "BLI_string_utils.hh"
 
 #include "BLI_ressource_strings.h"
 #include "BLI_string.h"
@@ -16,11 +19,11 @@ TEST(memiter, Nop)
   BLI_memiter_destroy(mi);
 }
 
-static void memiter_empty_test(int num_elems, const int chunk_size)
+static void memiter_empty_test(int elems_num, const int chunk_size)
 {
   BLI_memiter *mi = BLI_memiter_create(chunk_size);
   void *data;
-  for (int index = 0; index < num_elems; index++) {
+  for (int index = 0; index < elems_num; index++) {
     data = BLI_memiter_alloc(mi, 0);
   }
   int index = 0, total_size = 0;
@@ -32,17 +35,17 @@ static void memiter_empty_test(int num_elems, const int chunk_size)
     total_size += elem_size;
   }
   EXPECT_EQ(0, total_size);
-  EXPECT_EQ(num_elems, index);
+  EXPECT_EQ(elems_num, index);
 
   BLI_memiter_destroy(mi);
 }
 
 #define MEMITER_NUMBER_TEST_FN(fn, number_type) \
-  static void fn(int num_elems, const int chunk_size) \
+  static void fn(int elems_num, const int chunk_size) \
   { \
     BLI_memiter *mi = BLI_memiter_create(chunk_size); \
     number_type *data; \
-    for (int index = 0; index < num_elems; index++) { \
+    for (int index = 0; index < elems_num; index++) { \
       data = (number_type *)BLI_memiter_alloc(mi, sizeof(number_type)); \
       *data = index; \
     } \
@@ -98,7 +101,7 @@ static void memiter_words10k_test(const char split_char, const int chunk_size)
 {
   const int words_len = sizeof(words10k) - 1;
   char *words = BLI_strdupn(words10k, words_len);
-  BLI_str_replace_char(words, split_char, '\0');
+  BLI_string_replace_char(words, split_char, '\0');
 
   BLI_memiter *mi = BLI_memiter_create(chunk_size);
 
@@ -242,7 +245,7 @@ TEST_NUMBER_AT_CHUNK_SIZE(256)
 
 #define STRINGS_TEST(chunk_size, ...) \
   { \
-    const char *data[] = {__VA_ARGS__, NULL}; \
+    const char *data[] = {__VA_ARGS__, nullptr}; \
     memiter_string_test(data, chunk_size); \
   }
 

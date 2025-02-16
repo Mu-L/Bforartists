@@ -1,76 +1,85 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2023 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(INC
   ../include
-  ../../blenfont
-  ../../blenkernel
-  ../../blenlib
-  ../../blentranslation
-  ../../depsgraph
-  ../../gpu
-  ../../imbuf
-  ../../makesdna
   ../../makesrna
-  ../../sequencer
-  ../../windowmanager
-  ../../../../intern/atomic
-  ../../../../intern/glew-mx
-  ../../../../intern/guardedalloc
+
+  # RNA_prototypes.hh
+  ${CMAKE_BINARY_DIR}/source/blender/makesrna
 )
 
+set(INC_SYS
+)
 
 set(SRC
-  sequencer_add.c
-  sequencer_buttons.c
-  sequencer_draw.c
-  sequencer_edit.c
-  sequencer_modifier.c
-  sequencer_ops.c
-  sequencer_preview.c
-  sequencer_proxy.c
-  sequencer_scopes.c
-  sequencer_select.c
-  sequencer_view.c
-  space_sequencer.c
+  sequencer_add.cc
+  sequencer_buttons.cc
+  sequencer_channels_draw.cc
+  sequencer_channels_edit.cc
+  sequencer_clipboard.cc
+  sequencer_drag_drop.cc
+  sequencer_edit.cc
+  sequencer_modifier.cc
+  sequencer_ops.cc
+  sequencer_preview.cc
+  sequencer_preview_draw.cc
+  sequencer_proxy.cc
+  sequencer_quads_batch.cc
+  sequencer_retiming.cc
+  sequencer_retiming_draw.cc
+  sequencer_scopes.cc
+  sequencer_select.cc
+  sequencer_strips_batch.cc
+  sequencer_text_edit.cc
+  sequencer_thumbnails.cc
+  sequencer_timeline_draw.cc
+  sequencer_view.cc
+  space_sequencer.cc
 
-  sequencer_intern.h
+  sequencer_intern.hh
+  sequencer_quads_batch.hh
+  sequencer_scopes.hh
+  sequencer_strips_batch.hh
 )
 
 set(LIB
+  PRIVATE bf::blenfont
+  PRIVATE bf::blenkernel
+  PRIVATE bf::blenlib
+  PRIVATE bf::blenloader
+  PRIVATE bf::blentranslation
+  PRIVATE bf::depsgraph
+  PRIVATE bf::dna
+  PRIVATE bf::draw
   bf_editor_interface
   bf_editor_util
+  PRIVATE bf::gpu
+  PRIVATE bf::imbuf
+  PRIVATE bf::imbuf::movie
+  PRIVATE bf::intern::atomic
+  PRIVATE bf::intern::guardedalloc
+  PRIVATE bf::animrig
+  PRIVATE bf::sequencer
+  PRIVATE bf::windowmanager
 )
 
 if(WITH_AUDASPACE)
-  add_definitions(-DWITH_AUDASPACE)
-
   list(APPEND INC_SYS
     ${AUDASPACE_C_INCLUDE_DIRS}
   )
-  list(APPEND LIB
-    ${AUDASPACE_C_LIBRARIES}
-    ${AUDASPACE_PY_LIBRARIES}
-  )
-endif()
-
-if(WITH_INTERNATIONAL)
-  add_definitions(-DWITH_INTERNATIONAL)
+  if(WITH_SYSTEM_AUDASPACE)
+    list(APPEND LIB
+      ${AUDASPACE_C_LIBRARIES}
+      ${AUDASPACE_PY_LIBRARIES}
+    )
+  endif()
+  add_definitions(-DWITH_AUDASPACE)
 endif()
 
 
 blender_add_lib(bf_editor_space_sequencer "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+
+# RNA_prototypes.hh dna_type_offsets.h
+add_dependencies(bf_editor_space_sequencer bf_rna)

@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2008-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -45,27 +33,32 @@
 #include "BPy_ViewMap.h"
 #include "BPy_ViewShape.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "BKE_appdir.hh"
+#include "DNA_scene_types.h"
+#include "FRS_freestyle.h"
+#include "RNA_access.hh"
+#include "RNA_prototypes.hh"
+#include "bpy_rna.hh" /* pyrna_struct_CreatePyObject() */
+
+#include "../generic/py_capi_utils.hh" /* #PyC_UnicodeFromBytes */
+
+#include "BKE_colorband.hh"  /* BKE_colorband_evaluate() */
+#include "BKE_colortools.hh" /* BKE_curvemapping_evaluateF() */
+#include "BKE_material.hh"   /* ramp_blend() */
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
 //------------------------ MODULE FUNCTIONS ----------------------------------
 
-#include "BKE_appdir.h"
-#include "DNA_scene_types.h"
-#include "FRS_freestyle.h"
-#include "RNA_access.h"
-#include "bpy_rna.h" /* pyrna_struct_CreatePyObject() */
-
-static char Freestyle_getCurrentScene___doc__[] =
+PyDoc_STRVAR(
+    /* Wrap. */
+    Freestyle_getCurrentScene___doc__,
     ".. function:: getCurrentScene()\n"
     "\n"
     "   Returns the current scene.\n"
     "\n"
     "   :return: The current scene.\n"
-    "   :rtype: :class:`bpy.types.Scene`\n";
+    "   :rtype: :class:`bpy.types.Scene`\n");
 
 static PyObject *Freestyle_getCurrentScene(PyObject * /*self*/)
 {
@@ -74,8 +67,7 @@ static PyObject *Freestyle_getCurrentScene(PyObject * /*self*/)
     PyErr_SetString(PyExc_TypeError, "current scene not available");
     return nullptr;
   }
-  PointerRNA ptr_scene;
-  RNA_pointer_create(&scene->id, &RNA_Scene, scene, &ptr_scene);
+  PointerRNA ptr_scene = RNA_pointer_create_discrete(&scene->id, &RNA_Scene, scene);
   return pyrna_struct_CreatePyObject(&ptr_scene);
 }
 
@@ -103,6 +95,9 @@ static int ramp_blend_type(const char *type)
   }
   if (STREQ(type, "DIFFERENCE")) {
     return MA_RAMP_DIFF;
+  }
+  if (STREQ(type, "EXCLUSION")) {
+    return MA_RAMP_EXCLUSION;
   }
   if (STREQ(type, "DARKEN")) {
     return MA_RAMP_DARK;
@@ -140,9 +135,9 @@ static int ramp_blend_type(const char *type)
   return -1;
 }
 
-#include "BKE_material.h" /* ramp_blend() */
-
-static char Freestyle_blendRamp___doc__[] =
+PyDoc_STRVAR(
+    /* Wrap. */
+    Freestyle_blendRamp___doc__,
     ".. function:: blendRamp(type, color1, fac, color2)\n"
     "\n"
     "   Blend two colors according to a ramp blend type.\n"
@@ -150,13 +145,13 @@ static char Freestyle_blendRamp___doc__[] =
     "   :arg type: Ramp blend type.\n"
     "   :type type: int\n"
     "   :arg color1: 1st color.\n"
-    "   :type color1: :class:`mathutils.Vector`, list or tuple of 3 real numbers\n"
+    "   :type color1: :class:`mathutils.Vector` | tuple[float, float, float] | list[float]\n"
     "   :arg fac: Blend factor.\n"
     "   :type fac: float\n"
     "   :arg color2: 1st color.\n"
-    "   :type color2: :class:`mathutils.Vector`, list or tuple of 3 real numbers\n"
+    "   :type color2: :class:`mathutils.Vector` | tuple[float, float, float] | list[float]\n"
     "   :return: Blended color in RGB format.\n"
-    "   :rtype: :class:`mathutils.Vector`\n";
+    "   :rtype: :class:`mathutils.Vector`\n");
 
 static PyObject *Freestyle_blendRamp(PyObject * /*self*/, PyObject *args)
 {
@@ -178,7 +173,8 @@ static PyObject *Freestyle_blendRamp(PyObject * /*self*/, PyObject *args)
                             3,
                             obj1,
                             "argument 2 must be a 3D vector "
-                            "(either a tuple/list of 3 elements or Vector)") == -1) {
+                            "(either a tuple/list of 3 elements or Vector)") == -1)
+  {
     return nullptr;
   }
   if (mathutils_array_parse(b,
@@ -186,16 +182,17 @@ static PyObject *Freestyle_blendRamp(PyObject * /*self*/, PyObject *args)
                             3,
                             obj2,
                             "argument 4 must be a 3D vector "
-                            "(either a tuple/list of 3 elements or Vector)") == -1) {
+                            "(either a tuple/list of 3 elements or Vector)") == -1)
+  {
     return nullptr;
   }
   ramp_blend(type, a, fac, b);
   return Vector_CreatePyObject(a, 3, nullptr);
 }
 
-#include "BKE_colorband.h" /* BKE_colorband_evaluate() */
-
-static char Freestyle_evaluateColorRamp___doc__[] =
+PyDoc_STRVAR(
+    /* Wrap. */
+    Freestyle_evaluateColorRamp___doc__,
     ".. function:: evaluateColorRamp(ramp, in)\n"
     "\n"
     "   Evaluate a color ramp at a point in the interval 0 to 1.\n"
@@ -205,7 +202,7 @@ static char Freestyle_evaluateColorRamp___doc__[] =
     "   :arg in: Value in the interval 0 to 1.\n"
     "   :type in: float\n"
     "   :return: color in RGBA format.\n"
-    "   :rtype: :class:`mathutils.Vector`\n";
+    "   :rtype: :class:`mathutils.Vector`\n");
 
 static PyObject *Freestyle_evaluateColorRamp(PyObject * /*self*/, PyObject *args)
 {
@@ -213,14 +210,14 @@ static PyObject *Freestyle_evaluateColorRamp(PyObject * /*self*/, PyObject *args
   ColorBand *coba;
   float in, out[4];
 
-  if (!(PyArg_ParseTuple(args, "O!f", &pyrna_struct_Type, &py_srna, &in))) {
+  if (!PyArg_ParseTuple(args, "O!f", &pyrna_struct_Type, &py_srna, &in)) {
     return nullptr;
   }
-  if (!RNA_struct_is_a(py_srna->ptr.type, &RNA_ColorRamp)) {
+  if (!RNA_struct_is_a(py_srna->ptr->type, &RNA_ColorRamp)) {
     PyErr_SetString(PyExc_TypeError, "1st argument is not a ColorRamp object");
     return nullptr;
   }
-  coba = (ColorBand *)py_srna->ptr.data;
+  coba = (ColorBand *)py_srna->ptr->data;
   if (!BKE_colorband_evaluate(coba, in, out)) {
     PyErr_SetString(PyExc_ValueError, "failed to evaluate the color ramp");
     return nullptr;
@@ -228,10 +225,11 @@ static PyObject *Freestyle_evaluateColorRamp(PyObject * /*self*/, PyObject *args
   return Vector_CreatePyObject(out, 4, nullptr);
 }
 
-#include "BKE_colortools.h" /* BKE_curvemapping_evaluateF() */
 #include "DNA_color_types.h"
 
-static char Freestyle_evaluateCurveMappingF___doc__[] =
+PyDoc_STRVAR(
+    /* Wrap. */
+    Freestyle_evaluateCurveMappingF___doc__,
     ".. function:: evaluateCurveMappingF(cumap, cur, value)\n"
     "\n"
     "   Evaluate a curve mapping at a point in the interval 0 to 1.\n"
@@ -243,7 +241,7 @@ static char Freestyle_evaluateCurveMappingF___doc__[] =
     "   :arg value: Input value in the interval 0 to 1.\n"
     "   :type value: float\n"
     "   :return: Mapped output value.\n"
-    "   :rtype: float\n";
+    "   :rtype: float\n");
 
 static PyObject *Freestyle_evaluateCurveMappingF(PyObject * /*self*/, PyObject *args)
 {
@@ -252,10 +250,10 @@ static PyObject *Freestyle_evaluateCurveMappingF(PyObject * /*self*/, PyObject *
   int cur;
   float value;
 
-  if (!(PyArg_ParseTuple(args, "O!if", &pyrna_struct_Type, &py_srna, &cur, &value))) {
+  if (!PyArg_ParseTuple(args, "O!if", &pyrna_struct_Type, &py_srna, &cur, &value)) {
     return nullptr;
   }
-  if (!RNA_struct_is_a(py_srna->ptr.type, &RNA_CurveMapping)) {
+  if (!RNA_struct_is_a(py_srna->ptr->type, &RNA_CurveMapping)) {
     PyErr_SetString(PyExc_TypeError, "1st argument is not a CurveMapping object");
     return nullptr;
   }
@@ -263,10 +261,10 @@ static PyObject *Freestyle_evaluateCurveMappingF(PyObject * /*self*/, PyObject *
     PyErr_SetString(PyExc_ValueError, "2nd argument is out of range");
     return nullptr;
   }
-  cumap = (CurveMapping *)py_srna->ptr.data;
+  cumap = (CurveMapping *)py_srna->ptr->data;
   BKE_curvemapping_init(cumap);
   /* disable extrapolation if enabled */
-  if ((cumap->flag & CUMA_EXTEND_EXTRAPOLATE)) {
+  if (cumap->flag & CUMA_EXTEND_EXTRAPOLATE) {
     cumap->flag &= ~CUMA_EXTEND_EXTRAPOLATE;
     BKE_curvemapping_changed(cumap, false);
   }
@@ -275,7 +273,9 @@ static PyObject *Freestyle_evaluateCurveMappingF(PyObject * /*self*/, PyObject *
 
 /*-----------------------Freestyle module docstring----------------------------*/
 
-static char module_docstring[] =
+PyDoc_STRVAR(
+    /* Force wrapped line. */
+    module_docstring,
     "This module provides classes for defining line drawing rules (such as\n"
     "predicates, functions, chaining iterators, and stroke shaders), as well\n"
     "as helper functions for style module writing.\n"
@@ -497,7 +497,7 @@ static char module_docstring[] =
     "- :class:`IntegrationType`\n"
     "- :class:`MediumType`\n"
     "- :class:`Nature`\n"
-    "\n";
+    "\n");
 
 /*-----------------------Freestyle module method def---------------------------*/
 
@@ -521,15 +521,19 @@ static PyMethodDef module_functions[] = {
 /*-----------------------Freestyle module definition---------------------------*/
 
 static PyModuleDef module_definition = {
-    PyModuleDef_HEAD_INIT,
-    "_freestyle",
-    module_docstring,
-    -1,
-    module_functions,
+    /*m_base*/ PyModuleDef_HEAD_INIT,
+    /*m_name*/ "_freestyle",
+    /*m_doc*/ module_docstring,
+    /*m_size*/ -1,
+    /*m_methods*/ module_functions,
+    /*m_slots*/ nullptr,
+    /*m_traverse*/ nullptr,
+    /*m_clear*/ nullptr,
+    /*m_free*/ nullptr,
 };
 
 //-------------------MODULE INITIALIZATION--------------------------------
-PyObject *Freestyle_Init(void)
+PyObject *Freestyle_Init()
 {
   PyObject *module;
 
@@ -541,12 +545,13 @@ PyObject *Freestyle_Init(void)
   PyDict_SetItemString(PySys_GetObject("modules"), module_definition.m_name, module);
 
   // update 'sys.path' for Freestyle Python API modules
-  const char *const path = BKE_appdir_folder_id(BLENDER_SYSTEM_SCRIPTS, "freestyle");
-  if (path) {
+  const std::optional<std::string> path = BKE_appdir_folder_id(BLENDER_SYSTEM_SCRIPTS,
+                                                               "freestyle");
+  if (path.has_value()) {
     char modpath[FILE_MAX];
-    BLI_join_dirfile(modpath, sizeof(modpath), path, "modules");
+    BLI_path_join(modpath, sizeof(modpath), path->c_str(), "modules");
     PyObject *sys_path = PySys_GetObject("path"); /* borrow */
-    PyObject *py_modpath = PyUnicode_FromString(modpath);
+    PyObject *py_modpath = PyC_UnicodeFromBytes(modpath);
     PyList_Append(sys_path, py_modpath);
     Py_DECREF(py_modpath);
 #if 0
@@ -590,7 +595,3 @@ PyObject *Freestyle_Init(void)
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
-
-#ifdef __cplusplus
-}
-#endif

@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup bli
@@ -21,32 +9,38 @@
 #include "MEM_guardedalloc.h"
 
 #include "BLI_kdtree_impl.h"
-#include "BLI_math.h"
-#include "BLI_strict_flags.h"
+#include "BLI_math_base.h"
 #include "BLI_utildefines.h"
+#include "BLI_vector.hh"
 
-#define _CONCAT_AUX(MACRO_ARG1, MACRO_ARG2) MACRO_ARG1##MACRO_ARG2
-#define _CONCAT(MACRO_ARG1, MACRO_ARG2) _CONCAT_AUX(MACRO_ARG1, MACRO_ARG2)
-#define BLI_kdtree_nd_(id) _CONCAT(KDTREE_PREFIX_ID, _##id)
+#include <algorithm>
+#include <cstring>
 
-typedef struct KDTreeNode_head {
+#include "BLI_strict_flags.h" /* IWYU pragma: keep. Keep last. */
+
+#define _BLI_KDTREE_CONCAT_AUX(MACRO_ARG1, MACRO_ARG2) MACRO_ARG1##MACRO_ARG2
+#define _BLI_KDTREE_CONCAT(MACRO_ARG1, MACRO_ARG2) _BLI_KDTREE_CONCAT_AUX(MACRO_ARG1, MACRO_ARG2)
+#define BLI_kdtree_nd_(id) _BLI_KDTREE_CONCAT(KDTREE_PREFIX_ID, _##id)
+
+struct KDTreeNode_head {
   uint left, right;
   float co[KD_DIMS];
   int index;
-} KDTreeNode_head;
+};
 
-typedef struct KDTreeNode {
+struct KDTreeNode {
   uint left, right;
   float co[KD_DIMS];
   int index;
   uint d; /* range is only (0..KD_DIMS - 1) */
-} KDTreeNode;
+};
 
 struct KDTree {
   KDTreeNode *nodes;
   uint nodes_len;
   uint root;
-#ifdef DEBUG
+  int max_node_index;
+#ifndef NDEBUG
   bool is_balanced;        /* ensure we call balance first */
   uint nodes_len_capacity; /* max size of the tree */
 #endif
@@ -60,7 +54,7 @@ struct KDTree {
 
 /**
  * When set we know all values are unbalanced,
- * otherwise clear them when re-balancing: see T62210.
+ * otherwise clear them when re-balancing: see #62210.
  */
 #define KD_NODE_ROOT_IS_INIT ((uint)-2)
 
@@ -86,7 +80,7 @@ static float len_squared_vnvn(const float v0[KD_DIMS], const float v1[KD_DIMS])
 
 static float len_squared_vnvn_cb(const float co_kdtree[KD_DIMS],
                                  const float co_search[KD_DIMS],
-                                 const void *UNUSED(user_data))
+                                 const void * /*user_data*/)
 {
   return len_squared_vnvn(co_kdtree, co_search);
 }
@@ -100,12 +94,14 @@ KDTree *BLI_kdtree_nd_(new)(uint nodes_len_capacity)
 {
   KDTree *tree;
 
-  tree = MEM_mallocN(sizeof(KDTree), "KDTree");
-  tree->nodes = MEM_mallocN(sizeof(KDTreeNode) * nodes_len_capacity, "KDTreeNode");
+  tree = MEM_cnew<KDTree>("KDTree");
+  tree->nodes = static_cast<KDTreeNode *>(
+      MEM_mallocN(sizeof(KDTreeNode) * nodes_len_capacity, "KDTreeNode"));
   tree->nodes_len = 0;
   tree->root = KD_NODE_ROOT_IS_INIT;
+  tree->max_node_index = -1;
 
-#ifdef DEBUG
+#ifndef NDEBUG
   tree->is_balanced = false;
   tree->nodes_len_capacity = nodes_len_capacity;
 #endif
@@ -128,7 +124,7 @@ void BLI_kdtree_nd_(insert)(KDTree *tree, int index, const float co[KD_DIMS])
 {
   KDTreeNode *node = &tree->nodes[tree->nodes_len++];
 
-#ifdef DEBUG
+#ifndef NDEBUG
   BLI_assert(tree->nodes_len <= tree->nodes_len_capacity);
 #endif
 
@@ -139,8 +135,9 @@ void BLI_kdtree_nd_(insert)(KDTree *tree, int index, const float co[KD_DIMS])
   copy_vn_vn(node->co, co);
   node->index = index;
   node->d = 0;
+  tree->max_node_index = std::max(tree->max_node_index, index);
 
-#ifdef DEBUG
+#ifndef NDEBUG
   tree->is_balanced = false;
 #endif
 }
@@ -154,7 +151,7 @@ static uint kdtree_balance(KDTreeNode *nodes, uint nodes_len, uint axis, const u
   if (nodes_len <= 0) {
     return KD_NODE_UNSET;
   }
-  else if (nodes_len == 1) {
+  if (nodes_len == 1) {
     return 0 + ofs;
   }
 
@@ -168,7 +165,7 @@ static uint kdtree_balance(KDTreeNode *nodes, uint nodes_len, uint axis, const u
     i = left - 1;
     j = right;
 
-    while (1) {
+    while (true) {
       while (nodes[++i].co[axis] < co) { /* pass */
       }
       while (nodes[--j].co[axis] > co && j > left) { /* pass */
@@ -190,7 +187,7 @@ static uint kdtree_balance(KDTreeNode *nodes, uint nodes_len, uint axis, const u
     }
   }
 
-  /* set node and sort subnodes */
+  /* Set node and sort sub-nodes. */
   node = &nodes[median];
   node->d = axis;
   axis = (axis + 1) % KD_DIMS;
@@ -212,15 +209,15 @@ void BLI_kdtree_nd_(balance)(KDTree *tree)
 
   tree->root = kdtree_balance(tree->nodes, tree->nodes_len, 0, 0);
 
-#ifdef DEBUG
+#ifndef NDEBUG
   tree->is_balanced = true;
 #endif
 }
 
 static uint *realloc_nodes(uint *stack, uint *stack_len_capacity, const bool is_alloc)
 {
-  uint *stack_new = MEM_mallocN((*stack_len_capacity + KD_NEAR_ALLOC_INC) * sizeof(uint),
-                                "KDTree.treestack");
+  uint *stack_new = static_cast<uint *>(
+      MEM_mallocN((*stack_len_capacity + KD_NEAR_ALLOC_INC) * sizeof(uint), "KDTree.treestack"));
   memcpy(stack_new, stack, *stack_len_capacity * sizeof(uint));
   // memset(stack_new + *stack_len_capacity, 0, sizeof(uint) * KD_NEAR_ALLOC_INC);
   if (is_alloc) {
@@ -243,7 +240,7 @@ int BLI_kdtree_nd_(find_nearest)(const KDTree *tree,
   float min_dist, cur_dist;
   uint stack_len_capacity, cur = 0;
 
-#ifdef DEBUG
+#ifndef NDEBUG
   BLI_assert(tree->is_balanced == true);
 #endif
 
@@ -347,13 +344,13 @@ int BLI_kdtree_nd_(find_nearest_cb)(
     KDTreeNearest *r_nearest)
 {
   const KDTreeNode *nodes = tree->nodes;
-  const KDTreeNode *min_node = NULL;
+  const KDTreeNode *min_node = nullptr;
 
   uint *stack, stack_default[KD_STACK_INIT];
   float min_dist = FLT_MAX, cur_dist;
   uint stack_len_capacity, cur = 0;
 
-#ifdef DEBUG
+#ifndef NDEBUG
   BLI_assert(tree->is_balanced == true);
 #endif
 
@@ -362,7 +359,7 @@ int BLI_kdtree_nd_(find_nearest_cb)(
   }
 
   stack = stack_default;
-  stack_len_capacity = ARRAY_SIZE(stack_default);
+  stack_len_capacity = int(ARRAY_SIZE(stack_default));
 
 #define NODE_TEST_NEAREST(node) \
   { \
@@ -440,9 +437,7 @@ finally:
 
     return min_node->index;
   }
-  else {
-    return -1;
-  }
+  return -1;
 }
 
 static void nearest_ordered_insert(KDTreeNearest *nearest,
@@ -462,9 +457,7 @@ static void nearest_ordered_insert(KDTreeNearest *nearest,
     if (dist >= nearest[i - 1].dist) {
       break;
     }
-    else {
-      nearest[i] = nearest[i - 1];
-    }
+    nearest[i] = nearest[i - 1];
   }
 
   nearest[i].index = index;
@@ -494,7 +487,7 @@ int BLI_kdtree_nd_(find_nearest_n_with_len_squared_cb)(
   uint stack_len_capacity, cur = 0;
   uint i, nearest_len = 0;
 
-#ifdef DEBUG
+#ifndef NDEBUG
   BLI_assert(tree->is_balanced == true);
 #endif
 
@@ -502,13 +495,13 @@ int BLI_kdtree_nd_(find_nearest_n_with_len_squared_cb)(
     return 0;
   }
 
-  if (len_sq_fn == NULL) {
+  if (len_sq_fn == nullptr) {
     len_sq_fn = len_squared_vnvn_cb;
-    BLI_assert(user_data == NULL);
+    BLI_assert(user_data == nullptr);
   }
 
   stack = stack_default;
-  stack_len_capacity = ARRAY_SIZE(stack_default);
+  stack_len_capacity = int(ARRAY_SIZE(stack_default));
 
   root = &nodes[tree->root];
 
@@ -594,26 +587,24 @@ int BLI_kdtree_nd_(find_nearest_n_with_len_squared_cb)(
 int BLI_kdtree_nd_(find_nearest_n)(const KDTree *tree,
                                    const float co[KD_DIMS],
                                    KDTreeNearest r_nearest[],
-                                   const uint nearest_len_capacity)
+                                   uint nearest_len_capacity)
 {
   return BLI_kdtree_nd_(find_nearest_n_with_len_squared_cb)(
-      tree, co, r_nearest, nearest_len_capacity, NULL, NULL);
+      tree, co, r_nearest, nearest_len_capacity, nullptr, nullptr);
 }
 
 static int nearest_cmp_dist(const void *a, const void *b)
 {
-  const KDTreeNearest *kda = a;
-  const KDTreeNearest *kdb = b;
+  const KDTreeNearest *kda = static_cast<const KDTreeNearest *>(a);
+  const KDTreeNearest *kdb = static_cast<const KDTreeNearest *>(b);
 
   if (kda->dist < kdb->dist) {
     return -1;
   }
-  else if (kda->dist > kdb->dist) {
+  if (kda->dist > kdb->dist) {
     return 1;
   }
-  else {
-    return 0;
-  }
+  return 0;
 }
 static void nearest_add_in_range(KDTreeNearest **r_nearest,
                                  uint nearest_index,
@@ -625,8 +616,8 @@ static void nearest_add_in_range(KDTreeNearest **r_nearest,
   KDTreeNearest *to;
 
   if (UNLIKELY(nearest_index >= *nearest_len_capacity)) {
-    *r_nearest = MEM_reallocN_id(
-        *r_nearest, (*nearest_len_capacity += KD_FOUND_ALLOC_INC) * sizeof(KDTreeNode), __func__);
+    *r_nearest = static_cast<KDTreeNearest *>(MEM_reallocN_id(
+        *r_nearest, (*nearest_len_capacity += KD_FOUND_ALLOC_INC) * sizeof(KDTreeNode), __func__));
   }
 
   to = (*r_nearest) + nearest_index;
@@ -653,13 +644,13 @@ int BLI_kdtree_nd_(range_search_with_len_squared_cb)(
 {
   const KDTreeNode *nodes = tree->nodes;
   uint *stack, stack_default[KD_STACK_INIT];
-  KDTreeNearest *nearest = NULL;
+  KDTreeNearest *nearest = nullptr;
   const float range_sq = range * range;
   float dist_sq;
   uint stack_len_capacity, cur = 0;
   uint nearest_len = 0, nearest_len_capacity = 0;
 
-#ifdef DEBUG
+#ifndef NDEBUG
   BLI_assert(tree->is_balanced == true);
 #endif
 
@@ -667,13 +658,13 @@ int BLI_kdtree_nd_(range_search_with_len_squared_cb)(
     return 0;
   }
 
-  if (len_sq_fn == NULL) {
+  if (len_sq_fn == nullptr) {
     len_sq_fn = len_squared_vnvn_cb;
-    BLI_assert(user_data == NULL);
+    BLI_assert(user_data == nullptr);
   }
 
   stack = stack_default;
-  stack_len_capacity = ARRAY_SIZE(stack_default);
+  stack_len_capacity = int(ARRAY_SIZE(stack_default));
 
   stack[cur++] = tree->root;
 
@@ -726,9 +717,10 @@ int BLI_kdtree_nd_(range_search_with_len_squared_cb)(
 int BLI_kdtree_nd_(range_search)(const KDTree *tree,
                                  const float co[KD_DIMS],
                                  KDTreeNearest **r_nearest,
-                                 const float range)
+                                 float range)
 {
-  return BLI_kdtree_nd_(range_search_with_len_squared_cb)(tree, co, r_nearest, range, NULL, NULL);
+  return BLI_kdtree_nd_(range_search_with_len_squared_cb)(
+      tree, co, r_nearest, range, nullptr, nullptr);
 }
 
 /**
@@ -753,7 +745,7 @@ void BLI_kdtree_nd_(range_search_cb)(
   float range_sq = range * range, dist_sq;
   uint stack_len_capacity, cur = 0;
 
-#ifdef DEBUG
+#ifndef NDEBUG
   BLI_assert(tree->is_balanced == true);
 #endif
 
@@ -762,7 +754,7 @@ void BLI_kdtree_nd_(range_search_cb)(
   }
 
   stack = stack_default;
-  stack_len_capacity = ARRAY_SIZE(stack_default);
+  stack_len_capacity = int(ARRAY_SIZE(stack_default));
 
   stack[cur++] = tree->root;
 
@@ -810,12 +802,12 @@ finally:
  * Use when we want to loop over nodes ordered by index.
  * Requires indices to be aligned with nodes.
  */
-static uint *kdtree_order(const KDTree *tree)
+static blender::Vector<int> kdtree_order(const KDTree *tree)
 {
   const KDTreeNode *nodes = tree->nodes;
-  uint *order = MEM_mallocN(sizeof(uint) * tree->nodes_len, __func__);
+  blender::Vector<int> order(tree->max_node_index + 1, -1);
   for (uint i = 0; i < tree->nodes_len; i++) {
-    order[nodes[i].index] = i;
+    order[nodes[i].index] = (int)i;
   }
   return order;
 }
@@ -837,7 +829,7 @@ struct DeDuplicateParams {
   int search;
 };
 
-static void deduplicate_recursive(const struct DeDuplicateParams *p, uint i)
+static void deduplicate_recursive(const DeDuplicateParams *p, uint i)
 {
   const KDTreeNode *node = &p->nodes[i];
   if (p->search_co[node->d] + p->range <= node->co[node->d]) {
@@ -890,19 +882,22 @@ int BLI_kdtree_nd_(calc_duplicates_fast)(const KDTree *tree,
                                          int *duplicates)
 {
   int found = 0;
-  struct DeDuplicateParams p = {
-      .nodes = tree->nodes,
-      .range = range,
-      .range_sq = square_f(range),
-      .duplicates = duplicates,
-      .duplicates_found = &found,
-  };
+
+  DeDuplicateParams p = {};
+  p.nodes = tree->nodes;
+  p.range = range;
+  p.range_sq = square_f(range);
+  p.duplicates = duplicates;
+  p.duplicates_found = &found;
 
   if (use_index_order) {
-    uint *order = kdtree_order(tree);
-    for (uint i = 0; i < tree->nodes_len; i++) {
-      const uint node_index = order[i];
-      const int index = (int)i;
+    blender::Vector<int> order = kdtree_order(tree);
+    for (int i = 0; i < tree->max_node_index + 1; i++) {
+      const int node_index = order[i];
+      if (node_index == -1) {
+        continue;
+      }
+      const int index = i;
       if (ELEM(duplicates[index], -1, index)) {
         p.search = index;
         copy_vn_vn(p.search_co, tree->nodes[node_index].co);
@@ -914,7 +909,6 @@ int BLI_kdtree_nd_(calc_duplicates_fast)(const KDTree *tree,
         }
       }
     }
-    MEM_freeN(order);
   }
   else {
     for (uint i = 0; i < tree->nodes_len; i++) {
@@ -941,29 +935,36 @@ int BLI_kdtree_nd_(calc_duplicates_fast)(const KDTree *tree,
 /** \name BLI_kdtree_3d_deduplicate
  * \{ */
 
+static int kdtree_cmp_bool(const bool a, const bool b)
+{
+  if (a == b) {
+    return 0;
+  }
+  return b ? -1 : 1;
+}
+
 static int kdtree_node_cmp_deduplicate(const void *n0_p, const void *n1_p)
 {
-  const KDTreeNode *n0 = n0_p;
-  const KDTreeNode *n1 = n1_p;
+  const KDTreeNode *n0 = static_cast<const KDTreeNode *>(n0_p);
+  const KDTreeNode *n1 = static_cast<const KDTreeNode *>(n1_p);
   for (uint j = 0; j < KD_DIMS; j++) {
     if (n0->co[j] < n1->co[j]) {
       return -1;
     }
-    else if (n0->co[j] > n1->co[j]) {
+    if (n0->co[j] > n1->co[j]) {
       return 1;
     }
   }
-  /* Sort by pointer so the first added will be used.
-   * assignment below ignores const correctness,
-   * however the values aren't used for sorting and are to be discarded. */
-  if (n0 < n1) {
-    ((KDTreeNode *)n1)->d = KD_DIMS; /* tag invalid */
-    return -1;
+
+  if (n0->d != KD_DIMS && n1->d != KD_DIMS) {
+    /* Two nodes share identical `co`
+     * Both are still valid.
+     * Cast away `const` and tag one of them as invalid. */
+    ((KDTreeNode *)n1)->d = KD_DIMS;
   }
-  else {
-    ((KDTreeNode *)n0)->d = KD_DIMS; /* tag invalid */
-    return 1;
-  }
+
+  /* Keep sorting until each unique value has one and only one valid node. */
+  return kdtree_cmp_bool(n0->d == KD_DIMS, n1->d == KD_DIMS);
 }
 
 /**
@@ -973,7 +974,7 @@ static int kdtree_node_cmp_deduplicate(const void *n0_p, const void *n1_p)
  */
 int BLI_kdtree_nd_(deduplicate)(KDTree *tree)
 {
-#ifdef DEBUG
+#ifndef NDEBUG
   tree->is_balanced = false;
 #endif
   qsort(tree->nodes, (size_t)tree->nodes_len, sizeof(*tree->nodes), kdtree_node_cmp_deduplicate);

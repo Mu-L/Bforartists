@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -20,17 +8,13 @@
 #include "BCSampleData.h"
 #include "collada_utils.h"
 
-#include "BKE_action.h"
-#include "BKE_lib_id.h"
-
-#include "BLI_math_rotation.h"
-
-#include "DNA_action_types.h"
+#include "BKE_action.hh"
+#include "BKE_lib_id.hh"
 
 /* Collection of animation curves */
 class BCAnimation {
  private:
-  Object *reference = NULL;
+  Object *reference = nullptr;
   bContext *mContext;
 
  public:
@@ -64,7 +48,7 @@ class BCAnimation {
   }
 };
 
-typedef std::map<Object *, BCAnimation *> BCAnimationObjectMap;
+using BCAnimationObjectMap = std::map<Object *, BCAnimation *>;
 
 class BCSampleFrame {
 
@@ -89,15 +73,20 @@ class BCSampleFrame {
   BCSample &add(Object *ob);
 
   /* Following methods return NULL if object is not in the sampleMap. */
+
+  /** Get the matrix for the given key, returns Unity when the key does not exist. */
   const BCSample *get_sample(Object *ob) const;
   const BCMatrix *get_sample_matrix(Object *ob) const;
+  /** Get the matrix for the given Bone, returns Unity when the Object is not sampled. */
   const BCMatrix *get_sample_matrix(Object *ob, Bone *bone) const;
 
+  /** Check if the key is in this BCSampleFrame. */
   bool has_sample_for(Object *ob) const;
+  /** Check if the Bone is in this BCSampleFrame. */
   bool has_sample_for(Object *ob, Bone *bone) const;
 };
 
-typedef std::map<int, BCSampleFrame> BCSampleFrameMap;
+using BCSampleFrameMap = std::map<int, BCSampleFrame>;
 
 class BCSampleFrameContainer {
 
@@ -129,13 +118,13 @@ class BCSampleFrameContainer {
   BCSampleFrameMap sample_frames;
 
  public:
-  ~BCSampleFrameContainer()
-  {
-  }
+  ~BCSampleFrameContainer() = default;
 
   BCSample &add(Object *ob, int frame_index);
-  BCSampleFrame *get_frame(int frame_index); /* returns NULL if frame does not exist */
+  /** Return either the #BCSampleFrame or NULL if frame does not exist. */
+  BCSampleFrame *get_frame(int frame_index);
 
+  /** Return a list of all frames that need to be sampled. */
   int get_frames(std::vector<int> &frames) const;
   int get_frames(Object *ob, BCFrames &frames) const;
   int get_frames(Object *ob, Bone *bone, BCFrames &frames) const;
@@ -159,6 +148,11 @@ class BCAnimationSampler {
   void generate_transforms(Object *ob, Bone *bone, BCAnimationCurveMap &curves);
 
   void initialize_curves(BCAnimationCurveMap &curves, Object *ob);
+  /**
+   * Collect all keyframes from all animation curves related to the object.
+   * The bc_get... functions check for NULL and correct object type.
+   * The #add_keyframes_from() function checks for NULL.
+   */
   void initialize_keyframes(BCFrameSet &frameset, Object *ob);
   BCSample &sample_object(Object *ob, int frame_index, bool for_opensim);
   void update_animation_curves(BCAnimation &animation,

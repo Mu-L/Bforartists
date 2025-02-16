@@ -1,81 +1,105 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#include "BKE_spline.hh"
+#include "BKE_curves.hh"
 
 #include "node_geometry_util.hh"
 
-static bNodeSocketTemplate geo_node_curve_primitive_star_in[] = {
-    {SOCK_INT, N_("Points"), 8.0f, 0.0f, 0.0f, 0.0f, 3, 256, PROP_UNSIGNED},
-    {SOCK_FLOAT, N_("Inner Radius"), 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
-    {SOCK_FLOAT, N_("Outer Radius"), 2.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
-    {SOCK_FLOAT, N_("Twist"), 0.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_ANGLE},
-    {-1, ""},
-};
+namespace blender::nodes::node_geo_curve_primitive_star_cc {
 
-static bNodeSocketTemplate geo_node_curve_primitive_star_out[] = {
-    {SOCK_GEOMETRY, N_("Curve")},
-    {-1, ""},
-};
-
-namespace blender::nodes {
-
-static std::unique_ptr<CurveEval> create_star_curve(const float inner_radius,
-                                                    const float outer_radius,
-                                                    const float twist,
-                                                    const int points)
+static void node_declare(NodeDeclarationBuilder &b)
 {
-  std::unique_ptr<CurveEval> curve = std::make_unique<CurveEval>();
-  std::unique_ptr<PolySpline> spline = std::make_unique<PolySpline>();
+  b.add_input<decl::Int>("Points")
+      .default_value(8)
+      .min(3)
+      .max(256)
+      .subtype(PROP_UNSIGNED)
+      .description("Number of points on each of the circles");
+  b.add_input<decl::Float>("Inner Radius")
+      .default_value(1.0f)
+      .min(0.0f)
+      .subtype(PROP_DISTANCE)
+      .description("Radius of the inner circle; can be larger than outer radius");
+  b.add_input<decl::Float>("Outer Radius")
+      .default_value(2.0f)
+      .min(0.0f)
+      .subtype(PROP_DISTANCE)
+      .description("Radius of the outer circle; can be smaller than inner radius");
+  b.add_input<decl::Float>("Twist")
+      .subtype(PROP_ANGLE)
+      .description("The counterclockwise rotation of the inner set of points");
+  b.add_output<decl::Geometry>("Curve");
+  b.add_output<decl::Bool>("Outer Points")
+      .field_on_all()
+      .description("An attribute field with a selection of the outer points");
+}
+
+static Curves *create_star_curve(const float inner_radius,
+                                 const float outer_radius,
+                                 const float twist,
+                                 const int points)
+{
+  Curves *curves_id = bke::curves_new_nomain_single(points * 2, CURVE_TYPE_POLY);
+  bke::CurvesGeometry &curves = curves_id->geometry.wrap();
+  curves.cyclic_for_write().first() = true;
+
+  MutableSpan<float3> positions = curves.positions_for_write();
 
   const float theta_step = (2.0f * M_PI) / float(points);
-  for (int i : IndexRange(points)) {
+  for (const int i : IndexRange(points)) {
     const float x = outer_radius * cos(theta_step * i);
     const float y = outer_radius * sin(theta_step * i);
-    spline->add_point(float3(x, y, 0.0f), 1.0f, 0.0f);
+    positions[i * 2] = {x, y, 0.0f};
 
     const float inner_x = inner_radius * cos(theta_step * i + theta_step * 0.5f + twist);
     const float inner_y = inner_radius * sin(theta_step * i + theta_step * 0.5f + twist);
-    spline->add_point(float3(inner_x, inner_y, 0.0f), 1.0f, 0.0f);
+    positions[i * 2 + 1] = {inner_x, inner_y, 0.0f};
   }
-  spline->set_cyclic(true);
-  spline->attributes.reallocate(spline->size());
-  curve->add_spline(std::move(spline));
-  curve->attributes.reallocate(curve->splines().size());
-  return curve;
+
+  return curves_id;
 }
 
-static void geo_node_curve_primitive_star_exec(GeoNodeExecParams params)
+static void create_selection_output(CurveComponent &component, const StringRef &r_attribute)
 {
-  std::unique_ptr<CurveEval> curve = create_star_curve(
-      std::max(params.extract_input<float>("Inner Radius"), 0.0f),
-      std::max(params.extract_input<float>("Outer Radius"), 0.0f),
-      params.extract_input<float>("Twist"),
-      std::max(params.extract_input<int>("Points"), 3));
-  params.set_output("Curve", GeometrySet::create_with_curve(curve.release()));
+  SpanAttributeWriter<bool> selection =
+      component.attributes_for_write()->lookup_or_add_for_write_only_span<bool>(r_attribute,
+                                                                                AttrDomain::Point);
+  for (int i : selection.span.index_range()) {
+    selection.span[i] = i % 2 == 0;
+  }
+  selection.finish();
 }
 
-}  // namespace blender::nodes
-
-void register_node_type_geo_curve_primitive_star()
+static void node_geo_exec(GeoNodeExecParams params)
 {
-  static bNodeType ntype;
-  geo_node_type_base(&ntype, GEO_NODE_CURVE_PRIMITIVE_STAR, "Star", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(
-      &ntype, geo_node_curve_primitive_star_in, geo_node_curve_primitive_star_out);
-  ntype.geometry_node_execute = blender::nodes::geo_node_curve_primitive_star_exec;
-  nodeRegisterType(&ntype);
+  Curves *curves = create_star_curve(std::max(params.extract_input<float>("Inner Radius"), 0.0f),
+                                     std::max(params.extract_input<float>("Outer Radius"), 0.0f),
+                                     params.extract_input<float>("Twist"),
+                                     std::max(params.extract_input<int>("Points"), 3));
+  GeometrySet output = GeometrySet::from_curves(curves);
+
+  if (std::optional<std::string> outer_points_id =
+          params.get_output_anonymous_attribute_id_if_needed("Outer Points"))
+  {
+    create_selection_output(output.get_component_for_write<CurveComponent>(), *outer_points_id);
+  }
+  params.set_output("Curve", std::move(output));
 }
+
+static void node_register()
+{
+  static blender::bke::bNodeType ntype;
+  geo_node_type_base(&ntype, "GeometryNodeCurveStar", GEO_NODE_CURVE_PRIMITIVE_STAR);
+  ntype.ui_name = "Star";
+  ntype.ui_description =
+      "Generate a poly spline in a star pattern by connecting alternating points of two circles";
+  ntype.enum_name_legacy = "CURVE_PRIMITIVE_STAR";
+  ntype.nclass = NODE_CLASS_GEOMETRY;
+  ntype.declare = node_declare;
+  ntype.geometry_node_execute = node_geo_exec;
+  blender::bke::node_register_type(&ntype);
+}
+NOD_REGISTER_NODE(node_register)
+
+}  // namespace blender::nodes::node_geo_curve_primitive_star_cc

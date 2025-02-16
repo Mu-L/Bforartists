@@ -1,24 +1,13 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2011-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #ifndef __PROJECTIONS_H__
 #define __PROJECTIONS_H__
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdlib>
+
+#include "MEM_guardedalloc.h"
 
 #define CONTAINS_INDEX
 #define GRID_DIMENSION 20
@@ -28,7 +17,7 @@
 #  define LONG __int64
 #  define int64_t __int64
 #else
-#  include <stdint.h>
+#  include <cstdint>
 #endif
 
 /**
@@ -88,10 +77,7 @@ class CubeTriangleIsect {
   /// Projections of the cube vertices
   CubeProjection cubeProj[NUM_AXES];
 
- public:
-  CubeTriangleIsect()
-  {
-  }
+  CubeTriangleIsect() = default;
 
   /**
    * Construction from a cube (axes aligned) and triangle
@@ -109,7 +95,7 @@ class CubeTriangleIsect {
   /**
    * Shifting a cube to a new origin
    */
-  void shift(int off[3]);
+  void shift(const int off[3]);
 
   /**
    * Method to test intersection of the triangle and the cube
@@ -120,9 +106,7 @@ class CubeTriangleIsect {
 
   float getIntersectionPrimary(int edgeInd) const;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("DUALCON:CubeTriangleIsect")
-#endif
 };
 
 #endif /* __PROJECTIONS_H__ */

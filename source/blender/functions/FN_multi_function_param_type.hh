@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -28,15 +16,29 @@
  * - Mutable: A mutable parameter can be considered to be an input and output. The caller has to
  *     initialize the data, but the function is allowed to modify it.
  *
- * Furthermore, every parameter has a MFDataType that describes what kind of data is being passed
+ * Furthermore, every parameter has a DataType that describes what kind of data is being passed
  * around.
  */
 
 #include "FN_multi_function_data_type.hh"
 
-namespace blender::fn {
+namespace blender::fn::multi_function {
 
-class MFParamType {
+enum class ParamCategory {
+  SingleInput,
+  VectorInput,
+  SingleOutput,
+  VectorOutput,
+  SingleMutable,
+  VectorMutable,
+};
+
+template<ParamCategory Category, typename T> struct ParamTag {
+  static constexpr ParamCategory category = Category;
+  using base_type = T;
+};
+
+class ParamType {
  public:
   enum InterfaceType {
     Input,
@@ -44,122 +46,125 @@ class MFParamType {
     Mutable,
   };
 
-  enum Category {
-    SingleInput,
-    VectorInput,
-    SingleOutput,
-    VectorOutput,
-    SingleMutable,
-    VectorMutable,
-  };
-
  private:
   InterfaceType interface_type_;
-  MFDataType data_type_;
+  DataType data_type_;
 
  public:
-  MFParamType(InterfaceType interface_type, MFDataType data_type)
-      : interface_type_(interface_type), data_type_(data_type)
-  {
-  }
+  ParamType(InterfaceType interface_type, DataType data_type);
 
-  static MFParamType ForSingleInput(const CPPType &type)
-  {
-    return MFParamType(InterfaceType::Input, MFDataType::ForSingle(type));
-  }
+  static ParamType ForSingleInput(const CPPType &type);
+  static ParamType ForVectorInput(const CPPType &base_type);
+  static ParamType ForSingleOutput(const CPPType &type);
+  static ParamType ForVectorOutput(const CPPType &base_type);
+  static ParamType ForMutableSingle(const CPPType &type);
+  static ParamType ForMutableVector(const CPPType &base_type);
 
-  static MFParamType ForVectorInput(const CPPType &base_type)
-  {
-    return MFParamType(InterfaceType::Input, MFDataType::ForVector(base_type));
-  }
+  const DataType &data_type() const;
+  InterfaceType interface_type() const;
+  ParamCategory category() const;
 
-  static MFParamType ForSingleOutput(const CPPType &type)
-  {
-    return MFParamType(InterfaceType::Output, MFDataType::ForSingle(type));
-  }
+  bool is_input_or_mutable() const;
+  bool is_output_or_mutable() const;
+  bool is_output() const;
 
-  static MFParamType ForVectorOutput(const CPPType &base_type)
-  {
-    return MFParamType(InterfaceType::Output, MFDataType::ForVector(base_type));
-  }
-
-  static MFParamType ForMutableSingle(const CPPType &type)
-  {
-    return MFParamType(InterfaceType::Mutable, MFDataType::ForSingle(type));
-  }
-
-  static MFParamType ForMutableVector(const CPPType &base_type)
-  {
-    return MFParamType(InterfaceType::Mutable, MFDataType::ForVector(base_type));
-  }
-
-  MFDataType data_type() const
-  {
-    return data_type_;
-  }
-
-  InterfaceType interface_type() const
-  {
-    return interface_type_;
-  }
-
-  Category category() const
-  {
-    switch (data_type_.category()) {
-      case MFDataType::Single: {
-        switch (interface_type_) {
-          case Input:
-            return SingleInput;
-          case Output:
-            return SingleOutput;
-          case Mutable:
-            return SingleMutable;
-        }
-        break;
-      }
-      case MFDataType::Vector: {
-        switch (interface_type_) {
-          case Input:
-            return VectorInput;
-          case Output:
-            return VectorOutput;
-          case Mutable:
-            return VectorMutable;
-        }
-        break;
-      }
-    }
-    BLI_assert(false);
-    return SingleInput;
-  }
-
-  bool is_input_or_mutable() const
-  {
-    return ELEM(interface_type_, Input, Mutable);
-  }
-
-  bool is_output_or_mutable() const
-  {
-    return ELEM(interface_type_, Output, Mutable);
-  }
-
-  bool is_output() const
-  {
-    return interface_type_ == Output;
-  }
-
-  friend bool operator==(const MFParamType &a, const MFParamType &b);
-  friend bool operator!=(const MFParamType &a, const MFParamType &b);
+  BLI_STRUCT_EQUALITY_OPERATORS_2(ParamType, interface_type_, data_type_)
 };
 
-inline bool operator==(const MFParamType &a, const MFParamType &b)
+/* -------------------------------------------------------------------- */
+/** \name #ParamType Inline Methods
+ * \{ */
+
+inline ParamType::ParamType(InterfaceType interface_type, DataType data_type)
+    : interface_type_(interface_type), data_type_(data_type)
 {
-  return a.interface_type_ == b.interface_type_ && a.data_type_ == b.data_type_;
 }
 
-inline bool operator!=(const MFParamType &a, const MFParamType &b)
+inline ParamType ParamType::ForSingleInput(const CPPType &type)
 {
-  return !(a == b);
+  return ParamType(InterfaceType::Input, DataType::ForSingle(type));
 }
 
-}  // namespace blender::fn
+inline ParamType ParamType::ForVectorInput(const CPPType &base_type)
+{
+  return ParamType(InterfaceType::Input, DataType::ForVector(base_type));
+}
+
+inline ParamType ParamType::ForSingleOutput(const CPPType &type)
+{
+  return ParamType(InterfaceType::Output, DataType::ForSingle(type));
+}
+
+inline ParamType ParamType::ForVectorOutput(const CPPType &base_type)
+{
+  return ParamType(InterfaceType::Output, DataType::ForVector(base_type));
+}
+
+inline ParamType ParamType::ForMutableSingle(const CPPType &type)
+{
+  return ParamType(InterfaceType::Mutable, DataType::ForSingle(type));
+}
+
+inline ParamType ParamType::ForMutableVector(const CPPType &base_type)
+{
+  return ParamType(InterfaceType::Mutable, DataType::ForVector(base_type));
+}
+
+inline const DataType &ParamType::data_type() const
+{
+  return data_type_;
+}
+
+inline ParamType::InterfaceType ParamType::interface_type() const
+{
+  return interface_type_;
+}
+
+inline ParamCategory ParamType::category() const
+{
+  switch (data_type_.category()) {
+    case DataType::Single: {
+      switch (interface_type_) {
+        case Input:
+          return ParamCategory::SingleInput;
+        case Output:
+          return ParamCategory::SingleOutput;
+        case Mutable:
+          return ParamCategory::SingleMutable;
+      }
+      break;
+    }
+    case DataType::Vector: {
+      switch (interface_type_) {
+        case Input:
+          return ParamCategory::VectorInput;
+        case Output:
+          return ParamCategory::VectorOutput;
+        case Mutable:
+          return ParamCategory::VectorMutable;
+      }
+      break;
+    }
+  }
+  BLI_assert_unreachable();
+  return ParamCategory::SingleInput;
+}
+
+inline bool ParamType::is_input_or_mutable() const
+{
+  return ELEM(interface_type_, Input, Mutable);
+}
+
+inline bool ParamType::is_output_or_mutable() const
+{
+  return ELEM(interface_type_, Output, Mutable);
+}
+
+inline bool ParamType::is_output() const
+{
+  return interface_type_ == Output;
+}
+
+/** \} */
+
+}  // namespace blender::fn::multi_function

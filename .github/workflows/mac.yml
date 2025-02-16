@@ -1,37 +1,14 @@
-name: Mac
-
+name: macOS
 on:
-  #push:
-    #branches: [ master ]
-  schedule:
-    - cron: 0 0 * * 1
+  push:
+      branches: [ "master" ]
   pull_request:
-    branches: [ master ]
+      branches: [ "master" ]
 
 jobs:
   build:
-
-    runs-on: macos-latest
-
-    steps:
-    - name: configure
-      run:
-        brew install cmake svn
-
-    - name: make
-      run: |
-        mkdir ~/bforartistsrepo
-        cd ~/bforartistsrepo
-        git clone https://github.com/Bforartists/Bforartists
-        mkdir ~/bforartistsrepo/lib
-        cd ~/bforartistsrepo/lib
-        svn checkout https://svn.blender.org/svnroot/bf-blender/trunk/lib/darwin/
-        cd ~/bforartistsrepo/Bforartists
-        make
-
-    - name: Upload Build
-      uses: actions/upload-artifact@v2
-      with:
-        name: Bforartists-Release-${{ runner.os }}
-        path: /Users/runner/bforartistsrepo/build_darwin/bin/
-
+    uses: ./.github/workflows/nightly-build.yml
+    with:
+      os: "macos-latest"
+      c_compiler: "clang"
+      cpp_compiler: "clang++"

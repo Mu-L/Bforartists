@@ -1,33 +1,46 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2020 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2020 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "pipeline_render.h"
 
 #include "intern/builder/deg_builder_nodes.h"
 #include "intern/builder/deg_builder_relations.h"
-#include "intern/depsgraph.h"
+#include "intern/depsgraph.hh"
 
 namespace blender::deg {
+
+namespace {
+
+class RenderDepsgraphNodeBuilder : public DepsgraphNodeBuilder {
+ public:
+  using DepsgraphNodeBuilder::DepsgraphNodeBuilder;
+
+  void build_idproperties(IDProperty * /*id_property*/) override {}
+};
+
+class RenderDepsgraphRelationBuilder : public DepsgraphRelationBuilder {
+ public:
+  using DepsgraphRelationBuilder::DepsgraphRelationBuilder;
+
+  void build_idproperties(IDProperty * /*id_property*/) override {}
+};
+
+}  // namespace
 
 RenderBuilderPipeline::RenderBuilderPipeline(::Depsgraph *graph) : AbstractBuilderPipeline(graph)
 {
   deg_graph_->is_render_pipeline_depsgraph = true;
+}
+
+std::unique_ptr<DepsgraphNodeBuilder> RenderBuilderPipeline::construct_node_builder()
+{
+  return std::make_unique<RenderDepsgraphNodeBuilder>(bmain_, deg_graph_, &builder_cache_);
+}
+
+std::unique_ptr<DepsgraphRelationBuilder> RenderBuilderPipeline::construct_relation_builder()
+{
+  return std::make_unique<RenderDepsgraphRelationBuilder>(bmain_, deg_graph_, &builder_cache_);
 }
 
 void RenderBuilderPipeline::build_nodes(DepsgraphNodeBuilder &node_builder)

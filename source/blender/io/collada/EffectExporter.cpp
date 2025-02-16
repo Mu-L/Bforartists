@@ -1,51 +1,35 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2010-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup collada
  */
 
 #include <map>
-#include <set>
 
-#include "COLLADAFWColorOrTexture.h"
 #include "COLLADASWEffectProfile.h"
 
-#include "DocumentExporter.h"
 #include "EffectExporter.h"
 #include "MaterialExporter.h"
+#include "Materials.h"
 
 #include "collada_internal.h"
 #include "collada_utils.h"
 
 #include "DNA_mesh_types.h"
-#include "DNA_world_types.h"
 
-#include "BKE_collection.h"
-#include "BKE_customdata.h"
-#include "BKE_material.h"
-#include "BKE_mesh.h"
+#include "BKE_collection.hh"
+#include "BKE_customdata.hh"
+#include "BKE_material.hh"
 
 static std::string getActiveUVLayerName(Object *ob)
 {
-  Mesh *me = (Mesh *)ob->data;
+  Mesh *mesh = (Mesh *)ob->data;
 
-  int num_layers = CustomData_number_of_layers(&me->ldata, CD_MLOOPUV);
+  int num_layers = CustomData_number_of_layers(&mesh->corner_data, CD_PROP_FLOAT2);
   if (num_layers) {
-    return std::string(bc_CustomData_get_active_layer_name(&me->ldata, CD_MLOOPUV));
+    return std::string(bc_CustomData_get_active_layer_name(&mesh->corner_data, CD_PROP_FLOAT2));
   }
 
   return "";
@@ -60,6 +44,7 @@ EffectsExporter::EffectsExporter(COLLADASW::StreamWriter *sw,
 
 bool EffectsExporter::hasEffects(Scene *sce)
 {
+  bool result = false;
   FOREACH_SCENE_OBJECT_BEGIN (sce, ob) {
     int a;
     for (a = 0; a < ob->totcol; a++) {
@@ -70,11 +55,12 @@ bool EffectsExporter::hasEffects(Scene *sce)
         continue;
       }
 
-      return true;
+      result = true;
+      break;
     }
   }
   FOREACH_SCENE_OBJECT_END;
-  return false;
+  return result;
 }
 
 void EffectsExporter::exportEffects(bContext *C, Scene *sce)
@@ -220,16 +206,18 @@ void EffectsExporter::operator()(Material *ma, Object *ob)
   set_transparency(ep, ma);
 
   /* TODO: */
-  // set_shininess(ep, ma); shininess not supported for lambert
-  // set_ambient(ep, ma);
-  // set_specular(ep, ma);
+#if 0
+  set_shininess(ep, ma); /* Shininess not supported for lambert. */
+  set_ambient(ep, ma);
+  set_specular(ep, ma);
+#endif
 
   get_images(ma, material_image_map);
   std::string active_uv(getActiveUVLayerName(ob));
   create_image_samplers(ep, material_image_map, active_uv);
 
 #if 0
-  unsigned int a, b;
+  uint a, b;
   for (a = 0, b = 0; a < tex_indices.size(); a++) {
     MTex *t = ma->mtex[tex_indices[a]];
     Image *ima = t->tex->ima;
@@ -254,7 +242,7 @@ void EffectsExporter::operator()(Material *ma, Object *ob)
 
       /* store pointers so they can be used later when we create <texture>s */
       samp_surf[b] = &samplers[a];
-      //samp_surf[b][1] = &surfaces[a];
+      // samp_surf[b][1] = &surfaces[a];
 
       im_samp_map[key] = b;
       b++;
@@ -274,7 +262,7 @@ void EffectsExporter::operator()(Material *ma, Object *ob)
     int i = im_samp_map[key];
     std::string uvname = strlen(t->uvname) ? t->uvname : active_uv;
     COLLADASW::Sampler *sampler = (COLLADASW::Sampler *)
-        samp_surf[i];  /* possibly uninitialized memory ... */
+        samp_surf[i]; /* possibly uninitialized memory ... */
     writeTextures(ep, key, sampler, t, ima, uvname);
   }
 #endif

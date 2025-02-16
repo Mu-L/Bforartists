@@ -1,24 +1,22 @@
+/* SPDX-FileCopyrightText: 2018-2022 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#pragma BLENDER_REQUIRE(common_view_lib.glsl)
-#pragma BLENDER_REQUIRE(gpu_shader_common_obinfos_lib.glsl)
+#include "infos/workbench_volume_info.hh"
 
-uniform float slicePosition;
-uniform int sliceAxis; /* -1 is no slice, 0 is X, 1 is Y, 2 is Z. */
+VERTEX_SHADER_CREATE_INFO(workbench_volume)
+VERTEX_SHADER_CREATE_INFO(workbench_volume_slice)
+VERTEX_SHADER_CREATE_INFO(workbench_volume_coba)
+VERTEX_SHADER_CREATE_INFO(workbench_volume_cubic)
+VERTEX_SHADER_CREATE_INFO(workbench_volume_smoke)
 
-uniform mat4 volumeTextureToObject;
-
-in vec3 pos;
-
-RESOURCE_ID_VARYING
-
-#ifdef VOLUME_SLICE
-in vec3 uvs;
-
-out vec3 localPos;
-#endif
+#include "draw_model_lib.glsl"
+#include "draw_view_lib.glsl"
 
 void main()
 {
+  drw_ResourceID_iface.resource_index = resource_id;
+
 #ifdef VOLUME_SLICE
   if (sliceAxis == 0) {
     localPos = vec3(slicePosition * 2.0 - 1.0, pos.xy);
@@ -39,7 +37,5 @@ void main()
 #else
   final_pos = (volumeTextureToObject * vec4(final_pos * 0.5 + 0.5, 1.0)).xyz;
 #endif
-  gl_Position = point_object_to_ndc(final_pos);
-
-  PASS_RESOURCE_ID
+  gl_Position = drw_point_world_to_homogenous(drw_point_object_to_world(final_pos));
 }

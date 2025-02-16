@@ -1,18 +1,27 @@
+/* SPDX-FileCopyrightText: 2020-2023 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-layout(std140) uniform material_block
+#pragma once
+
+#include "infos/workbench_prepass_info.hh"
+
+// SHADER_LIBRARY_CREATE_INFO(workbench_color_material)
+SHADER_LIBRARY_CREATE_INFO(workbench_color_texture)
+
+void workbench_material_data_get(int handle,
+                                 vec3 vertex_color,
+                                 out vec3 color,
+                                 out float alpha,
+                                 out float roughness,
+                                 out float metallic)
 {
-  vec4 mat_data[4096];
-};
-
-/* If set to -1, the resource handle is used instead. */
-uniform int materialIndex;
-
-void workbench_material_data_get(
-    int handle, out vec3 color, out float alpha, out float roughness, out float metallic)
-{
-  handle = (materialIndex != -1) ? materialIndex : handle;
-  vec4 data = mat_data[uint(handle) & 0xFFFu];
-  color = data.rgb;
+#ifdef WORKBENCH_COLOR_MATERIAL
+  vec4 data = materials_data[handle];
+#else
+  vec4 data = vec4(0.0);
+#endif
+  color = (data.r == -1) ? vertex_color : data.rgb;
 
   uint encoded_data = floatBitsToUint(data.w);
   alpha = float((encoded_data >> 16u) & 0xFFu) * (1.0 / 255.0);

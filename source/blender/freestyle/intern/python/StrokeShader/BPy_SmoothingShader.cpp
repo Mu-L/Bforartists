@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2004-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -22,17 +10,15 @@
 
 #include "../../stroke/AdvancedStrokeShaders.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 using namespace Freestyle;
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
 //------------------------INSTANCE METHODS ----------------------------------
 
-static char SmoothingShader___doc__[] =
+PyDoc_STRVAR(
+    /* Wrap. */
+    SmoothingShader___doc__,
     "Class hierarchy: :class:`freestyle.types.StrokeShader` > :class:`SmoothingShader`\n"
     "\n"
     "[Geometry shader]\n"
@@ -63,13 +49,13 @@ static char SmoothingShader___doc__[] =
     "\n"
     ".. method:: shade(stroke)\n"
     "\n"
-    "   Smoothes the stroke by moving the vertices to make the stroke\n"
-    "   smoother.  Uses curvature flow to converge towards a curve of\n"
-    "   constant curvature.  The diffusion method we use is anisotropic to\n"
+    "   Smooths the stroke by moving the vertices to make the stroke\n"
+    "   smoother. Uses curvature flow to converge towards a curve of\n"
+    "   constant curvature. The diffusion method we use is anisotropic to\n"
     "   prevent the diffusion across corners.\n"
     "\n"
     "   :arg stroke: A Stroke object.\n"
-    "   :type stroke: :class:`freestyle.types.Stroke`\n";
+    "   :type stroke: :class:`freestyle.types.Stroke`\n");
 
 static int SmoothingShader___init__(BPy_SmoothingShader *self, PyObject *args, PyObject *kwds)
 {
@@ -88,7 +74,8 @@ static int SmoothingShader___init__(BPy_SmoothingShader *self, PyObject *args, P
   double d2 = 0.1, d3 = 0.0, d4 = 0.2, d5 = 0.0, d6 = 0.0, d7 = 0.0, d8 = 1.0;
 
   if (!PyArg_ParseTupleAndKeywords(
-          args, kwds, "|iddddddd", (char **)kwlist, &i1, &d2, &d3, &d4, &d5, &d6, &d7, &d8)) {
+          args, kwds, "|iddddddd", (char **)kwlist, &i1, &d2, &d3, &d4, &d5, &d6, &d7, &d8))
+  {
     return -1;
   }
   self->py_ss.ss = new SmoothingShader(i1, d2, d3, d4, d5, d6, d7, d8);
@@ -98,47 +85,44 @@ static int SmoothingShader___init__(BPy_SmoothingShader *self, PyObject *args, P
 /*-----------------------BPy_SmoothingShader type definition ------------------------------*/
 
 PyTypeObject SmoothingShader_Type = {
-    PyVarObject_HEAD_INIT(nullptr, 0) "SmoothingShader", /* tp_name */
-    sizeof(BPy_SmoothingShader),                         /* tp_basicsize */
-    0,                                                   /* tp_itemsize */
-    nullptr,                                             /* tp_dealloc */
-    0,                                                   /* tp_vectorcall_offset */
-    nullptr,                                             /* tp_getattr */
-    nullptr,                                             /* tp_setattr */
-    nullptr,                                             /* tp_reserved */
-    nullptr,                                             /* tp_repr */
-    nullptr,                                             /* tp_as_number */
-    nullptr,                                             /* tp_as_sequence */
-    nullptr,                                             /* tp_as_mapping */
-    nullptr,                                             /* tp_hash */
-    nullptr,                                             /* tp_call */
-    nullptr,                                             /* tp_str */
-    nullptr,                                             /* tp_getattro */
-    nullptr,                                             /* tp_setattro */
-    nullptr,                                             /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,            /* tp_flags */
-    SmoothingShader___doc__,                             /* tp_doc */
-    nullptr,                                             /* tp_traverse */
-    nullptr,                                             /* tp_clear */
-    nullptr,                                             /* tp_richcompare */
-    0,                                                   /* tp_weaklistoffset */
-    nullptr,                                             /* tp_iter */
-    nullptr,                                             /* tp_iternext */
-    nullptr,                                             /* tp_methods */
-    nullptr,                                             /* tp_members */
-    nullptr,                                             /* tp_getset */
-    &StrokeShader_Type,                                  /* tp_base */
-    nullptr,                                             /* tp_dict */
-    nullptr,                                             /* tp_descr_get */
-    nullptr,                                             /* tp_descr_set */
-    0,                                                   /* tp_dictoffset */
-    (initproc)SmoothingShader___init__,                  /* tp_init */
-    nullptr,                                             /* tp_alloc */
-    nullptr,                                             /* tp_new */
+    /*ob_base*/ PyVarObject_HEAD_INIT(nullptr, 0)
+    /*tp_name*/ "SmoothingShader",
+    /*tp_basicsize*/ sizeof(BPy_SmoothingShader),
+    /*tp_itemsize*/ 0,
+    /*tp_dealloc*/ nullptr,
+    /*tp_vectorcall_offset*/ 0,
+    /*tp_getattr*/ nullptr,
+    /*tp_setattr*/ nullptr,
+    /*tp_as_async*/ nullptr,
+    /*tp_repr*/ nullptr,
+    /*tp_as_number*/ nullptr,
+    /*tp_as_sequence*/ nullptr,
+    /*tp_as_mapping*/ nullptr,
+    /*tp_hash*/ nullptr,
+    /*tp_call*/ nullptr,
+    /*tp_str*/ nullptr,
+    /*tp_getattro*/ nullptr,
+    /*tp_setattro*/ nullptr,
+    /*tp_as_buffer*/ nullptr,
+    /*tp_flags*/ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    /*tp_doc*/ SmoothingShader___doc__,
+    /*tp_traverse*/ nullptr,
+    /*tp_clear*/ nullptr,
+    /*tp_richcompare*/ nullptr,
+    /*tp_weaklistoffset*/ 0,
+    /*tp_iter*/ nullptr,
+    /*tp_iternext*/ nullptr,
+    /*tp_methods*/ nullptr,
+    /*tp_members*/ nullptr,
+    /*tp_getset*/ nullptr,
+    /*tp_base*/ &StrokeShader_Type,
+    /*tp_dict*/ nullptr,
+    /*tp_descr_get*/ nullptr,
+    /*tp_descr_set*/ nullptr,
+    /*tp_dictoffset*/ 0,
+    /*tp_init*/ (initproc)SmoothingShader___init__,
+    /*tp_alloc*/ nullptr,
+    /*tp_new*/ nullptr,
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////
-
-#ifdef __cplusplus
-}
-#endif

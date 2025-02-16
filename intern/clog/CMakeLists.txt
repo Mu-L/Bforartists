@@ -1,25 +1,9 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2002-2022 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(INC
-  .
-  ../atomic
-  ../guardedalloc
+  PUBLIC .
 )
 
 set(INC_SYS
@@ -33,9 +17,12 @@ set(SRC
 )
 
 set(LIB
+  PRIVATE bf::intern::guardedalloc
+  PRIVATE bf::intern::atomic
 )
 
-# Disabled for makesdna/makesrna.
+# Disabled for `makesdna` & `makesrna`.
 add_definitions(-DWITH_CLOG_PTHREADS)
 
 blender_add_lib(bf_intern_clog "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+add_library(bf::intern::clog ALIAS bf_intern_clog)

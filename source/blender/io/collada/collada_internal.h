@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup collada
@@ -20,15 +8,11 @@
 
 #pragma once
 
-#include <map>
 #include <string>
-#include <vector>
 
 #include "COLLADAFWFileInfo.h"
 #include "Math/COLLADABUMathMatrix4.h"
 
-#include "BLI_linklist.h"
-#include "BLI_math.h"
 #include "DNA_armature_types.h"
 #include "DNA_material_types.h"
 #include "DNA_object_types.h"
@@ -58,9 +42,9 @@ class UnitConverter {
 
   void convertVector3(COLLADABU::Math::Vector3 &vec, float *v);
 
-  UnitConverter::UnitSystem isMetricSystem(void);
+  UnitConverter::UnitSystem isMetricSystem();
 
-  float getLinearMeter(void);
+  float getLinearMeter();
 
   /* TODO: need also for angle conversion, time conversion... */
 
@@ -76,10 +60,11 @@ class UnitConverter {
 extern void clear_global_id_map();
 /** Look at documentation of translate_map */
 extern std::string translate_id(const std::string &id);
+/** Look at documentation of translate_map */
 extern std::string translate_id(const char *idString);
 
 extern std::string id_name(void *id);
-extern std::string encode_xml(std::string xml);
+extern std::string encode_xml(const std::string &xml);
 
 extern std::string get_geometry_id(Object *ob);
 extern std::string get_geometry_id(Object *ob, bool use_instantiation);

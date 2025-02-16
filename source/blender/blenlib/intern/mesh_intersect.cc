@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup bli
@@ -23,24 +11,25 @@
 
 #  include <algorithm>
 #  include <fstream>
+#  include <functional>
 #  include <iostream>
 #  include <memory>
+#  include <numeric>
 
-#  include "BLI_allocator.hh"
 #  include "BLI_array.hh"
 #  include "BLI_assert.h"
-#  include "BLI_delaunay_2d.h"
-#  include "BLI_double3.hh"
-#  include "BLI_float3.hh"
-#  include "BLI_hash.hh"
-#  include "BLI_kdopbvh.h"
+#  include "BLI_delaunay_2d.hh"
+#  include "BLI_kdopbvh.hh"
 #  include "BLI_map.hh"
-#  include "BLI_math_boolean.hh"
+#  include "BLI_math_geom.h"
+#  include "BLI_math_matrix.h"
 #  include "BLI_math_mpq.hh"
-#  include "BLI_mpq2.hh"
-#  include "BLI_mpq3.hh"
+#  include "BLI_math_vector.h"
+#  include "BLI_math_vector_mpq_types.hh"
+#  include "BLI_math_vector_types.hh"
 #  include "BLI_polyfill_2d.h"
 #  include "BLI_set.hh"
+#  include "BLI_sort.hh"
 #  include "BLI_span.hh"
 #  include "BLI_task.h"
 #  include "BLI_task.hh"
@@ -48,24 +37,22 @@
 #  include "BLI_vector.hh"
 #  include "BLI_vector_set.hh"
 
-#  include "PIL_time.h"
-
 #  include "BLI_mesh_intersect.hh"
 
-#  ifdef WITH_TBB
-#    include "tbb/parallel_sort.h"
-#  endif
-
 // #  define PERFDEBUG
+
+#  ifdef _WIN_32
+#    include "BLI_fileops.h"
+#  endif
 
 namespace blender::meshintersect {
 
 #  ifdef PERFDEBUG
-static void perfdata_init(void);
+static void perfdata_init();
 static void incperfcount(int countnum);
 static void bumpperfcount(int countnum, int amt);
 static void doperfmax(int maxnum, int val);
-static void dump_perfdata(void);
+static void dump_perfdata();
 #  endif
 
 /** For debugging, can disable threading in intersect code with this static constant. */
@@ -150,7 +137,6 @@ Plane::Plane(const double3 &norm, const double d) : norm(norm), d(d)
   norm_exact = mpq3(0, 0, 0); /* Marks as "exact not yet populated". */
 }
 
-/** This is wrong for degenerate planes, but we don't expect to call it on those. */
 bool Plane::exact_populated() const
 {
   return norm_exact[0] != 0 || norm_exact[1] != 0 || norm_exact[2] != 0;
@@ -181,9 +167,7 @@ Face::Face(
 {
 }
 
-Face::Face(Span<const Vert *> verts, int id, int orig) : vert(verts), id(id), orig(orig)
-{
-}
+Face::Face(Span<const Vert *> verts, int id, int orig) : vert(verts), id(id), orig(orig) {}
 
 void Face::populate_plane(bool need_exact)
 {
@@ -199,14 +183,14 @@ void Face::populate_plane(bool need_exact)
       for (int i : index_range()) {
         co[i] = vert[i]->co_exact;
       }
-      normal_exact = mpq3::cross_poly(co);
+      normal_exact = math::cross_poly(co.as_span());
     }
     else {
       mpq3 tr02 = vert[0]->co_exact - vert[2]->co_exact;
       mpq3 tr12 = vert[1]->co_exact - vert[2]->co_exact;
-      normal_exact = mpq3::cross(tr02, tr12);
+      normal_exact = math::cross(tr02, tr12);
     }
-    mpq_class d_exact = -mpq3::dot(normal_exact, vert[0]->co_exact);
+    mpq_class d_exact = -math::dot(normal_exact, vert[0]->co_exact);
     plane = new Plane(normal_exact, d_exact);
   }
   else {
@@ -216,14 +200,14 @@ void Face::populate_plane(bool need_exact)
       for (int i : index_range()) {
         co[i] = vert[i]->co;
       }
-      normal = double3::cross_poly(co);
+      normal = math::cross_poly(co.as_span());
     }
     else {
       double3 tr02 = vert[0]->co - vert[2]->co;
       double3 tr12 = vert[1]->co - vert[2]->co;
-      normal = double3::cross_high_precision(tr02, tr12);
+      normal = math::cross(tr02, tr12);
     }
-    double d = -double3::dot(normal, vert[0]->co);
+    double d = -math::dot(normal, vert[0]->co);
     plane = new Plane(normal, d);
   }
 }
@@ -324,9 +308,7 @@ class IMeshArena::IMeshArenaImpl : NonCopyable, NonMovable {
   struct VSetKey {
     Vert *vert;
 
-    VSetKey(Vert *p) : vert(p)
-    {
-    }
+    VSetKey(Vert *p) : vert(p) {}
 
     uint64_t hash() const
     {
@@ -654,8 +636,8 @@ void IMesh::populate_vert()
   /* This is likely an overestimate, since verts are shared between
    * faces. It is ok if estimate is over or even under. */
   constexpr int ESTIMATE_VERTS_PER_FACE = 4;
-  int estimate_num_verts = ESTIMATE_VERTS_PER_FACE * face_.size();
-  populate_vert(estimate_num_verts);
+  int estimate_verts_num = ESTIMATE_VERTS_PER_FACE * face_.size();
+  populate_vert(estimate_verts_num);
 }
 
 void IMesh::populate_vert(int max_verts)
@@ -688,11 +670,7 @@ void IMesh::populate_vert(int max_verts)
    * TODO: when all debugged, set fix_order = false. */
   const bool fix_order = true;
   if (fix_order) {
-#  ifdef WITH_TBB
-    tbb::parallel_sort(vert_.begin(), vert_.end(), [](const Vert *a, const Vert *b) {
-#  else
-    std::sort(vert_.begin(), vert_.end(), [](const Vert *a, const Vert *b) {
-#  endif
+    blender::parallel_sort(vert_.begin(), vert_.end(), [](const Vert *a, const Vert *b) {
       if (a->orig != NO_INDEX && b->orig != NO_INDEX) {
         return a->orig < b->orig;
       }
@@ -716,16 +694,16 @@ bool IMesh::erase_face_positions(int f_index, Span<bool> face_pos_erase, IMeshAr
 {
   const Face *cur_f = this->face(f_index);
   int cur_len = cur_f->size();
-  int num_to_erase = 0;
+  int to_erase_num = 0;
   for (int i : cur_f->index_range()) {
     if (face_pos_erase[i]) {
-      ++num_to_erase;
+      ++to_erase_num;
     }
   }
-  if (num_to_erase == 0) {
+  if (to_erase_num == 0) {
     return false;
   }
-  int new_len = cur_len - num_to_erase;
+  int new_len = cur_len - to_erase_num;
   if (new_len < 3) {
     /* This erase causes removal of whole face.
      * Because this may be called from a loop over the face array,
@@ -733,7 +711,7 @@ bool IMesh::erase_face_positions(int f_index, Span<bool> face_pos_erase, IMeshAr
      * mark with null pointer and caller should call remove_null_faces().
      * the loop is done.
      */
-    this->face_[f_index] = NULL;
+    this->face_[f_index] = nullptr;
     return true;
   }
   Array<const Vert *> new_vert(new_len);
@@ -803,11 +781,6 @@ std::ostream &operator<<(std::ostream &os, const IMesh &mesh)
   return os;
 }
 
-/**
- * Assume bounding boxes have been expanded by a sufficient epsilon on all sides
- * so that the comparisons against the bb bounds are sufficient to guarantee that
- * if an overlap or even touching could happen, this will return true.
- */
 bool bbs_might_intersect(const BoundingBox &bb_a, const BoundingBox &bb_b)
 {
   return isect_aabb_aabb_v3(bb_a.min, bb_a.max, bb_b.min, bb_b.max);
@@ -857,13 +830,13 @@ struct BBPadData {
 
 static void pad_face_bb_range_func(void *__restrict userdata,
                                    const int iter,
-                                   const TaskParallelTLS *__restrict UNUSED(tls))
+                                   const TaskParallelTLS *__restrict /*tls*/)
 {
   BBPadData *pad_data = static_cast<BBPadData *>(userdata);
   (*pad_data->face_bounding_box)[iter].expand(pad_data->pad);
 }
 
-static void calc_face_bb_reduce(const void *__restrict UNUSED(userdata),
+static void calc_face_bb_reduce(const void *__restrict /*userdata*/,
                                 void *__restrict chunk_join,
                                 void *__restrict chunk)
 {
@@ -976,7 +949,7 @@ class CoplanarClusterInfo {
     return tri_cluster_[t];
   }
 
-  int add_cluster(CoplanarCluster cl)
+  int add_cluster(const CoplanarCluster &cl)
   {
     int c_index = clusters_.append_and_get_index(cl);
     for (int t : cl) {
@@ -1026,18 +999,10 @@ struct ITT_value {
   enum ITT_value_kind kind = INONE;
 
   ITT_value() = default;
-  explicit ITT_value(ITT_value_kind k) : kind(k)
-  {
-  }
-  ITT_value(ITT_value_kind k, int tsrc) : t_source(tsrc), kind(k)
-  {
-  }
-  ITT_value(ITT_value_kind k, const mpq3 &p1) : p1(p1), kind(k)
-  {
-  }
-  ITT_value(ITT_value_kind k, const mpq3 &p1, const mpq3 &p2) : p1(p1), p2(p2), kind(k)
-  {
-  }
+  explicit ITT_value(ITT_value_kind k) : kind(k) {}
+  ITT_value(ITT_value_kind k, int tsrc) : t_source(tsrc), kind(k) {}
+  ITT_value(ITT_value_kind k, const mpq3 &p1) : p1(p1), kind(k) {}
+  ITT_value(ITT_value_kind k, const mpq3 &p1, const mpq3 &p2) : p1(p1), p2(p2), kind(k) {}
 };
 
 static std::ostream &operator<<(std::ostream &os, const ITT_value &itt);
@@ -1104,15 +1069,15 @@ static mpq2 project_3d_to_2d(const mpq3 &p3d, int proj_axis)
  */
 static double supremum_dot_cross(const double3 &a, const double3 &b)
 {
-  double3 abs_a = double3::abs(a);
-  double3 abs_b = double3::abs(b);
+  double3 abs_a = math::abs(a);
+  double3 abs_b = math::abs(b);
   double3 c;
   /* This is dot(cross(a, b), cross(a,b)) but using absolute values for a and b
    * and always using + when operation is + or -. */
   c[0] = abs_a[1] * abs_b[2] + abs_a[2] * abs_b[1];
   c[1] = abs_a[2] * abs_b[0] + abs_a[0] * abs_b[2];
   c[2] = abs_a[0] * abs_b[1] + abs_a[1] * abs_b[0];
-  return double3::dot(c, c);
+  return math::dot(c, c);
 }
 
 /* The index of dot when inputs are plane_coords with index 1 is much higher.
@@ -1149,11 +1114,11 @@ static int filter_plane_side(const double3 &p,
                              const double3 &abs_plane_p,
                              const double3 &abs_plane_no)
 {
-  double d = double3::dot(p - plane_p, plane_no);
+  double d = math::dot(p - plane_p, plane_no);
   if (d == 0.0) {
     return 0;
   }
-  double supremum = double3::dot(abs_p + abs_plane_p, abs_plane_no);
+  double supremum = math::dot(abs_p + abs_plane_p, abs_plane_no);
   double err_bound = supremum * index_plane_side * DBL_EPSILON;
   if (fabs(d) > err_bound) {
     return d > 0 ? 1 : -1;
@@ -1162,11 +1127,11 @@ static int filter_plane_side(const double3 &p,
 }
 
 /*
- * interesect_tri_tri and helper functions.
+ * #intersect_tri_tri and helper functions.
  * This code uses the algorithm of Guigue and Devillers, as described
  * in "Faster Triangle-Triangle Intersection Tests".
- * Adapted from github code by Eric Haines:
- * github.com/erich666/jgt-code/tree/master/Volume_08/Number_1/Guigue2003
+ * Adapted from code by Eric Haines:
+ * https://github.com/erich666/jgt-code/tree/master/Volume_08/Number_1/Guigue2003
  */
 
 /**
@@ -1175,7 +1140,7 @@ static int filter_plane_side(const double3 &p,
  * This works because the ratio of the projections of ab and ac onto n is the same as
  * the ratio along the line ab of the intersection point to the whole of ab.
  * The ab, ac, and dotbuf arguments are used as a temporaries; declaring them
- * in the caller can avoid many allocs and frees of mpq3 and mpq_class structures.
+ * in the caller can avoid many allocations and frees of mpq3 and mpq_class structures.
  */
 static inline mpq3 tti_interp(
     const mpq3 &a, const mpq3 &b, const mpq3 &c, const mpq3 &n, mpq3 &ab, mpq3 &ac, mpq3 &dotbuf)
@@ -1184,9 +1149,9 @@ static inline mpq3 tti_interp(
   ab -= b;
   ac = a;
   ac -= c;
-  mpq_class den = mpq3::dot_with_buffer(ab, n, dotbuf);
+  mpq_class den = math::dot_with_buffer(ab, n, dotbuf);
   BLI_assert(den != 0);
-  mpq_class alpha = mpq3::dot_with_buffer(ac, n, dotbuf) / den;
+  mpq_class alpha = math::dot_with_buffer(ac, n, dotbuf) / den;
   return a - alpha * ab;
 }
 
@@ -1195,7 +1160,7 @@ static inline mpq3 tti_interp(
  * order. This is the same as -oriented(a, b, c, a + ad), but uses fewer arithmetic operations.
  * TODO: change arguments to `const Vert *` and use floating filters.
  * The ba, ca, n, and dotbuf arguments are used as temporaries; declaring them
- * in the caller can avoid many allocs and frees of mpq3 and mpq_class structures.
+ * in the caller can avoid many allocations and frees of mpq3 and mpq_class structures.
  */
 static inline int tti_above(const mpq3 &a,
                             const mpq3 &b,
@@ -1215,7 +1180,7 @@ static inline int tti_above(const mpq3 &a,
   n.y = ba.z * ca.x - ba.x * ca.z;
   n.z = ba.x * ca.y - ba.y * ca.x;
 
-  return sgn(mpq3::dot_with_buffer(ad, n, dotbuf));
+  return sgn(math::dot_with_buffer(ad, n, dotbuf));
 }
 
 /**
@@ -1434,11 +1399,11 @@ static ITT_value intersect_tri_tri(const IMesh &tm, int t1, int t2)
   const double3 &d_r2 = vr2->co;
   const double3 &d_n2 = tri2.plane->norm;
 
-  const double3 &abs_d_p1 = double3::abs(d_p1);
-  const double3 &abs_d_q1 = double3::abs(d_q1);
-  const double3 &abs_d_r1 = double3::abs(d_r1);
-  const double3 &abs_d_r2 = double3::abs(d_r2);
-  const double3 &abs_d_n2 = double3::abs(d_n2);
+  const double3 &abs_d_p1 = math::abs(d_p1);
+  const double3 &abs_d_q1 = math::abs(d_q1);
+  const double3 &abs_d_r1 = math::abs(d_r1);
+  const double3 &abs_d_r2 = math::abs(d_r2);
+  const double3 &abs_d_n2 = math::abs(d_n2);
 
   int sp1 = filter_plane_side(d_p1, d_r2, d_n2, abs_d_p1, abs_d_r2, abs_d_n2);
   int sq1 = filter_plane_side(d_q1, d_r2, d_n2, abs_d_q1, abs_d_r2, abs_d_n2);
@@ -1454,9 +1419,9 @@ static ITT_value intersect_tri_tri(const IMesh &tm, int t1, int t2)
   }
 
   const double3 &d_n1 = tri1.plane->norm;
-  const double3 &abs_d_p2 = double3::abs(d_p2);
-  const double3 &abs_d_q2 = double3::abs(d_q2);
-  const double3 &abs_d_n1 = double3::abs(d_n1);
+  const double3 &abs_d_p2 = math::abs(d_p2);
+  const double3 &abs_d_q2 = math::abs(d_q2);
+  const double3 &abs_d_n1 = math::abs(d_n1);
 
   int sp2 = filter_plane_side(d_p2, d_r1, d_n1, abs_d_p2, abs_d_r1, abs_d_n1);
   int sq2 = filter_plane_side(d_q2, d_r1, d_n1, abs_d_q2, abs_d_r1, abs_d_n1);
@@ -1483,17 +1448,17 @@ static ITT_value intersect_tri_tri(const IMesh &tm, int t1, int t2)
   if (sp1 == 0) {
     buf[0] = p1;
     buf[0] -= r2;
-    sp1 = sgn(mpq3::dot_with_buffer(buf[0], n2, buf[1]));
+    sp1 = sgn(math::dot_with_buffer(buf[0], n2, buf[1]));
   }
   if (sq1 == 0) {
     buf[0] = q1;
     buf[0] -= r2;
-    sq1 = sgn(mpq3::dot_with_buffer(buf[0], n2, buf[1]));
+    sq1 = sgn(math::dot_with_buffer(buf[0], n2, buf[1]));
   }
   if (sr1 == 0) {
     buf[0] = r1;
     buf[0] -= r2;
-    sr1 = sgn(mpq3::dot_with_buffer(buf[0], n2, buf[1]));
+    sr1 = sgn(math::dot_with_buffer(buf[0], n2, buf[1]));
   }
 
   if (dbg_level > 1) {
@@ -1515,17 +1480,17 @@ static ITT_value intersect_tri_tri(const IMesh &tm, int t1, int t2)
   if (sp2 == 0) {
     buf[0] = p2;
     buf[0] -= r1;
-    sp2 = sgn(mpq3::dot_with_buffer(buf[0], n1, buf[1]));
+    sp2 = sgn(math::dot_with_buffer(buf[0], n1, buf[1]));
   }
   if (sq2 == 0) {
     buf[0] = q2;
     buf[0] -= r1;
-    sq2 = sgn(mpq3::dot_with_buffer(buf[0], n1, buf[1]));
+    sq2 = sgn(math::dot_with_buffer(buf[0], n1, buf[1]));
   }
   if (sr2 == 0) {
     buf[0] = r2;
     buf[0] -= r1;
-    sr2 = sgn(mpq3::dot_with_buffer(buf[0], n1, buf[1]));
+    sr2 = sgn(math::dot_with_buffer(buf[0], n1, buf[1]));
   }
 
   if (dbg_level > 1) {
@@ -1623,7 +1588,8 @@ struct CDT_data {
   Vector<bool> is_reversed;
   /** Result of running CDT on input with (vert, edge, face). */
   CDT_result<mpq_class> cdt_out;
-  /** To speed up get_cdt_edge_orig, sometimes populate this map from vertex pair to output edge.
+  /**
+   * To speed up get_cdt_edge_orig, sometimes populate this map from vertex pair to output edge.
    */
   Map<std::pair<int, int>, int> verts_to_edge;
   int proj_axis;
@@ -1721,13 +1687,13 @@ static void prepare_need_tri(CDT_data &cd, const IMesh &tm, int t)
   cd.is_reversed.append(rev);
 }
 
-static CDT_data prepare_cdt_input(const IMesh &tm, int t, const Vector<ITT_value> itts)
+static CDT_data prepare_cdt_input(const IMesh &tm, int t, const Span<ITT_value> itts)
 {
   CDT_data ans;
   BLI_assert(tm.face(t)->plane_populated());
   ans.t_plane = tm.face(t)->plane;
   BLI_assert(ans.t_plane->exact_populated());
-  ans.proj_axis = mpq3::dominant_axis(ans.t_plane->norm_exact);
+  ans.proj_axis = math::dominant_axis(ans.t_plane->norm_exact);
   prepare_need_tri(ans, tm, t);
   for (const ITT_value &itt : itts) {
     switch (itt.kind) {
@@ -1753,7 +1719,7 @@ static CDT_data prepare_cdt_input(const IMesh &tm, int t, const Vector<ITT_value
 static CDT_data prepare_cdt_input_for_cluster(const IMesh &tm,
                                               const CoplanarClusterInfo &clinfo,
                                               int c,
-                                              const Vector<ITT_value> itts)
+                                              const Span<ITT_value> itts)
 {
   CDT_data ans;
   BLI_assert(c < clinfo.tot_cluster());
@@ -1763,7 +1729,7 @@ static CDT_data prepare_cdt_input_for_cluster(const IMesh &tm,
   BLI_assert(tm.face(t0)->plane_populated());
   ans.t_plane = tm.face(t0)->plane;
   BLI_assert(ans.t_plane->exact_populated());
-  ans.proj_axis = mpq3::dominant_axis(ans.t_plane->norm_exact);
+  ans.proj_axis = math::dominant_axis(ans.t_plane->norm_exact);
   for (const int t : cl) {
     prepare_need_tri(ans, tm, t);
   }
@@ -2002,17 +1968,19 @@ static Face *cdt_tri_as_imesh_face(
   return facep;
 }
 
-/* Like BLI_math's is_quad_flip_v3_first_third_fast_with_normal, with const double3's. */
+/* Like BLI_math's is_quad_flip_v3_first_third_fast, with const double3's. */
 static bool is_quad_flip_first_third(const double3 &v1,
                                      const double3 &v2,
                                      const double3 &v3,
-                                     const double3 &v4,
-                                     const double3 &normal)
+                                     const double3 &v4)
 {
-  double3 dir_v3v1 = v3 - v1;
-  double3 tangent = double3::cross_high_precision(dir_v3v1, normal);
-  double dot = double3::dot(v1, tangent);
-  return (double3::dot(v4, tangent) >= dot) || (double3::dot(v2, tangent) <= dot);
+  const double3 d_12 = v2 - v1;
+  const double3 d_13 = v3 - v1;
+  const double3 d_14 = v4 - v1;
+
+  const double3 cross_a = math::cross(d_12, d_13);
+  const double3 cross_b = math::cross(d_14, d_13);
+  return math::dot(cross_a, cross_b) > 0.0f;
 }
 
 /**
@@ -2048,7 +2016,7 @@ static Array<Face *> polyfill_triangulate_poly(Face *f, IMeshArena *arena)
     int eo_23 = f->edge_orig[2];
     int eo_30 = f->edge_orig[3];
     Face *f0, *f1;
-    if (UNLIKELY(is_quad_flip_first_third(v0->co, v1->co, v2->co, v3->co, f->plane->norm))) {
+    if (UNLIKELY(is_quad_flip_first_third(v0->co, v1->co, v2->co, v3->co))) {
       f0 = arena->add_face({v0, v1, v3}, f->orig, {eo_01, -1, eo_30}, {false, false, false});
       f1 = arena->add_face({v1, v2, v3}, f->orig, {eo_12, eo_23, -1}, {false, false, false});
     }
@@ -2058,12 +2026,13 @@ static Array<Face *> polyfill_triangulate_poly(Face *f, IMeshArena *arena)
     }
     return Array<Face *>{f0, f1};
   }
-  /* Project along negative face normal so (x,y) can be used in 2d. */ float axis_mat[3][3];
+  /* Project along negative face normal so (x,y) can be used in 2d. */
+  float axis_mat[3][3];
   float(*projverts)[2];
-  unsigned int(*tris)[3];
+  uint(*tris)[3];
   const int totfilltri = flen - 2;
   /* Prepare projected vertices and array to receive triangles in tessellation. */
-  tris = static_cast<unsigned int(*)[3]>(MEM_malloc_arrayN(totfilltri, sizeof(*tris), __func__));
+  tris = static_cast<uint(*)[3]>(MEM_malloc_arrayN(totfilltri, sizeof(*tris), __func__));
   projverts = static_cast<float(*)[2]>(MEM_malloc_arrayN(flen, sizeof(*projverts), __func__));
   axis_dominant_v3_to_m3_negate(axis_mat, no);
   for (int j = 0; j < flen; ++j) {
@@ -2075,7 +2044,7 @@ static Array<Face *> polyfill_triangulate_poly(Face *f, IMeshArena *arena)
   /* Put tessellation triangles into Face form. Record original edges where they exist. */
   Array<Face *> ans(totfilltri);
   for (int t = 0; t < totfilltri; ++t) {
-    unsigned int *tri = tris[t];
+    uint *tri = tris[t];
     int eo[3];
     const Vert *v[3];
     for (int k = 0; k < 3; k++) {
@@ -2118,21 +2087,19 @@ static Array<Face *> polyfill_triangulate_poly(Face *f, IMeshArena *arena)
 static Array<Face *> exact_triangulate_poly(Face *f, IMeshArena *arena)
 {
   int flen = f->size();
-  CDT_input<mpq_class> cdt_in;
-  cdt_in.vert = Array<mpq2>(flen);
-  cdt_in.face = Array<Vector<int>>(1);
-  cdt_in.face[0].reserve(flen);
-  for (int i : f->index_range()) {
-    cdt_in.face[0].append(i);
-  }
+  Array<mpq2> in_verts(flen);
+  Array<Vector<int>> faces(1);
+  faces.first().resize(flen);
+  std::iota(faces.first().begin(), faces.first().end(), 0);
+
   /* Project poly along dominant axis of normal to get 2d coords. */
   if (!f->plane_populated()) {
     f->populate_plane(false);
   }
   const double3 &poly_normal = f->plane->norm;
-  int axis = double3::dominant_axis(poly_normal);
+  int axis = math::dominant_axis(poly_normal);
   /* If project down y axis as opposed to x or z, the orientation
-   * of the polygon will be reversed.
+   * of the face will be reversed.
    * Yet another reversal happens if the poly normal in the dominant
    * direction is opposite that of the positive dominant axis. */
   bool rev1 = (axis == 1);
@@ -2140,7 +2107,7 @@ static Array<Face *> exact_triangulate_poly(Face *f, IMeshArena *arena)
   bool rev = rev1 ^ rev2;
   for (int i = 0; i < flen; ++i) {
     int ii = rev ? flen - i - 1 : i;
-    mpq2 &p2d = cdt_in.vert[ii];
+    mpq2 &p2d = in_verts[ii];
     int k = 0;
     for (int j = 0; j < 3; ++j) {
       if (j != axis) {
@@ -2148,6 +2115,11 @@ static Array<Face *> exact_triangulate_poly(Face *f, IMeshArena *arena)
       }
     }
   }
+
+  CDT_input<mpq_class> cdt_in;
+  cdt_in.vert = std::move(in_verts);
+  cdt_in.face = std::move(faces);
+
   CDT_result<mpq_class> cdt_out = delaunay_2d_calc(cdt_in, CDT_INSIDE);
   int n_tris = cdt_out.face.size();
   Array<Face *> ans(n_tris);
@@ -2158,7 +2130,7 @@ static Array<Face *> exact_triangulate_poly(Face *f, IMeshArena *arena)
     bool needs_steiner = false;
     for (int i = 0; i < 3; ++i) {
       i_v_out[i] = cdt_out.face[t][i];
-      if (cdt_out.vert_orig[i_v_out[i]].size() == 0) {
+      if (cdt_out.vert_orig[i_v_out[i]].is_empty()) {
         needs_steiner = true;
         break;
       }
@@ -2209,15 +2181,15 @@ static bool face_is_degenerate(const Face *f)
   }
   double3 da = v2->co - v0->co;
   double3 db = v2->co - v1->co;
-  double3 dab = double3::cross_high_precision(da, db);
-  double dab_length_squared = dab.length_squared();
+  double3 dab = math::cross(da, db);
+  double dab_length_squared = math::length_squared(dab);
   double err_bound = supremum_dot_cross(dab, dab) * index_dot_cross * DBL_EPSILON;
   if (dab_length_squared > err_bound) {
     return false;
   }
   mpq3 a = v2->co_exact - v0->co_exact;
   mpq3 b = v2->co_exact - v1->co_exact;
-  mpq3 ab = mpq3::cross(a, b);
+  mpq3 ab = math::cross(a, b);
   if (ab.x == 0 && ab.y == 0 && ab.z == 0) {
     return true;
   }
@@ -2225,8 +2197,7 @@ static bool face_is_degenerate(const Face *f)
   return false;
 }
 
-/** Fast check for degenerate tris. Only tests for when verts are identical,
- * not cases where there are zero-length edges. */
+/** Fast check for degenerate tris. It is OK if it returns true for nearly degenerate triangles. */
 static bool any_degenerate_tris_fast(const Array<Face *> triangulation)
 {
   for (const Face *f : triangulation) {
@@ -2234,6 +2205,23 @@ static bool any_degenerate_tris_fast(const Array<Face *> triangulation)
     const Vert *v1 = (*f)[1];
     const Vert *v2 = (*f)[2];
     if (v0 == v1 || v0 == v2 || v1 == v2) {
+      return true;
+    }
+    double3 da = v2->co - v0->co;
+    double3 db = v2->co - v1->co;
+    double da_length_squared = math::length_squared(da);
+    double db_length_squared = math::length_squared(db);
+    if (da_length_squared == 0.0 || db_length_squared == 0.0) {
+      return true;
+    }
+    /* |da x db| = |da| |db| sin t, where t is angle between them.
+     * The triangle is almost degenerate if sin t is almost 0.
+     * sin^2 t = |da x db|^2 / (|da|^2 |db|^2)
+     */
+    double3 dab = math::cross(da, db);
+    double dab_length_squared = math::length_squared(dab);
+    double sin_squared_t = dab_length_squared / (da_length_squared * db_length_squared);
+    if (sin_squared_t < 1e-8) {
       return true;
     }
   }
@@ -2260,12 +2248,6 @@ static Array<Face *> triangulate_poly(Face *f, IMeshArena *arena)
   return ans;
 }
 
-/**
- * Return an #IMesh that is a triangulation of a mesh with general
- * polygonal faces, #IMesh.
- * Added diagonals will be distinguishable by having edge original
- * indices of #NO_INDEX.
- */
 IMesh triangulate_polymesh(IMesh &imesh, IMeshArena *arena)
 {
   Vector<Face *> face_tris;
@@ -2332,7 +2314,7 @@ static bool bvhtreeverlap_cmp(const BVHTreeOverlap &a, const BVHTreeOverlap &b)
   if (a.indexA < b.indexA) {
     return true;
   }
-  if ((a.indexA == b.indexA) & (a.indexB < b.indexB)) {
+  if ((a.indexA == b.indexA) && (a.indexB < b.indexB)) {
     return true;
   }
   return false;
@@ -2342,7 +2324,7 @@ class TriOverlaps {
   BVHTree *tree_b_{nullptr};
   BVHTreeOverlap *overlap_{nullptr};
   Array<int> first_overlap_;
-  uint overlap_tot_{0};
+  uint overlap_num_{0};
 
   struct CBData {
     const IMesh &tm;
@@ -2353,7 +2335,7 @@ class TriOverlaps {
 
  public:
   TriOverlaps(const IMesh &tm,
-              const Array<BoundingBox> &tri_bb,
+              const Span<BoundingBox> tri_bb,
               int nshapes,
               std::function<int(int)> shape_fn,
               bool use_self)
@@ -2404,16 +2386,16 @@ class TriOverlaps {
     if (two_trees_no_self) {
       BLI_bvhtree_balance(tree_b_);
       /* Don't expect a lot of trivial intersects in this case. */
-      overlap_ = BLI_bvhtree_overlap(tree_, tree_b_, &overlap_tot_, nullptr, nullptr);
+      overlap_ = BLI_bvhtree_overlap(tree_, tree_b_, &overlap_num_, nullptr, nullptr);
     }
     else {
       CBData cbdata{tm, shape_fn, nshapes, use_self};
       if (nshapes == 1) {
-        overlap_ = BLI_bvhtree_overlap(tree_, tree_, &overlap_tot_, nullptr, nullptr);
+        overlap_ = BLI_bvhtree_overlap(tree_, tree_, &overlap_num_, nullptr, nullptr);
       }
       else {
         overlap_ = BLI_bvhtree_overlap(
-            tree_, tree_, &overlap_tot_, only_different_shapes, &cbdata);
+            tree_, tree_, &overlap_num_, only_different_shapes, &cbdata);
       }
     }
     /* The rest of the code is simpler and easier to parallelize if, in the two-trees case,
@@ -2421,23 +2403,23 @@ class TriOverlaps {
      * in the repeated part, sorting will then bring things with indexB together. */
     if (two_trees_no_self) {
       overlap_ = static_cast<BVHTreeOverlap *>(
-          MEM_reallocN(overlap_, 2 * overlap_tot_ * sizeof(overlap_[0])));
-      for (uint i = 0; i < overlap_tot_; ++i) {
-        overlap_[overlap_tot_ + i].indexA = overlap_[i].indexB;
-        overlap_[overlap_tot_ + i].indexB = overlap_[i].indexA;
+          MEM_reallocN(overlap_, 2 * overlap_num_ * sizeof(overlap_[0])));
+      for (uint i = 0; i < overlap_num_; ++i) {
+        overlap_[overlap_num_ + i].indexA = overlap_[i].indexB;
+        overlap_[overlap_num_ + i].indexB = overlap_[i].indexA;
       }
-      overlap_tot_ += overlap_tot_;
+      overlap_num_ += overlap_num_;
     }
     /* Sort the overlaps to bring all the intersects with a given indexA together. */
-    std::sort(overlap_, overlap_ + overlap_tot_, bvhtreeverlap_cmp);
+    std::sort(overlap_, overlap_ + overlap_num_, bvhtreeverlap_cmp);
     if (dbg_level > 0) {
-      std::cout << overlap_tot_ << " overlaps found:\n";
+      std::cout << overlap_num_ << " overlaps found:\n";
       for (BVHTreeOverlap ov : overlap()) {
         std::cout << "A: " << ov.indexA << ", B: " << ov.indexB << "\n";
       }
     }
     first_overlap_ = Array<int>(tm.face_size(), -1);
-    for (int i = 0; i < static_cast<int>(overlap_tot_); ++i) {
+    for (int i = 0; i < int(overlap_num_); ++i) {
       int t = overlap_[i].indexA;
       if (first_overlap_[t] == -1) {
         first_overlap_[t] = i;
@@ -2460,7 +2442,7 @@ class TriOverlaps {
 
   Span<BVHTreeOverlap> overlap() const
   {
-    return Span<BVHTreeOverlap>(overlap_, overlap_tot_);
+    return Span<BVHTreeOverlap>(overlap_, overlap_num_);
   }
 
   int first_overlap_index(int t) const
@@ -2469,7 +2451,7 @@ class TriOverlaps {
   }
 
  private:
-  static bool only_different_shapes(void *userdata, int index_a, int index_b, int UNUSED(thread))
+  static bool only_different_shapes(void *userdata, int index_a, int index_b, int /*thread*/)
   {
     CBData *cbdata = static_cast<CBData *>(userdata);
     return cbdata->tm.face(index_a)->orig != cbdata->tm.face(index_b)->orig;
@@ -2505,7 +2487,7 @@ static std::pair<int, int> canon_int_pair(int a, int b)
 
 static void calc_overlap_itts_range_func(void *__restrict userdata,
                                          const int iter,
-                                         const TaskParallelTLS *__restrict UNUSED(tls))
+                                         const TaskParallelTLS *__restrict /*tls*/)
 {
   constexpr int dbg_level = 0;
   OverlapIttsData *data = static_cast<OverlapIttsData *>(userdata);
@@ -2552,79 +2534,6 @@ static void calc_overlap_itts(Map<std::pair<int, int>, ITT_value> &itt_map,
 }
 
 /**
- * Data needed for parallelization of calc_subdivided_non_cluster_tris.
- */
-struct OverlapTriRange {
-  int tri_index;
-  int overlap_start;
-  int len;
-};
-struct SubdivideTrisData {
-  Array<IMesh> &r_tri_subdivided;
-  const IMesh &tm;
-  const Map<std::pair<int, int>, ITT_value> &itt_map;
-  Span<BVHTreeOverlap> overlap;
-  IMeshArena *arena;
-
-  /* This vector gives, for each triangle in tm that has an intersection
-   * we want to calculate: what the index of that triangle in tm is,
-   * where it starts in the ov structure as indexA, and how many
-   * overlap pairs have that same indexA (they will be continuous). */
-  Vector<OverlapTriRange> overlap_tri_range;
-
-  SubdivideTrisData(Array<IMesh> &r_tri_subdivided,
-                    const IMesh &tm,
-                    const Map<std::pair<int, int>, ITT_value> &itt_map,
-                    Span<BVHTreeOverlap> overlap,
-                    IMeshArena *arena)
-      : r_tri_subdivided(r_tri_subdivided),
-        tm(tm),
-        itt_map(itt_map),
-        overlap(overlap),
-        arena(arena)
-  {
-  }
-};
-
-static void calc_subdivided_tri_range_func(void *__restrict userdata,
-                                           const int iter,
-                                           const TaskParallelTLS *__restrict UNUSED(tls))
-{
-  constexpr int dbg_level = 0;
-  SubdivideTrisData *data = static_cast<SubdivideTrisData *>(userdata);
-  OverlapTriRange &otr = data->overlap_tri_range[iter];
-  int t = otr.tri_index;
-  if (dbg_level > 0) {
-    std::cout << "calc_subdivided_tri_range_func\nt=" << t << " start=" << otr.overlap_start
-              << " len=" << otr.len << "\n";
-  }
-  constexpr int inline_capacity = 100;
-  Vector<ITT_value, inline_capacity> itts(otr.len);
-  for (int j = otr.overlap_start; j < otr.overlap_start + otr.len; ++j) {
-    int t_other = data->overlap[j].indexB;
-    std::pair<int, int> key = canon_int_pair(t, t_other);
-    ITT_value itt;
-    if (data->itt_map.contains(key)) {
-      itt = data->itt_map.lookup(key);
-    }
-    if (itt.kind != INONE) {
-      itts.append(itt);
-    }
-    if (dbg_level > 0) {
-      std::cout << "  tri t" << t_other << "; result = " << itt << "\n";
-    }
-  }
-  if (itts.size() > 0) {
-    CDT_data cd_data = prepare_cdt_input(data->tm, t, itts);
-    do_cdt(cd_data);
-    data->r_tri_subdivided[t] = extract_subdivided_tri(cd_data, data->tm, t, data->arena);
-    if (dbg_level > 0) {
-      std::cout << "subdivide output\n" << data->r_tri_subdivided[t];
-    }
-  }
-}
-
-/**
  * For each triangle in tm, fill in the corresponding slot in
  * r_tri_subdivided with the result of intersecting it with
  * all the other triangles in the mesh, if it intersects any others.
@@ -2642,15 +2551,19 @@ static void calc_subdivided_non_cluster_tris(Array<IMesh> &r_tri_subdivided,
     std::cout << "\nCALC_SUBDIVIDED_TRIS\n\n";
   }
   Span<BVHTreeOverlap> overlap = ov.overlap();
-  SubdivideTrisData data(r_tri_subdivided, tm, itt_map, overlap, arena);
-  int overlap_tot = overlap.size();
-  data.overlap_tri_range = Vector<OverlapTriRange>();
-  data.overlap_tri_range.reserve(overlap_tot);
+  struct OverlapTriRange {
+    int tri_index;
+    int overlap_start;
+    int len;
+  };
+  Vector<OverlapTriRange> overlap_tri_range;
+  int overlap_num = overlap.size();
+  overlap_tri_range.reserve(overlap_num);
   int overlap_index = 0;
-  while (overlap_index < overlap_tot) {
+  while (overlap_index < overlap_num) {
     int t = overlap[overlap_index].indexA;
     int i = overlap_index;
-    while (i + 1 < overlap_tot && overlap[i + 1].indexA == t) {
+    while (i + 1 < overlap_num && overlap[i + 1].indexA == t) {
       ++i;
     }
     /* Now overlap[overlap_index] to overlap[i] have indexA == t.
@@ -2660,7 +2573,7 @@ static void calc_subdivided_non_cluster_tris(Array<IMesh> &r_tri_subdivided,
       int len = i - overlap_index + 1;
       if (!(len == 1 && overlap[overlap_index].indexB == t)) {
         OverlapTriRange range = {t, overlap_index, len};
-        data.overlap_tri_range.append(range);
+        overlap_tri_range.append(range);
 #  ifdef PERFDEBUG
         bumpperfcount(0, len); /* Non-cluster overlaps. */
 #  endif
@@ -2668,13 +2581,50 @@ static void calc_subdivided_non_cluster_tris(Array<IMesh> &r_tri_subdivided,
     }
     overlap_index = i + 1;
   }
-  int overlap_tri_range_tot = data.overlap_tri_range.size();
-  TaskParallelSettings settings;
-  BLI_parallel_range_settings_defaults(&settings);
-  settings.min_iter_per_thread = 50;
-  settings.use_threading = intersect_use_threading;
-  BLI_task_parallel_range(
-      0, overlap_tri_range_tot, &data, calc_subdivided_tri_range_func, &settings);
+  int overlap_tri_range_num = overlap_tri_range.size();
+  Array<CDT_data> cd_data(overlap_tri_range_num);
+  int grain_size = 64;
+  threading::parallel_for(overlap_tri_range.index_range(), grain_size, [&](IndexRange range) {
+    for (int otr_index : range) {
+      OverlapTriRange &otr = overlap_tri_range[otr_index];
+      int t = otr.tri_index;
+      if (dbg_level > 0) {
+        std::cout << "handling overlap range\nt=" << t << " start=" << otr.overlap_start
+                  << " len=" << otr.len << "\n";
+      }
+      constexpr int inline_capacity = 100;
+      Vector<ITT_value, inline_capacity> itts(otr.len);
+      for (int j = otr.overlap_start; j < otr.overlap_start + otr.len; ++j) {
+        int t_other = overlap[j].indexB;
+        std::pair<int, int> key = canon_int_pair(t, t_other);
+        ITT_value itt;
+        if (itt_map.contains(key)) {
+          itt = itt_map.lookup(key);
+        }
+        if (itt.kind != INONE) {
+          itts.append(itt);
+        }
+        if (dbg_level > 0) {
+          std::cout << "  tri t" << t_other << "; result = " << itt << "\n";
+        }
+      }
+      if (itts.size() > 0) {
+        cd_data[otr_index] = prepare_cdt_input(tm, t, itts);
+        do_cdt(cd_data[otr_index]);
+      }
+    }
+  });
+  /* Extract the new faces serially, so that Boolean is repeatable regardless of parallelism. */
+  for (int otr_index : overlap_tri_range.index_range()) {
+    CDT_data &cdd = cd_data[otr_index];
+    if (cdd.vert.size() > 0) {
+      int t = overlap_tri_range[otr_index].tri_index;
+      r_tri_subdivided[t] = extract_subdivided_tri(cdd, tm, t, arena);
+      if (dbg_level > 1) {
+        std::cout << "subdivide output for tri " << t << " = " << r_tri_subdivided[t];
+      }
+    }
+  }
   /* Now have to put in the triangles that are the same as the input ones, and not in clusters.
    */
   threading::parallel_for(tm.face_index_range(), 2048, [&](IndexRange range) {
@@ -2696,7 +2646,7 @@ static void calc_subdivided_non_cluster_tris(Array<IMesh> &r_tri_subdivided,
 static void calc_cluster_tris(Array<IMesh> &tri_subdivided,
                               const IMesh &tm,
                               const CoplanarClusterInfo &clinfo,
-                              const Array<CDT_data> &cluster_subdivided,
+                              const Span<CDT_data> cluster_subdivided,
                               IMeshArena *arena)
 {
   for (int c : clinfo.index_range()) {
@@ -2732,7 +2682,7 @@ static CDT_data calc_cluster_subdivided(const CoplanarClusterInfo &clinfo,
                                         const IMesh &tm,
                                         const TriOverlaps &ov,
                                         const Map<std::pair<int, int>, ITT_value> &itt_map,
-                                        IMeshArena *UNUSED(arena))
+                                        IMeshArena * /*arena*/)
 {
   constexpr int dbg_level = 0;
   BLI_assert(c < clinfo.tot_cluster());
@@ -2817,7 +2767,7 @@ static CoplanarClusterInfo find_clusters(const IMesh &tm,
   if (dbg_level > 0) {
     std::cout << "found " << maybe_coplanar_tris.size() << " possible coplanar tris\n";
   }
-  if (maybe_coplanar_tris.size() == 0) {
+  if (maybe_coplanar_tris.is_empty()) {
     if (dbg_level > 0) {
       std::cout << "No possible coplanar tris, so no clusters\n";
     }
@@ -2864,7 +2814,7 @@ static CoplanarClusterInfo find_clusters(const IMesh &tm,
           no_int_cls.append(&cl);
         }
       }
-      if (int_cls.size() == 0) {
+      if (int_cls.is_empty()) {
         /* t doesn't intersect any existing cluster in its plane, so make one just for it. */
         if (dbg_level > 1) {
           std::cout << "no intersecting clusters for t, make a new one\n";
@@ -2939,7 +2889,7 @@ static void degenerate_range_func(void *__restrict userdata,
   chunk_data->has_degenerate_tri |= is_degenerate;
 }
 
-static void degenerate_reduce(const void *__restrict UNUSED(userdata),
+static void degenerate_reduce(const void *__restrict /*userdata*/,
                               void *__restrict chunk_join,
                               void *__restrict chunk)
 {
@@ -2978,16 +2928,15 @@ static IMesh remove_degenerate_tris(const IMesh &tm_in)
   return ans;
 }
 
-/* This is the main routine for calculating the self_intersection of a triangle mesh. */
 IMesh trimesh_self_intersect(const IMesh &tm_in, IMeshArena *arena)
 {
   return trimesh_nary_intersect(
-      tm_in, 1, [](int UNUSED(t)) { return 0; }, true, arena);
+      tm_in, 1, [](int /*t*/) { return 0; }, true, arena);
 }
 
 IMesh trimesh_nary_intersect(const IMesh &tm_in,
                              int nshapes,
-                             std::function<int(int)> shape_fn,
+                             const FunctionRef<int(int)> shape_fn,
                              bool use_self,
                              IMeshArena *arena)
 {
@@ -3009,7 +2958,7 @@ IMesh trimesh_nary_intersect(const IMesh &tm_in,
   }
 #  ifdef PERFDEBUG
   perfdata_init();
-  double start_time = PIL_check_seconds_timer();
+  double start_time = BLI_time_now_seconds();
   std::cout << "trimesh_nary_intersect start\n";
 #  endif
   /* Usually can use tm_in but if it has degenerate or illegal triangles,
@@ -3027,17 +2976,17 @@ IMesh trimesh_nary_intersect(const IMesh &tm_in,
     }
   }
 #  ifdef PERFDEBUG
-  double clean_time = PIL_check_seconds_timer();
+  double clean_time = BLI_time_now_seconds();
   std::cout << "cleaned, time = " << clean_time - start_time << "\n";
 #  endif
   Array<BoundingBox> tri_bb = calc_face_bounding_boxes(*tm_clean);
 #  ifdef PERFDEBUG
-  double bb_calc_time = PIL_check_seconds_timer();
+  double bb_calc_time = BLI_time_now_seconds();
   std::cout << "bbs calculated, time = " << bb_calc_time - clean_time << "\n";
 #  endif
   TriOverlaps tri_ov(*tm_clean, tri_bb, nshapes, shape_fn, use_self);
 #  ifdef PERFDEBUG
-  double overlap_time = PIL_check_seconds_timer();
+  double overlap_time = BLI_time_now_seconds();
   std::cout << "intersect overlaps calculated, time = " << overlap_time - bb_calc_time << "\n";
 #  endif
   Array<IMesh> tri_subdivided(tm_clean->face_size(), NoInitialization());
@@ -3050,7 +2999,7 @@ IMesh trimesh_nary_intersect(const IMesh &tm_in,
     }
   });
 #  ifdef PERFDEBUG
-  double plane_populate = PIL_check_seconds_timer();
+  double plane_populate = BLI_time_now_seconds();
   std::cout << "planes populated, time = " << plane_populate - overlap_time << "\n";
 #  endif
   /* itt_map((a,b)) will hold the intersection value resulting from intersecting
@@ -3059,7 +3008,7 @@ IMesh trimesh_nary_intersect(const IMesh &tm_in,
   itt_map.reserve(tri_ov.overlap().size());
   calc_overlap_itts(itt_map, *tm_clean, tri_ov, arena);
 #  ifdef PERFDEBUG
-  double itt_time = PIL_check_seconds_timer();
+  double itt_time = BLI_time_now_seconds();
   std::cout << "itts found, time = " << itt_time - plane_populate << "\n";
 #  endif
   CoplanarClusterInfo clinfo = find_clusters(*tm_clean, tri_bb, itt_map);
@@ -3067,7 +3016,7 @@ IMesh trimesh_nary_intersect(const IMesh &tm_in,
     std::cout << clinfo;
   }
 #  ifdef PERFDEBUG
-  double find_cluster_time = PIL_check_seconds_timer();
+  double find_cluster_time = BLI_time_now_seconds();
   std::cout << "clusters found, time = " << find_cluster_time - itt_time << "\n";
   doperfmax(0, tm_in.face_size());
   doperfmax(1, clinfo.tot_cluster());
@@ -3075,7 +3024,7 @@ IMesh trimesh_nary_intersect(const IMesh &tm_in,
 #  endif
   calc_subdivided_non_cluster_tris(tri_subdivided, *tm_clean, itt_map, clinfo, tri_ov, arena);
 #  ifdef PERFDEBUG
-  double subdivided_tris_time = PIL_check_seconds_timer();
+  double subdivided_tris_time = BLI_time_now_seconds();
   std::cout << "subdivided non-cluster tris found, time = " << subdivided_tris_time - itt_time
             << "\n";
 #  endif
@@ -3084,13 +3033,13 @@ IMesh trimesh_nary_intersect(const IMesh &tm_in,
     cluster_subdivided[c] = calc_cluster_subdivided(clinfo, c, *tm_clean, tri_ov, itt_map, arena);
   }
 #  ifdef PERFDEBUG
-  double cluster_subdivide_time = PIL_check_seconds_timer();
+  double cluster_subdivide_time = BLI_time_now_seconds();
   std::cout << "subdivided clusters found, time = "
             << cluster_subdivide_time - subdivided_tris_time << "\n";
 #  endif
   calc_cluster_tris(tri_subdivided, *tm_clean, clinfo, cluster_subdivided, arena);
 #  ifdef PERFDEBUG
-  double extract_time = PIL_check_seconds_timer();
+  double extract_time = BLI_time_now_seconds();
   std::cout << "subdivided cluster tris found, time = " << extract_time - cluster_subdivide_time
             << "\n";
 #  endif
@@ -3100,7 +3049,7 @@ IMesh trimesh_nary_intersect(const IMesh &tm_in,
     std::cout << combined;
   }
 #  ifdef PERFDEBUG
-  double end_time = PIL_check_seconds_timer();
+  double end_time = BLI_time_now_seconds();
   std::cout << "triangles combined, time = " << end_time - extract_time << "\n";
   std::cout << "trimesh_nary_intersect done, total time = " << end_time - start_time << "\n";
   dump_perfdata();
@@ -3153,19 +3102,21 @@ static std::ostream &operator<<(std::ostream &os, const ITT_value &itt)
   return os;
 }
 
-/**
- * Writing the obj_mesh has the side effect of populating verts.
- */
 void write_obj_mesh(IMesh &m, const std::string &objname)
 {
   /* Would like to use #BKE_tempdir_base() here, but that brings in dependence on kernel library.
    * This is just for developer debugging anyway,
    * and should never be called in production Blender. */
 #  ifdef _WIN_32
-  const char *objdir = BLI_getenv("HOME");
+  const char *objdir = BLI_dir_home();
+  if (objdir == nullptr) {
+    std::cout << "Could not access home directory\n";
+    return;
+  }
 #  else
   const char *objdir = "/tmp/";
 #  endif
+
   if (m.face_size() == 0) {
     return;
   }
@@ -3185,7 +3136,6 @@ void write_obj_mesh(IMesh &m, const std::string &objname)
     const double3 dv = v->co;
     f << "v " << dv[0] << " " << dv[1] << " " << dv[2] << "\n";
   }
-  int i = 0;
   for (const Face *face : m.faces()) {
     /* OBJ files use 1-indexing for vertices. */
     f << "f ";
@@ -3196,7 +3146,6 @@ void write_obj_mesh(IMesh &m, const std::string &objname)
       f << i + 1 << " ";
     }
     f << "\n";
-    ++i;
   }
   f.close();
 }
@@ -3211,7 +3160,7 @@ struct PerfCounts {
 
 static PerfCounts *perfdata = nullptr;
 
-static void perfdata_init(void)
+static void perfdata_init()
 {
   perfdata = new PerfCounts;
 
@@ -3263,7 +3212,7 @@ static void doperfmax(int maxnum, int val)
   perfdata->max[maxnum] = max_ii(perfdata->max[maxnum], val);
 }
 
-static void dump_perfdata(void)
+static void dump_perfdata()
 {
   std::cout << "\nPERFDATA\n";
   for (int i : perfdata->count.index_range()) {

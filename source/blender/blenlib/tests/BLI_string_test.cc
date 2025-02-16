@@ -1,4 +1,6 @@
-/* Apache License, Version 2.0 */
+/* SPDX-FileCopyrightText: 2023 Blender Authors
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "testing/testing.h"
 
@@ -9,9 +11,11 @@
 #include <utility>
 #include <vector>
 
+#include "MEM_guardedalloc.h"
+
 #include "BLI_string.h"
 #include "BLI_string_utf8.h"
-#include "BLI_string_utils.h"
+#include "BLI_string_utils.hh"
 #include "BLI_utildefines.h"
 
 using std::initializer_list;
@@ -20,7 +24,76 @@ using std::string;
 using std::vector;
 
 /* -------------------------------------------------------------------- */
-/* tests */
+/** \name String Concatenate
+ * \{ */
+
+TEST(string, StrCat)
+{
+#define STR_N_CAT(dst_init, dst_size, src, result_expect) \
+  { \
+    char dst[dst_size + 1] = dst_init; \
+    dst[dst_size] = 0xff; \
+    BLI_strncat(dst, src, dst_size); \
+    EXPECT_STREQ(dst, result_expect); \
+    EXPECT_EQ(dst[dst_size], 0xff); \
+  }
+
+  STR_N_CAT("", 1, "", "");
+  STR_N_CAT("", 1, "Y", "");
+  STR_N_CAT("", 2, "Y", "Y");
+  STR_N_CAT("", 2, "YZ", "Y");
+  STR_N_CAT("X", 2, "YZ", "X");
+  STR_N_CAT("ABC", 4, "XYZ", "ABC");
+  STR_N_CAT("ABC", 7, "XYZ", "ABCXYZ");
+#undef STR_N_CAT
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name String Replace
+ * \{ */
+
+TEST(string, StrReplaceRange)
+{
+#define STR_REPLACE_RANGE(src, size, beg, end, dst, result_expect) \
+  { \
+    char string[size] = src; \
+    BLI_string_replace_range(string, sizeof(string), beg, end, dst); \
+    EXPECT_STREQ(string, result_expect); \
+  }
+
+  STR_REPLACE_RANGE("a ", 5, 2, 2, "b!", "a b!");
+  STR_REPLACE_RANGE("a ", 4, 2, 2, "b!", "a b");
+  STR_REPLACE_RANGE("a ", 5, 1, 2, "b!", "ab!");
+  STR_REPLACE_RANGE("XYZ", 5, 1, 1, "A", "XAYZ");
+  STR_REPLACE_RANGE("XYZ", 5, 1, 1, "AB", "XABY");
+  STR_REPLACE_RANGE("XYZ", 5, 1, 1, "ABC", "XABC");
+
+  /* Add at the end when there is no room (no-op). */
+  STR_REPLACE_RANGE("XYZA", 5, 4, 4, "?", "XYZA");
+  /* Add at the start, replace all contents. */
+  STR_REPLACE_RANGE("XYZ", 4, 0, 0, "ABC", "ABC");
+  STR_REPLACE_RANGE("XYZ", 7, 0, 0, "ABC", "ABCXYZ");
+  /* Only remove. */
+  STR_REPLACE_RANGE("XYZ", 4, 1, 3, "", "X");
+  STR_REPLACE_RANGE("XYZ", 4, 0, 2, "", "Z");
+  STR_REPLACE_RANGE("XYZ", 4, 0, 3, "", "");
+  /* Only Add. */
+  STR_REPLACE_RANGE("", 4, 0, 0, "XYZ", "XYZ");
+  STR_REPLACE_RANGE("", 4, 0, 0, "XYZ?", "XYZ");
+  /* Do nothing. */
+  STR_REPLACE_RANGE("", 1, 0, 0, "?", "");
+  STR_REPLACE_RANGE("", 1, 0, 0, "", "");
+
+#undef STR_REPLACE_RANGE
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name String Partition
+ * \{ */
 
 /* BLI_str_partition */
 TEST(string, StrPartition)
@@ -63,7 +136,7 @@ TEST(string, StrPartition)
   {
     const char *str = "";
 
-    /* "" -> "", NULL, NULL, 0 */
+    /* "" -> "", nullptr, nullptr, 0 */
     pre_len = BLI_str_partition(str, delim, &sep, &suf);
     EXPECT_EQ(pre_len, 0);
     EXPECT_EQ(sep, (void *)nullptr);
@@ -73,7 +146,7 @@ TEST(string, StrPartition)
   {
     const char *str = "material";
 
-    /* "material" -> "material", NULL, NULL, 8 */
+    /* "material" -> "material", nullptr, nullptr, 8 */
     pre_len = BLI_str_partition(str, delim, &sep, &suf);
     EXPECT_EQ(pre_len, 8);
     EXPECT_EQ(sep, (void *)nullptr);
@@ -122,7 +195,7 @@ TEST(string, StrRPartition)
   {
     const char *str = "";
 
-    /* "" -> "", NULL, NULL, 0 */
+    /* "" -> "", nullptr, nullptr, 0 */
     pre_len = BLI_str_rpartition(str, delim, &sep, &suf);
     EXPECT_EQ(pre_len, 0);
     EXPECT_EQ(sep, (void *)nullptr);
@@ -132,7 +205,7 @@ TEST(string, StrRPartition)
   {
     const char *str = "material";
 
-    /* "material" -> "material", NULL, NULL, 8 */
+    /* "material" -> "material", nullptr, nullptr, 8 */
     pre_len = BLI_str_rpartition(str, delim, &sep, &suf);
     EXPECT_EQ(pre_len, 8);
     EXPECT_EQ(sep, (void *)nullptr);
@@ -163,7 +236,7 @@ TEST(string, StrPartitionEx)
   {
     const char *str = "mate.rial";
 
-    /* "mate.rial" over "mate" -> "mate.rial", NULL, NULL, 4 */
+    /* "mate.rial" over "mate" -> "mate.rial", nullptr, nullptr, 4 */
     pre_len = BLI_str_partition_ex(str, str + 4, delim, &sep, &suf, true);
     EXPECT_EQ(pre_len, 4);
     EXPECT_EQ(sep, (void *)nullptr);
@@ -174,7 +247,7 @@ TEST(string, StrPartitionEx)
 /* BLI_str_partition_utf8 */
 TEST(string, StrPartitionUtf8)
 {
-  const unsigned int delim[] = {'-', '.', '_', 0x00F1 /* n tilde */, 0x262F /* ying-yang */, '\0'};
+  const uint delim[] = {'-', '.', '_', 0x00F1 /* n tilde */, 0x262F /* ying-yang */, '\0'};
   const char *sep, *suf;
   size_t pre_len;
 
@@ -212,7 +285,7 @@ TEST(string, StrPartitionUtf8)
   {
     const char *str = "";
 
-    /* "" -> "", NULL, NULL, 0 */
+    /* "" -> "", nullptr, nullptr, 0 */
     pre_len = BLI_str_partition_utf8(str, delim, &sep, &suf);
     EXPECT_EQ(pre_len, 0);
     EXPECT_EQ(sep, (void *)nullptr);
@@ -222,7 +295,7 @@ TEST(string, StrPartitionUtf8)
   {
     const char *str = "material";
 
-    /* "material" -> "material", NULL, NULL, 8 */
+    /* "material" -> "material", nullptr, nullptr, 8 */
     pre_len = BLI_str_partition_utf8(str, delim, &sep, &suf);
     EXPECT_EQ(pre_len, 8);
     EXPECT_EQ(sep, (void *)nullptr);
@@ -233,7 +306,7 @@ TEST(string, StrPartitionUtf8)
 /* BLI_str_rpartition_utf8 */
 TEST(string, StrRPartitionUtf8)
 {
-  const unsigned int delim[] = {'-', '.', '_', 0x00F1 /* n tilde */, 0x262F /* ying-yang */, '\0'};
+  const uint delim[] = {'-', '.', '_', 0x00F1 /* n tilde */, 0x262F /* ying-yang */, '\0'};
   const char *sep, *suf;
   size_t pre_len;
 
@@ -271,7 +344,7 @@ TEST(string, StrRPartitionUtf8)
   {
     const char *str = "";
 
-    /* "" -> "", NULL, NULL, 0 */
+    /* "" -> "", nullptr, nullptr, 0 */
     pre_len = BLI_str_rpartition_utf8(str, delim, &sep, &suf);
     EXPECT_EQ(pre_len, 0);
     EXPECT_EQ(sep, (void *)nullptr);
@@ -281,7 +354,7 @@ TEST(string, StrRPartitionUtf8)
   {
     const char *str = "material";
 
-    /* "material" -> "material", NULL, NULL, 8 */
+    /* "material" -> "material", nullptr, nullptr, 8 */
     pre_len = BLI_str_rpartition_utf8(str, delim, &sep, &suf);
     EXPECT_EQ(pre_len, 8);
     EXPECT_EQ(sep, (void *)nullptr);
@@ -292,7 +365,7 @@ TEST(string, StrRPartitionUtf8)
 /* BLI_str_partition_ex_utf8 */
 TEST(string, StrPartitionExUtf8)
 {
-  const unsigned int delim[] = {'-', '.', '_', 0x00F1 /* n tilde */, 0x262F /* ying-yang */, '\0'};
+  const uint delim[] = {'-', '.', '_', 0x00F1 /* n tilde */, 0x262F /* ying-yang */, '\0'};
   const char *sep, *suf;
   size_t pre_len;
 
@@ -313,7 +386,7 @@ TEST(string, StrPartitionExUtf8)
   {
     const char *str = "mate\xe2\x98\xafrial";
 
-    /* "mate\xe2\x98\xafrial" over "mate" -> "mate\xe2\x98\xafrial", NULL, NULL, 4 */
+    /* "mate\xe2\x98\xafrial" over "mate" -> "mate\xe2\x98\xafrial", nullptr, nullptr, 4 */
     pre_len = BLI_str_partition_ex_utf8(str, str + 4, delim, &sep, &suf, true);
     EXPECT_EQ(pre_len, 4);
     EXPECT_EQ(sep, (void *)nullptr);
@@ -321,44 +394,82 @@ TEST(string, StrPartitionExUtf8)
   }
 }
 
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name String Format Integer (Grouped)
+ * \{ */
+
 /* BLI_str_format_int_grouped */
 TEST(string, StrFormatIntGrouped)
 {
-  char num_str[16];
-  int num;
+  char number_str[BLI_STR_FORMAT_INT32_GROUPED_SIZE];
+  int number;
 
-  BLI_str_format_int_grouped(num_str, num = 0);
-  EXPECT_STREQ("0", num_str);
+  BLI_str_format_int_grouped(number_str, number = 0);
+  EXPECT_STREQ("0", number_str);
 
-  BLI_str_format_int_grouped(num_str, num = 1);
-  EXPECT_STREQ("1", num_str);
+  BLI_str_format_int_grouped(number_str, number = 1);
+  EXPECT_STREQ("1", number_str);
 
-  BLI_str_format_int_grouped(num_str, num = -1);
-  EXPECT_STREQ("-1", num_str);
+  BLI_str_format_int_grouped(number_str, number = -1);
+  EXPECT_STREQ("-1", number_str);
 
-  BLI_str_format_int_grouped(num_str, num = -2147483648);
-  EXPECT_STREQ("-2,147,483,648", num_str);
+  BLI_str_format_int_grouped(number_str, number = 1000);
+  EXPECT_STREQ("1,000", number_str);
 
-  BLI_str_format_int_grouped(num_str, num = 2147483647);
-  EXPECT_STREQ("2,147,483,647", num_str);
+  BLI_str_format_int_grouped(number_str, number = -1000);
+  EXPECT_STREQ("-1,000", number_str);
 
-  BLI_str_format_int_grouped(num_str, num = 1000);
-  EXPECT_STREQ("1,000", num_str);
+  BLI_str_format_int_grouped(number_str, number = 999);
+  EXPECT_STREQ("999", number_str);
 
-  BLI_str_format_int_grouped(num_str, num = -1000);
-  EXPECT_STREQ("-1,000", num_str);
+  BLI_str_format_int_grouped(number_str, number = -999);
+  EXPECT_STREQ("-999", number_str);
 
-  BLI_str_format_int_grouped(num_str, num = 999);
-  EXPECT_STREQ("999", num_str);
+  BLI_str_format_int_grouped(number_str, number = 2147483647);
+  EXPECT_STREQ("2,147,483,647", number_str);
 
-  BLI_str_format_int_grouped(num_str, num = -999);
-  EXPECT_STREQ("-999", num_str);
+  BLI_str_format_int_grouped(number_str, number = -2147483648);
+  EXPECT_STREQ("-2,147,483,648", number_str);
+  /* Ensure the limit is correct. */
+  EXPECT_EQ(sizeof(number_str), strlen(number_str) + 1);
 }
+
+/* BLI_str_format_uint64_grouped */
+TEST(string, StrFormatUint64Grouped)
+{
+  char number_str[BLI_STR_FORMAT_UINT64_GROUPED_SIZE];
+  uint64_t number;
+
+  BLI_str_format_uint64_grouped(number_str, number = 0);
+  EXPECT_STREQ("0", number_str);
+
+  BLI_str_format_uint64_grouped(number_str, number = 1);
+  EXPECT_STREQ("1", number_str);
+
+  BLI_str_format_uint64_grouped(number_str, number = 999);
+  EXPECT_STREQ("999", number_str);
+
+  BLI_str_format_uint64_grouped(number_str, number = 1000);
+  EXPECT_STREQ("1,000", number_str);
+
+  BLI_str_format_uint64_grouped(number_str, number = 18446744073709551615u);
+  EXPECT_STREQ("18,446,744,073,709,551,615", number_str);
+  /* Ensure the limit is correct. */
+  EXPECT_EQ(sizeof(number_str), strlen(number_str) + 1);
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name String Format Byte Units
+ * \{ */
 
 /* BLI_str_format_byte_unit */
 TEST(string, StrFormatByteUnits)
 {
-  char size_str[15];
+  char size_str[BLI_STR_FORMAT_INT64_BYTE_UNIT_SIZE];
   long long int size;
 
   /* Base 10 */
@@ -418,108 +529,341 @@ TEST(string, StrFormatByteUnits)
   /* Test maximum string length. */
   BLI_str_format_byte_unit(size_str, size = -9223200000000000000, false);
   EXPECT_STREQ("-8191.8472 PiB", size_str);
+  /* Ensure the limit is correct. */
+  EXPECT_EQ(sizeof(size_str), strlen(size_str) + 1);
 }
 
-/* BLI_str_format_attribute_domain_size */
-TEST(string, StrFormatAttributeDomainSize)
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name String Format Decimal Units
+ * \{ */
+
+/* BLI_str_format_decimal_unit */
+TEST(string, StrFormatDecimalUnits)
 {
-  char size_str[7];
+  char size_str[BLI_STR_FORMAT_INT32_DECIMAL_UNIT_SIZE];
   int size;
 
-  BLI_str_format_attribute_domain_size(size_str, size = 0);
+  BLI_str_format_decimal_unit(size_str, size = 0);
   EXPECT_STREQ("0", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = 1);
+  BLI_str_format_decimal_unit(size_str, size = 1);
   EXPECT_STREQ("1", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = 10);
+  BLI_str_format_decimal_unit(size_str, size = 10);
   EXPECT_STREQ("10", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = 15);
+  BLI_str_format_decimal_unit(size_str, size = 15);
   EXPECT_STREQ("15", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = 100);
+  BLI_str_format_decimal_unit(size_str, size = 100);
   EXPECT_STREQ("100", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = 155);
+  BLI_str_format_decimal_unit(size_str, size = 155);
   EXPECT_STREQ("155", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = 1000);
+  BLI_str_format_decimal_unit(size_str, size = 1000);
   EXPECT_STREQ("1.0K", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = 1555);
+  BLI_str_format_decimal_unit(size_str, size = 1555);
   EXPECT_STREQ("1.6K", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = 10000);
+  BLI_str_format_decimal_unit(size_str, size = 10000);
   EXPECT_STREQ("10.0K", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = 15555);
+  BLI_str_format_decimal_unit(size_str, size = 15555);
   EXPECT_STREQ("15.6K", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = 100000);
+  BLI_str_format_decimal_unit(size_str, size = 100000);
   EXPECT_STREQ("100K", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = 100000);
+  BLI_str_format_decimal_unit(size_str, size = 100000);
   EXPECT_STREQ("100K", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = 155555);
+  BLI_str_format_decimal_unit(size_str, size = 155555);
   EXPECT_STREQ("156K", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = 1000000);
+  BLI_str_format_decimal_unit(size_str, size = 1000000);
   EXPECT_STREQ("1.0M", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = 1555555);
+  BLI_str_format_decimal_unit(size_str, size = 1555555);
   EXPECT_STREQ("1.6M", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = 10000000);
+  BLI_str_format_decimal_unit(size_str, size = 10000000);
   EXPECT_STREQ("10.0M", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = 15555555);
+  BLI_str_format_decimal_unit(size_str, size = 15555555);
   EXPECT_STREQ("15.6M", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = 100000000);
+  BLI_str_format_decimal_unit(size_str, size = 100000000);
   EXPECT_STREQ("100M", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = 155555555);
+  BLI_str_format_decimal_unit(size_str, size = 155555555);
   EXPECT_STREQ("156M", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = 1000000000);
+  BLI_str_format_decimal_unit(size_str, size = 1000000000);
   EXPECT_STREQ("1.0B", size_str);
 
   /* Largest possible value. */
-  BLI_str_format_attribute_domain_size(size_str, size = INT32_MAX);
+  BLI_str_format_decimal_unit(size_str, size = INT32_MAX);
   EXPECT_STREQ("2.1B", size_str);
 
-  BLI_str_format_attribute_domain_size(size_str, size = -0);
+  BLI_str_format_decimal_unit(size_str, size = -0);
   EXPECT_STREQ("0", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = -1);
+  BLI_str_format_decimal_unit(size_str, size = -1);
   EXPECT_STREQ("-1", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = -10);
+  BLI_str_format_decimal_unit(size_str, size = -10);
   EXPECT_STREQ("-10", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = -15);
+  BLI_str_format_decimal_unit(size_str, size = -15);
   EXPECT_STREQ("-15", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = -100);
+  BLI_str_format_decimal_unit(size_str, size = -100);
   EXPECT_STREQ("-100", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = -155);
+  BLI_str_format_decimal_unit(size_str, size = -155);
   EXPECT_STREQ("-155", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = -1000);
+  BLI_str_format_decimal_unit(size_str, size = -1000);
   EXPECT_STREQ("-1.0K", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = -1555);
+  BLI_str_format_decimal_unit(size_str, size = -1555);
   EXPECT_STREQ("-1.6K", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = -10000);
+  BLI_str_format_decimal_unit(size_str, size = -10000);
   EXPECT_STREQ("-10.0K", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = -15555);
+  BLI_str_format_decimal_unit(size_str, size = -15555);
   EXPECT_STREQ("-15.6K", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = -100000);
+  BLI_str_format_decimal_unit(size_str, size = -100000);
   EXPECT_STREQ("-100K", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = -155555);
+  BLI_str_format_decimal_unit(size_str, size = -155555);
   EXPECT_STREQ("-156K", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = -1000000);
+  BLI_str_format_decimal_unit(size_str, size = -1000000);
   EXPECT_STREQ("-1.0M", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = -1555555);
+  BLI_str_format_decimal_unit(size_str, size = -1555555);
   EXPECT_STREQ("-1.6M", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = -10000000);
+  BLI_str_format_decimal_unit(size_str, size = -10000000);
   EXPECT_STREQ("-10.0M", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = -15555555);
+  BLI_str_format_decimal_unit(size_str, size = -15555555);
   EXPECT_STREQ("-15.6M", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = -100000000);
+  BLI_str_format_decimal_unit(size_str, size = -100000000);
   EXPECT_STREQ("-100M", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = -155555555);
+  BLI_str_format_decimal_unit(size_str, size = -155555555);
   EXPECT_STREQ("-156M", size_str);
-  BLI_str_format_attribute_domain_size(size_str, size = -1000000000);
+  BLI_str_format_decimal_unit(size_str, size = -1000000000);
   EXPECT_STREQ("-1.0B", size_str);
 
   /* Smallest possible value. */
-  BLI_str_format_attribute_domain_size(size_str, size = -INT32_MAX);
+  BLI_str_format_decimal_unit(size_str, size = -INT32_MAX);
   EXPECT_STREQ("-2.1B", size_str);
 }
 
+/* BLI_str_format_integer_unit */
+TEST(string, StrFormatIntegerUnits)
+{
+  char size_str[BLI_STR_FORMAT_INT32_INTEGER_UNIT_SIZE];
+  int size;
+
+  BLI_str_format_integer_unit(size_str, size = 0);
+  EXPECT_STREQ("0", size_str);
+  BLI_str_format_integer_unit(size_str, size = 1);
+  EXPECT_STREQ("1", size_str);
+  BLI_str_format_integer_unit(size_str, size = 10);
+  EXPECT_STREQ("10", size_str);
+  BLI_str_format_integer_unit(size_str, size = 15);
+  EXPECT_STREQ("15", size_str);
+  BLI_str_format_integer_unit(size_str, size = 100);
+  EXPECT_STREQ("100", size_str);
+  BLI_str_format_integer_unit(size_str, size = 155);
+  EXPECT_STREQ("155", size_str);
+  BLI_str_format_integer_unit(size_str, size = 1000);
+  EXPECT_STREQ("1K", size_str);
+  BLI_str_format_integer_unit(size_str, size = 1555);
+  EXPECT_STREQ("1K", size_str);
+  BLI_str_format_integer_unit(size_str, size = 10000);
+  EXPECT_STREQ("10K", size_str);
+  BLI_str_format_integer_unit(size_str, size = 15555);
+  EXPECT_STREQ("15K", size_str);
+  BLI_str_format_integer_unit(size_str, size = 100000);
+  EXPECT_STREQ(".1M", size_str);
+  BLI_str_format_integer_unit(size_str, size = 155555);
+  EXPECT_STREQ(".1M", size_str);
+  BLI_str_format_integer_unit(size_str, size = 1000000);
+  EXPECT_STREQ("1M", size_str);
+  BLI_str_format_integer_unit(size_str, size = 1555555);
+  EXPECT_STREQ("1M", size_str);
+  BLI_str_format_integer_unit(size_str, size = 2555555);
+  EXPECT_STREQ("2M", size_str);
+  BLI_str_format_integer_unit(size_str, size = 10000000);
+  EXPECT_STREQ("10M", size_str);
+  BLI_str_format_integer_unit(size_str, size = 15555555);
+  EXPECT_STREQ("15M", size_str);
+  BLI_str_format_integer_unit(size_str, size = 100000000);
+  EXPECT_STREQ(".1B", size_str);
+  BLI_str_format_integer_unit(size_str, size = 155555555);
+  EXPECT_STREQ(".1B", size_str);
+  BLI_str_format_integer_unit(size_str, size = 255555555);
+  EXPECT_STREQ(".2B", size_str);
+  BLI_str_format_integer_unit(size_str, size = 1000000000);
+  EXPECT_STREQ("1B", size_str);
+
+  /* Largest possible value. */
+  BLI_str_format_integer_unit(size_str, size = INT32_MAX);
+  EXPECT_STREQ("2B", size_str);
+
+  BLI_str_format_integer_unit(size_str, size = -0);
+  EXPECT_STREQ("0", size_str);
+  BLI_str_format_integer_unit(size_str, size = -1);
+  EXPECT_STREQ("-1", size_str);
+  BLI_str_format_integer_unit(size_str, size = -10);
+  EXPECT_STREQ("-10", size_str);
+  BLI_str_format_integer_unit(size_str, size = -15);
+  EXPECT_STREQ("-15", size_str);
+  BLI_str_format_integer_unit(size_str, size = -100);
+  EXPECT_STREQ("-100", size_str);
+  BLI_str_format_integer_unit(size_str, size = -155);
+  EXPECT_STREQ("-155", size_str);
+  BLI_str_format_integer_unit(size_str, size = -1000);
+  EXPECT_STREQ("-1K", size_str);
+  BLI_str_format_integer_unit(size_str, size = -1555);
+  EXPECT_STREQ("-1K", size_str);
+  BLI_str_format_integer_unit(size_str, size = -10000);
+  EXPECT_STREQ("-10K", size_str);
+  BLI_str_format_integer_unit(size_str, size = -15555);
+  EXPECT_STREQ("-15K", size_str);
+  BLI_str_format_integer_unit(size_str, size = -100000);
+  EXPECT_STREQ("-.1M", size_str);
+  BLI_str_format_integer_unit(size_str, size = -155555);
+  EXPECT_STREQ("-.1M", size_str);
+  BLI_str_format_integer_unit(size_str, size = -1000000);
+  EXPECT_STREQ("-1M", size_str);
+  BLI_str_format_integer_unit(size_str, size = -1555555);
+  EXPECT_STREQ("-1M", size_str);
+  BLI_str_format_integer_unit(size_str, size = -10000000);
+  EXPECT_STREQ("-10M", size_str);
+  BLI_str_format_integer_unit(size_str, size = -15555555);
+  EXPECT_STREQ("-15M", size_str);
+  BLI_str_format_integer_unit(size_str, size = -100000000);
+  EXPECT_STREQ("-.1B", size_str);
+  BLI_str_format_integer_unit(size_str, size = -155555555);
+  EXPECT_STREQ("-.1B", size_str);
+  BLI_str_format_integer_unit(size_str, size = -1000000000);
+  EXPECT_STREQ("-1B", size_str);
+
+  /* Smallest possible value. */
+  BLI_str_format_integer_unit(size_str, size = -INT32_MAX);
+  EXPECT_STREQ("-2B", size_str);
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name String Length (Clamped)
+ * \{ */
+
+TEST(string, StringNLen)
+{
+  EXPECT_EQ(0, BLI_strnlen("", 0));
+  EXPECT_EQ(0, BLI_strnlen("", 1));
+  EXPECT_EQ(0, BLI_strnlen("", 100));
+
+  EXPECT_EQ(0, BLI_strnlen("x", 0));
+  EXPECT_EQ(1, BLI_strnlen("x", 1));
+  EXPECT_EQ(1, BLI_strnlen("x", 100));
+
+  /* `ü` is `\xc3\xbc`. */
+  EXPECT_EQ(2, BLI_strnlen("ü", 100));
+
+  EXPECT_EQ(0, BLI_strnlen("this is a longer string", 0));
+  EXPECT_EQ(1, BLI_strnlen("this is a longer string", 1));
+  EXPECT_EQ(5, BLI_strnlen("this is a longer string", 5));
+  EXPECT_EQ(47, BLI_strnlen("This string writes about an agent without name.", 100));
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name String Join
+ * \{ */
+
+#define BUFFER_SIZE 128
+
+static void string_join_array_test_truncate(const char *strings[],
+                                            int strings_num,
+                                            char buffer[BUFFER_SIZE])
+{
+  const int buffer_len = BLI_string_join_array(buffer, BUFFER_SIZE, strings, strings_num);
+
+  { /* Ensure the allocated version is the same. */
+    char *buffer_alloc = BLI_string_join_arrayN(strings, strings_num);
+    EXPECT_STREQ(buffer_alloc, buffer);
+    MEM_freeN(buffer_alloc);
+  }
+
+  for (int dst_size = buffer_len + 1; dst_size > 0; dst_size--) {
+    char dst_tmp[BUFFER_SIZE];
+    int dst_tmp_len = BLI_string_join_array(dst_tmp, dst_size, strings, strings_num);
+    EXPECT_EQ(dst_tmp_len + 1, dst_size);
+    EXPECT_EQ(strncmp(dst_tmp, buffer, dst_tmp_len), 0);
+  }
+}
+
+static void string_join_array_with_sep_char_test_truncate(const char *strings[],
+                                                          int strings_num,
+                                                          char buffer[BUFFER_SIZE])
+{
+  const int buffer_len = BLI_string_join_array_by_sep_char(
+      buffer, BUFFER_SIZE, '|', strings, strings_num);
+
+  { /* Ensure the allocated version is the same. */
+    char *buffer_alloc = BLI_string_join_array_by_sep_charN('|', strings, strings_num);
+    EXPECT_STREQ(buffer_alloc, buffer);
+    MEM_freeN(buffer_alloc);
+  }
+
+  for (int dst_size = buffer_len + 1; dst_size > 0; dst_size--) {
+    char dst_tmp[BUFFER_SIZE];
+    int dst_tmp_len = BLI_string_join_array_by_sep_char(
+        dst_tmp, dst_size, '|', strings, strings_num);
+    EXPECT_EQ(dst_tmp_len + 1, dst_size);
+    EXPECT_EQ(strncmp(dst_tmp, buffer, dst_tmp_len), 0);
+  }
+}
+
+TEST(string, StrJoin_Truncate)
+{
+  char buffer[BUFFER_SIZE];
+  { /* Multiple single char words. */
+    const char *strings[] = {"a", "b", "c", "d", "e", "f"};
+    string_join_array_test_truncate(strings, ARRAY_SIZE(strings), buffer);
+    EXPECT_STREQ(buffer, "abcdef");
+    string_join_array_with_sep_char_test_truncate(strings, ARRAY_SIZE(strings), buffer);
+    EXPECT_STREQ(buffer, "a|b|c|d|e|f");
+  }
+  { /* Multiple char pair words. */
+    const char *strings[] = {"aa", "bb", "cc", "dd", "ee", "ff"};
+    string_join_array_test_truncate(strings, ARRAY_SIZE(strings), buffer);
+    EXPECT_STREQ(buffer, "aabbccddeeff");
+    string_join_array_with_sep_char_test_truncate(strings, ARRAY_SIZE(strings), buffer);
+    EXPECT_STREQ(buffer, "aa|bb|cc|dd|ee|ff");
+  }
+  { /* Multiple empty words. */
+    const char *strings[] = {"", "", "", "", "", ""};
+    string_join_array_test_truncate(strings, ARRAY_SIZE(strings), buffer);
+    EXPECT_STREQ(buffer, "");
+    string_join_array_with_sep_char_test_truncate(strings, ARRAY_SIZE(strings), buffer);
+    EXPECT_STREQ(buffer, "|||||");
+  }
+  { /* Single word. */
+    const char *strings[] = {"test"};
+    string_join_array_test_truncate(strings, ARRAY_SIZE(strings), buffer);
+    EXPECT_STREQ(buffer, "test");
+    string_join_array_with_sep_char_test_truncate(strings, ARRAY_SIZE(strings), buffer);
+    EXPECT_STREQ(buffer, "test");
+  }
+  { /* Empty item. */
+    const char *strings[] = {""};
+    string_join_array_test_truncate(strings, ARRAY_SIZE(strings), buffer);
+    EXPECT_STREQ(buffer, "");
+    string_join_array_with_sep_char_test_truncate(strings, ARRAY_SIZE(strings), buffer);
+    EXPECT_STREQ(buffer, "");
+  }
+  { /* Empty array. */
+    const char *strings[] = {"a"};
+    string_join_array_test_truncate(strings, 0, buffer);
+    EXPECT_STREQ(buffer, "");
+    string_join_array_with_sep_char_test_truncate(strings, 0, buffer);
+    EXPECT_STREQ(buffer, "");
+  }
+}
+
+#undef BUFFER_SIZE
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name String Find Split Words
+ * \{ */
+
 struct WordInfo {
   WordInfo() = default;
-  WordInfo(int start, int end) : start(start), end(end)
-  {
-  }
+  WordInfo(int start, int end) : start(start), end(end) {}
   bool operator==(const WordInfo &other) const
   {
     return start == other.start && end == other.end;
@@ -636,6 +980,62 @@ TEST_F(StringFindSplitWords, LimitChars)
   testStringFindSplitWords(words, 0, {{-1, -1}});
 }
 
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name String Element
+ * \{ */
+
+/* #BLI_string_elem_split_by_delim */
+
+TEST(string, StringElemEmpty)
+{
+  EXPECT_FALSE(BLI_string_elem_split_by_delim("A", ':', ""));
+
+  EXPECT_TRUE(BLI_string_elem_split_by_delim("", ':', ""));
+  EXPECT_TRUE(BLI_string_elem_split_by_delim(":", ':', ""));
+  EXPECT_TRUE(BLI_string_elem_split_by_delim("::", ':', ""));
+  EXPECT_TRUE(BLI_string_elem_split_by_delim("A:", ':', ""));
+  EXPECT_TRUE(BLI_string_elem_split_by_delim(":A", ':', ""));
+}
+
+TEST(string, StringElemSingle)
+{
+  EXPECT_TRUE(BLI_string_elem_split_by_delim("A", ':', "A"));
+  EXPECT_FALSE(BLI_string_elem_split_by_delim("A", ':', "B"));
+
+  EXPECT_TRUE(BLI_string_elem_split_by_delim("B", 'A', "B"));
+  EXPECT_FALSE(BLI_string_elem_split_by_delim("A", 'A', "A"));
+}
+
+TEST(string, StringElemComplex)
+{
+  EXPECT_TRUE(BLI_string_elem_split_by_delim("TEST", ':', "TEST"));
+
+  EXPECT_TRUE(BLI_string_elem_split_by_delim(":TEST", ':', "TEST"));
+  EXPECT_TRUE(BLI_string_elem_split_by_delim("TEST:", ':', "TEST"));
+  EXPECT_TRUE(BLI_string_elem_split_by_delim(":TEST:", ':', "TEST"));
+
+  EXPECT_TRUE(BLI_string_elem_split_by_delim("::TEST", ':', "TEST"));
+  EXPECT_TRUE(BLI_string_elem_split_by_delim("TEST::", ':', "TEST"));
+  EXPECT_TRUE(BLI_string_elem_split_by_delim("::TEST::", ':', "TEST"));
+
+  EXPECT_FALSE(BLI_string_elem_split_by_delim(":TEST ", ':', "TEST"));
+  EXPECT_FALSE(BLI_string_elem_split_by_delim(" TEST:", ':', "TEST"));
+  EXPECT_FALSE(BLI_string_elem_split_by_delim(": TEST :", ':', "TEST"));
+
+  EXPECT_TRUE(BLI_string_elem_split_by_delim("A:B:TEST", ':', "TEST"));
+  EXPECT_TRUE(BLI_string_elem_split_by_delim("TEST:A:B", ':', "TEST"));
+  EXPECT_TRUE(BLI_string_elem_split_by_delim("A:TEST:B", ':', "TEST"));
+  EXPECT_TRUE(BLI_string_elem_split_by_delim(":A:TEST:B:", ':', "TEST"));
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name String Search (Case Insensitive)
+ * \{ */
+
 /* BLI_strncasestr */
 TEST(string, StringStrncasestr)
 {
@@ -661,6 +1061,12 @@ TEST(string, StringStrncasestr)
   EXPECT_EQ(res, (void *)nullptr);
 }
 
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name String Maximum Word Count
+ * \{ */
+
 /* BLI_string_max_possible_word_count */
 TEST(string, StringMaxPossibleWordCount)
 {
@@ -670,6 +1076,12 @@ TEST(string, StringMaxPossibleWordCount)
   EXPECT_EQ(BLI_string_max_possible_word_count(3), 2);
   EXPECT_EQ(BLI_string_max_possible_word_count(10), 6);
 }
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name String is Decimal
+ * \{ */
 
 /* BLI_string_is_decimal */
 TEST(string, StrIsDecimal)
@@ -689,6 +1101,12 @@ TEST(string, StrIsDecimal)
   EXPECT_TRUE(BLI_string_is_decimal("001"));
   EXPECT_TRUE(BLI_string_is_decimal("11342908713948713498745980171334059871345098713405981734"));
 }
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name String Natural Case Insensitive Comparison
+ * \{ */
 
 /* BLI_strcasecmp_natural */
 class StringCasecmpNatural : public testing::Test {
@@ -733,6 +1151,12 @@ class StringCasecmpNatural : public testing::Test {
     return ret_array;
   }
 };
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name String Case Insensitive Comparison
+ * \{ */
 
 TEST_F(StringCasecmpNatural, Empty)
 {
@@ -894,7 +1318,13 @@ TEST_F(StringCasecmpNatural, TextAndNumbers)
   testReturnsMoreThanZeroForAll(positive);
 }
 
-/* BLI_str_escape, BLI_str_unescape */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name String Escape/Un-Escape
+ *
+ * #BLI_str_escape, #BLI_str_unescape.
+ * \{ */
 
 class StringEscape : public testing::Test {
  protected:
@@ -905,10 +1335,12 @@ class StringEscape : public testing::Test {
   void testEscapeWords(const CompareWordsArray &items)
   {
     size_t dst_test_len;
-    char dst_test[64];
+    char dst_test[64]; /* Must be big enough for all input. */
     for (const auto &item : items) {
+      /* Validate the static size is big enough (test the test itself). */
+      EXPECT_LT((strlen(item[0]) * 2) + 1, sizeof(dst_test));
       /* Escape the string. */
-      dst_test_len = BLI_str_escape(dst_test, item[0], SIZE_MAX);
+      dst_test_len = BLI_str_escape(dst_test, item[0], sizeof(dst_test));
       EXPECT_STREQ(dst_test, item[1]);
       EXPECT_EQ(dst_test_len, strlen(dst_test));
       /* Escape back. */
@@ -974,4 +1406,21 @@ TEST_F(StringEscape, Control)
   };
 
   testEscapeWords(escaped);
+}
+
+/** \} */
+
+TEST(BLI_string, bounded_strcpy)
+{
+  {
+    char str[8];
+    STRNCPY(str, "Hello");
+    EXPECT_STREQ(str, "Hello");
+  }
+
+  {
+    char str[8];
+    STRNCPY(str, "Hello, World!");
+    EXPECT_STREQ(str, "Hello, ");
+  }
 }

@@ -1,22 +1,6 @@
-# ##### BEGIN GPL LICENSE BLOCK #####
+# SPDX-FileCopyrightText: 2012-2022 Blender Authors
 #
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ##### END GPL LICENSE BLOCK #####
-
-# <pep8 compliant>
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 # Currently this script only generates images from different modifier
 # combinations and does not validate they work correctly,
@@ -63,7 +47,7 @@ def render_gl(context, filepath, shade):
 
     # stop to inspect!
     # if filepath == "test_cube_shell_solidify_subsurf_wp_wire":
-    #     assert(0)
+    #     assert False
     # else:
     #     return
 
@@ -73,8 +57,8 @@ def render_gl(context, filepath, shade):
 
 def render_gl_all_modes(context, obj, filepath=""):
 
-    assert(obj is not None)
-    assert(filepath != "")
+    assert obj is not None
+    assert filepath != ""
 
     scene = context.scene
 
@@ -109,7 +93,7 @@ def render_gl_all_modes(context, obj, filepath=""):
 
     render_gl(context, filepath + "_wp_wire", shade='WIREFRAME')
 
-    assert(1)
+    assert 1
 
     bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
 

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2017-2023 Blender Authors
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
 # Module to find OpenEXR.
 #
 # This module will first look into the directories defined by the variables:
@@ -6,7 +10,7 @@
 # It also supports non-standard names for the library components.
 #
 # To use a custom OpenEXR
-#   - Set the variable OPENEXR_CUSTOM to True
+#   - Set the variable OPENEXR_CUSTOM to TRUE
 #   - Set the variable OPENEXR_CUSTOM_LIBRARY to the name of the library to
 #     use, e.g. "SpiIlmImf"
 #   - Optionally set the variable OPENEXR_CUSTOM_INCLUDE_DIR to any
@@ -20,7 +24,7 @@
 # OPENEXR_LIBRARIES   - list of libraries to link against when using OpenEXR.
 #                       This list does NOT include the IlmBase libraries.
 #                       These are defined by the FindIlmBase module.
-# OPENEXR_FOUND       - True if OpenEXR was found.
+# OPENEXR_FOUND       - TRUE if OpenEXR was found.
 
 # Other standard issue macros
 include(SelectLibraryConfigurations)
@@ -173,7 +177,8 @@ if(OPENEXR_INCLUDE_DIR)
              "\\1" XYZ ${OPENEXR_BUILD_SPECIFICATION})
       set("OPENEXR_VERSION" ${XYZ} CACHE STRING "Version of OpenEXR lib")
     else()
-      # Old versions (before 2.0?) do not have any version string, just assuming 2.0 should be fine though.
+      # Old versions (before 2.0?) do not have any version string,
+      # just assuming 2.0 should be fine though.
       message(WARNING "Could not determine ILMBase library version, assuming 2.0.")
       set("OPENEXR_VERSION" "2.0" CACHE STRING "Version of OpenEXR lib")
     endif()
@@ -186,11 +191,11 @@ if(OPENEXR_CUSTOM)
   endif()
   set(OpenEXR_Library ${OPENEXR_CUSTOM_LIBRARY})
 else()
-# elseif(${OPENEXR_VERSION} VERSION_LESS "2.1")
+  # elseif(${OPENEXR_VERSION} VERSION_LESS "2.1")
   set(OpenEXR_Library IlmImf)
-# else()
-#   string(REGEX REPLACE "([0-9]+)[.]([0-9]+).*" "\\1_\\2" _openexr_libs_ver ${OPENEXR_VERSION})
-#   set(OpenEXR_Library IlmImf-${_openexr_libs_ver})
+  # else()
+  #   string(REGEX REPLACE "([0-9]+)[.]([0-9]+).*" "\\1_\\2" _openexr_libs_ver ${OPENEXR_VERSION})
+  #   set(OpenEXR_Library IlmImf-${_openexr_libs_ver})
 endif()
 
 # Locate the OpenEXR library
@@ -225,7 +230,7 @@ if(OPENEXR_FOUND)
     FIND_PACKAGE_MESSAGE(OPENEXR
       "Found OpenEXR: ${OPENEXR_LIBRARIES}"
       "[${OPENEXR_INCLUDE_DIR}][${OPENEXR_LIBRARIES}][${OPENEXR_CURRENT_STATE}]"
-      )
+    )
   endif()
 endif()
 

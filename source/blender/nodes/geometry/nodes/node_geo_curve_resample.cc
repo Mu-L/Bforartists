@@ -1,237 +1,233 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#include "BLI_array.hh"
-#include "BLI_task.hh"
-#include "BLI_timeit.hh"
+#include "GEO_resample_curves.hh"
 
-#include "BKE_attribute_math.hh"
-#include "BKE_spline.hh"
+#include "BKE_curves.hh"
+#include "BKE_grease_pencil.hh"
 
-#include "UI_interface.h"
-#include "UI_resources.h"
+#include "UI_interface.hh"
+#include "UI_resources.hh"
+
+#include "NOD_rna_define.hh"
 
 #include "node_geometry_util.hh"
 
-using blender::fn::GVArray_For_GSpan;
-using blender::fn::GVArray_For_Span;
-using blender::fn::GVArray_Typed;
+namespace blender::nodes::node_geo_curve_resample_cc {
 
-static bNodeSocketTemplate geo_node_curve_resample_in[] = {
-    {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_INT, N_("Count"), 10, 0, 0, 0, 1, 100000},
-    {SOCK_FLOAT, N_("Length"), 0.1f, 0.0f, 0.0f, 0.0f, 0.001f, FLT_MAX, PROP_DISTANCE},
-    {-1, ""},
-};
+NODE_STORAGE_FUNCS(NodeGeometryCurveResample)
 
-static bNodeSocketTemplate geo_node_curve_resample_out[] = {
-    {SOCK_GEOMETRY, N_("Geometry")},
-    {-1, ""},
-};
-
-static void geo_node_curve_resample_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+static void node_declare(NodeDeclarationBuilder &b)
 {
-  uiItemR(layout, ptr, "mode", UI_ITEM_R_EXPAND, nullptr, ICON_NONE);
+  b.add_input<decl::Geometry>("Curve").supported_type(
+      {GeometryComponent::Type::Curve, GeometryComponent::Type::GreasePencil});
+  b.add_input<decl::Bool>("Selection").default_value(true).field_on_all().hide_value();
+  auto &count =
+      b.add_input<decl::Int>("Count").default_value(10).min(1).max(100000).field_on_all();
+  auto &length = b.add_input<decl::Float>("Length")
+                     .default_value(0.1f)
+                     .min(0.01f)
+                     .subtype(PROP_DISTANCE)
+                     .field_on_all();
+  b.add_output<decl::Geometry>("Curve").propagate_all();
+
+  const bNode *node = b.node_or_null();
+  if (node != nullptr) {
+    const NodeGeometryCurveResample &storage = node_storage(*node);
+    const GeometryNodeCurveResampleMode mode = GeometryNodeCurveResampleMode(storage.mode);
+
+    count.available(mode == GEO_NODE_CURVE_RESAMPLE_COUNT);
+    length.available(mode == GEO_NODE_CURVE_RESAMPLE_LENGTH);
+  }
 }
 
-static void geo_node_curve_resample_init(bNodeTree *UNUSED(tree), bNode *node)
+static void node_layout(uiLayout *layout, bContext * /*C*/, PointerRNA *ptr)
 {
-  NodeGeometryCurveResample *data = (NodeGeometryCurveResample *)MEM_callocN(
-      sizeof(NodeGeometryCurveResample), __func__);
+  uiItemR(layout, ptr, "mode", UI_ITEM_NONE, "", ICON_NONE);
+}
 
-  data->mode = GEO_NODE_CURVE_SAMPLE_COUNT;
+static void node_layout_ex(uiLayout *layout, bContext * /*C*/, PointerRNA *ptr)
+{
+  uiItemR(layout, ptr, "keep_last_segment", UI_ITEM_NONE, std::nullopt, ICON_NONE);
+}
+
+static void node_init(bNodeTree * /*tree*/, bNode *node)
+{
+  NodeGeometryCurveResample *data = MEM_cnew<NodeGeometryCurveResample>(__func__);
+
+  data->mode = GEO_NODE_CURVE_RESAMPLE_COUNT;
+  data->keep_last_segment = true;
   node->storage = data;
 }
 
-static void geo_node_curve_resample_update(bNodeTree *UNUSED(ntree), bNode *node)
+static void node_geo_exec(GeoNodeExecParams params)
 {
-  NodeGeometryCurveResample &node_storage = *(NodeGeometryCurveResample *)node->storage;
-  const GeometryNodeCurveSampleMode mode = (GeometryNodeCurveSampleMode)node_storage.mode;
+  GeometrySet geometry_set = params.extract_input<GeometrySet>("Curve");
 
-  bNodeSocket *count_socket = ((bNodeSocket *)node->inputs.first)->next;
-  bNodeSocket *length_socket = count_socket->next;
+  const NodeGeometryCurveResample &storage = node_storage(params.node());
+  const GeometryNodeCurveResampleMode mode = (GeometryNodeCurveResampleMode)storage.mode;
 
-  nodeSetSocketAvailability(count_socket, mode == GEO_NODE_CURVE_SAMPLE_COUNT);
-  nodeSetSocketAvailability(length_socket, mode == GEO_NODE_CURVE_SAMPLE_LENGTH);
-}
+  const Field<bool> selection = params.extract_input<Field<bool>>("Selection");
 
-namespace blender::nodes {
+  GeometryComponentEditData::remember_deformed_positions_if_necessary(geometry_set);
 
-struct SampleModeParam {
-  GeometryNodeCurveSampleMode mode;
-  std::optional<float> length;
-  std::optional<int> count;
-};
-
-static SplinePtr resample_spline(const Spline &input_spline, const int count)
-{
-  std::unique_ptr<PolySpline> output_spline = std::make_unique<PolySpline>();
-  output_spline->set_cyclic(input_spline.is_cyclic());
-  output_spline->normal_mode = input_spline.normal_mode;
-
-  if (input_spline.evaluated_edges_size() < 1 || count == 1) {
-    output_spline->add_point(input_spline.positions().first(),
-                             input_spline.tilts().first(),
-                             input_spline.radii().first());
-    output_spline->attributes.reallocate(1);
-    input_spline.attributes.foreach_attribute(
-        [&](StringRefNull name, const AttributeMetaData &meta_data) {
-          std::optional<GSpan> src = input_spline.attributes.get_for_read(name);
-          BLI_assert(src);
-          if (!output_spline->attributes.create(name, meta_data.data_type)) {
-            BLI_assert_unreachable();
-            return false;
-          }
-          std::optional<GMutableSpan> dst = output_spline->attributes.get_for_write(name);
-          if (!dst) {
-            BLI_assert_unreachable();
-            return false;
-          }
-          src->type().copy_assign(src->data(), dst->data());
-          return true;
-        },
-        ATTR_DOMAIN_POINT);
-    return output_spline;
-  }
-
-  output_spline->resize(count);
-
-  Array<float> uniform_samples = input_spline.sample_uniform_index_factors(count);
-
-  input_spline.sample_with_index_factors<float3>(
-      input_spline.evaluated_positions(), uniform_samples, output_spline->positions());
-
-  input_spline.sample_with_index_factors<float>(
-      input_spline.interpolate_to_evaluated(input_spline.radii()),
-      uniform_samples,
-      output_spline->radii());
-
-  input_spline.sample_with_index_factors<float>(
-      input_spline.interpolate_to_evaluated(input_spline.tilts()),
-      uniform_samples,
-      output_spline->tilts());
-
-  output_spline->attributes.reallocate(count);
-  input_spline.attributes.foreach_attribute(
-      [&](StringRefNull name, const AttributeMetaData &meta_data) {
-        std::optional<GSpan> input_attribute = input_spline.attributes.get_for_read(name);
-        BLI_assert(input_attribute);
-        if (!output_spline->attributes.create(name, meta_data.data_type)) {
-          BLI_assert_unreachable();
-          return false;
+  switch (mode) {
+    case GEO_NODE_CURVE_RESAMPLE_COUNT: {
+      Field<int> count = params.extract_input<Field<int>>("Count");
+      geometry_set.modify_geometry_sets([&](GeometrySet &geometry) {
+        if (const Curves *src_curves_id = geometry.get_curves()) {
+          const bke::CurvesGeometry &src_curves = src_curves_id->geometry.wrap();
+          const bke::CurvesFieldContext field_context{*src_curves_id, AttrDomain::Curve};
+          bke::CurvesGeometry dst_curves = geometry::resample_to_count(
+              src_curves, field_context, selection, count);
+          Curves *dst_curves_id = bke::curves_new_nomain(std::move(dst_curves));
+          bke::curves_copy_parameters(*src_curves_id, *dst_curves_id);
+          geometry.replace_curves(dst_curves_id);
         }
-        std::optional<GMutableSpan> output_attribute = output_spline->attributes.get_for_write(
-            name);
-        if (!output_attribute) {
-          BLI_assert_unreachable();
-          return false;
+        if (GreasePencil *grease_pencil = geometry_set.get_grease_pencil_for_write()) {
+          using namespace blender::bke::greasepencil;
+          for (const int layer_index : grease_pencil->layers().index_range()) {
+            Drawing *drawing = grease_pencil->get_eval_drawing(grease_pencil->layer(layer_index));
+
+            if (drawing == nullptr) {
+              continue;
+            }
+            const bke::CurvesGeometry &src_curves = drawing->strokes();
+            const bke::GreasePencilLayerFieldContext field_context(
+                *grease_pencil, AttrDomain::Curve, layer_index);
+            bke::CurvesGeometry dst_curves = geometry::resample_to_count(
+                src_curves, field_context, selection, count);
+            drawing->strokes_for_write() = std::move(dst_curves);
+            drawing->tag_topology_changed();
+          }
         }
-
-        input_spline.sample_with_index_factors(
-            *input_spline.interpolate_to_evaluated(*input_attribute),
-            uniform_samples,
-            *output_attribute);
-
-        return true;
-      },
-      ATTR_DOMAIN_POINT);
-
-  return output_spline;
-}
-
-static std::unique_ptr<CurveEval> resample_curve(const CurveEval &input_curve,
-                                                 const SampleModeParam &mode_param)
-{
-  Span<SplinePtr> input_splines = input_curve.splines();
-
-  std::unique_ptr<CurveEval> output_curve = std::make_unique<CurveEval>();
-  output_curve->resize(input_splines.size());
-  MutableSpan<SplinePtr> output_splines = output_curve->splines();
-
-  if (mode_param.mode == GEO_NODE_CURVE_SAMPLE_COUNT) {
-    threading::parallel_for(input_splines.index_range(), 128, [&](IndexRange range) {
-      for (const int i : range) {
-        BLI_assert(mode_param.count);
-        output_splines[i] = resample_spline(*input_splines[i], *mode_param.count);
-      }
-    });
-  }
-  else if (mode_param.mode == GEO_NODE_CURVE_SAMPLE_LENGTH) {
-    threading::parallel_for(input_splines.index_range(), 128, [&](IndexRange range) {
-      for (const int i : range) {
-        const float length = input_splines[i]->length();
-        const int count = std::max(int(length / *mode_param.length), 1);
-        output_splines[i] = resample_spline(*input_splines[i], count);
-      }
-    });
-  }
-
-  output_curve->attributes = input_curve.attributes;
-
-  return output_curve;
-}
-
-static void geo_node_resample_exec(GeoNodeExecParams params)
-{
-  GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
-
-  geometry_set = bke::geometry_set_realize_instances(geometry_set);
-
-  if (!geometry_set.has_curve()) {
-    params.set_output("Geometry", GeometrySet());
-    return;
-  }
-
-  const CurveEval &input_curve = *geometry_set.get_curve_for_read();
-  NodeGeometryCurveResample &node_storage = *(NodeGeometryCurveResample *)params.node().storage;
-  const GeometryNodeCurveSampleMode mode = (GeometryNodeCurveSampleMode)node_storage.mode;
-  SampleModeParam mode_param;
-  mode_param.mode = mode;
-  if (mode == GEO_NODE_CURVE_SAMPLE_COUNT) {
-    const int count = params.extract_input<int>("Count");
-    if (count < 1) {
-      params.set_output("Geometry", GeometrySet());
-      return;
+      });
+      break;
     }
-    mode_param.count.emplace(count);
-  }
-  else if (mode == GEO_NODE_CURVE_SAMPLE_LENGTH) {
-    /* Don't allow asymptotic count increase for low resolution values. */
-    const float resolution = std::max(params.extract_input<float>("Length"), 0.0001f);
-    mode_param.length.emplace(resolution);
+    case GEO_NODE_CURVE_RESAMPLE_LENGTH: {
+      Field<float> length = params.extract_input<Field<float>>("Length");
+      geometry_set.modify_geometry_sets([&](GeometrySet &geometry) {
+        if (const Curves *src_curves_id = geometry.get_curves()) {
+          const bke::CurvesGeometry &src_curves = src_curves_id->geometry.wrap();
+          const bke::CurvesFieldContext field_context{*src_curves_id, AttrDomain::Curve};
+          bke::CurvesGeometry dst_curves = geometry::resample_to_length(
+              src_curves, field_context, selection, length, {}, storage.keep_last_segment);
+          Curves *dst_curves_id = bke::curves_new_nomain(std::move(dst_curves));
+          bke::curves_copy_parameters(*src_curves_id, *dst_curves_id);
+          geometry.replace_curves(dst_curves_id);
+        }
+        if (GreasePencil *grease_pencil = geometry_set.get_grease_pencil_for_write()) {
+          using namespace blender::bke::greasepencil;
+          for (const int layer_index : grease_pencil->layers().index_range()) {
+            Drawing *drawing = grease_pencil->get_eval_drawing(grease_pencil->layer(layer_index));
+            if (drawing == nullptr) {
+              continue;
+            }
+            const bke::CurvesGeometry &src_curves = drawing->strokes();
+            const bke::GreasePencilLayerFieldContext field_context(
+                *grease_pencil, AttrDomain::Curve, layer_index);
+            bke::CurvesGeometry dst_curves = geometry::resample_to_length(
+                src_curves, field_context, selection, length, {}, storage.keep_last_segment);
+            drawing->strokes_for_write() = std::move(dst_curves);
+            drawing->tag_topology_changed();
+          }
+        }
+      });
+      break;
+    }
+    case GEO_NODE_CURVE_RESAMPLE_EVALUATED:
+      geometry_set.modify_geometry_sets([&](GeometrySet &geometry) {
+        if (const Curves *src_curves_id = geometry.get_curves()) {
+          const bke::CurvesGeometry &src_curves = src_curves_id->geometry.wrap();
+          const bke::CurvesFieldContext field_context{*src_curves_id, AttrDomain::Curve};
+          bke::CurvesGeometry dst_curves = geometry::resample_to_evaluated(
+              src_curves, field_context, selection);
+          Curves *dst_curves_id = bke::curves_new_nomain(std::move(dst_curves));
+          bke::curves_copy_parameters(*src_curves_id, *dst_curves_id);
+          geometry.replace_curves(dst_curves_id);
+        }
+        if (GreasePencil *grease_pencil = geometry_set.get_grease_pencil_for_write()) {
+          using namespace blender::bke::greasepencil;
+          for (const int layer_index : grease_pencil->layers().index_range()) {
+            Drawing *drawing = grease_pencil->get_eval_drawing(grease_pencil->layer(layer_index));
+            if (drawing == nullptr) {
+              continue;
+            }
+            const bke::CurvesGeometry &src_curves = drawing->strokes();
+            const bke::GreasePencilLayerFieldContext field_context(
+                *grease_pencil, AttrDomain::Curve, layer_index);
+            bke::CurvesGeometry dst_curves = geometry::resample_to_evaluated(
+                src_curves, field_context, selection);
+            drawing->strokes_for_write() = std::move(dst_curves);
+            drawing->tag_topology_changed();
+          }
+        }
+      });
+      break;
   }
 
-  std::unique_ptr<CurveEval> output_curve = resample_curve(input_curve, mode_param);
-
-  params.set_output("Geometry", GeometrySet::create_with_curve(output_curve.release()));
+  params.set_output("Curve", std::move(geometry_set));
 }
 
-}  // namespace blender::nodes
-
-void register_node_type_geo_curve_resample()
+static void node_rna(StructRNA *srna)
 {
-  static bNodeType ntype;
+  static EnumPropertyItem mode_items[] = {
+      {GEO_NODE_CURVE_RESAMPLE_EVALUATED,
+       "EVALUATED",
+       0,
+       "Evaluated",
+       "Output the input spline's evaluated points, based on the resolution attribute for NURBS "
+       "and Bézier splines. Poly splines are unchanged"},
+      {GEO_NODE_CURVE_RESAMPLE_COUNT,
+       "COUNT",
+       0,
+       "Count",
+       "Sample the specified number of points along each spline"},
+      {GEO_NODE_CURVE_RESAMPLE_LENGTH,
+       "LENGTH",
+       0,
+       "Length",
+       "Calculate the number of samples by splitting each spline into segments with the specified "
+       "length"},
+      {0, nullptr, 0, nullptr, nullptr},
+  };
 
-  geo_node_type_base(&ntype, GEO_NODE_CURVE_RESAMPLE, "Resample Curve", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(&ntype, geo_node_curve_resample_in, geo_node_curve_resample_out);
-  ntype.draw_buttons = geo_node_curve_resample_layout;
-  node_type_storage(
-      &ntype, "NodeGeometryCurveResample", node_free_standard_storage, node_copy_standard_storage);
-  node_type_init(&ntype, geo_node_curve_resample_init);
-  node_type_update(&ntype, geo_node_curve_resample_update);
-  ntype.geometry_node_execute = blender::nodes::geo_node_resample_exec;
-  nodeRegisterType(&ntype);
+  RNA_def_node_enum(srna,
+                    "mode",
+                    "Mode",
+                    "How to specify the amount of samples",
+                    mode_items,
+                    NOD_storage_enum_accessors(mode));
+
+  RNA_def_node_boolean(srna,
+                       "keep_last_segment",
+                       "Keep Last Segment",
+                       "Don't collapse a curves to single points if they are shorter than the "
+                       "given length. The collapsing behavior exists for compatibility reasons.",
+                       NOD_storage_boolean_accessors(keep_last_segment, 1));
 }
+
+static void node_register()
+{
+  static blender::bke::bNodeType ntype;
+
+  geo_node_type_base(&ntype, "GeometryNodeResampleCurve", GEO_NODE_RESAMPLE_CURVE);
+  ntype.ui_name = "Resample Curve";
+  ntype.ui_description = "Generate a poly spline for each input spline";
+  ntype.enum_name_legacy = "RESAMPLE_CURVE";
+  ntype.nclass = NODE_CLASS_GEOMETRY;
+  ntype.declare = node_declare;
+  ntype.draw_buttons = node_layout;
+  ntype.draw_buttons_ex = node_layout_ex;
+  blender::bke::node_type_storage(
+      &ntype, "NodeGeometryCurveResample", node_free_standard_storage, node_copy_standard_storage);
+  ntype.initfunc = node_init;
+  ntype.geometry_node_execute = node_geo_exec;
+  blender::bke::node_register_type(&ntype);
+
+  node_rna(ntype.rna_ext.srna);
+}
+NOD_REGISTER_NODE(node_register)
+
+}  // namespace blender::nodes::node_geo_curve_resample_cc

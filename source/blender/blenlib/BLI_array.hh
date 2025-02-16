@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -31,7 +19,7 @@
  *
  * A main benefit of using Array over Vector is that it expresses the intent of the developer
  * better. It indicates that the size of the data structure is not expected to change. Furthermore,
- * you can be more certain that an array does not overallocate.
+ * you can be more certain that an array does not over-allocate.
  *
  * blender::Array supports small object optimization to improve performance when the size turns out
  * to be small at run-time.
@@ -78,10 +66,10 @@ class Array {
   int64_t size_;
 
   /** Used for allocations when the inline buffer is too small. */
-  Allocator allocator_;
+  BLI_NO_UNIQUE_ADDRESS Allocator allocator_;
 
   /** A placeholder buffer that will remain uninitialized until it is used. */
-  TypedBuffer<T, InlineBufferCapacity> inline_buffer_;
+  BLI_NO_UNIQUE_ADDRESS TypedBuffer<T, InlineBufferCapacity> inline_buffer_;
 
  public:
   /**
@@ -93,14 +81,12 @@ class Array {
     size_ = 0;
   }
 
-  Array(NoExceptConstructor, Allocator allocator = {}) noexcept : Array(allocator)
-  {
-  }
+  Array(NoExceptConstructor, Allocator allocator = {}) noexcept : Array(allocator) {}
 
   /**
    * Create a new array that contains copies of all values.
    */
-  template<typename U, typename std::enable_if_t<std::is_convertible_v<U, T>> * = nullptr>
+  template<typename U, BLI_ENABLE_IF((std::is_convertible_v<U, T>))>
   Array(Span<U> values, Allocator allocator = {}) : Array(NoExceptConstructor(), allocator)
   {
     const int64_t size = values.size();
@@ -112,7 +98,7 @@ class Array {
   /**
    * Create a new array that contains copies of all values.
    */
-  template<typename U, typename std::enable_if_t<std::is_convertible_v<U, T>> * = nullptr>
+  template<typename U, BLI_ENABLE_IF((std::is_convertible_v<U, T>))>
   Array(const std::initializer_list<U> &values, Allocator allocator = {})
       : Array(Span<U>(values), allocator)
   {
@@ -171,15 +157,16 @@ class Array {
     size_ = size;
   }
 
-  Array(const Array &other) : Array(other.as_span(), other.allocator_)
-  {
-  }
+  Array(const Array &other) : Array(other.as_span(), other.allocator_) {}
 
   Array(Array &&other) noexcept(std::is_nothrow_move_constructible_v<T>)
       : Array(NoExceptConstructor(), other.allocator_)
   {
     if (other.data_ == other.inline_buffer_) {
-      uninitialized_relocate_n(other.data_, other.size_, data_);
+      /* This comparison with #InlineBufferCapacity may look a bit useless, and indeed it is.
+       * However, it helps to quiet a wrong GCC `-Warray-bounds` warning. */
+      const int64_t relocate_num = (InlineBufferCapacity > 0) ? other.size_ : 0;
+      uninitialized_relocate_n(other.data_, relocate_num, data_);
     }
     else {
       data_ = other.data_;
@@ -230,13 +217,13 @@ class Array {
     return MutableSpan<T>(data_, size_);
   }
 
-  template<typename U, typename std::enable_if_t<is_span_convertible_pointer_v<T, U>> * = nullptr>
+  template<typename U, BLI_ENABLE_IF((is_span_convertible_pointer_v<T, U>))>
   operator Span<U>() const
   {
     return Span<U>(data_, size_);
   }
 
-  template<typename U, typename std::enable_if_t<is_span_convertible_pointer_v<T, U>> * = nullptr>
+  template<typename U, BLI_ENABLE_IF((is_span_convertible_pointer_v<T, U>))>
   operator MutableSpan<U>()
   {
     return MutableSpan<U>(data_, size_);
@@ -277,18 +264,35 @@ class Array {
   }
 
   /**
-   * Return a reference to the last element in the array.
+   * Return a reference to the first element in the array.
    * This invokes undefined behavior when the array is empty.
    */
-  const T &last() const
+  const T &first() const
   {
     BLI_assert(size_ > 0);
-    return *(data_ + size_ - 1);
+    return *data_;
   }
-  T &last()
+  T &first()
   {
     BLI_assert(size_ > 0);
-    return *(data_ + size_ - 1);
+    return *data_;
+  }
+
+  /**
+   * Return a reference to the nth last element.
+   * This invokes undefined behavior when the array is too short.
+   */
+  const T &last(const int64_t n = 0) const
+  {
+    BLI_assert(n >= 0);
+    BLI_assert(n < size_);
+    return *(data_ + size_ - 1 - n);
+  }
+  T &last(const int64_t n = 0)
+  {
+    BLI_assert(n >= 0);
+    BLI_assert(n < size_);
+    return *(data_ + size_ - 1 - n);
   }
 
   /**
@@ -414,15 +418,12 @@ class Array {
     if (size <= InlineBufferCapacity) {
       return inline_buffer_;
     }
-    else {
-      return this->allocate(size);
-    }
+    return this->allocate(size);
   }
 
   T *allocate(int64_t size)
   {
-    return static_cast<T *>(
-        allocator_.allocate(static_cast<size_t>(size) * sizeof(T), alignof(T), AT));
+    return static_cast<T *>(allocator_.allocate(size_t(size) * sizeof(T), alignof(T), AT));
   }
 
   void deallocate_if_not_inline(T *ptr)
@@ -432,12 +433,5 @@ class Array {
     }
   }
 };
-
-/**
- * Same as a normal Array, but does not use Blender's guarded allocator. This is useful when
- * allocating memory with static storage duration.
- */
-template<typename T, int64_t InlineBufferCapacity = default_inline_buffer_capacity(sizeof(T))>
-using RawArray = Array<T, InlineBufferCapacity, RawAllocator>;
 
 }  // namespace blender

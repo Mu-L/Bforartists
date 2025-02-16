@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -24,16 +9,60 @@
  * \brief General operations for probes.
  */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "BLI_sys_types.h"
 
 struct LightProbe;
 struct Main;
+struct BlendWriter;
+struct BlendDataReader;
+struct LightProbeObjectCache;
+struct LightProbeGridCacheFrame;
+struct Object;
 
-void BKE_lightprobe_type_set(struct LightProbe *probe, const short lightprobe_type);
-void *BKE_lightprobe_add(struct Main *bmain, const char *name);
+void BKE_lightprobe_type_set(struct LightProbe *probe, short lightprobe_type);
+struct LightProbe *BKE_lightprobe_add(struct Main *bmain, const char *name);
 
-#ifdef __cplusplus
-}
-#endif
+void BKE_lightprobe_cache_blend_write(struct BlendWriter *writer,
+                                      struct LightProbeObjectCache *cache);
+
+void BKE_lightprobe_cache_blend_read(struct BlendDataReader *reader,
+                                     struct LightProbeObjectCache *cache);
+
+/**
+ * Create a single empty irradiance grid cache.
+ */
+struct LightProbeGridCacheFrame *BKE_lightprobe_grid_cache_frame_create(void);
+
+/**
+ * Create a copy of a cache frame.
+ * This does not include the in-progress baking data.
+ */
+LightProbeGridCacheFrame *BKE_lightprobe_grid_cache_frame_copy(LightProbeGridCacheFrame *src);
+
+/**
+ * Free a single grid cache.
+ */
+void BKE_lightprobe_grid_cache_frame_free(struct LightProbeGridCacheFrame *cache);
+
+/**
+ * Create the grid cache list depending on the lightprobe baking settings.
+ * The list is left empty to be filled by the baking process.
+ */
+void BKE_lightprobe_cache_create(struct Object *object);
+
+/**
+ * Create a copy of a whole cache.
+ * This does not include the in-progress baking data.
+ */
+LightProbeObjectCache *BKE_lightprobe_cache_copy(LightProbeObjectCache *src_cache);
+
+/**
+ * Free all irradiance grids allocated for the given object.
+ */
+void BKE_lightprobe_cache_free(struct Object *object);
+
+/**
+ * Return the number of sample stored inside an irradiance cache.
+ * This depends on the light cache type.
+ */
+int64_t BKE_lightprobe_grid_cache_frame_sample_count(const struct LightProbeGridCacheFrame *cache);

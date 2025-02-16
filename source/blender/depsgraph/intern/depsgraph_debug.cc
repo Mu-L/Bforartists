@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2014 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2014 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup depsgraph
@@ -23,24 +8,21 @@
  * Implementation of tools for debugging the depsgraph
  */
 
-#include "BLI_utildefines.h"
-
 #include "DNA_scene_types.h"
 
-#include "DNA_object_types.h"
+#include "BKE_global.hh"
 
-#include "DEG_depsgraph.h"
-#include "DEG_depsgraph_build.h"
-#include "DEG_depsgraph_debug.h"
-#include "DEG_depsgraph_query.h"
+#include "DEG_depsgraph.hh"
+#include "DEG_depsgraph_build.hh"
+#include "DEG_depsgraph_debug.hh"
+#include "DEG_depsgraph_query.hh"
 
 #include "intern/debug/deg_debug.h"
-#include "intern/depsgraph.h"
-#include "intern/depsgraph_relation.h"
-#include "intern/depsgraph_type.h"
-#include "intern/node/deg_node_component.h"
-#include "intern/node/deg_node_id.h"
-#include "intern/node/deg_node_time.h"
+#include "intern/depsgraph.hh"
+#include "intern/depsgraph_relation.hh"
+#include "intern/node/deg_node_component.hh"
+#include "intern/node/deg_node_id.hh"
+#include "intern/node/deg_node_time.hh"
 
 namespace deg = blender::deg;
 
@@ -56,19 +38,19 @@ int DEG_debug_flags_get(const Depsgraph *depsgraph)
   return deg_graph->debug.flags;
 }
 
-void DEG_debug_name_set(struct Depsgraph *depsgraph, const char *name)
+void DEG_debug_name_set(Depsgraph *depsgraph, const char *name)
 {
   deg::Depsgraph *deg_graph = reinterpret_cast<deg::Depsgraph *>(depsgraph);
   deg_graph->debug.name = name;
 }
 
-const char *DEG_debug_name_get(struct Depsgraph *depsgraph)
+const char *DEG_debug_name_get(Depsgraph *depsgraph)
 {
   const deg::Depsgraph *deg_graph = reinterpret_cast<const deg::Depsgraph *>(depsgraph);
   return deg_graph->debug.name.c_str();
 }
 
-bool DEG_debug_compare(const struct Depsgraph *graph1, const struct Depsgraph *graph2)
+bool DEG_debug_compare(const Depsgraph *graph1, const Depsgraph *graph2)
 {
   BLI_assert(graph1 != nullptr);
   BLI_assert(graph2 != nullptr);
@@ -187,7 +169,7 @@ bool DEG_debug_consistency_check(Depsgraph *graph)
              node->identifier().c_str(),
              node->num_links_pending,
              num_links_pending);
-      printf("Number of inlinks: %d\n", (int)node->inlinks.size());
+      printf("Number of inlinks: %d\n", int(node->inlinks.size()));
       return false;
     }
   }
@@ -196,12 +178,6 @@ bool DEG_debug_consistency_check(Depsgraph *graph)
 
 /* ------------------------------------------------ */
 
-/**
- * Obtain simple statistics about the complexity of the depsgraph.
- * \param[out] r_outer:      The number of outer nodes in the graph
- * \param[out] r_operations: The number of operation nodes in the graph
- * \param[out] r_relations:  The number of relations between (executable) nodes in the graph
- */
 void DEG_stats_simple(const Depsgraph *graph,
                       size_t *r_outer,
                       size_t *r_operations,
@@ -245,21 +221,21 @@ void DEG_stats_simple(const Depsgraph *graph,
   }
 }
 
-static deg::string depsgraph_name_for_logging(struct Depsgraph *depsgraph)
+static std::string depsgraph_name_for_logging(Depsgraph *depsgraph)
 {
   const char *name = DEG_debug_name_get(depsgraph);
   if (name[0] == '\0') {
     return "";
   }
-  return "[" + deg::string(name) + "]: ";
+  return "[" + std::string(name) + "]: ";
 }
 
-void DEG_debug_print_begin(struct Depsgraph *depsgraph)
+void DEG_debug_print_begin(Depsgraph *depsgraph)
 {
   fprintf(stdout, "%s", depsgraph_name_for_logging(depsgraph).c_str());
 }
 
-void DEG_debug_print_eval(struct Depsgraph *depsgraph,
+void DEG_debug_print_eval(Depsgraph *depsgraph,
                           const char *function_name,
                           const char *object_name,
                           const void *object_address)
@@ -278,7 +254,7 @@ void DEG_debug_print_eval(struct Depsgraph *depsgraph,
   fflush(stdout);
 }
 
-void DEG_debug_print_eval_subdata(struct Depsgraph *depsgraph,
+void DEG_debug_print_eval_subdata(Depsgraph *depsgraph,
                                   const char *function_name,
                                   const char *object_name,
                                   const void *object_address,
@@ -305,7 +281,7 @@ void DEG_debug_print_eval_subdata(struct Depsgraph *depsgraph,
   fflush(stdout);
 }
 
-void DEG_debug_print_eval_subdata_index(struct Depsgraph *depsgraph,
+void DEG_debug_print_eval_subdata_index(Depsgraph *depsgraph,
                                         const char *function_name,
                                         const char *object_name,
                                         const void *object_address,
@@ -334,7 +310,7 @@ void DEG_debug_print_eval_subdata_index(struct Depsgraph *depsgraph,
   fflush(stdout);
 }
 
-void DEG_debug_print_eval_parent_typed(struct Depsgraph *depsgraph,
+void DEG_debug_print_eval_parent_typed(Depsgraph *depsgraph,
                                        const char *function_name,
                                        const char *object_name,
                                        const void *object_address,
@@ -361,7 +337,7 @@ void DEG_debug_print_eval_parent_typed(struct Depsgraph *depsgraph,
   fflush(stdout);
 }
 
-void DEG_debug_print_eval_time(struct Depsgraph *depsgraph,
+void DEG_debug_print_eval_time(Depsgraph *depsgraph,
                                const char *function_name,
                                const char *object_name,
                                const void *object_address,

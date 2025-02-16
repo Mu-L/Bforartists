@@ -1,20 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * DNA default value access.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
@@ -36,9 +22,13 @@
  * When adding new defaults for larger structs you may want to write-out the in-memory data.
  *
  * To create these defaults there is a GDB script which can be handy to get started:
- * `./source/tools/utils/gdb_struct_repr_c99.py`
+ * `./tools/utils/gdb_struct_repr_c99.py`
  *
- * Magic numbers should be replaced with flags before committing.
+ * Magic numbers should be replaced with human readable values before committing,
+ * typically enums or preprocessor defined values.
+ *
+ * \note Defaults must be registered by adding the #SDNA_DEFAULT_DECL_STRUCT and
+ * #SDNA_DEFAULT_DECL macro calls to the lists below.
  *
  * Public API
  * ----------
@@ -49,7 +39,8 @@
  *
  * These access the struct table #DNA_default_table using the struct number.
  *
- * \note Struct members only define their members (pointers are left as NULL set).
+ * \note Struct defaults only define members stored directly in the struct,
+ * pointers are set to null.
  *
  * Typical Usage
  * -------------
@@ -68,6 +59,9 @@
  *   #BLO_update_defaults_startup_blend & #blo_do_versions_userdef.
  */
 
+#define DNA_DEPRECATED_ALLOW
+
+#include <float.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -76,14 +70,16 @@
 #include "MEM_guardedalloc.h"
 
 #include "BLI_endian_switch.h"
-#include "BLI_math.h"
-#include "BLI_memarena.h"
+#include "BLI_math_base.h"
+#include "BLI_math_rotation.h"
 #include "BLI_utildefines.h"
 
-#include "IMB_imbuf.h"
+#include "IMB_imbuf_enums.h"
+#include "movie/MOV_enums.hh"
 
 #include "DNA_defaults.h"
 
+#include "DNA_anim_types.h"
 #include "DNA_armature_types.h"
 #include "DNA_asset_types.h"
 #include "DNA_brush_types.h"
@@ -92,15 +88,17 @@
 #include "DNA_cloth_types.h"
 #include "DNA_collection_types.h"
 #include "DNA_curve_types.h"
+#include "DNA_curves_types.h"
 #include "DNA_fluid_types.h"
 #include "DNA_gpencil_modifier_types.h"
-#include "DNA_hair_types.h"
+#include "DNA_grease_pencil_types.h"
 #include "DNA_image_types.h"
 #include "DNA_key_types.h"
 #include "DNA_lattice_types.h"
 #include "DNA_light_types.h"
 #include "DNA_lightprobe_types.h"
 #include "DNA_linestyle_types.h"
+#include "DNA_mask_types.h"
 #include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meta_types.h"
@@ -110,13 +108,13 @@
 #include "DNA_particle_types.h"
 #include "DNA_pointcloud_types.h"
 #include "DNA_scene_types.h"
-#include "DNA_simulation_types.h"
 #include "DNA_space_types.h"
 #include "DNA_speaker_types.h"
 #include "DNA_texture_types.h"
 #include "DNA_volume_types.h"
 #include "DNA_world_types.h"
 
+#include "DNA_action_defaults.h"
 #include "DNA_armature_defaults.h"
 #include "DNA_asset_defaults.h"
 #include "DNA_brush_defaults.h"
@@ -124,9 +122,10 @@
 #include "DNA_camera_defaults.h"
 #include "DNA_collection_defaults.h"
 #include "DNA_curve_defaults.h"
+#include "DNA_curves_defaults.h"
 #include "DNA_fluid_defaults.h"
 #include "DNA_gpencil_modifier_defaults.h"
-#include "DNA_hair_defaults.h"
+#include "DNA_grease_pencil_defaults.h"
 #include "DNA_image_defaults.h"
 #include "DNA_lattice_defaults.h"
 #include "DNA_light_defaults.h"
@@ -141,14 +140,20 @@
 #include "DNA_particle_defaults.h"
 #include "DNA_pointcloud_defaults.h"
 #include "DNA_scene_defaults.h"
-#include "DNA_simulation_defaults.h"
+#include "DNA_space_defaults.h"
 #include "DNA_speaker_defaults.h"
 #include "DNA_texture_defaults.h"
+#include "DNA_userdef_defaults.h"
 #include "DNA_volume_defaults.h"
 #include "DNA_world_defaults.h"
 
 #define SDNA_DEFAULT_DECL_STRUCT(struct_name) \
   static const struct_name DNA_DEFAULT_##struct_name = _DNA_DEFAULT_##struct_name
+
+/* DNA_action_defaults.h */
+SDNA_DEFAULT_DECL_STRUCT(bAction);
+SDNA_DEFAULT_DECL_STRUCT(ActionLayer);
+SDNA_DEFAULT_DECL_STRUCT(ActionStrip);
 
 /* DNA_asset_defaults.h */
 SDNA_DEFAULT_DECL_STRUCT(AssetMetaData);
@@ -180,8 +185,11 @@ SDNA_DEFAULT_DECL_STRUCT(FluidEffectorSettings);
 /* DNA_image_defaults.h */
 SDNA_DEFAULT_DECL_STRUCT(Image);
 
-/* DNA_hair_defaults.h */
-SDNA_DEFAULT_DECL_STRUCT(Hair);
+/* DNA_curves_defaults.h */
+SDNA_DEFAULT_DECL_STRUCT(Curves);
+
+/* DNA_grease_pencil_defaults.h */
+SDNA_DEFAULT_DECL_STRUCT(GreasePencil);
 
 /* DNA_lattice_defaults.h */
 SDNA_DEFAULT_DECL_STRUCT(Lattice);
@@ -206,6 +214,8 @@ SDNA_DEFAULT_DECL_STRUCT(MetaBall);
 
 /* DNA_movieclip_defaults.h */
 SDNA_DEFAULT_DECL_STRUCT(MovieClip);
+SDNA_DEFAULT_DECL_STRUCT(MovieClipUser);
+SDNA_DEFAULT_DECL_STRUCT(MovieClipScopes);
 
 /* DNA_object_defaults.h */
 SDNA_DEFAULT_DECL_STRUCT(Object);
@@ -219,15 +229,21 @@ SDNA_DEFAULT_DECL_STRUCT(PointCloud);
 /* DNA_scene_defaults.h */
 SDNA_DEFAULT_DECL_STRUCT(Scene);
 SDNA_DEFAULT_DECL_STRUCT(ToolSettings);
+SDNA_DEFAULT_DECL_STRUCT(Sculpt);
 
-/* DNA_simulation_defaults.h */
-SDNA_DEFAULT_DECL_STRUCT(Simulation);
+/* DNA_space_defaults.h */
+SDNA_DEFAULT_DECL_STRUCT(SpaceClip);
 
 /* DNA_speaker_defaults.h */
 SDNA_DEFAULT_DECL_STRUCT(Speaker);
 
 /* DNA_texture_defaults.h */
 SDNA_DEFAULT_DECL_STRUCT(Tex);
+
+/* DNA_userdef_types.h */
+SDNA_DEFAULT_DECL_STRUCT(bUserAssetLibrary);
+SDNA_DEFAULT_DECL_STRUCT(bUserExtensionRepo);
+SDNA_DEFAULT_DECL_STRUCT(bUserAssetShelfSettings);
 
 /* DNA_view3d_defaults.h */
 SDNA_DEFAULT_DECL_STRUCT(View3D);
@@ -296,6 +312,14 @@ SDNA_DEFAULT_DECL_STRUCT(WeightVGMixModifierData);
 SDNA_DEFAULT_DECL_STRUCT(WeightVGProximityModifierData);
 SDNA_DEFAULT_DECL_STRUCT(WeldModifierData);
 SDNA_DEFAULT_DECL_STRUCT(WireframeModifierData);
+SDNA_DEFAULT_DECL_STRUCT(GreasePencilSubdivModifierData);
+SDNA_DEFAULT_DECL_STRUCT(GreasePencilNoiseModifierData);
+SDNA_DEFAULT_DECL_STRUCT(GreasePencilLengthModifierData);
+SDNA_DEFAULT_DECL_STRUCT(GreasePencilLineartModifierData);
+SDNA_DEFAULT_DECL_STRUCT(GreasePencilBuildModifierData);
+
+/* Grease Pencil 3.0 modifiers. */
+SDNA_DEFAULT_DECL_STRUCT(GreasePencilSmoothModifierData);
 
 /* DNA_gpencil_modifier_defaults.h */
 SDNA_DEFAULT_DECL_STRUCT(ArmatureGpencilModifierData);
@@ -309,21 +333,50 @@ SDNA_DEFAULT_DECL_STRUCT(MultiplyGpencilModifierData);
 SDNA_DEFAULT_DECL_STRUCT(NoiseGpencilModifierData);
 SDNA_DEFAULT_DECL_STRUCT(OffsetGpencilModifierData);
 SDNA_DEFAULT_DECL_STRUCT(OpacityGpencilModifierData);
+SDNA_DEFAULT_DECL_STRUCT(OutlineGpencilModifierData);
 SDNA_DEFAULT_DECL_STRUCT(SimplifyGpencilModifierData);
 SDNA_DEFAULT_DECL_STRUCT(SmoothGpencilModifierData);
 SDNA_DEFAULT_DECL_STRUCT(SubdivGpencilModifierData);
 SDNA_DEFAULT_DECL_STRUCT(TextureGpencilModifierData);
 SDNA_DEFAULT_DECL_STRUCT(ThickGpencilModifierData);
 SDNA_DEFAULT_DECL_STRUCT(TimeGpencilModifierData);
+SDNA_DEFAULT_DECL_STRUCT(TimeGpencilModifierSegment);
 SDNA_DEFAULT_DECL_STRUCT(TintGpencilModifierData);
-SDNA_DEFAULT_DECL_STRUCT(WeightGpencilModifierData);
+SDNA_DEFAULT_DECL_STRUCT(WeightProxGpencilModifierData);
+SDNA_DEFAULT_DECL_STRUCT(WeightAngleGpencilModifierData);
 SDNA_DEFAULT_DECL_STRUCT(LineartGpencilModifierData);
 SDNA_DEFAULT_DECL_STRUCT(LengthGpencilModifierData);
+SDNA_DEFAULT_DECL_STRUCT(DashGpencilModifierData);
+SDNA_DEFAULT_DECL_STRUCT(DashGpencilModifierSegment);
+SDNA_DEFAULT_DECL_STRUCT(ShrinkwrapGpencilModifierData);
+SDNA_DEFAULT_DECL_STRUCT(EnvelopeGpencilModifierData);
+SDNA_DEFAULT_DECL_STRUCT(GreasePencilOpacityModifierData);
+SDNA_DEFAULT_DECL_STRUCT(GreasePencilColorModifierData);
+SDNA_DEFAULT_DECL_STRUCT(GreasePencilTintModifierData);
+SDNA_DEFAULT_DECL_STRUCT(GreasePencilOffsetModifierData);
+SDNA_DEFAULT_DECL_STRUCT(GreasePencilMirrorModifierData);
+SDNA_DEFAULT_DECL_STRUCT(GreasePencilThickModifierData);
+SDNA_DEFAULT_DECL_STRUCT(GreasePencilLatticeModifierData);
+SDNA_DEFAULT_DECL_STRUCT(GreasePencilDashModifierSegment);
+SDNA_DEFAULT_DECL_STRUCT(GreasePencilDashModifierData);
+SDNA_DEFAULT_DECL_STRUCT(GreasePencilMultiModifierData);
+SDNA_DEFAULT_DECL_STRUCT(GreasePencilWeightAngleModifierData);
+SDNA_DEFAULT_DECL_STRUCT(GreasePencilArrayModifierData);
+SDNA_DEFAULT_DECL_STRUCT(GreasePencilWeightProximityModifierData);
+SDNA_DEFAULT_DECL_STRUCT(GreasePencilHookModifierData);
+SDNA_DEFAULT_DECL_STRUCT(GreasePencilArmatureModifierData);
+SDNA_DEFAULT_DECL_STRUCT(GreasePencilTimeModifierSegment);
+SDNA_DEFAULT_DECL_STRUCT(GreasePencilTimeModifierData);
+SDNA_DEFAULT_DECL_STRUCT(GreasePencilSimplifyModifierData);
+SDNA_DEFAULT_DECL_STRUCT(GreasePencilEnvelopeModifierData);
+SDNA_DEFAULT_DECL_STRUCT(GreasePencilOutlineModifierData);
+SDNA_DEFAULT_DECL_STRUCT(GreasePencilShrinkwrapModifierData);
+SDNA_DEFAULT_DECL_STRUCT(GreasePencilTextureModifierData);
 
 #undef SDNA_DEFAULT_DECL_STRUCT
 
 /* Reuse existing definitions. */
-extern const struct UserDef U_default;
+extern const UserDef U_default;
 #define DNA_DEFAULT_UserDef U_default
 
 extern const bTheme U_theme_default;
@@ -333,7 +386,7 @@ extern const bTheme U_theme_default;
  * Prevent assigning the wrong struct types since all elements in #DNA_default_table are `void *`.
  */
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L)
-#  define SDNA_TYPE_CHECKED(v, t) (&(v) + (_Generic((v), t : 0)))
+#  define SDNA_TYPE_CHECKED(v, t) (&(v) + (_Generic((v), t: 0)))
 #else
 #  define SDNA_TYPE_CHECKED(v, t) (&(v))
 #endif
@@ -344,8 +397,14 @@ extern const bTheme U_theme_default;
 #define SDNA_DEFAULT_DECL_EX(struct_name, struct_path) \
   [SDNA_TYPE_FROM_STRUCT(struct_name)] = SDNA_TYPE_CHECKED(DNA_DEFAULT_##struct_path, struct_name)
 
-/** Keep headers sorted. */
+/* NOTE: Keep headers sorted. */
+
 const void *DNA_default_table[SDNA_TYPE_MAX] = {
+
+    /* DNA_anim_defaults.h */
+    SDNA_DEFAULT_DECL(bAction),
+    SDNA_DEFAULT_DECL(ActionLayer),
+    SDNA_DEFAULT_DECL(ActionStrip),
 
     /* DNA_asset_defaults.h */
     SDNA_DEFAULT_DECL(AssetMetaData),
@@ -379,8 +438,11 @@ const void *DNA_default_table[SDNA_TYPE_MAX] = {
     /* DNA_image_defaults.h */
     SDNA_DEFAULT_DECL(Image),
 
-    /* DNA_hair_defaults.h */
-    SDNA_DEFAULT_DECL(Hair),
+    /* DNA_curves_defaults.h */
+    SDNA_DEFAULT_DECL(Curves),
+
+    /* DNA_grease_pencil_defaults.h */
+    SDNA_DEFAULT_DECL(GreasePencil),
 
     /* DNA_lattice_defaults.h */
     SDNA_DEFAULT_DECL(Lattice),
@@ -400,11 +462,18 @@ const void *DNA_default_table[SDNA_TYPE_MAX] = {
     /* DNA_mesh_defaults.h */
     SDNA_DEFAULT_DECL(Mesh),
 
+    /* DNA_space_defaults.h */
+    SDNA_DEFAULT_DECL(SpaceClip),
+    SDNA_DEFAULT_DECL_EX(MaskSpaceInfo, SpaceClip.mask_info),
+
     /* DNA_meta_defaults.h */
     SDNA_DEFAULT_DECL(MetaBall),
 
     /* DNA_movieclip_defaults.h */
     SDNA_DEFAULT_DECL(MovieClip),
+    SDNA_DEFAULT_DECL(MovieClipUser),
+    SDNA_DEFAULT_DECL(MovieClipScopes),
+    SDNA_DEFAULT_DECL_EX(MovieTrackingMarker, MovieClipScopes.undist_marker),
 
     /* DNA_object_defaults.h */
     SDNA_DEFAULT_DECL(Object),
@@ -426,6 +495,7 @@ const void *DNA_default_table[SDNA_TYPE_MAX] = {
     SDNA_DEFAULT_DECL_EX(PhysicsSettings, Scene.physics_settings),
     SDNA_DEFAULT_DECL_EX(SceneDisplay, Scene.display),
     SDNA_DEFAULT_DECL_EX(SceneEEVEE, Scene.eevee),
+    SDNA_DEFAULT_DECL_EX(RaytraceEEVEE, Scene.eevee.ray_tracing_options),
 
     SDNA_DEFAULT_DECL(ToolSettings),
     SDNA_DEFAULT_DECL_EX(CurvePaintSettings, ToolSettings.curve_paint_settings),
@@ -437,8 +507,7 @@ const void *DNA_default_table[SDNA_TYPE_MAX] = {
     SDNA_DEFAULT_DECL_EX(GP_Sculpt_Settings, ToolSettings.gp_sculpt),
     SDNA_DEFAULT_DECL_EX(GP_Sculpt_Guide, ToolSettings.gp_sculpt.guide),
 
-    /* DNA_simulation_defaults.h */
-    SDNA_DEFAULT_DECL(Simulation),
+    SDNA_DEFAULT_DECL(Sculpt),
 
     /* DNA_speaker_defaults.h */
     SDNA_DEFAULT_DECL(Speaker),
@@ -453,6 +522,9 @@ const void *DNA_default_table[SDNA_TYPE_MAX] = {
     SDNA_DEFAULT_DECL_EX(UserDef_SpaceData, UserDef.space_data),
     SDNA_DEFAULT_DECL_EX(UserDef_FileSpaceData, UserDef.file_space_data),
     SDNA_DEFAULT_DECL_EX(WalkNavigation, UserDef.walk_navigation),
+    SDNA_DEFAULT_DECL(bUserAssetLibrary),
+    SDNA_DEFAULT_DECL(bUserExtensionRepo),
+    SDNA_DEFAULT_DECL(bUserAssetShelfSettings),
 
     /* DNA_view3d_defaults.h */
     SDNA_DEFAULT_DECL(View3D),
@@ -524,6 +596,15 @@ const void *DNA_default_table[SDNA_TYPE_MAX] = {
     SDNA_DEFAULT_DECL(WeightVGProximityModifierData),
     SDNA_DEFAULT_DECL(WeldModifierData),
     SDNA_DEFAULT_DECL(WireframeModifierData),
+    SDNA_DEFAULT_DECL(GreasePencilSubdivModifierData),
+    SDNA_DEFAULT_DECL(GreasePencilNoiseModifierData),
+    SDNA_DEFAULT_DECL(GreasePencilLengthModifierData),
+    SDNA_DEFAULT_DECL(GreasePencilHookModifierData),
+    SDNA_DEFAULT_DECL(GreasePencilLineartModifierData),
+    SDNA_DEFAULT_DECL(GreasePencilBuildModifierData),
+
+    /* Grease Pencil 3.0 defaults. */
+    SDNA_DEFAULT_DECL(GreasePencilSmoothModifierData),
 
     /* DNA_gpencil_modifier_defaults.h */
     SDNA_DEFAULT_DECL(ArmatureGpencilModifierData),
@@ -537,6 +618,7 @@ const void *DNA_default_table[SDNA_TYPE_MAX] = {
     SDNA_DEFAULT_DECL(NoiseGpencilModifierData),
     SDNA_DEFAULT_DECL(OffsetGpencilModifierData),
     SDNA_DEFAULT_DECL(OpacityGpencilModifierData),
+    SDNA_DEFAULT_DECL(OutlineGpencilModifierData),
     SDNA_DEFAULT_DECL(SimplifyGpencilModifierData),
     SDNA_DEFAULT_DECL(SmoothGpencilModifierData),
     SDNA_DEFAULT_DECL(SubdivGpencilModifierData),
@@ -544,16 +626,45 @@ const void *DNA_default_table[SDNA_TYPE_MAX] = {
     SDNA_DEFAULT_DECL(ThickGpencilModifierData),
     SDNA_DEFAULT_DECL(TimeGpencilModifierData),
     SDNA_DEFAULT_DECL(TintGpencilModifierData),
-    SDNA_DEFAULT_DECL(WeightGpencilModifierData),
+    SDNA_DEFAULT_DECL(TimeGpencilModifierSegment),
+    SDNA_DEFAULT_DECL(WeightAngleGpencilModifierData),
+    SDNA_DEFAULT_DECL(WeightProxGpencilModifierData),
     SDNA_DEFAULT_DECL(LineartGpencilModifierData),
     SDNA_DEFAULT_DECL(LengthGpencilModifierData),
+    SDNA_DEFAULT_DECL(DashGpencilModifierData),
+    SDNA_DEFAULT_DECL(DashGpencilModifierSegment),
+    SDNA_DEFAULT_DECL(ShrinkwrapGpencilModifierData),
+    SDNA_DEFAULT_DECL(EnvelopeGpencilModifierData),
+    SDNA_DEFAULT_DECL(GreasePencilOpacityModifierData),
+    SDNA_DEFAULT_DECL(GreasePencilColorModifierData),
+    SDNA_DEFAULT_DECL(GreasePencilTintModifierData),
+    SDNA_DEFAULT_DECL(GreasePencilOffsetModifierData),
+    SDNA_DEFAULT_DECL(GreasePencilMirrorModifierData),
+    SDNA_DEFAULT_DECL(GreasePencilThickModifierData),
+    SDNA_DEFAULT_DECL(GreasePencilLatticeModifierData),
+    SDNA_DEFAULT_DECL(GreasePencilDashModifierSegment),
+    SDNA_DEFAULT_DECL(GreasePencilDashModifierData),
+    SDNA_DEFAULT_DECL(GreasePencilMultiModifierData),
+    SDNA_DEFAULT_DECL(GreasePencilWeightAngleModifierData),
+    SDNA_DEFAULT_DECL(GreasePencilArrayModifierData),
+    SDNA_DEFAULT_DECL(GreasePencilWeightProximityModifierData),
+    SDNA_DEFAULT_DECL(GreasePencilArmatureModifierData),
+    SDNA_DEFAULT_DECL(GreasePencilTimeModifierSegment),
+    SDNA_DEFAULT_DECL(GreasePencilTimeModifierData),
+    SDNA_DEFAULT_DECL(GreasePencilSimplifyModifierData),
+    SDNA_DEFAULT_DECL(GreasePencilEnvelopeModifierData),
+    SDNA_DEFAULT_DECL(GreasePencilOutlineModifierData),
+    SDNA_DEFAULT_DECL(GreasePencilShrinkwrapModifierData),
+    SDNA_DEFAULT_DECL(GreasePencilTextureModifierData),
 };
 #undef SDNA_DEFAULT_DECL
 #undef SDNA_DEFAULT_DECL_EX
 
-char *_DNA_struct_default_alloc_impl(const char *data_src, size_t size, const char *alloc_str)
+uint8_t *_DNA_struct_default_alloc_impl(const uint8_t *data_src,
+                                        size_t size,
+                                        const char *alloc_str)
 {
-  char *data_dst = MEM_mallocN(size, alloc_str);
+  uint8_t *data_dst = MEM_mallocN(size, alloc_str);
   memcpy(data_dst, data_src, size);
   return data_dst;
 }

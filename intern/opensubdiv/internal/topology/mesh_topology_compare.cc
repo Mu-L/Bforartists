@@ -1,40 +1,24 @@
-// Copyright 2020 Blender Foundation. All rights reserved.
-//
-// This program is free software; you can redistribute it and/or
-// modify it under the terms of the GNU General Public License
-// as published by the Free Software Foundation; either version 2
-// of the License, or (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program; if not, write to the Free Software Foundation,
-// Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-//
-// Author: Sergey Sharybin
+/* SPDX-FileCopyrightText: 2020 Blender Foundation
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
+ * Author: Sergey Sharybin. */
 
 #include "internal/topology/mesh_topology.h"
 
 #include <cassert>
 #include <cstring>
 #include <opensubdiv/sdc/crease.h>
+#include <vector>
 
-#include "internal/base/type.h"
+#include "opensubdiv_converter_capi.hh"
 
-#include "opensubdiv_converter_capi.h"
-
-namespace blender {
-namespace opensubdiv {
-
-namespace {
+namespace blender::opensubdiv {
 
 ////////////////////////////////////////////////////////////////////////////////
 // Quick preliminary checks.
 
-int getEffectiveNumEdges(const OpenSubdiv_Converter *converter)
+static int getEffectiveNumEdges(const OpenSubdiv_Converter *converter)
 {
   if (converter->getNumEdges == nullptr) {
     return 0;
@@ -43,13 +27,13 @@ int getEffectiveNumEdges(const OpenSubdiv_Converter *converter)
   return converter->getNumEdges(converter);
 }
 
-bool isEqualGeometryCounters(const MeshTopology &mesh_topology,
-                             const OpenSubdiv_Converter *converter)
+static bool isEqualGeometryCounters(const MeshTopology &mesh_topology,
+                                    const OpenSubdiv_Converter *converter)
 {
   if (converter->getNumVertices(converter) != mesh_topology.getNumVertices()) {
     return false;
   }
-  if (converter->getNumFaces(converter) != mesh_topology.getNumFaces()) {
+  if (converter->faces.size() != mesh_topology.getNumFaces()) {
     return false;
   }
   if (getEffectiveNumEdges(converter) != mesh_topology.getNumEdges()) {
@@ -64,7 +48,8 @@ bool isEqualGeometryCounters(const MeshTopology &mesh_topology,
 
 // Edges.
 
-bool isEqualGeometryEdge(const MeshTopology &mesh_topology, const OpenSubdiv_Converter *converter)
+static bool isEqualGeometryEdge(const MeshTopology &mesh_topology,
+                                const OpenSubdiv_Converter *converter)
 {
   const int num_requested_edges = getEffectiveNumEdges(converter);
   if (num_requested_edges != mesh_topology.getNumEdges()) {
@@ -85,16 +70,17 @@ bool isEqualGeometryEdge(const MeshTopology &mesh_topology, const OpenSubdiv_Con
 
 // Faces.
 
-bool isEqualGeometryFace(const MeshTopology &mesh_topology, const OpenSubdiv_Converter *converter)
+static bool isEqualGeometryFace(const MeshTopology &mesh_topology,
+                                const OpenSubdiv_Converter *converter)
 {
-  const int num_requested_faces = converter->getNumFaces(converter);
+  const int num_requested_faces = converter->faces.size();
   if (num_requested_faces != mesh_topology.getNumFaces()) {
     return false;
   }
 
-  vector<int> vertices_of_face;
+  std::vector<int> vertices_of_face;
   for (int face_index = 0; face_index < num_requested_faces; ++face_index) {
-    int num_face_vertices = converter->getNumFaceVertices(converter, face_index);
+    int num_face_vertices = converter->faces[face_index].size();
     if (mesh_topology.getNumFaceVertices(face_index) != num_face_vertices) {
       return false;
     }
@@ -112,7 +98,8 @@ bool isEqualGeometryFace(const MeshTopology &mesh_topology, const OpenSubdiv_Con
 
 // Geometry comparison entry point.
 
-bool isEqualGeometry(const MeshTopology &mesh_topology, const OpenSubdiv_Converter *converter)
+static bool isEqualGeometry(const MeshTopology &mesh_topology,
+                            const OpenSubdiv_Converter *converter)
 {
   if (!isEqualGeometryEdge(mesh_topology, converter)) {
     return false;
@@ -130,10 +117,12 @@ bool isEqualGeometry(const MeshTopology &mesh_topology, const OpenSubdiv_Convert
 // Vertices.
 
 // TODO(sergey): Make this function usable by factory as well.
-float getEffectiveVertexSharpness(const OpenSubdiv_Converter *converter, const int vertex_index)
+static float getEffectiveVertexSharpness(const OpenSubdiv_Converter *converter,
+                                         const int vertex_index)
 {
   if (converter->isInfiniteSharpVertex != nullptr &&
-      converter->isInfiniteSharpVertex(converter, vertex_index)) {
+      converter->isInfiniteSharpVertex(converter, vertex_index))
+  {
     return OpenSubdiv::Sdc::Crease::SHARPNESS_INFINITE;
   }
 
@@ -144,7 +133,8 @@ float getEffectiveVertexSharpness(const OpenSubdiv_Converter *converter, const i
   return 0.0f;
 }
 
-bool isEqualVertexTags(const MeshTopology &mesh_topology, const OpenSubdiv_Converter *converter)
+static bool isEqualVertexTags(const MeshTopology &mesh_topology,
+                              const OpenSubdiv_Converter *converter)
 {
   const int num_vertices = mesh_topology.getNumVertices();
   for (int vertex_index = 0; vertex_index < num_vertices; ++vertex_index) {
@@ -162,7 +152,7 @@ bool isEqualVertexTags(const MeshTopology &mesh_topology, const OpenSubdiv_Conve
 // Edges.
 
 // TODO(sergey): Make this function usable by factory as well.
-float getEffectiveEdgeSharpness(const OpenSubdiv_Converter *converter, const int edge_index)
+static float getEffectiveEdgeSharpness(const OpenSubdiv_Converter *converter, const int edge_index)
 {
   if (converter->getEdgeSharpness != nullptr) {
     return converter->getEdgeSharpness(converter, edge_index);
@@ -171,7 +161,8 @@ float getEffectiveEdgeSharpness(const OpenSubdiv_Converter *converter, const int
   return 0.0f;
 }
 
-bool isEqualEdgeTags(const MeshTopology &mesh_topology, const OpenSubdiv_Converter *converter)
+static bool isEqualEdgeTags(const MeshTopology &mesh_topology,
+                            const OpenSubdiv_Converter *converter)
 {
   const int num_edges = mesh_topology.getNumEdges();
   for (int edge_index = 0; edge_index < num_edges; ++edge_index) {
@@ -189,7 +180,8 @@ bool isEqualEdgeTags(const MeshTopology &mesh_topology, const OpenSubdiv_Convert
     int requested_edge_vertices[2];
     converter->getEdgeVertices(converter, edge_index, requested_edge_vertices);
     if (!mesh_topology.isEdgeEqual(
-            edge_index, requested_edge_vertices[0], requested_edge_vertices[1])) {
+            edge_index, requested_edge_vertices[0], requested_edge_vertices[1]))
+    {
       return false;
     }
   }
@@ -199,7 +191,7 @@ bool isEqualEdgeTags(const MeshTopology &mesh_topology, const OpenSubdiv_Convert
 
 // Tags comparison entry point.
 
-bool isEqualTags(const MeshTopology &mesh_topology, const OpenSubdiv_Converter *converter)
+static bool isEqualTags(const MeshTopology &mesh_topology, const OpenSubdiv_Converter *converter)
 {
   if (!isEqualVertexTags(mesh_topology, converter)) {
     return false;
@@ -210,8 +202,6 @@ bool isEqualTags(const MeshTopology &mesh_topology, const OpenSubdiv_Converter *
 
   return true;
 }
-
-}  // namespace
 
 ////////////////////////////////////////////////////////////////////////////////
 // Entry point.
@@ -236,5 +226,4 @@ bool MeshTopology::isEqualToConverter(const OpenSubdiv_Converter *converter) con
   return true;
 }
 
-}  // namespace opensubdiv
-}  // namespace blender
+}  // namespace blender::opensubdiv

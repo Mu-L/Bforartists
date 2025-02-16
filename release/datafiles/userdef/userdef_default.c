@@ -1,57 +1,48 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2019-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /* Preferences Data File 'U_default'. */
 
 /* For constants. */
-#include "BLI_math_base.h"
+#include "BLI_math_constants.h"
 
 #include "DNA_anim_types.h"
 #include "DNA_curve_types.h"
 #include "DNA_space_types.h"
 #include "DNA_userdef_types.h"
 
-#include "BLI_math_rotation.h"
-
 #include "BKE_blender_version.h"
 
-#include "BLO_readfile.h" /* own include */
+#include "GPU_platform_backend_enum.h"
+
+#include "BLO_userdef_default.h" /* own include */
 
 /* bfa - for the flag names have a look into source\blender\makesrna\intern\rna_userdef.c*/
-/*bfa -  added USER_TOOLTIPS_PYTHON, USER_DEVELOPER_UI and USER_FILENOUI to the .flag*/
+/*bfa -  added USER_TOOLTIPS_PYTHON, USER_DEVELOPER_UI, USER_OUTLINER_COL_COLLECTION_ROWS, USER_ANIM_SHOW_CHANNEL_GROUP_COLORS and USER_FILENOUI to the .flag*/
 const UserDef U_default = {
     .versionfile = BLENDER_FILE_VERSION,
     .subversionfile = BLENDER_FILE_SUBVERSION,
-    .flag = (USER_AUTOSAVE | USER_TOOLTIPS | USER_TOOLTIPS_PYTHON |
-             USER_DEVELOPER_UI | USER_SAVE_PREVIEWS | USER_RELPATHS | USER_FILENOUI |
-             USER_RELEASECONFIRM | USER_SCRIPT_AUTOEXEC_DISABLE | USER_NONEGFRAMES),
-    .dupflag = USER_DUP_MESH | USER_DUP_CURVE | USER_DUP_SURF | USER_DUP_FONT | USER_DUP_MBALL |
-               USER_DUP_LAMP | USER_DUP_ARM | USER_DUP_ACT | USER_DUP_LIGHTPROBE |
-               USER_DUP_GPENCIL,
+    .flag = (USER_AUTOSAVE | USER_TOOLTIPS | USER_RELPATHS | USER_RELEASECONFIRM | USER_TOOLTIPS_PYTHON | USER_DEVELOPER_UI | USER_FILENOUI),
+    /*BFA - added USER_DUP_NTREE*/
+    .dupflag = USER_DUP_MESH | USER_DUP_CURVE | USER_DUP_SURF | USER_DUP_LATTICE | USER_DUP_FONT |
+               USER_DUP_MBALL | USER_DUP_LAMP | USER_DUP_ARM | USER_DUP_CAMERA | USER_DUP_SPEAKER |
+               USER_DUP_ACT | USER_DUP_LIGHTPROBE | USER_DUP_GPENCIL | USER_DUP_CURVES | USER_DUP_NTREE | USER_DUP_POINTCLOUD,
     .pref_flag = USER_PREF_FLAG_SAVE,
     .savetime = 2,
     .tempdir = "",
+    /* Overwritten by #BKE_appdir_font_folder_default(..)
+     * unless the system font's cannot be found. */
     .fontdir = "//",
     .renderdir = "//",
     .render_cachedir = "",
     .textudir = "//",
-    .pythondir = "",
+    .script_directories = {NULL, NULL},
     .sounddir = "//",
     .i18ndir = "",
     .image_editor = "",
+    .text_editor = "",
+    .text_editor_args = "",
     .anim_player = "",
     .anim_player_preset = 0,
     .v2d_min_gridsize = 45,
@@ -61,12 +52,11 @@ const UserDef U_default = {
     .mini_axis_type = USER_MINI_AXIS_TYPE_GIZMO,
     /*bfa - added USER_ORBIT_SELECTION */
     .uiflag = (USER_FILTERFILEEXTS | USER_DRAWVIEWINFO | USER_PLAINMENUS |
-               USER_LOCK_CURSOR_ADJUST | USER_DEPTH_CURSOR | USER_ORBIT_SELECTION |
-               USER_AUTOPERSP | USER_DEPTH_NAVIGATE | USER_GLOBALUNDO |
-               USER_HIDE_DOT | USER_SHOW_GIZMO_NAVIGATE | USER_SHOW_VIEWPORTNAME | USER_SHOW_FPS |
-               USER_CONTINUOUS_MOUSE | USER_SAVE_PROMPT),
+               USER_LOCK_CURSOR_ADJUST | USER_DEPTH_CURSOR | USER_AUTOPERSP |
+               USER_NODE_AUTO_OFFSET | USER_GLOBALUNDO | USER_SHOW_GIZMO_NAVIGATE |
+               USER_SHOW_VIEWPORTNAME | USER_SHOW_FPS | USER_CONTINUOUS_MOUSE | USER_SAVE_PROMPT | USER_ORBIT_SELECTION),
     .uiflag2 = USER_REGION_OVERLAP,
-    .gpu_flag = USER_GPU_FLAG_OVERLAY_SMOOTH_WIRE,
+    .gpu_flag = USER_GPU_FLAG_OVERLAY_SMOOTH_WIRE | USER_GPU_FLAG_SUBDIVISION_EVALUATION,
     .app_flag = 0,
     /** Default language of English (1), not Automatic (0). */
     .language = 1,
@@ -82,13 +72,16 @@ const UserDef U_default = {
 
     /** Default so DPI is detected automatically. */
     .dpi = 0,
-    .dpi_fac = 0.0,
-    .inv_dpi_fac = 0.0, /* run-time. */
+    .scale_factor = 0.0,
+    .inv_scale_factor = 0.0, /* run-time. */
     .pixelsize = 1,
     .virtual_pixel = 0,
 
+    .viewport_line_width = 1.0, /* BFA - GooEngine */
+
     .scrollback = 256,
-    .node_margin = 80,
+    .node_margin = 40,
+    .node_preview_res = 120,
     .transopts = USER_TR_TOOLTIPS,
     .menuthreshold1 = 5,
     .menuthreshold2 = 2,
@@ -110,13 +103,24 @@ const UserDef U_default = {
     .autoexec_paths = {NULL},
     .user_menus = {NULL},
 
-    .keyconfigstr = "bforartists", /*bfa - the active keymap*/
+    .keyconfigstr = "Bforartists", /*bfa - the active keymap*/
+
+    .network_timeout = 10,
+    .network_connection_limit = 5,
+
     .undosteps = 32,
     .undomemory = 0,
     .gp_manhattandist = 1,
     .gp_euclideandist = 2,
     .gp_eraser = 25,
     .gp_settings = 0,
+    .playback_fps_samples = 8,
+#ifdef __APPLE__
+    .gpu_backend = GPU_BACKEND_METAL,
+#else
+    .gpu_backend = GPU_BACKEND_OPENGL,
+#endif
+    .max_shader_compilation_subprocesses = 0,
 
     /** Initialized by: #BKE_studiolight_default. */
     .light_param = {{0}},
@@ -139,7 +143,7 @@ const UserDef U_default = {
     .pad_rot_angle = 15,
     .rvisize = 25,
     .rvibright = 8,
-    .recent_files = 10,
+    .recent_files = 20,
     .smooth_viewtx = 200,
     .glreslimit = 0,
     .color_picker_type = USER_CP_CIRCLE_HSV,
@@ -156,19 +160,21 @@ const UserDef U_default = {
     .pressure_softness = 0.0,
     .ndof_sensitivity = 4.0,
     .ndof_orbit_sensitivity = 4.0,
-    .ndof_deadzone = 0.1,
-    .ndof_flag = (NDOF_MODE_ORBIT | NDOF_LOCK_HORIZON | NDOF_SHOULD_PAN | NDOF_SHOULD_ZOOM |
-                  NDOF_SHOULD_ROTATE |
+    .ndof_deadzone = 0.0,
+    .ndof_flag = (NDOF_SHOW_GUIDE_ORBIT_CENTER | NDOF_ORBIT_CENTER_AUTO | NDOF_MODE_ORBIT |
+                  NDOF_LOCK_HORIZON | NDOF_SHOULD_PAN | NDOF_SHOULD_ZOOM | NDOF_SHOULD_ROTATE |
                   /* Software from the driver authors follows this convention
-                   * so invert this by default, see: T67579. */
+                   * so invert this by default, see: #67579. */
                   NDOF_ROTX_INVERT_AXIS | NDOF_ROTY_INVERT_AXIS | NDOF_ROTZ_INVERT_AXIS |
                   NDOF_PANX_INVERT_AXIS | NDOF_PANY_INVERT_AXIS | NDOF_PANZ_INVERT_AXIS |
-                  NDOF_ZOOM_INVERT),
+                  NDOF_ZOOM_INVERT | NDOF_CAMERA_PAN_ZOOM),
     .image_draw_method = IMAGE_DRAW_METHOD_AUTO,
     .glalphaclip = 0.004,
     .autokey_mode = (AUTOKEY_MODE_NORMAL & ~AUTOKEY_ON),
-    .autokey_flag = AUTOKEY_FLAG_XYZ2RGB,
-    .animation_flag = USER_ANIM_SHOW_CHANNEL_GROUP_COLORS, /*bfa - channel group colors on. use_anim_channel_group_colors*/
+    .keying_flag = KEYING_FLAG_XYZ2RGB | AUTOKEY_FLAG_INSERTNEEDED,
+    .key_insert_channels = (USER_ANIM_KEY_CHANNEL_LOCATION | USER_ANIM_KEY_CHANNEL_ROTATION |
+                            USER_ANIM_KEY_CHANNEL_SCALE | USER_ANIM_KEY_CHANNEL_CUSTOM_PROPERTIES),
+    .animation_flag = USER_ANIM_HIGH_QUALITY_DRAWING,
     .text_render = 0,
     .navigation_mode = VIEW_NAVIGATION_WALK,
     .view_rotate_sensitivity_turntable = DEG2RAD(0.4),
@@ -193,7 +199,6 @@ const UserDef U_default = {
     .pie_menu_confirm = 0,
     .pie_menu_radius = 100,
     .pie_menu_threshold = 12,
-    .opensubdiv_compute_type = 0,
     .factor_display_type = USER_FACTOR_AS_FACTOR,
     .render_display_type = USER_RENDER_DISPLAY_WINDOW,
     .filebrowser_display_type = USER_TEMP_SPACE_DISPLAY_WINDOW,
@@ -218,7 +223,7 @@ const UserDef U_default = {
     .file_space_data =
         {
             .display_type = FILE_VERTICALDISPLAY,
-            .thumbnail_size = 128,
+            .thumbnail_size = 96,
             .sort_type = FILE_SORT_ALPHA,
             .details_flags = FILE_DETAILS_SIZE | FILE_DETAILS_DATETIME,
             .flag = FILE_HIDE_DOT,
@@ -236,7 +241,10 @@ const UserDef U_default = {
 
     .collection_instance_empty_size = 1.0f,
 
-    .statusbar_flag = STATUSBAR_SHOW_VERSION,
+    .statusbar_flag = STATUSBAR_SHOW_VERSION | STATUSBAR_SHOW_EXTENSIONS_UPDATES,
+    .file_preview_type = USER_FILE_PREVIEW_AUTO,
+
+    .sequencer_editor_flag = USER_SEQ_ED_SIMPLE_TWEAKING | USER_SEQ_ED_CONNECT_STRIPS_BY_DEFAULT,
 
     .runtime =
         {

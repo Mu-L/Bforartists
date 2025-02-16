@@ -1,20 +1,8 @@
-// Copyright 2018 Blender Foundation. All rights reserved.
-//
-// This program is free software; you can redistribute it and/or
-// modify it under the terms of the GNU General Public License
-// as published by the Free Software Foundation; either version 2
-// of the License, or (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program; if not, write to the Free Software Foundation,
-// Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-//
-// Author: Sergey Sharybin
+/* SPDX-FileCopyrightText: 2018 Blender Foundation
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
+ * Author: Sergey Sharybin. */
 
 #ifdef _MSC_VER
 #  include <iso646.h>
@@ -25,8 +13,7 @@
 #include <cassert>
 #include <opensubdiv/sdc/crease.h>
 
-namespace blender {
-namespace opensubdiv {
+namespace blender::opensubdiv {
 
 OpenSubdiv::Sdc::SchemeType getSchemeTypeFromCAPI(OpenSubdiv_SchemeType type)
 {
@@ -45,7 +32,7 @@ OpenSubdiv::Sdc::SchemeType getSchemeTypeFromCAPI(OpenSubdiv_SchemeType type)
 OpenSubdiv::Sdc::Options::FVarLinearInterpolation getFVarLinearInterpolationFromCAPI(
     OpenSubdiv_FVarLinearInterpolation linear_interpolation)
 {
-  typedef OpenSubdiv::Sdc::Options Options;
+  using Options = OpenSubdiv::Sdc::Options;
   switch (linear_interpolation) {
     case OSD_FVAR_LINEAR_INTERPOLATION_NONE:
       return Options::FVAR_LINEAR_NONE;
@@ -67,7 +54,7 @@ OpenSubdiv::Sdc::Options::FVarLinearInterpolation getFVarLinearInterpolationFrom
 OpenSubdiv_FVarLinearInterpolation getCAPIFVarLinearInterpolationFromOSD(
     OpenSubdiv::Sdc::Options::FVarLinearInterpolation linear_interpolation)
 {
-  typedef OpenSubdiv::Sdc::Options Options;
+  using Options = OpenSubdiv::Sdc::Options;
   switch (linear_interpolation) {
     case Options::FVAR_LINEAR_NONE:
       return OSD_FVAR_LINEAR_INTERPOLATION_NONE;
@@ -103,5 +90,4 @@ OpenSubdiv::Sdc::Options::VtxBoundaryInterpolation getVtxBoundaryInterpolationFr
   return Options::VTX_BOUNDARY_EDGE_ONLY;
 }
 
-}  // namespace opensubdiv
-}  // namespace blender
+}  // namespace blender::opensubdiv

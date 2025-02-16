@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2008-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -103,7 +91,7 @@ void AppCanvas::init()
 
 void AppCanvas::postDraw()
 {
-  for (unsigned int i = 0; i < _StyleModules.size(); i++) {
+  for (uint i = 0; i < _StyleModules.size(); i++) {
     if (!_StyleModules[i]->getDisplayed() || !_Layers[i]) {
       continue;
     }
@@ -132,8 +120,8 @@ void AppCanvas::readColorPixels(int x, int y, int w, int h, RGBImage &oImage) co
     int ymax = border().getMax().y();
     int rectx = _pass_diffuse.width;
     int recty = _pass_diffuse.height;
-    float xfac = ((float)rectx) / ((float)(xmax - xmin));
-    float yfac = ((float)recty) / ((float)(ymax - ymin));
+    float xfac = float(rectx) / float(xmax - xmin);
+    float yfac = float(recty) / float(ymax - ymin);
 #if 0
     if (G.debug & G_DEBUG_FREESTYLE) {
       printf("readColorPixels %d x %d @ (%d, %d) in %d x %d [%d x %d] -- %d x %d @ %d%%\n",
@@ -147,17 +135,17 @@ void AppCanvas::readColorPixels(int x, int y, int w, int h, RGBImage &oImage) co
              ymax - ymin,
              rectx,
              recty,
-             (int)(xfac * 100.0f));
+             int(xfac * 100.0f));
     }
 #endif
     int ii, jj;
     for (int j = 0; j < h; j++) {
-      jj = (int)((y - ymin + j) * yfac);
+      jj = int((y - ymin + j) * yfac);
       if (jj < 0 || jj >= recty) {
         continue;
       }
       for (int i = 0; i < w; i++) {
-        ii = (int)((x - xmin + i) * xfac);
+        ii = int((x - xmin + i) * xfac);
         if (ii < 0 || ii >= rectx) {
           continue;
         }
@@ -181,8 +169,8 @@ void AppCanvas::readDepthPixels(int x, int y, int w, int h, GrayImage &oImage) c
     int ymax = border().getMax().y();
     int rectx = _pass_z.width;
     int recty = _pass_z.height;
-    float xfac = ((float)rectx) / ((float)(xmax - xmin));
-    float yfac = ((float)recty) / ((float)(ymax - ymin));
+    float xfac = float(rectx) / float(xmax - xmin);
+    float yfac = float(recty) / float(ymax - ymin);
 #if 0
     if (G.debug & G_DEBUG_FREESTYLE) {
       printf("readDepthPixels %d x %d @ (%d, %d) in %d x %d [%d x %d] -- %d x %d @ %d%%\n",
@@ -196,17 +184,17 @@ void AppCanvas::readDepthPixels(int x, int y, int w, int h, GrayImage &oImage) c
              ymax - ymin,
              rectx,
              recty,
-             (int)(xfac * 100.0f));
+             int(xfac * 100.0f));
     }
 #endif
     int ii, jj;
     for (int j = 0; j < h; j++) {
-      jj = (int)((y - ymin + j) * yfac);
+      jj = int((y - ymin + j) * yfac);
       if (jj < 0 || jj >= recty) {
         continue;
       }
       for (int i = 0; i < w; i++) {
-        ii = (int)((x - xmin + i) * xfac);
+        ii = int((x - xmin + i) * xfac);
         if (ii < 0 || ii >= rectx) {
           continue;
         }
@@ -227,8 +215,6 @@ void AppCanvas::RenderStroke(Stroke *iStroke)
   }
 }
 
-void AppCanvas::update()
-{
-}
+void AppCanvas::update() {}
 
 } /* namespace Freestyle */

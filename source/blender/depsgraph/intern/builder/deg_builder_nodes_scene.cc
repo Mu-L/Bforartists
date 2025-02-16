@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2013 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2013 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup depsgraph
@@ -24,6 +9,8 @@
 #include "intern/builder/deg_builder_nodes.h"
 
 #include "DNA_scene_types.h"
+
+#include "BLI_listbase.h"
 
 namespace blender::deg {
 
@@ -46,8 +33,18 @@ void DepsgraphNodeBuilder::build_scene_render(Scene *scene, ViewLayer *view_laye
     build_scene_sequencer(scene);
     build_scene_speakers(scene, view_layer);
   }
+  build_scene_camera(scene);
+}
+
+void DepsgraphNodeBuilder::build_scene_camera(Scene *scene)
+{
   if (scene->camera != nullptr) {
-    build_object(-1, scene->camera, DEG_ID_LINKED_DIRECTLY, true);
+    build_object(-1, scene->camera, DEG_ID_LINKED_INDIRECTLY, true);
+  }
+  LISTBASE_FOREACH (TimeMarker *, marker, &scene->markers) {
+    if (!ELEM(marker->camera, nullptr, scene->camera)) {
+      build_object(-1, marker->camera, DEG_ID_LINKED_INDIRECTLY, true);
+    }
   }
 }
 
@@ -58,7 +55,9 @@ void DepsgraphNodeBuilder::build_scene_parameters(Scene *scene)
   }
   build_parameters(&scene->id);
   build_idproperties(scene->id.properties);
-  add_operation_node(&scene->id, NodeType::PARAMETERS, OperationCode::SCENE_EVAL);
+
+  add_operation_node(&scene->id, NodeType::SCENE, OperationCode::SCENE_EVAL);
+
   /* NOTE: This is a bit overkill and can potentially pull a bit too much into the graph, but:
    *
    * - We definitely need an ID node for the scene's compositor, otherwise re-mapping will no

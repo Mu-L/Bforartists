@@ -178,7 +178,7 @@ bool AutoTrack::TrackMarker(Marker* tracked_marker,
     return false;
   }
 
-  // Store original position befoer tracking, so we can claculate offset later.
+  // Store original position before tracking, so we can claculate offset later.
   Vec2f original_center = tracked_marker->center;
 
   // Do the tracking!
@@ -283,15 +283,13 @@ void AutoTrack::DetectAndTrack(const DetectAndTrackOptions& options) {
 
       // Find tracks in the previous frame that are not in this one.
       vector<Marker*> previous_frame_markers_to_track;
-      int num_skipped = 0;
       for (int i = 0; i < previous_frame_markers.size(); ++i) {
         if (std::binary_search(tracks_in_this_frame.begin(),
                                tracks_in_this_frame.end(),
                                previous_frame_markers[i].track)) {
-          num_skipped++;
-        } else {
-          previous_frame_markers_to_track.push_back(&previous_frame_markers[i]);
+          continue;
         }
+        previous_frame_markers_to_track.push_back(&previous_frame_markers[i]);
       }
 
       // Finally track the markers from the last frame into this one.

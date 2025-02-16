@@ -1,6 +1,15 @@
+/* SPDX-FileCopyrightText: 2020-2023 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
+
+#pragma once
+
+#include "infos/workbench_prepass_info.hh"
+
+SHADER_LIBRARY_CREATE_INFO(workbench_color_texture)
 
 /* TODO(fclem): deduplicate code. */
-bool node_tex_tile_lookup(inout vec3 co, sampler2DArray ima, sampler1DArray map)
+bool node_tex_tile_lookup(inout vec3 co, sampler1DArray map)
 {
   vec2 tile_pos = floor(co.xy);
 
@@ -25,30 +34,23 @@ bool node_tex_tile_lookup(inout vec3 co, sampler2DArray ima, sampler1DArray map)
   return true;
 }
 
-uniform sampler2DArray imageTileArray;
-uniform sampler1DArray imageTileData;
-uniform sampler2D imageTexture;
-
-uniform float imageTransparencyCutoff = 0.1;
-uniform bool imagePremult;
-
 vec3 workbench_image_color(vec2 uvs)
 {
-#ifdef V3D_SHADING_TEXTURE_COLOR
+#ifdef WORKBENCH_COLOR_TEXTURE
   vec4 color;
 
-#  ifdef TEXTURE_IMAGE_ARRAY
   vec3 co = vec3(uvs, 0.0);
-  if (node_tex_tile_lookup(co, imageTileArray, imageTileData)) {
-    color = texture(imageTileArray, co);
+  if (isImageTile) {
+    if (node_tex_tile_lookup(co, imageTileData)) {
+      color = texture(imageTileArray, co);
+    }
+    else {
+      color = vec4(1.0, 0.0, 1.0, 1.0);
+    }
   }
   else {
-    color = vec4(1.0, 0.0, 1.0, 1.0);
+    color = texture(imageTexture, uvs);
   }
-#  else
-
-  color = texture(imageTexture, uvs);
-#  endif
 
   /* Unpremultiply if stored multiplied, since straight alpha is expected by shaders. */
   if (imagePremult && !(color.a == 0.0 || color.a == 1.0)) {

@@ -1,34 +1,23 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup balembic
  */
 
 #include "abc_reader_camera.h"
-#include "abc_reader_transform.h"
 #include "abc_util.h"
 
 #include "DNA_camera_types.h"
 #include "DNA_object_types.h"
 
-#include "BKE_camera.h"
-#include "BKE_object.h"
+#include "BLI_math_base.h"
 
-#include "BLI_math.h"
+#include "BKE_camera.h"
+#include "BKE_object.hh"
+
+#include "BLT_translation.hh"
 
 using Alembic::AbcGeom::CameraSample;
 using Alembic::AbcGeom::ICamera;
@@ -56,17 +45,17 @@ bool AbcCameraReader::valid() const
 bool AbcCameraReader::accepts_object_type(
     const Alembic::AbcCoreAbstract::ObjectHeader &alembic_header,
     const Object *const ob,
-    const char **err_str) const
+    const char **r_err_str) const
 {
   if (!Alembic::AbcGeom::ICamera::matches(alembic_header)) {
-    *err_str =
+    *r_err_str = RPT_(
         "Object type mismatch, Alembic object path pointed to Camera when importing, but not any "
-        "more.";
+        "more");
     return false;
   }
 
   if (ob->type != OB_CAMERA) {
-    *err_str = "Object type mismatch, Alembic object path points to Camera.";
+    *r_err_str = RPT_("Object type mismatch, Alembic object path points to Camera");
     return false;
   }
 
@@ -75,7 +64,7 @@ bool AbcCameraReader::accepts_object_type(
 
 void AbcCameraReader::readObjectData(Main *bmain, const ISampleSelector &sample_sel)
 {
-  Camera *bcam = static_cast<Camera *>(BKE_camera_add(bmain, m_data_name.c_str()));
+  Camera *bcam = BKE_camera_add(bmain, m_data_name.c_str());
 
   CameraSample cam_sample;
   m_schema.get(cam_sample, sample_sel);
@@ -83,7 +72,8 @@ void AbcCameraReader::readObjectData(Main *bmain, const ISampleSelector &sample_
   ICompoundProperty customDataContainer = m_schema.getUserProperties();
 
   if (customDataContainer.valid() && customDataContainer.getPropertyHeader("stereoDistance") &&
-      customDataContainer.getPropertyHeader("eyeSeparation")) {
+      customDataContainer.getPropertyHeader("eyeSeparation"))
+  {
     IFloatProperty convergence_plane(customDataContainer, "stereoDistance");
     IFloatProperty eye_separation(customDataContainer, "eyeSeparation");
 
@@ -91,11 +81,11 @@ void AbcCameraReader::readObjectData(Main *bmain, const ISampleSelector &sample_
     bcam->stereo.convergence_distance = convergence_plane.getValue(sample_sel);
   }
 
-  const float lens = static_cast<float>(cam_sample.getFocalLength());
-  const float apperture_x = static_cast<float>(cam_sample.getHorizontalAperture());
-  const float apperture_y = static_cast<float>(cam_sample.getVerticalAperture());
-  const float h_film_offset = static_cast<float>(cam_sample.getHorizontalFilmOffset());
-  const float v_film_offset = static_cast<float>(cam_sample.getVerticalFilmOffset());
+  const float lens = float(cam_sample.getFocalLength());
+  const float apperture_x = float(cam_sample.getHorizontalAperture());
+  const float apperture_y = float(cam_sample.getVerticalAperture());
+  const float h_film_offset = float(cam_sample.getHorizontalFilmOffset());
+  const float v_film_offset = float(cam_sample.getVerticalFilmOffset());
   const float film_aspect = apperture_x / apperture_y;
 
   bcam->lens = lens;
@@ -103,10 +93,10 @@ void AbcCameraReader::readObjectData(Main *bmain, const ISampleSelector &sample_
   bcam->sensor_y = apperture_y * 10;
   bcam->shiftx = h_film_offset / apperture_x;
   bcam->shifty = v_film_offset / apperture_y / film_aspect;
-  bcam->clip_start = max_ff(0.1f, static_cast<float>(cam_sample.getNearClippingPlane()));
-  bcam->clip_end = static_cast<float>(cam_sample.getFarClippingPlane());
-  bcam->dof.focus_distance = static_cast<float>(cam_sample.getFocusDistance());
-  bcam->dof.aperture_fstop = static_cast<float>(cam_sample.getFStop());
+  bcam->clip_start = max_ff(0.1f, float(cam_sample.getNearClippingPlane()));
+  bcam->clip_end = float(cam_sample.getFarClippingPlane());
+  bcam->dof.focus_distance = float(cam_sample.getFocusDistance());
+  bcam->dof.aperture_fstop = float(cam_sample.getFStop());
 
   m_object = BKE_object_add_only_object(bmain, OB_CAMERA, m_object_name.c_str());
   m_object->data = bcam;

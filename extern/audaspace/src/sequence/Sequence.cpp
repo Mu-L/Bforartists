@@ -92,7 +92,7 @@ AnimateableProperty* Sequence::getAnimProperty(AnimateablePropertyType type)
 
 std::shared_ptr<SequenceEntry> Sequence::add(std::shared_ptr<ISound> sound, double begin, double end, double skip)
 {
-	return m_sequence->add(sound, begin, end, skip);
+	return m_sequence->add(sound, m_sequence, begin, end, skip);
 }
 
 void Sequence::remove(std::shared_ptr<SequenceEntry> entry)
@@ -100,9 +100,9 @@ void Sequence::remove(std::shared_ptr<SequenceEntry> entry)
 	m_sequence->remove(entry);
 }
 
-std::shared_ptr<IReader> Sequence::createQualityReader()
+std::shared_ptr<IReader> Sequence::createQualityReader(ResampleQuality quality)
 {
-	return std::shared_ptr<IReader>(new SequenceReader(m_sequence, true));
+	return std::shared_ptr<IReader>(new SequenceReader(m_sequence, quality));
 }
 
 std::shared_ptr<IReader> Sequence::createReader()

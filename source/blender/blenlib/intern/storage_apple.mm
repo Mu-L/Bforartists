@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2020 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2020 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup bli
@@ -28,7 +13,8 @@
 #include <sys/xattr.h>
 
 #include "BLI_fileops.h"
-#include "BLI_path_util.h"
+#include "BLI_path_utils.hh"
+#include "BLI_string.h"
 
 /* Extended file attribute used by OneDrive to mark placeholder files. */
 static const char *ONEDRIVE_RECALLONOPEN_ATTRIBUTE = "com.microsoft.OneDrive.RecallOnOpen";
@@ -48,9 +34,13 @@ bool BLI_file_alias_target(const char *filepath, char r_targetpath[FILE_MAXDIR])
     NSURL *shortcutURL = [[NSURL alloc] initFileURLWithFileSystemRepresentation:filepath
                                                                     isDirectory:NO
                                                                   relativeToURL:nil];
-    const NSURL *targetURL = [NSURL URLByResolvingAliasFileAtURL:shortcutURL
-                                                         options:NSURLBookmarkResolutionWithoutUI
-                                                           error:&error];
+
+    /* Note, NSURLBookmarkResolutionWithoutMounting keeps blender from crashing when an alias can't
+     * be mounted */
+    NSURL *targetURL = [NSURL URLByResolvingAliasFileAtURL:shortcutURL
+                                                   options:NSURLBookmarkResolutionWithoutUI |
+                                                           NSURLBookmarkResolutionWithoutMounting
+                                                     error:&error];
     const BOOL isSame = [shortcutURL isEqual:targetURL] and
                         ([[[shortcutURL path] stringByStandardizingPath]
                             isEqualToString:[[targetURL path] stringByStandardizingPath]]);
@@ -99,7 +89,7 @@ static bool find_attribute(const std::string &attributes, const char *search_att
  */
 static bool test_onedrive_file_is_placeholder(const char *path)
 {
-  /* Note: Currently only checking for the "com.microsoft.OneDrive.RecallOnOpen" extended file
+  /* NOTE: Currently only checking for the "com.microsoft.OneDrive.RecallOnOpen" extended file
    * attribute. In theory this attribute can also be set on files that aren't located inside a
    * OneDrive folder. Maybe additional checks are required? */
 
@@ -139,9 +129,9 @@ eFileAttributes BLI_file_attributes(const char *path)
   /* clang-format off */
   @autoreleasepool {
     /* clang-format on */
-    const NSURL *fileURL = [[NSURL alloc] initFileURLWithFileSystemRepresentation:path
-                                                                      isDirectory:NO
-                                                                    relativeToURL:nil];
+    NSURL *fileURL = [[[NSURL alloc] initFileURLWithFileSystemRepresentation:path
+                                                                 isDirectory:NO
+                                                               relativeToURL:nil] autorelease];
 
     /* Querying NSURLIsReadableKey and NSURLIsWritableKey keys for OneDrive placeholder files
      * triggers their unwanted download. */
@@ -156,7 +146,7 @@ eFileAttributes BLI_file_attributes(const char *path)
           @[ NSURLIsAliasFileKey, NSURLIsHiddenKey, NSURLIsReadableKey, NSURLIsWritableKey ];
     }
 
-    const NSDictionary *resourceKeyValues = [fileURL resourceValuesForKeys:resourceKeys error:nil];
+    NSDictionary *resourceKeyValues = [fileURL resourceValuesForKeys:resourceKeys error:nil];
 
     const bool is_alias = [resourceKeyValues[(void)(@"@%"), NSURLIsAliasFileKey] boolValue];
     const bool is_hidden = [resourceKeyValues[(void)(@"@%"), NSURLIsHiddenKey] boolValue];
@@ -183,4 +173,28 @@ eFileAttributes BLI_file_attributes(const char *path)
   }
 
   return (eFileAttributes)ret;
+}
+
+char *BLI_current_working_dir(char *dir, const size_t maxncpy)
+{
+  /* Can't just copy to the *dir pointer, as [path getCString gets grumpy. */
+  char path_expanded[PATH_MAX];
+  @autoreleasepool {
+    NSString *path = [[NSFileManager defaultManager] currentDirectoryPath];
+    const size_t length = maxncpy > PATH_MAX ? PATH_MAX : maxncpy;
+    [path getCString:path_expanded maxLength:length encoding:NSUTF8StringEncoding];
+    BLI_strncpy(dir, path_expanded, maxncpy);
+    return dir;
+  }
+}
+
+bool BLI_change_working_dir(const char *dir)
+{
+  @autoreleasepool {
+    NSString *path = [[NSString alloc] initWithUTF8String:dir];
+    if ([[NSFileManager defaultManager] changeCurrentDirectoryPath:path] == YES) {
+      return true;
+    }
+    return false;
+  }
 }

@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup collada
@@ -26,24 +14,18 @@
 #include "COLLADAFWAnimation.h"
 #include "COLLADAFWAnimationCurve.h"
 #include "COLLADAFWAnimationList.h"
-#include "COLLADAFWCamera.h"
-#include "COLLADAFWEffect.h"
-#include "COLLADAFWInstanceGeometry.h"
-#include "COLLADAFWLight.h"
-#include "COLLADAFWMaterial.h"
 #include "COLLADAFWNode.h"
 #include "COLLADAFWUniqueId.h"
 
-#include "BKE_context.h"
+#include "BKE_context.hh"
 
 #include "DNA_anim_types.h"
 
 #include "DNA_camera_types.h"
-#include "DNA_light_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 
-//#include "ArmatureImporter.h"
+// #include "ArmatureImporter.h"
 #include "TransformReader.h"
 
 #include "collada_internal.h"
@@ -52,7 +34,7 @@ class ArmatureImporter;
 
 class AnimationImporterBase {
  public:
-  /* virtual void change_eul_to_quat(Object *ob, bAction *act) = 0; */
+  // virtual void change_eul_to_quat(Object *ob, bAction *act) = 0;
 };
 
 class AnimationImporter : private TransformReader, public AnimationImporterBase {
@@ -75,20 +57,15 @@ class AnimationImporter : private TransformReader, public AnimationImporterBase 
                 float value,
                 eBezTriple_Interpolation ipo = BEZT_IPO_LIN);
 
-  /* create one or several fcurves depending on the number of parameters being animated */
+  /**
+   * Create one or several fcurves depending on the number of parameters being animated.
+   */
   void animation_to_fcurves(COLLADAFW::AnimationCurve *curve);
 
   void fcurve_deg_to_rad(FCurve *cu);
   void fcurve_scale(FCurve *cu, int scale);
 
   void fcurve_is_used(FCurve *fcu);
-
-  void add_fcurves_to_object(Main *bmain,
-                             Object *ob,
-                             std::vector<FCurve *> &curves,
-                             char *rna_path,
-                             int array_index,
-                             Animation *animated);
 
   int typeFlag;
 
@@ -143,13 +120,16 @@ class AnimationImporter : private TransformReader, public AnimationImporterBase 
   void set_import_from_version(std::string import_from_version);
   bool write_animation(const COLLADAFW::Animation *anim);
 
-  /* called on post-process stage after writeVisualScenes */
+  /** Called on post-process stage after writeVisualScenes. */
   bool write_animation_list(const COLLADAFW::AnimationList *animlist);
 
+  /**
+   * \todo refactor read_node_transform to not automatically apply anything,
+   * but rather return the transform matrix, so caller can do with it what is
+   * necessary. Same for \ref get_node_mat
+   */
   void read_node_transform(COLLADAFW::Node *node, Object *ob);
-#if 0
-  virtual void change_eul_to_quat(Object *ob, bAction *act);
-#endif
+  // virtual void change_eul_to_quat(Object *ob, bAction *act);
 
   void translate_Animations(COLLADAFW::Node *Node,
                             std::map<COLLADAFW::UniqueId, COLLADAFW::Node *> &root_map,
@@ -157,6 +137,10 @@ class AnimationImporter : private TransformReader, public AnimationImporterBase 
                             std::map<COLLADAFW::UniqueId, const COLLADAFW::Object *> FW_object_map,
                             std::map<COLLADAFW::UniqueId, Material *> uid_material_map);
 
+  /**
+   * Check if object is animated by checking if animlist_map
+   * holds the animlist_id of node transforms.
+   */
   AnimMix *get_animation_type(
       const COLLADAFW::Node *node,
       std::map<COLLADAFW::UniqueId, const COLLADAFW::Object *> FW_object_map);
@@ -167,66 +151,66 @@ class AnimationImporter : private TransformReader, public AnimationImporterBase 
                            COLLADAFW::Node *node,
                            COLLADAFW::Transformation *tm);
 
-  void add_bone_animation_sampled(Object *ob,
-                                  std::vector<FCurve *> &animcurves,
-                                  COLLADAFW::Node *root,
-                                  COLLADAFW::Node *node,
-                                  COLLADAFW::Transformation *tm);
-
+  /**
+   * Creates the rna_paths and array indices of fcurves from animations using transformation and
+   * bound animation class of each animation.
+   */
   void Assign_transform_animations(COLLADAFW::Transformation *transform,
                                    const COLLADAFW::AnimationList::AnimationBinding *binding,
                                    std::vector<FCurve *> *curves,
                                    bool is_joint,
                                    char *joint_path);
 
+  /**
+   * Creates the rna_paths and array indices of fcurves from animations using color and bound
+   * animation class of each animation.
+   */
   void Assign_color_animations(const COLLADAFW::UniqueId &listid,
-                               ListBase *AnimCurves,
+                               AnimData &adt,
                                const char *anim_type);
   void Assign_float_animations(const COLLADAFW::UniqueId &listid,
-                               ListBase *AnimCurves,
+                               AnimData &adt,
                                const char *anim_type);
+  /**
+   * Lens animations must be stored in COLLADA by using FOV,
+   * while blender internally uses focal length.
+   * The imported animation curves must be converted appropriately.
+   */
   void Assign_lens_animations(const COLLADAFW::UniqueId &listid,
-                              ListBase *AnimCurves,
-                              const double aspect,
-                              Camera *cam,
+                              AnimData &adt,
+                              double aspect,
+                              const Camera *cam,
                               const char *anim_type,
                               int fov_type);
 
   int setAnimType(const COLLADAFW::Animatable *prop, int type, int addition);
 
+  /** Sets the rna_path and array index to curve. */
   void modify_fcurve(std::vector<FCurve *> *curves,
                      const char *rna_path,
                      int array_index,
                      int scale = 1);
   void unused_fcurve(std::vector<FCurve *> *curves);
-  /* prerequisites:
-   * animlist_map - map animlist id -> animlist
-   * curve_map - map anim id -> curve(s) */
-  Object *translate_animation_OLD(COLLADAFW::Node *node,
-                                  std::map<COLLADAFW::UniqueId, Object *> &object_map,
-                                  std::map<COLLADAFW::UniqueId, COLLADAFW::Node *> &root_map,
-                                  COLLADAFW::Transformation::TransformationType tm_type,
-                                  Object *par_job = NULL);
 
   void find_frames(std::vector<float> *frames, std::vector<FCurve *> *curves);
-  void find_frames_old(std::vector<float> *frames,
-                       COLLADAFW::Node *node,
-                       COLLADAFW::Transformation::TransformationType tm_type);
-  /* internal, better make it private
-   * warning: evaluates only rotation
-   * prerequisites: animlist_map, curve_map */
+
+  /**
+   * Internal, better make it private
+   * WARNING: evaluates only rotation and only assigns matrix transforms now
+   * prerequisites: animlist_map, curve_map.
+   */
   void evaluate_transform_at_frame(float mat[4][4], COLLADAFW::Node *node, float fra);
 
-  /* return true to indicate that mat contains a sane value */
+  /** Return true to indicate that mat contains a sane value. */
   bool evaluate_animation(COLLADAFW::Transformation *tm,
                           float mat[4][4],
                           float fra,
                           const char *node_id);
 
-  /* gives a world-space mat of joint at rest position */
+  /** Gives a world-space mat of joint at rest position. */
   void get_joint_rest_mat(float mat[4][4], COLLADAFW::Node *root, COLLADAFW::Node *node);
 
-  /* gives a world-space mat, end's mat not included */
+  /** * Gives a world-space mat, end's mat not included. */
   bool calc_joint_parent_mat_rest(float mat[4][4],
                                   float par[4][4],
                                   COLLADAFW::Node *node,
@@ -234,18 +218,5 @@ class AnimationImporter : private TransformReader, public AnimationImporterBase 
 
   float convert_to_focal_length(float in_xfov, int fov_type, float aspect, float sensorx);
 
-#ifdef ARMATURE_TEST
-  Object *get_joint_object(COLLADAFW::Node *root, COLLADAFW::Node *node, Object *par_job);
-#endif
-
-#if 0
-  /* recursively evaluates joint tree until end is found, mat then is world-space matrix of end
-   * mat must be identity on enter, node must be root */
-  bool evaluate_joint_world_transform_at_frame(
-      float mat[4][4], float par[4][4], COLLADAFW::Node *node, COLLADAFW::Node *end, float fra);
-#endif
-
   void add_bone_fcurve(Object *ob, COLLADAFW::Node *node, FCurve *fcu);
-
-  void extra_data_importer(std::string elementName);
 };

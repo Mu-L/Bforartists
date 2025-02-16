@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2011-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup collada
@@ -31,9 +19,7 @@
 #include "BLI_utildefines.h"
 
 //--------------------------------------------------------------------
-ErrorHandler::ErrorHandler() : mError(false)
-{
-}
+ErrorHandler::ErrorHandler() : mError(false) {}
 
 //--------------------------------------------------------------------
 bool ErrorHandler::handleError(const COLLADASaxFWL::IError *error)
@@ -53,7 +39,8 @@ bool ErrorHandler::handleError(const COLLADASaxFWL::IError *error)
     error_message = parserError.getErrorMessage();
 
     if (parserError.getErrorType() ==
-        GeneratedSaxParser::ParserError::ERROR_VALIDATION_MIN_OCCURS_UNMATCHED) {
+        GeneratedSaxParser::ParserError::ERROR_VALIDATION_MIN_OCCURS_UNMATCHED)
+    {
       if (STREQ(parserError.getElement(), "effect")) {
         isError = false;
       }
@@ -61,21 +48,25 @@ bool ErrorHandler::handleError(const COLLADASaxFWL::IError *error)
 
     else if (parserError.getErrorType() ==
              GeneratedSaxParser::ParserError::
-                 ERROR_VALIDATION_SEQUENCE_PREVIOUS_SIBLING_NOT_PRESENT) {
+                 ERROR_VALIDATION_SEQUENCE_PREVIOUS_SIBLING_NOT_PRESENT)
+    {
       if (!(STREQ(parserError.getElement(), "extra") &&
-            STREQ(parserError.getAdditionalText().c_str(), "sibling: fx_profile_abstract"))) {
+            STREQ(parserError.getAdditionalText().c_str(), "sibling: fx_profile_abstract")))
+      {
         isError = false;
       }
     }
 
     else if (parserError.getErrorType() ==
-             GeneratedSaxParser::ParserError::ERROR_COULD_NOT_OPEN_FILE) {
+             GeneratedSaxParser::ParserError::ERROR_COULD_NOT_OPEN_FILE)
+    {
       isError = true;
       error_context = "File access";
     }
 
     else if (parserError.getErrorType() ==
-             GeneratedSaxParser::ParserError::ERROR_REQUIRED_ATTRIBUTE_MISSING) {
+             GeneratedSaxParser::ParserError::ERROR_REQUIRED_ATTRIBUTE_MISSING)
+    {
       isError = true;
     }
 

@@ -4,9 +4,9 @@
 #ifdef WINDRES
 	#include "winresrc.h"
 	#define IDC_STATIC (-1)
-	//#define STRINGIFY_(x) #x // bfa - stringify defines becomes obsolete
-	//#define STRINGIFY(x) STRINGIFY_(x)
-	//#define BLEN_VER_RC_STR STRINGIFY(BLEN_VER_RC_STR_M)
+	#define STRINGIFY_(x) #x
+	#define STRINGIFY(x) STRINGIFY_(x)
+	#define BLEN_VER_RC_STR STRINGIFY(BLEN_VER_RC_STR_M)
 #endif
 
 APPICON ICON DISCARDABLE "winblender.ico"
@@ -26,6 +26,8 @@ crossC_cursor CURSOR "cursors/crossc.cur"
 eraser_cursor CURSOR "cursors/eraser.cur"
 eyedropper_cursor CURSOR "cursors/eyedropper.cur"
 handopen_cursor CURSOR "cursors/handopen.cur"
+handclosed_cursor CURSOR "cursors/handclosed.cur"
+handpoint_cursor CURSOR "cursors/handpoint.cur"
 knife_cursor CURSOR "cursors/knife.cur"
 pencil_cursor CURSOR "cursors/pencil.cur"
 scrollew_cursor CURSOR "cursors/scrollew.cur"
@@ -36,13 +38,13 @@ splitv_cursor CURSOR "cursors/splitv.cur"
 zoomin_cursor CURSOR "cursors/zoomin.cur"
 zoomout_cursor CURSOR "cursors/zoomout.cur"
 forbidden_cursor CURSOR "cursors/forbidden.cur"
+handle_left_cursor CURSOR "cursors/handle_left.cur"
+handle_right_cursor CURSOR "cursors/handle_right.cur"
+handle_both_cursor CURSOR "cursors/handle_both.cur"
 
 IDR_VERSION1 VERSIONINFO
-//FILEVERSION BLEN_VER_RC_1, BLEN_VER_RC_2, BLEN_VER_RC_3, BLEN_VER_RC_4
-//PRODUCTVERSION BLEN_VER_RC_1, BLEN_VER_RC_2, BLEN_VER_RC_3, BLEN_VER_RC_4
-
-FILEVERSION 2,9,3// bfa - don't separate by dots, but commas here.
-PRODUCTVERSION 2,9,3// bfa - don't separate by dots, but commas here.
+FILEVERSION BLEN_VER_RC_1, BLEN_VER_RC_2, BLEN_VER_RC_3, BLEN_VER_RC_4
+PRODUCTVERSION BLEN_VER_RC_1, BLEN_VER_RC_2, BLEN_VER_RC_3, BLEN_VER_RC_4
 FILEOS 0x00000004
 FILETYPE 0x00000001
 BEGIN
@@ -50,22 +52,13 @@ BEGIN
   BEGIN
     BLOCK "04090000"
     BEGIN
-      //VALUE "FileVersion", BLEN_VER_RC_STR
-      //VALUE "ProductVersion", BLEN_VER_RC_STR
-      //VALUE "CompanyName", "Blender Foundation"
-      //VALUE "FileDescription", "Blender"
-      //VALUE "LegalCopyright", "GPLv3 (Blender Foundation)"
-      //VALUE "OriginalFilename", "blender.exe"
-      //VALUE "ProductName", "Blender"
-
-	  // bfa - changed the detail settings
-	  VALUE "FileVersion", "2.9.3"
-	  VALUE "ProductVersion", "2.9.3"
-	  VALUE "CompanyName", "Bforartists"
-	  VALUE "FileDescription", "Bforartists2"
-	  VALUE "LegalCopyright", "GPLv3"
-	  VALUE "OriginalFilename", "bforartists.exe"
-	  VALUE "ProductName", "Bforartists2"
+      VALUE "FileVersion", BLEN_VER_RC_STR
+      VALUE "ProductVersion", BLEN_VER_RC_STR
+      VALUE "CompanyName", "Bforartists"
+      VALUE "FileDescription", "Bforartists4"
+      VALUE "LegalCopyright", "GPLv3 (Bforartists)"
+      VALUE "OriginalFilename", "bforartists.exe"
+      VALUE "ProductName", "Bforartists4"
     END
   END
   BLOCK "VarFileInfo"

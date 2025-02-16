@@ -1,108 +1,166 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#include "BKE_spline.hh"
-#include "UI_interface.h"
-#include "UI_resources.h"
+#include "BKE_curves.hh"
+#include "NOD_rna_define.hh"
+
+#include "UI_interface.hh"
+#include "UI_resources.hh"
+
+#include "NOD_socket_search_link.hh"
+
 #include "node_geometry_util.hh"
 
-static bNodeSocketTemplate geo_node_curve_primitive_quadrilateral_in[] = {
-    {SOCK_FLOAT, N_("Width"), 2.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
-    {SOCK_FLOAT, N_("Height"), 2.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
-    {SOCK_FLOAT, N_("Bottom Width"), 4.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
-    {SOCK_FLOAT, N_("Top Width"), 2.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
-    {SOCK_FLOAT, N_("Offset"), 1.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_DISTANCE},
-    {SOCK_FLOAT, N_("Bottom Height"), 3.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX, PROP_DISTANCE},
-    {SOCK_FLOAT, N_("Top Height"), 1.0f, 0.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_DISTANCE},
-    {SOCK_VECTOR, N_("Point 1"), -1.0f, 1.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_DISTANCE},
-    {SOCK_VECTOR, N_("Point 2"), 1.0f, 1.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_DISTANCE},
-    {SOCK_VECTOR, N_("Point 3"), 1.0f, -1.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_DISTANCE},
-    {SOCK_VECTOR, N_("Point 4"), -1.0f, -1.0f, 0.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_DISTANCE},
-    {-1, ""},
-};
+namespace blender::nodes::node_geo_curve_primitive_quadrilateral_cc {
 
-static bNodeSocketTemplate geo_node_curve_primitive_quadrilateral_out[] = {
-    {SOCK_GEOMETRY, N_("Curve")},
-    {-1, ""},
-};
+NODE_STORAGE_FUNCS(NodeGeometryCurvePrimitiveQuad)
 
-static void geo_node_curve_primitive_quadrilateral_layout(uiLayout *layout,
-                                                          bContext *UNUSED(C),
-                                                          PointerRNA *ptr)
+static void node_declare(NodeDeclarationBuilder &b)
 {
-  uiItemR(layout, ptr, "mode", 0, "", ICON_NONE);
+  auto &width = b.add_input<decl::Float>("Width")
+                    .default_value(2.0f)
+                    .min(0.0f)
+                    .subtype(PROP_DISTANCE)
+                    .description("The X axis size of the shape");
+  auto &height = b.add_input<decl::Float>("Height")
+                     .default_value(2.0f)
+                     .min(0.0f)
+                     .subtype(PROP_DISTANCE)
+                     .description("The Y axis size of the shape")
+                     .available(false);
+  auto &bottom = b.add_input<decl::Float>("Bottom Width")
+                     .default_value(4.0f)
+                     .min(0.0f)
+                     .subtype(PROP_DISTANCE)
+                     .description("The X axis size of the shape")
+                     .available(false);
+  auto &top = b.add_input<decl::Float>("Top Width")
+                  .default_value(2.0f)
+                  .min(0.0f)
+                  .subtype(PROP_DISTANCE)
+                  .description("The X axis size of the shape")
+                  .available(false);
+  auto &offset =
+      b.add_input<decl::Float>("Offset")
+          .default_value(1.0f)
+          .subtype(PROP_DISTANCE)
+          .description(
+              "For Parallelogram, the relative X difference between the top and bottom edges. For "
+              "Trapezoid, the amount to move the top edge in the positive X axis")
+          .available(false);
+  auto &bottom_height = b.add_input<decl::Float>("Bottom Height")
+                            .default_value(3.0f)
+                            .min(0.0f)
+                            .subtype(PROP_DISTANCE)
+                            .description("The distance between the bottom point and the X axis")
+                            .available(false);
+  auto &top_height = b.add_input<decl::Float>("Top Height")
+                         .default_value(1.0f)
+                         .subtype(PROP_DISTANCE)
+                         .description("The distance between the top point and the X axis")
+                         .available(false);
+  auto &p1 = b.add_input<decl::Vector>("Point 1")
+                 .default_value({-1.0f, -1.0f, 0.0f})
+                 .subtype(PROP_TRANSLATION)
+                 .description("The exact location of the point to use")
+                 .available(false);
+  auto &p2 = b.add_input<decl::Vector>("Point 2")
+                 .default_value({1.0f, -1.0f, 0.0f})
+                 .subtype(PROP_TRANSLATION)
+                 .description("The exact location of the point to use")
+                 .available(false);
+  auto &p3 = b.add_input<decl::Vector>("Point 3")
+                 .default_value({1.0f, 1.0f, 0.0f})
+                 .subtype(PROP_TRANSLATION)
+                 .description("The exact location of the point to use")
+                 .available(false);
+  auto &p4 = b.add_input<decl::Vector>("Point 4")
+                 .default_value({-1.0f, 1.0f, 0.0f})
+                 .subtype(PROP_TRANSLATION)
+                 .description("The exact location of the point to use")
+                 .available(false);
+  b.add_output<decl::Geometry>("Curve");
+
+  const bNode *node = b.node_or_null();
+  if (node != nullptr) {
+    const NodeGeometryCurvePrimitiveQuad &storage = node_storage(*node);
+    switch (GeometryNodeCurvePrimitiveQuadMode(storage.mode)) {
+      case GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_RECTANGLE:
+        width.available(true);
+        height.available(true);
+        break;
+      case GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_PARALLELOGRAM:
+        width.available(true);
+        height.available(true);
+        offset.available(true);
+        break;
+      case GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_TRAPEZOID:
+        bottom.available(true);
+        top.available(true);
+        offset.available(true);
+        height.available(true);
+        break;
+      case GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_KITE:
+        width.available(true);
+        bottom_height.available(true);
+        top_height.available(true);
+        break;
+      case GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_POINTS:
+        p1.available(true);
+        p2.available(true);
+        p3.available(true);
+        p4.available(true);
+        break;
+    }
+  }
 }
 
-static void geo_node_curve_primitive_quadrilateral_init(bNodeTree *UNUSED(tree), bNode *node)
+static void node_layout(uiLayout *layout, bContext * /*C*/, PointerRNA *ptr)
 {
-  NodeGeometryCurvePrimitiveQuad *data = (NodeGeometryCurvePrimitiveQuad *)MEM_callocN(
-      sizeof(NodeGeometryCurvePrimitiveQuad), __func__);
+  uiItemR(layout, ptr, "mode", UI_ITEM_NONE, "", ICON_NONE);
+}
+
+static void node_init(bNodeTree * /*tree*/, bNode *node)
+{
+  NodeGeometryCurvePrimitiveQuad *data = MEM_cnew<NodeGeometryCurvePrimitiveQuad>(__func__);
   data->mode = GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_RECTANGLE;
   node->storage = data;
 }
 
-namespace blender::nodes {
+class SocketSearchOp {
+ public:
+  std::string socket_name;
+  GeometryNodeCurvePrimitiveQuadMode quad_mode;
+  void operator()(LinkSearchOpParams &params)
+  {
+    bNode &node = params.add_node("GeometryNodeCurvePrimitiveQuadrilateral");
+    node_storage(node).mode = quad_mode;
+    params.update_and_connect_available_socket(node, socket_name);
+  }
+};
 
-static void geo_node_curve_primitive_quadrilateral_update(bNodeTree *UNUSED(ntree), bNode *node)
+static void node_gather_link_searches(GatherLinkSearchOpParams &params)
 {
-  NodeGeometryCurvePrimitiveQuad &node_storage = *(NodeGeometryCurvePrimitiveQuad *)node->storage;
-  GeometryNodeCurvePrimitiveQuadMode mode = static_cast<GeometryNodeCurvePrimitiveQuadMode>(
-      node_storage.mode);
-
-  bNodeSocket *width = ((bNodeSocket *)node->inputs.first);
-  bNodeSocket *height = width->next;
-  bNodeSocket *bottom = height->next;
-  bNodeSocket *top = bottom->next;
-  bNodeSocket *offset = top->next;
-  bNodeSocket *bottom_height = offset->next;
-  bNodeSocket *top_height = bottom_height->next;
-  bNodeSocket *p1 = top_height->next;
-  bNodeSocket *p2 = p1->next;
-  bNodeSocket *p3 = p2->next;
-  bNodeSocket *p4 = p3->next;
-
-  LISTBASE_FOREACH (bNodeSocket *, sock, &node->inputs) {
-    nodeSetSocketAvailability(sock, false);
+  const NodeDeclaration &declaration = *params.node_type().static_declaration;
+  if (params.in_out() == SOCK_OUT) {
+    search_link_ops_for_declarations(params, declaration.outputs);
   }
-
-  if (mode == GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_RECTANGLE) {
-    nodeSetSocketAvailability(width, true);
-    nodeSetSocketAvailability(height, true);
-  }
-  else if (mode == GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_PARALLELOGRAM) {
-    nodeSetSocketAvailability(width, true);
-    nodeSetSocketAvailability(height, true);
-    nodeSetSocketAvailability(offset, true);
-  }
-  else if (mode == GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_TRAPEZOID) {
-    nodeSetSocketAvailability(bottom, true);
-    nodeSetSocketAvailability(top, true);
-    nodeSetSocketAvailability(offset, true);
-    nodeSetSocketAvailability(height, true);
-  }
-  else if (mode == GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_KITE) {
-    nodeSetSocketAvailability(width, true);
-    nodeSetSocketAvailability(bottom_height, true);
-    nodeSetSocketAvailability(top_height, true);
-  }
-  else if (mode == GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_POINTS) {
-    nodeSetSocketAvailability(p1, true);
-    nodeSetSocketAvailability(p2, true);
-    nodeSetSocketAvailability(p3, true);
-    nodeSetSocketAvailability(p4, true);
+  else if (params.node_tree().typeinfo->validate_link(
+               eNodeSocketDatatype(params.other_socket().type), SOCK_FLOAT))
+  {
+    params.add_item(IFACE_("Width"),
+                    SocketSearchOp{"Width", GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_RECTANGLE});
+    params.add_item(IFACE_("Height"),
+                    SocketSearchOp{"Height", GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_RECTANGLE});
+    params.add_item(IFACE_("Bottom Width"),
+                    SocketSearchOp{"Bottom Width", GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_TRAPEZOID});
+    params.add_item(IFACE_("Top Width"),
+                    SocketSearchOp{"Top Width", GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_TRAPEZOID});
+    params.add_item(IFACE_("Offset"),
+                    SocketSearchOp{"Offset", GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_PARALLELOGRAM});
+    params.add_item(IFACE_("Point 1"),
+                    SocketSearchOp{"Point 1", GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_POINTS});
   }
 }
 
@@ -110,10 +168,10 @@ static void create_rectangle_curve(MutableSpan<float3> positions,
                                    const float height,
                                    const float width)
 {
-  positions[0] = float3(width / 2.0f, -height / 2.0f, 0.0f);
-  positions[1] = float3(-width / 2.0f, -height / 2.0f, 0.0f);
-  positions[2] = float3(-width / 2.0f, height / 2.0f, 0.0f);
-  positions[3] = float3(width / 2.0f, height / 2.0f, 0.0f);
+  positions[0] = float3(width / 2.0f, height / 2.0f, 0.0f);
+  positions[1] = float3(-width / 2.0f, height / 2.0f, 0.0f);
+  positions[2] = float3(-width / 2.0f, -height / 2.0f, 0.0f);
+  positions[3] = float3(width / 2.0f, -height / 2.0f, 0.0f);
 }
 
 static void create_points_curve(MutableSpan<float3> positions,
@@ -133,10 +191,10 @@ static void create_parallelogram_curve(MutableSpan<float3> positions,
                                        const float width,
                                        const float offset)
 {
-  positions[0] = float3(width / 2.0f - offset / 2.0f, -height / 2.0f, 0.0f);
-  positions[1] = float3(-width / 2.0f - offset / 2.0f, -height / 2.0f, 0.0f);
-  positions[2] = float3(-width / 2.0f + offset / 2.0f, height / 2.0f, 0.0f);
-  positions[3] = float3(width / 2.0f + offset / 2.0f, height / 2.0f, 0.0f);
+  positions[0] = float3(width / 2.0f + offset / 2.0f, height / 2.0f, 0.0f);
+  positions[1] = float3(-width / 2.0f + offset / 2.0f, height / 2.0f, 0.0f);
+  positions[2] = float3(-width / 2.0f - offset / 2.0f, -height / 2.0f, 0.0f);
+  positions[3] = float3(width / 2.0f - offset / 2.0f, -height / 2.0f, 0.0f);
 }
 static void create_trapezoid_curve(MutableSpan<float3> positions,
                                    const float bottom,
@@ -144,10 +202,10 @@ static void create_trapezoid_curve(MutableSpan<float3> positions,
                                    const float offset,
                                    const float height)
 {
-  positions[0] = float3(bottom / 2.0f, -height / 2.0f, 0.0f);
-  positions[1] = float3(-bottom / 2.0f, -height / 2.0f, 0.0f);
-  positions[2] = float3(-top / 2.0f + offset, height / 2.0f, 0.0f);
-  positions[3] = float3(top / 2.0f + offset, height / 2.0f, 0.0f);
+  positions[0] = float3(top / 2.0f + offset, height / 2.0f, 0.0f);
+  positions[1] = float3(-top / 2.0f + offset, height / 2.0f, 0.0f);
+  positions[2] = float3(-bottom / 2.0f, -height / 2.0f, 0.0f);
+  positions[3] = float3(bottom / 2.0f, -height / 2.0f, 0.0f);
 }
 
 static void create_kite_curve(MutableSpan<float3> positions,
@@ -155,26 +213,22 @@ static void create_kite_curve(MutableSpan<float3> positions,
                               const float bottom_height,
                               const float top_height)
 {
-  positions[0] = float3(-width / 2.0f, 0, 0);
-  positions[1] = float3(0, top_height, 0);
-  positions[2] = float3(width / 2, 0, 0);
-  positions[3] = float3(0, -bottom_height, 0);
+  positions[0] = float3(0, -bottom_height, 0);
+  positions[1] = float3(width / 2, 0, 0);
+  positions[2] = float3(0, top_height, 0);
+  positions[3] = float3(-width / 2.0f, 0, 0);
 }
 
-static void geo_node_curve_primitive_quadrilateral_exec(GeoNodeExecParams params)
+static void node_geo_exec(GeoNodeExecParams params)
 {
-  const NodeGeometryCurvePrimitiveQuad &node_storage =
-      *(NodeGeometryCurvePrimitiveQuad *)(params.node()).storage;
-  const GeometryNodeCurvePrimitiveQuadMode mode = static_cast<GeometryNodeCurvePrimitiveQuadMode>(
-      node_storage.mode);
+  const NodeGeometryCurvePrimitiveQuad &storage = node_storage(params.node());
+  const GeometryNodeCurvePrimitiveQuadMode mode = (GeometryNodeCurvePrimitiveQuadMode)storage.mode;
 
-  std::unique_ptr<CurveEval> curve = std::make_unique<CurveEval>();
-  std::unique_ptr<PolySpline> spline = std::make_unique<PolySpline>();
-  spline->resize(4);
-  spline->radii().fill(1.0f);
-  spline->tilts().fill(0.0f);
-  spline->set_cyclic(true);
-  MutableSpan<float3> positions = spline->positions();
+  Curves *curves_id = bke::curves_new_nomain_single(4, CURVE_TYPE_POLY);
+  bke::CurvesGeometry &curves = curves_id->geometry.wrap();
+  curves.cyclic_for_write().first() = true;
+
+  MutableSpan<float3> positions = curves.positions_for_write();
 
   switch (mode) {
     case GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_RECTANGLE:
@@ -210,32 +264,71 @@ static void geo_node_curve_primitive_quadrilateral_exec(GeoNodeExecParams params
                           params.extract_input<float3>("Point 4"));
       break;
     default:
-      params.set_output("Curve", GeometrySet());
+      params.set_default_remaining_outputs();
       return;
   }
 
-  curve->add_spline(std::move(spline));
-  curve->attributes.reallocate(curve->splines().size());
-  params.set_output("Curve", GeometrySet::create_with_curve(curve.release()));
+  params.set_output("Curve", GeometrySet::from_curves(curves_id));
 }
 
-}  // namespace blender::nodes
-
-void register_node_type_geo_curve_primitive_quadrilateral()
+static void node_rna(StructRNA *srna)
 {
-  static bNodeType ntype;
-  geo_node_type_base(
-      &ntype, GEO_NODE_CURVE_PRIMITIVE_QUADRILATERAL, "Quadrilateral", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(&ntype,
-                             geo_node_curve_primitive_quadrilateral_in,
-                             geo_node_curve_primitive_quadrilateral_out);
-  ntype.geometry_node_execute = blender::nodes::geo_node_curve_primitive_quadrilateral_exec;
-  ntype.draw_buttons = geo_node_curve_primitive_quadrilateral_layout;
-  node_type_update(&ntype, blender::nodes::geo_node_curve_primitive_quadrilateral_update);
-  node_type_init(&ntype, geo_node_curve_primitive_quadrilateral_init);
-  node_type_storage(&ntype,
-                    "NodeGeometryCurvePrimitiveQuad",
-                    node_free_standard_storage,
-                    node_copy_standard_storage);
-  nodeRegisterType(&ntype);
+  static EnumPropertyItem mode_items[] = {
+      {GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_RECTANGLE,
+       "RECTANGLE",
+       0,
+       "Rectangle",
+       "Create a rectangle"},
+      {GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_PARALLELOGRAM,
+       "PARALLELOGRAM",
+       0,
+       "Parallelogram",
+       "Create a parallelogram"},
+      {GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_TRAPEZOID,
+       "TRAPEZOID",
+       0,
+       "Trapezoid",
+       "Create a trapezoid"},
+      {GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_KITE, "KITE", 0, "Kite", "Create a Kite / Dart"},
+      {GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_POINTS,
+       "POINTS",
+       0,
+       "Points",
+       "Create a quadrilateral from four points"},
+      {0, nullptr, 0, nullptr, nullptr},
+  };
+
+  RNA_def_node_enum(srna,
+                    "mode",
+                    "Mode",
+                    "",
+                    mode_items,
+                    NOD_storage_enum_accessors(mode),
+                    GEO_NODE_CURVE_PRIMITIVE_QUAD_MODE_RECTANGLE);
 }
+
+static void node_register()
+{
+  static blender::bke::bNodeType ntype;
+  geo_node_type_base(
+      &ntype, "GeometryNodeCurvePrimitiveQuadrilateral", GEO_NODE_CURVE_PRIMITIVE_QUADRILATERAL);
+  ntype.ui_name = "Quadrilateral";
+  ntype.ui_description = "Generate a polygon with four points";
+  ntype.enum_name_legacy = "CURVE_PRIMITIVE_QUADRILATERAL";
+  ntype.nclass = NODE_CLASS_GEOMETRY;
+  ntype.declare = node_declare;
+  ntype.geometry_node_execute = node_geo_exec;
+  ntype.draw_buttons = node_layout;
+  ntype.initfunc = node_init;
+  blender::bke::node_type_storage(&ntype,
+                                  "NodeGeometryCurvePrimitiveQuad",
+                                  node_free_standard_storage,
+                                  node_copy_standard_storage);
+  ntype.gather_link_search_ops = node_gather_link_searches;
+  blender::bke::node_register_type(&ntype);
+
+  node_rna(ntype.rna_ext.srna);
+}
+NOD_REGISTER_NODE(node_register)
+
+}  // namespace blender::nodes::node_geo_curve_primitive_quadrilateral_cc

@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2020 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2020 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup gpu
@@ -23,13 +8,13 @@
  * Debug features of OpenGL.
  */
 
-#include "BKE_global.h"
+#include "BKE_global.hh"
 
 #include "BLI_string.h"
 
 #include "gpu_context_private.hh"
 
-#include "GPU_debug.h"
+#include "GPU_debug.hh"
 
 using namespace blender;
 using namespace blender::gpu;
@@ -45,7 +30,7 @@ void GPU_debug_group_begin(const char *name)
   ctx->debug_group_begin(name, stack.size());
 }
 
-void GPU_debug_group_end(void)
+void GPU_debug_group_end()
 {
   if (!(G.debug & G_DEBUG_GPU)) {
     return;
@@ -55,10 +40,6 @@ void GPU_debug_group_end(void)
   ctx->debug_group_end();
 }
 
-/**
- * Return a formatted string showing the current group hierarchy in this format:
- * "Group1 > Group 2 > Group3 > ... > GroupN : "
- */
 void GPU_debug_get_groups_names(int name_buf_len, char *r_name_buf)
 {
   Context *ctx = Context::get();
@@ -66,18 +47,17 @@ void GPU_debug_get_groups_names(int name_buf_len, char *r_name_buf)
     return;
   }
   DebugStack &stack = ctx->debug_stack;
-  if (stack.size() == 0) {
+  if (stack.is_empty()) {
     r_name_buf[0] = '\0';
     return;
   }
-  size_t sz = 0;
+  size_t len = 0;
   for (StringRef &name : stack) {
-    sz += BLI_snprintf_rlen(r_name_buf + sz, name_buf_len - sz, "%s > ", name.data());
+    len += BLI_snprintf_rlen(r_name_buf + len, name_buf_len - len, "%s > ", name.data());
   }
-  r_name_buf[sz - 3] = '\0';
+  r_name_buf[len - 3] = '\0';
 }
 
-/* Return true if inside a debug group with the same name. */
 bool GPU_debug_group_match(const char *ref)
 {
   /* Otherwise there will be no names. */
@@ -93,4 +73,94 @@ bool GPU_debug_group_match(const char *ref)
     }
   }
   return false;
+}
+
+void GPU_debug_capture_begin(const char *title)
+{
+  /* GPU Frame capture is only enabled when --debug-gpu is specified. */
+  if (!(G.debug & G_DEBUG_GPU)) {
+    return;
+  }
+
+  Context *ctx = Context::get();
+  if (ctx && !ctx->debug_is_capturing) {
+    ctx->debug_is_capturing = ctx->debug_capture_begin(title);
+    /* Call GPU_finish to ensure all desired GPU commands occur within the capture boundary. */
+    GPU_finish();
+  }
+}
+
+void GPU_debug_capture_end()
+{
+  /* GPU Frame capture is only enabled when --debug-gpu is specified. */
+  if (!(G.debug & G_DEBUG_GPU)) {
+    return;
+  }
+
+  Context *ctx = Context::get();
+  if (ctx && ctx->debug_is_capturing) {
+    /* Call GPU_finish to ensure all desired GPU commands occur within the capture boundary. */
+    GPU_finish();
+    ctx->debug_capture_end();
+    ctx->debug_is_capturing = false;
+  }
+}
+
+void *GPU_debug_capture_scope_create(const char *name)
+{
+  /* GPU Frame capture is only enabled when --debug-gpu is specified. */
+  if (!(G.debug & G_DEBUG_GPU)) {
+    return nullptr;
+  }
+
+  Context *ctx = Context::get();
+  if (!ctx) {
+    return nullptr;
+  }
+  return ctx->debug_capture_scope_create(name);
+}
+
+bool GPU_debug_capture_scope_begin(void *scope)
+{
+  /* Early exit if scope does not exist or not in debug mode. */
+  if (!(G.debug & G_DEBUG_GPU) || !scope) {
+    return false;
+  }
+
+  Context *ctx = Context::get();
+  if (!ctx) {
+    return false;
+  }
+
+  /* Declare beginning of capture scope region. */
+  bool scope_capturing = ctx->debug_capture_scope_begin(scope);
+  if (scope_capturing && !ctx->debug_is_capturing) {
+    /* Call GPU_finish to ensure all desired GPU commands occur within the capture boundary. */
+    GPU_finish();
+    ctx->debug_is_capturing = true;
+  }
+  return ctx->debug_is_capturing;
+}
+
+void GPU_debug_capture_scope_end(void *scope)
+{
+  /* Early exit if scope does not exist or not in debug mode. */
+  if (!(G.debug & G_DEBUG_GPU) || !scope) {
+    return;
+  }
+
+  Context *ctx = Context::get();
+  if (!ctx) {
+    return;
+  }
+
+  /* If capturing, call GPU_finish to ensure all desired GPU commands occur within the capture
+   * boundary. */
+  if (ctx->debug_is_capturing) {
+    GPU_finish();
+    ctx->debug_is_capturing = false;
+  }
+
+  /* Declare end of capture scope region. */
+  ctx->debug_capture_scope_end(scope);
 }

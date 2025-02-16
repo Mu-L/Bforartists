@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2020 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2020 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup gpu
@@ -25,9 +10,9 @@
 
 #include "MEM_guardedalloc.h"
 
-#include "gpu_index_buffer_private.hh"
+#include "GPU_index_buffer.hh"
 
-#include "glew-mx.h"
+#include <epoxy/gl.h>
 
 namespace blender::gpu {
 
@@ -42,27 +27,35 @@ class GLIndexBuf : public IndexBuf {
  public:
   ~GLIndexBuf();
 
-  void bind(void);
+  void bind();
   void bind_as_ssbo(uint binding) override;
 
-  const uint32_t *read() const override;
+  void read(uint32_t *data) const override;
 
   void *offset_ptr(uint additional_vertex_offset) const
   {
     additional_vertex_offset += index_start_;
     if (index_type_ == GPU_INDEX_U32) {
-      return (GLuint *)0 + additional_vertex_offset;
+      return reinterpret_cast<void *>(intptr_t(additional_vertex_offset) * sizeof(GLuint));
     }
-    return (GLushort *)0 + additional_vertex_offset;
+    return reinterpret_cast<void *>(intptr_t(additional_vertex_offset) * sizeof(GLushort));
   }
 
-  GLuint restart_index(void) const
+  GLuint restart_index() const
   {
     return (index_type_ == GPU_INDEX_U16) ? 0xFFFFu : 0xFFFFFFFFu;
   }
 
+  void upload_data() override;
+
+  void update_sub(uint start, uint len, const void *data) override;
+
  private:
   bool is_active() const;
+  void strip_restart_indices() override
+  {
+    /* No-op. */
+  }
 
   MEM_CXX_CLASS_ALLOC_FUNCS("GLIndexBuf")
 };

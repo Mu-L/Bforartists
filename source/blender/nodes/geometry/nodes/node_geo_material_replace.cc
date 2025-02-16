@@ -1,75 +1,69 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "node_geometry_util.hh"
 
-#include "UI_interface.h"
-#include "UI_resources.h"
-
 #include "DNA_mesh_types.h"
-#include "DNA_meshdata_types.h"
 
-#include "BKE_material.h"
+#include "BKE_grease_pencil.hh"
 
-static bNodeSocketTemplate geo_node_material_replace_in[] = {
-    {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_MATERIAL, N_("Old")},
-    {SOCK_MATERIAL, N_("New")},
-    {-1, ""},
-};
+namespace blender::nodes::node_geo_material_replace_cc {
 
-static bNodeSocketTemplate geo_node_material_replace_out[] = {
-    {SOCK_GEOMETRY, N_("Geometry")},
-    {-1, ""},
-};
+static void node_declare(NodeDeclarationBuilder &b)
+{
+  b.add_input<decl::Geometry>("Geometry")
+      .supported_type({GeometryComponent::Type::Mesh, GeometryComponent::Type::GreasePencil});
+  b.add_input<decl::Material>("Old");
+  b.add_input<decl::Material>("New").translation_context(BLT_I18NCONTEXT_ID_MATERIAL);
+  b.add_output<decl::Geometry>("Geometry").propagate_all();
+}
 
-namespace blender::nodes {
+static void replace_materials(MutableSpan<Material *> materials,
+                              Material *src_material,
+                              Material *dst_material)
+{
+  for (const int i : materials.index_range()) {
+    if (materials[i] == src_material) {
+      materials[i] = dst_material;
+    }
+  }
+}
 
-static void geo_node_material_replace_exec(GeoNodeExecParams params)
+static void node_geo_exec(GeoNodeExecParams params)
 {
   Material *old_material = params.extract_input<Material *>("Old");
   Material *new_material = params.extract_input<Material *>("New");
 
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
-  geometry_set = geometry_set_realize_instances(geometry_set);
 
-  if (geometry_set.has<MeshComponent>()) {
-    MeshComponent &mesh_component = geometry_set.get_component_for_write<MeshComponent>();
-    Mesh *mesh = mesh_component.get_for_write();
-    if (mesh != nullptr) {
-      for (const int i : IndexRange(mesh->totcol)) {
-        if (mesh->mat[i] == old_material) {
-          mesh->mat[i] = new_material;
-        }
-      }
+  geometry_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
+    if (Mesh *mesh = geometry_set.get_mesh_for_write()) {
+      replace_materials({mesh->mat, mesh->totcol}, old_material, new_material);
     }
-  }
+    if (GreasePencil *grease_pencil = geometry_set.get_grease_pencil_for_write()) {
+      replace_materials({grease_pencil->material_array, grease_pencil->material_array_num},
+                        old_material,
+                        new_material);
+    }
+  });
 
   params.set_output("Geometry", std::move(geometry_set));
 }
 
-}  // namespace blender::nodes
-
-void register_node_type_geo_material_replace()
+static void node_register()
 {
-  static bNodeType ntype;
+  static blender::bke::bNodeType ntype;
 
-  geo_node_type_base(
-      &ntype, GEO_NODE_MATERIAL_REPLACE, "Material Replace", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(&ntype, geo_node_material_replace_in, geo_node_material_replace_out);
-  ntype.geometry_node_execute = blender::nodes::geo_node_material_replace_exec;
-  nodeRegisterType(&ntype);
+  geo_node_type_base(&ntype, "GeometryNodeReplaceMaterial", GEO_NODE_REPLACE_MATERIAL);
+  ntype.ui_name = "Replace Material";
+  ntype.ui_description = "Swap one material with another";
+  ntype.enum_name_legacy = "REPLACE_MATERIAL";
+  ntype.nclass = NODE_CLASS_GEOMETRY;
+  ntype.declare = node_declare;
+  ntype.geometry_node_execute = node_geo_exec;
+  blender::bke::node_register_type(&ntype);
 }
+NOD_REGISTER_NODE(node_register)
+
+}  // namespace blender::nodes::node_geo_material_replace_cc

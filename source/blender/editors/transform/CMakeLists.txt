@@ -1,131 +1,128 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2023 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(INC
   ../include
-  ../../blenfont
-  ../../blenkernel
-  ../../blenlib
-  ../../blentranslation
-  ../../bmesh
-  ../../depsgraph
-  ../../gpu
   ../../ikplugin
-  ../../makesdna
   ../../makesrna
-  ../../render
-  ../../sequencer
-  ../../windowmanager
-  ../../../../intern/glew-mx
-  ../../../../intern/guardedalloc
+  # RNA_prototypes.hh
+  ${CMAKE_BINARY_DIR}/source/blender/makesrna
+)
+set(INC_SYS
 )
 
-
 set(SRC
-  transform.c
-  transform_constraints.c
-  transform_convert.c
-  transform_convert_action.c
-  transform_convert_armature.c
-  transform_convert_cursor.c
-  transform_convert_curve.c
-  transform_convert_gpencil.c
-  transform_convert_graph.c
-  transform_convert_lattice.c
-  transform_convert_mask.c
-  transform_convert_mball.c
-  transform_convert_mesh.c
-  transform_convert_mesh_edge.c
-  transform_convert_mesh_skin.c
-  transform_convert_mesh_uv.c
-  transform_convert_nla.c
-  transform_convert_node.c
-  transform_convert_object.c
-  transform_convert_object_texspace.c
-  transform_convert_paintcurve.c
-  transform_convert_particle.c
-  transform_convert_sculpt.c
-  transform_convert_sequencer.c
-  transform_convert_tracking.c
-  transform_draw_cursors.c
-  transform_generics.c
-  transform_gizmo_2d.c
-  transform_gizmo_3d.c
-  transform_gizmo_extrude_3d.c
-  transform_input.c
-  transform_mode.c
-  transform_mode_align.c
-  transform_mode_baketime.c
-  transform_mode_bbone_resize.c
-  transform_mode_bend.c
-  transform_mode_boneenvelope.c
-  transform_mode_boneroll.c
-  transform_mode_curveshrinkfatten.c
-  transform_mode_edge_bevelweight.c
-  transform_mode_edge_crease.c
-  transform_mode_edge_rotate_normal.c
-  transform_mode_edge_seq_slide.c
-  transform_mode_edge_slide.c
-  transform_mode_gpopacity.c
-  transform_mode_gpshrinkfatten.c
-  transform_mode_maskshrinkfatten.c
-  transform_mode_mirror.c
-  transform_mode_push_pull.c
-  transform_mode_resize.c
-  transform_mode_rotate.c
-  transform_mode_shear.c
-  transform_mode_shrink_fatten.c
-  transform_mode_skin_resize.c
-  transform_mode_tilt.c
-  transform_mode_timescale.c
-  transform_mode_timeslide.c
-  transform_mode_timetranslate.c
-  transform_mode_tosphere.c
-  transform_mode_trackball.c
-  transform_mode_translate.c
-  transform_mode_vert_slide.c
-  transform_ops.c
-  transform_orientations.c
-  transform_snap.c
-  transform_snap_object.c
-  transform_snap_sequencer.c
+  transform.cc
+  transform_constraints.cc
+  transform_convert.cc
+  transform_convert_action.cc
+  transform_convert_armature.cc
+  transform_convert_cursor.cc
+  transform_convert_curve.cc
+  transform_convert_curves.cc
+  transform_convert_graph.cc
+  transform_convert_grease_pencil.cc
+  transform_convert_lattice.cc
+  transform_convert_mask.cc
+  transform_convert_mball.cc
+  transform_convert_mesh.cc
+  transform_convert_mesh_edge.cc
+  transform_convert_mesh_skin.cc
+  transform_convert_mesh_uv.cc
+  transform_convert_mesh_vert_cdata.cc
+  transform_convert_nla.cc
+  transform_convert_node.cc
+  transform_convert_object.cc
+  transform_convert_object_texspace.cc
+  transform_convert_paintcurve.cc
+  transform_convert_particle.cc
+  transform_convert_sculpt.cc
+  transform_convert_sequencer.cc
+  transform_convert_sequencer_image.cc
+  transform_convert_sequencer_retiming.cc
+  transform_convert_tracking.cc
+  transform_convert_tracking_curves.cc
+  transform_draw_cursors.cc
+  transform_generics.cc
+  transform_gizmo_2d.cc
+  transform_gizmo_3d.cc
+  transform_gizmo_3d_cage.cc
+  transform_gizmo_3d_shear.cc
+  transform_gizmo_extrude_3d.cc
+  transform_input.cc
+  transform_mode.cc
+  transform_mode_align.cc
+  transform_mode_baketime.cc
+  transform_mode_bbone_resize.cc
+  transform_mode_bend.cc
+  transform_mode_boneenvelope.cc
+  transform_mode_boneroll.cc
+  transform_mode_curveshrinkfatten.cc
+  transform_mode_customdata.cc
+  transform_mode_edge_rotate_normal.cc
+  transform_mode_edge_seq_slide.cc
+  transform_mode_edge_slide.cc
+  transform_mode_gpopacity.cc
+  transform_mode_maskshrinkfatten.cc
+  transform_mode_mirror.cc
+  transform_mode_push_pull.cc
+  transform_mode_resize.cc
+  transform_mode_rotate.cc
+  transform_mode_shear.cc
+  transform_mode_shrink_fatten.cc
+  transform_mode_skin_resize.cc
+  transform_mode_snapsource.cc
+  transform_mode_tilt.cc
+  transform_mode_timescale.cc
+  transform_mode_timeslide.cc
+  transform_mode_timetranslate.cc
+  transform_mode_tosphere.cc
+  transform_mode_trackball.cc
+  transform_mode_translate.cc
+  transform_mode_vert_slide.cc
+  transform_ops.cc
+  transform_orientations.cc
+  transform_snap.cc
+  transform_snap_animation.cc
+  transform_snap_object.cc
+  transform_snap_object_armature.cc
+  transform_snap_object_camera.cc
+  transform_snap_object_curve.cc
+  transform_snap_object_editmesh.cc
+  transform_snap_object_mesh.cc
+  transform_snap_sequencer.cc
 
-  transform.h
-  transform_constraints.h
-  transform_convert.h
-  transform_data.h
-  transform_draw_cursors.h
-  transform_mode.h
-  transform_orientations.h
-  transform_snap.h
+  transform.hh
+  transform_constraints.hh
+  transform_convert.hh
+  transform_draw_cursors.hh
+  transform_gizmo.hh
+  transform_mode.hh
+  transform_orientations.hh
+  transform_snap.hh
+  transform_snap_object.hh
 )
 
 set(LIB
-  bf_blenfont
-  bf_blenkernel
-  bf_blenlib
-  bf_bmesh
+  PRIVATE bf::animrig
+  PRIVATE bf::blenfont
+  PRIVATE bf::blentranslation
+  PRIVATE bf::extern::fmtlib
+  PRIVATE bf::blenkernel
+  PRIVATE bf::blenlib
+  PRIVATE bf::bmesh
+  PRIVATE bf::depsgraph
+  PRIVATE bf::dna
   bf_editor_mask
-  bf_gpu
+  PRIVATE bf::gpu
+  PRIVATE bf::intern::guardedalloc
+  PRIVATE bf::render
+  PRIVATE bf::sequencer
+  PRIVATE bf::windowmanager
 )
 
-if(WITH_INTERNATIONAL)
-  add_definitions(-DWITH_INTERNATIONAL)
-endif()
-
-
 blender_add_lib(bf_editor_transform "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+
+# RNA_prototypes.hh
+add_dependencies(bf_editor_transform bf_rna)

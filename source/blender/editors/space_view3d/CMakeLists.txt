@@ -1,90 +1,102 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2023 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(INC
+  ../asset
   ../include
-  ../../blenfont
-  ../../blenkernel
-  ../../blenlib
-  ../../blentranslation
-  ../../bmesh
-  ../../depsgraph
-  ../../draw
-  ../../gpu
-  ../../imbuf
-  ../../makesdna
   ../../makesrna
-  ../../render
-  ../../windowmanager
-  ../../../../intern/glew-mx
-  ../../../../intern/guardedalloc
+  ../../modifiers
   ../../../../intern/mantaflow/extern
 
-  # dna_type_offsets.h
-  ${CMAKE_CURRENT_BINARY_DIR}/../../makesdna/intern
+  # RNA_prototypes.hh
+  ${CMAKE_BINARY_DIR}/source/blender/makesrna
 )
 
+set(INC_SYS
+)
 
 set(SRC
-  drawobject.c
-  space_view3d.c
-  view3d_buttons.c
-  view3d_camera_control.c
-  view3d_draw.c
-  view3d_edit.c
-  view3d_gizmo_armature.c
-  view3d_gizmo_camera.c
-  view3d_gizmo_empty.c
-  view3d_gizmo_forcefield.c
-  view3d_gizmo_light.c
-  view3d_gizmo_navigate.c
-  view3d_gizmo_navigate_type.c
-  view3d_gizmo_preselect.c
-  view3d_gizmo_preselect_type.c
-  view3d_gizmo_ruler.c
-  view3d_gizmo_tool_generic.c
-  view3d_header.c
-  view3d_iterators.c
-  view3d_navigate_fly.c
-  view3d_navigate_walk.c
-  view3d_ops.c
-  view3d_placement.c
-  view3d_project.c
-  view3d_select.c
-  view3d_snap.c
-  view3d_utils.c
-  view3d_view.c
+  drawobject.cc
+  space_view3d.cc
+  view3d_buttons.cc
+  view3d_camera_control.cc
+  view3d_context.cc
+  view3d_cursor_snap.cc
+  view3d_draw.cc
+  view3d_edit.cc
+  view3d_gizmo_armature.cc
+  view3d_gizmo_camera.cc
+  view3d_gizmo_empty.cc
+  view3d_gizmo_forcefield.cc
+  view3d_gizmo_geometry_nodes.cc
+  view3d_gizmo_light.cc
+  view3d_gizmo_navigate.cc
+  view3d_gizmo_navigate_type.cc
+  view3d_gizmo_preselect.cc
+  view3d_gizmo_preselect_type.cc
+  view3d_gizmo_ruler.cc
+  view3d_gizmo_tool_generic.cc
+  view3d_header.cc
+  view3d_iterators.cc
+  view3d_navigate.cc
+  view3d_navigate_fly.cc
+  view3d_navigate_smoothview.cc
+  view3d_navigate_view_all.cc
+  view3d_navigate_view_axis.cc
+  view3d_navigate_view_camera.cc
+  view3d_navigate_view_center_cursor.cc
+  view3d_navigate_view_center_pick.cc
+  view3d_navigate_view_dolly.cc
+  view3d_navigate_view_move.cc
+  view3d_navigate_view_ndof.cc
+  view3d_navigate_view_orbit.cc
+  view3d_navigate_view_pan.cc
+  view3d_navigate_view_roll.cc
+  view3d_navigate_view_rotate.cc
+  view3d_navigate_view_zoom.cc
+  view3d_navigate_walk.cc
+  view3d_navigate_zoom_border.cc
+  view3d_ops.cc
+  view3d_placement.cc
+  view3d_project.cc
+  view3d_select.cc
+  view3d_snap.cc
+  view3d_utils.cc
+  view3d_view.cc
 
-  view3d_intern.h
+  view3d_intern.hh
+  view3d_navigate.hh
 )
 
 set(LIB
+  PRIVATE bf::animrig
+  PRIVATE bf::asset_system
+  PRIVATE bf::blenfont
+  PRIVATE bf::blenkernel
+  PRIVATE bf::blenlib
+  PRIVATE bf::blenloader
+  PRIVATE bf::blentranslation
+  PRIVATE bf::bmesh
+  PRIVATE bf::depsgraph
+  PRIVATE bf::dna
+  PRIVATE bf::draw
+  bf_editor_curves
   bf_editor_lattice
   bf_editor_mesh
+  PRIVATE bf::extern::fmtlib
+  PRIVATE bf::functions
+  PRIVATE bf::gpu
+  PRIVATE bf::imbuf
+  PRIVATE bf::intern::guardedalloc
+  PRIVATE bf::nodes
+  PRIVATE bf::render
+  PRIVATE bf::windowmanager
 )
 
 if(WITH_PYTHON)
-  blender_include_dirs(../../python)
+  list(APPEND INC ../../python)
   add_definitions(-DWITH_PYTHON)
-endif()
-
-
-if(WITH_INTERNATIONAL)
-  add_definitions(-DWITH_INTERNATIONAL)
 endif()
 
 if(WITH_FREESTYLE)
@@ -97,5 +109,5 @@ endif()
 
 blender_add_lib(bf_editor_space_view3d "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
 
-# Needed so we can use dna_type_offsets.h for defaults initialization.
-add_dependencies(bf_editor_space_view3d bf_dna)
+# RNA_prototypes.hh
+add_dependencies(bf_editor_space_view3d bf_rna)

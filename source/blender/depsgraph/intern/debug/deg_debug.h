@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2013 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2013 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup depsgraph
@@ -23,15 +8,11 @@
 
 #pragma once
 
-#include "intern/debug/deg_time_average.h"
-#include "intern/depsgraph_type.h"
+#include <string>
 
-#include "BKE_global.h"
+#include "BKE_global.hh"  // IWYU pragma: keep
 
-#include "DEG_depsgraph_debug.h"
-
-namespace blender {
-namespace deg {
+namespace blender::deg {
 
 class DepsgraphDebug {
  public:
@@ -47,11 +28,7 @@ class DepsgraphDebug {
 
   /* Name of this dependency graph (is used for debug prints, helping to distinguish graphs
    * created for different view layer). */
-  string name;
-
-  /* Is true when dependency graph was evaluated at least once.
-   * This is NOT an indication that depsgraph is at its evaluated state. */
-  bool is_ever_evaluated;
+  std::string name;
 
  protected:
   /* Maximum number of counters used to calculate frame rate of depsgraph update. */
@@ -61,8 +38,6 @@ class DepsgraphDebug {
    * Is initialized from begin_graph_evaluation() when time debug is enabled.
    */
   double graph_evaluation_start_time_;
-
-  AveragedTimeSampler<MAX_FPS_COUNTERS> fps_samples_;
 };
 
 #define DEG_DEBUG_PRINTF(depsgraph, type, ...) \
@@ -86,9 +61,8 @@ class DepsgraphDebug {
     fflush(stderr); \
   } while (0)
 
-bool terminal_do_color(void);
-string color_for_pointer(const void *pointer);
-string color_end(void);
+bool terminal_do_color();
+std::string color_for_pointer(const void *pointer);
+std::string color_end();
 
-}  // namespace deg
-}  // namespace blender
+}  // namespace blender::deg

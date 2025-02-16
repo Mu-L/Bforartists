@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2011-2022 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -21,7 +9,9 @@
 
 #include "AverageAreaGridDensityProvider.h"
 
-#include "BKE_global.h"
+#include "BLI_sys_types.h"
+
+#include "BKE_global.hh"
 
 namespace Freestyle {
 
@@ -62,7 +52,7 @@ void AverageAreaGridDensityProvider::initialize(const real proscenium[4], real s
   float prosceniumHeight = (proscenium[3] - proscenium[2]);
 
   real cellArea = 0.0;
-  unsigned numFaces = 0;
+  uint numFaces = 0;
   for (source.begin(); source.isValid(); source.next()) {
     Polygon3r &poly(source.getGridSpacePolygon());
     Vec3r min, max;
@@ -71,7 +61,7 @@ void AverageAreaGridDensityProvider::initialize(const real proscenium[4], real s
     ++numFaces;
   }
   if (G.debug & G_DEBUG_FREESTYLE) {
-    cout << "Total area: " << cellArea << ".  Number of faces: " << numFaces << "." << endl;
+    cout << "Total area: " << cellArea << ". Number of faces: " << numFaces << "." << endl;
   }
   cellArea /= numFaces;
   cellArea *= sizeFactor;
@@ -80,7 +70,7 @@ void AverageAreaGridDensityProvider::initialize(const real proscenium[4], real s
   }
 
   _cellSize = sqrt(cellArea);
-  unsigned maxCells = 931;  // * 1.1 = 1024
+  uint maxCells = 931;  // * 1.1 = 1024
   if (std::max(prosceniumWidth, prosceniumHeight) / _cellSize > maxCells) {
     if (G.debug & G_DEBUG_FREESTYLE) {
       cout << "Scene-dependent cell size (" << _cellSize << " square) is too small." << endl;

@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup bli
@@ -30,24 +18,30 @@
 
 namespace blender {
 
+/**
+ * If enabled, #LinearAllocator keeps track of how much memory it owns and how much it has
+ * allocated.
+ */
+// #define BLI_DEBUG_LINEAR_ALLOCATOR_SIZE
+
 template<typename Allocator = GuardedAllocator> class LinearAllocator : NonCopyable, NonMovable {
  private:
-  Allocator allocator_;
-  Vector<void *> owned_buffers_;
-  Vector<Span<char>> unused_borrowed_buffers_;
+  BLI_NO_UNIQUE_ADDRESS Allocator allocator_;
+  Vector<void *, 2> owned_buffers_;
 
   uintptr_t current_begin_;
   uintptr_t current_end_;
 
-#ifdef DEBUG
-  int64_t debug_allocated_amount_ = 0;
-#endif
-
   /* Buffers larger than that are not packed together with smaller allocations to avoid wasting
    * memory. */
-  constexpr static inline int64_t large_buffer_threshold = 4096;
+  constexpr static int64_t large_buffer_threshold = 4096;
 
  public:
+#ifdef BLI_DEBUG_LINEAR_ALLOCATOR_SIZE
+  int64_t user_requested_size_ = 0;
+  int64_t owned_allocation_size_ = 0;
+#endif
+
   LinearAllocator()
   {
     current_begin_ = 0;
@@ -71,7 +65,7 @@ template<typename Allocator = GuardedAllocator> class LinearAllocator : NonCopya
   {
     BLI_assert(size >= 0);
     BLI_assert(alignment >= 1);
-    BLI_assert(is_power_of_2_i(alignment));
+    BLI_assert(is_power_of_2(alignment));
 
     const uintptr_t alignment_mask = alignment - 1;
     const uintptr_t potential_allocation_begin = (current_begin_ + alignment_mask) &
@@ -79,8 +73,8 @@ template<typename Allocator = GuardedAllocator> class LinearAllocator : NonCopya
     const uintptr_t potential_allocation_end = potential_allocation_begin + size;
 
     if (potential_allocation_end <= current_end_) {
-#ifdef DEBUG
-      debug_allocated_amount_ += size;
+#ifdef BLI_DEBUG_LINEAR_ALLOCATOR_SIZE
+      user_requested_size_ += size;
 #endif
       current_begin_ = potential_allocation_end;
       return reinterpret_cast<void *>(potential_allocation_begin);
@@ -89,6 +83,9 @@ template<typename Allocator = GuardedAllocator> class LinearAllocator : NonCopya
       this->allocate_new_buffer(size + alignment, alignment);
       return this->allocate(size, alignment);
     }
+#ifdef BLI_DEBUG_LINEAR_ALLOCATOR_SIZE
+    user_requested_size_ += size;
+#endif
     return this->allocator_large_buffer(size, alignment);
   };
 
@@ -121,7 +118,7 @@ template<typename Allocator = GuardedAllocator> class LinearAllocator : NonCopya
    * You must not call `delete` on the returned value.
    * Instead, only the destructor has to be called.
    */
-  template<typename T, typename... Args> destruct_ptr<T> construct(Args &&... args)
+  template<typename T, typename... Args> destruct_ptr<T> construct(Args &&...args)
   {
     void *buffer = this->allocate(sizeof(T), alignof(T));
     T *value = new (buffer) T(std::forward<Args>(args)...);
@@ -134,7 +131,7 @@ template<typename Allocator = GuardedAllocator> class LinearAllocator : NonCopya
    * the constructed elements.
    */
   template<typename T, typename... Args>
-  MutableSpan<T> construct_array(int64_t size, Args &&... args)
+  MutableSpan<T> construct_array(int64_t size, Args &&...args)
   {
     MutableSpan<T> array = this->allocate_array<T>(size);
     for (const int64_t i : IndexRange(size)) {
@@ -164,7 +161,7 @@ template<typename Allocator = GuardedAllocator> class LinearAllocator : NonCopya
   {
     const int64_t alloc_size = str.size() + 1;
     char *buffer = static_cast<char *>(this->allocate(alloc_size, 1));
-    str.copy(buffer, alloc_size);
+    str.copy_unsafe(buffer);
     return StringRefNull(static_cast<const char *>(buffer));
   }
 
@@ -175,7 +172,7 @@ template<typename Allocator = GuardedAllocator> class LinearAllocator : NonCopya
     void *pointer_buffer = this->allocate(element_amount * sizeof(void *), alignof(void *));
     void *elements_buffer = this->allocate(element_amount * element_size, element_alignment);
 
-    MutableSpan<void *> pointers((void **)pointer_buffer, element_amount);
+    MutableSpan<void *> pointers(static_cast<void **>(pointer_buffer), element_amount);
     void *next_element_buffer = elements_buffer;
     for (int64_t i : IndexRange(element_amount)) {
       pointers[i] = next_element_buffer;
@@ -186,7 +183,7 @@ template<typename Allocator = GuardedAllocator> class LinearAllocator : NonCopya
   }
 
   template<typename T, typename... Args>
-  Span<T *> construct_elements_and_pointer_array(int64_t n, Args &&... args)
+  Span<T *> construct_elements_and_pointer_array(int64_t n, Args &&...args)
   {
     MutableSpan<void *> void_pointers = this->allocate_elements_and_pointer_array(
         n, sizeof(T), alignof(T));
@@ -203,9 +200,11 @@ template<typename Allocator = GuardedAllocator> class LinearAllocator : NonCopya
    * Tell the allocator to use up the given memory buffer, before allocating new memory from the
    * system.
    */
-  void provide_buffer(void *buffer, uint size)
+  void provide_buffer(void *buffer, const int64_t size)
   {
-    unused_borrowed_buffers_.append(Span<char>(static_cast<char *>(buffer), size));
+    BLI_assert(owned_buffers_.is_empty());
+    current_begin_ = uintptr_t(buffer);
+    current_end_ = current_begin_ + size;
   }
 
   template<size_t Size, size_t Alignment>
@@ -214,19 +213,60 @@ template<typename Allocator = GuardedAllocator> class LinearAllocator : NonCopya
     this->provide_buffer(aligned_buffer.ptr(), Size);
   }
 
+  /**
+   * Some algorithms can be implemented more efficiently by over-allocating the destination memory
+   * a bit. This allows the algorithm not to worry about having enough memory. Generally, this can
+   * be a useful strategy if the actual required memory is not known in advance, but an upper bound
+   * can be found. Ideally, one can free the over-allocated memory in the end again to reduce
+   * memory consumption.
+   *
+   * A linear allocator generally does allow freeing any memory. However, there is one exception.
+   * One can free the end of the last allocation (but not any previous allocation). While uses of
+   * this approach are quite limited, it's still the best option in some situations.
+   */
+  void free_end_of_previous_allocation(const int64_t original_allocation_size,
+                                       const void *free_after)
+  {
+    /* If the original allocation size was large, it might have been separately allocated. In this
+     * case, we can't free the end of it anymore. */
+    if (original_allocation_size <= large_buffer_threshold) {
+      const int64_t new_begin = uintptr_t(free_after);
+      BLI_assert(new_begin <= current_begin_);
+#ifndef NDEBUG
+      /* This condition is not really necessary but it helps finding the cases where memory was
+       * freed. */
+      const int64_t freed_bytes_num = current_begin_ - new_begin;
+      if (freed_bytes_num > 0) {
+        current_begin_ = new_begin;
+      }
+#else
+      current_begin_ = new_begin;
+#endif
+    }
+  }
+
+  /**
+   * This allocator takes ownership of the buffers owned by `other`. Therefor, when `other` is
+   * destructed, memory allocated using it is not freed.
+   *
+   * Note that the caller is responsible for making sure that buffers passed into #provide_buffer
+   * of `other` live at least as long as this allocator.
+   */
+  void transfer_ownership_from(LinearAllocator<> &other)
+  {
+    owned_buffers_.extend(other.owned_buffers_);
+#ifdef BLI_DEBUG_LINEAR_ALLOCATOR_SIZE
+    user_requested_size_ += other.user_requested_size_;
+    owned_allocation_size_ += other.owned_allocation_size_;
+#endif
+    other.owned_buffers_.clear();
+    std::destroy_at(&other);
+    new (&other) LinearAllocator<>();
+  }
+
  private:
   void allocate_new_buffer(int64_t min_allocation_size, int64_t min_alignment)
   {
-    for (int64_t i : unused_borrowed_buffers_.index_range()) {
-      Span<char> buffer = unused_borrowed_buffers_[i];
-      if (buffer.size() >= min_allocation_size) {
-        unused_borrowed_buffers_.remove_and_reorder(i);
-        current_begin_ = (uintptr_t)buffer.begin();
-        current_end_ = (uintptr_t)buffer.end();
-        return;
-      }
-    }
-
     /* Possibly allocate more bytes than necessary for the current allocation. This way more small
      * allocations can be packed together. Large buffers are allocated exactly to avoid wasting too
      * much memory. */
@@ -238,16 +278,23 @@ template<typename Allocator = GuardedAllocator> class LinearAllocator : NonCopya
                                std::max<int64_t>(size_in_bytes, grow_size));
     }
 
-    void *buffer = allocator_.allocate(size_in_bytes, min_alignment, __func__);
-    owned_buffers_.append(buffer);
-    current_begin_ = (uintptr_t)buffer;
+    void *buffer = this->allocated_owned(size_in_bytes, min_alignment);
+    current_begin_ = uintptr_t(buffer);
     current_end_ = current_begin_ + size_in_bytes;
   }
 
   void *allocator_large_buffer(const int64_t size, const int64_t alignment)
   {
+    return this->allocated_owned(size, alignment);
+  }
+
+  void *allocated_owned(const int64_t size, const int64_t alignment)
+  {
     void *buffer = allocator_.allocate(size, alignment, __func__);
     owned_buffers_.append(buffer);
+#ifdef BLI_DEBUG_LINEAR_ALLOCATOR_SIZE
+    owned_allocation_size_ += size;
+#endif
     return buffer;
   }
 };

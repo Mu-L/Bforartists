@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -33,9 +21,7 @@
 
 #include "../system/FreestyleConfig.h"
 
-#ifdef WITH_CXX_GUARDEDALLOC
-#  include "MEM_guardedalloc.h"
-#endif
+#include "MEM_guardedalloc.h"
 
 namespace Freestyle {
 
@@ -149,7 +135,7 @@ class Canvas {
    */
   void loadMap(const char *iFileName,
                const char *iMapName,
-               unsigned iNbLevels = 4,
+               uint iNbLevels = 4,
                float iSigma = 1.0f);
 
   /** Reads a pixel value in a map.
@@ -223,11 +209,11 @@ class Canvas {
 
   /** inserts a shader at pos index+1 */
   void PushBackStyleModule(StyleModule *iStyleModule);
-  void InsertStyleModule(unsigned index, StyleModule *iStyleModule);
-  void RemoveStyleModule(unsigned index);
-  void SwapStyleModules(unsigned i1, unsigned i2);
-  void ReplaceStyleModule(unsigned index, StyleModule *iStyleModule);
-  void setVisible(unsigned index, bool iVisible);
+  void InsertStyleModule(uint index, StyleModule *iStyleModule);
+  void RemoveStyleModule(uint index);
+  void SwapStyleModules(uint i1, uint i2);
+  void ReplaceStyleModule(uint index, StyleModule *iStyleModule);
+  void setVisible(uint index, bool iVisible);
 
 #if 0
   inline void setDensityMap(InformationMap<RGBImage> *iMap)
@@ -242,12 +228,10 @@ class Canvas {
   }
 
   void resetModified(bool iMod = false);
-  void causalStyleModules(std::vector<unsigned> &vec, unsigned index = 0);
-  void setModified(unsigned index, bool iMod);
+  void causalStyleModules(std::vector<uint> &vec, uint index = 0);
+  void setModified(uint index, bool iMod);
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:Canvas")
-#endif
 };
 
 } /* namespace Freestyle */

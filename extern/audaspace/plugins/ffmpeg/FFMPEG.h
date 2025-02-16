@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2009-2016 Jörg Müller
+ * Copyright 2009-2024 Jörg Müller
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -52,9 +52,11 @@ public:
 	 */
 	static void registerPlugin();
 
-	virtual std::shared_ptr<IReader> createReader(std::string filename);
-	virtual std::shared_ptr<IReader> createReader(std::shared_ptr<Buffer> buffer);
-	virtual std::shared_ptr<IWriter> createWriter(std::string filename, DeviceSpecs specs, Container format, Codec codec, unsigned int bitrate);
+	virtual std::shared_ptr<IReader> createReader(const std::string &filename, int stream = 0);
+	virtual std::shared_ptr<IReader> createReader(std::shared_ptr<Buffer> buffer, int stream = 0);
+	virtual std::vector<StreamInfo> queryStreams(const std::string &filename);
+	virtual std::vector<StreamInfo> queryStreams(std::shared_ptr<Buffer> buffer);
+	virtual std::shared_ptr<IWriter> createWriter(const std::string &filename, DeviceSpecs specs, Container format, Codec codec, unsigned int bitrate);
 };
 
 AUD_NAMESPACE_END

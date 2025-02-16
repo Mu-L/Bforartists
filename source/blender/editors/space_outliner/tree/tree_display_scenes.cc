@@ -1,35 +1,24 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup spoutliner
  */
 
-#include "BLI_listbase.h"
+#include "DNA_space_types.h"
+
 #include "BLI_listbase_wrapper.hh"
 #include "BLI_mempool.h"
 
-#include "BKE_main.h"
+#include "BKE_main.hh"
 
-#include "../outliner_intern.h"
+#include "../outliner_intern.hh"
+#include "common.hh"
 #include "tree_display.hh"
 
 namespace blender::ed::outliner {
 
-/* Convenience/readability. */
 template<typename T> using List = ListBaseWrapper<T>;
 
 TreeDisplayScenes::TreeDisplayScenes(SpaceOutliner &space_outliner)
@@ -37,7 +26,12 @@ TreeDisplayScenes::TreeDisplayScenes(SpaceOutliner &space_outliner)
 {
 }
 
-ListBase TreeDisplayScenes::buildTree(const TreeSourceData &source_data)
+bool TreeDisplayScenes::supports_mode_column() const
+{
+  return true;
+}
+
+ListBase TreeDisplayScenes::build_tree(const TreeSourceData &source_data)
 {
   /* On first view we open scenes. */
   const int show_opened = !space_outliner_.treestore ||
@@ -46,8 +40,7 @@ ListBase TreeDisplayScenes::buildTree(const TreeSourceData &source_data)
 
   for (ID *id : List<ID>(source_data.bmain->scenes)) {
     Scene *scene = reinterpret_cast<Scene *>(id);
-    TreeElement *te = outliner_add_element(
-        &space_outliner_, &tree, scene, nullptr, TSE_SOME_ID, 0);
+    TreeElement *te = add_element(&tree, id, nullptr, nullptr, TSE_SOME_ID, 0);
     TreeStoreElem *tselem = TREESTORE(te);
 
     /* New scene elements open by default */

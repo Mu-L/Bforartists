@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup balembic
@@ -23,9 +11,9 @@
 
 #include "DNA_object_types.h"
 
-#include "BLI_utildefines.h"
+#include "BLT_translation.hh"
 
-#include "BKE_object.h"
+#include "BKE_object.hh"
 
 using Alembic::Abc::ISampleSelector;
 
@@ -52,24 +40,24 @@ bool AbcEmptyReader::valid() const
 bool AbcEmptyReader::accepts_object_type(
     const Alembic::AbcCoreAbstract::ObjectHeader &alembic_header,
     const Object *const ob,
-    const char **err_str) const
+    const char **r_err_str) const
 {
   if (!Alembic::AbcGeom::IXform::matches(alembic_header)) {
-    *err_str =
+    *r_err_str = RPT_(
         "Object type mismatch, Alembic object path pointed to XForm when importing, but not any "
-        "more.";
+        "more");
     return false;
   }
 
   if (ob->type != OB_EMPTY) {
-    *err_str = "Object type mismatch, Alembic object path points to XForm.";
+    *r_err_str = RPT_("Object type mismatch, Alembic object path points to XForm");
     return false;
   }
 
   return true;
 }
 
-void AbcEmptyReader::readObjectData(Main *bmain, const ISampleSelector &UNUSED(sample_sel))
+void AbcEmptyReader::readObjectData(Main *bmain, const ISampleSelector & /*sample_sel*/)
 {
   m_object = BKE_object_add_only_object(bmain, OB_EMPTY, m_object_name.c_str());
   m_object->data = nullptr;

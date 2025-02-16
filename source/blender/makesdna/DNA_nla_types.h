@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2001-2002 NaN Holding BV. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
@@ -25,15 +10,11 @@
 
 #include "DNA_listBase.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 struct Ipo;
 struct Object;
 struct bAction;
 
-/* simple uniform modifier structure, assumed it can hold all type info */
+/** Simple uniform modifier structure, assumed it can hold all type info. */
 typedef struct bActionModifier {
   struct bActionModifier *next, *prev;
   short type, flag;
@@ -48,9 +29,11 @@ typedef struct bActionModifier {
   struct Object *ob;
 } bActionModifier;
 
-/* NLA-Modifier Types (UNUSED) */
-// #define ACTSTRIP_MOD_DEFORM      0
-// #define ACTSTRIP_MOD_NOISE       1
+// /* NLA-Modifier Types (UNUSED) */
+// enum {
+// 	ACTSTRIP_MOD_DEFORM = 0,
+// 	ACTSTRIP_MOD_NOISE = 1,
+// };
 
 typedef struct bActionStrip {
   struct bActionStrip *next, *prev;
@@ -72,7 +55,7 @@ typedef struct bActionStrip {
   float actstart, actend;
   /** Offset within action, for cycles and striding. */
   float actoffs;
-  /** The stridelength (considered when flag & ACT_USESTRIDE). */
+  /** The stride-length (considered when flag & ACT_USESTRIDE). */
   float stridelen;
   /** The number of times to repeat the action range. */
   float repeat;
@@ -91,11 +74,13 @@ typedef struct bActionStrip {
   ListBase modifiers;
 } bActionStrip;
 
-/* strip->mode (these defines aren't really used, but are here for reference) */
-#define ACTSTRIPMODE_BLEND 0
-#define ACTSTRIPMODE_ADD 1
+/** #Strip::mode (these defines aren't really used, but are here for reference) */
+enum {
+  ACTSTRIPMODE_BLEND = 0,
+  ACTSTRIPMODE_ADD = 1,
+};
 
-/* strip->flag */
+/** #bActionStrip.flag */
 typedef enum eActStrip_Flag {
   ACTSTRIP_SELECT = (1 << 0),
   ACTSTRIP_USESTRIDE = (1 << 1),
@@ -109,7 +94,3 @@ typedef enum eActStrip_Flag {
   ACTSTRIP_REVERSE = (1 << 7),
   ACTSTRIP_AUTO_BLENDS = (1 << 11),
 } eActStrip_Flag;
-
-#ifdef __cplusplus
-}
-#endif

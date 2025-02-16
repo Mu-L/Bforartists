@@ -1,73 +1,63 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2009 Blender Authors
+#
+# SPDX-License-Identifier: GPL-2.0-or-later
 
-# ***** BEGIN GPL LICENSE BLOCK *****
-#
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# The Original Code is Copyright (C) 2009 Blender Foundation.
-# All rights reserved.
-#
-# ***** END GPL LICENCE BLOCK *****
-
-
-# <pep8 compliant>
+__all__ = (
+    "__all__",
+)
 
 import sys
 
-argv = sys.argv[:]
 
-strip_byte = False
-if "--strip-byte" in argv:
-    argv.remove("--strip-byte")
-    strip_byte = True
+def main() -> int:
+    argv = sys.argv[:]
 
-if len(argv) < 2:
-    sys.stdout.write("Usage: ctodata <c_file> [--strip-byte]\n")
-    sys.exit(1)
+    strip_byte = False
+    if "--strip-byte" in argv:
+        argv.remove("--strip-byte")
+        strip_byte = True
 
-filename = argv[1]
+    if len(argv) < 2:
+        sys.stdout.write("Usage: ctodata <c_file> [--strip-byte]\n")
+        return 1
 
-try:
-    fpin = open(filename, "r")
-except:
-    sys.stdout.write("Unable to open input %s\n" % argv[1])
-    sys.exit(1)
+    filename = argv[1]
 
-data = fpin.read().rsplit("{")[-1].split("}")[0]
-data = data.replace(",", " ")
-data = data.split()
-data = [int(v) for v in data]
+    try:
+        fpin = open(filename, "r")
+    except:
+        sys.stdout.write("Unable to open input {:s}\n".format(argv[1]))
+        return 1
 
-if strip_byte:
-    # String data gets trailing byte.
-    last = data.pop()
-    assert(last == 0)
+    data_as_str = fpin.read().rsplit("{")[-1].split("}")[0]
+    data_as_str = data_as_str.replace(",", " ")
+    data_as_list = [int(v) for v in data_as_str.split()]
+    del data_as_str
 
-data = bytes(data)
+    if strip_byte:
+        # String data gets trailing byte.
+        last = data_as_list.pop()
+        assert last == 0
 
-dname = filename + ".ctodata"
+    data = bytes(data_as_list)
+    del data_as_list
 
-sys.stdout.write("Making DATA file <%s>\n" % dname)
+    dname = filename + ".ctodata"
 
-try:
-    fpout = open(dname, "wb")
-except:
-    sys.stdout.write("Unable to open output %s\n" % dname)
-    sys.exit(1)
+    sys.stdout.write("Making DATA file <{:s}>\n".format(dname))
 
-size = fpout.write(data)
+    try:
+        fpout = open(dname, "wb")
+    except:
+        sys.stdout.write("Unable to open output {:s}\n".format(dname))
+        sys.exit(1)
 
-sys.stdout.write("%d\n" % size)
+    size = fpout.write(data)
+
+    sys.stdout.write("{:d}\n".format(size))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

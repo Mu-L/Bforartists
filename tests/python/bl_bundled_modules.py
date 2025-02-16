@@ -1,29 +1,49 @@
-# ##### BEGIN GPL LICENSE BLOCK #####
+# SPDX-FileCopyrightText: 2009-2023 Blender Authors
 #
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ##### END GPL LICENSE BLOCK #####
+# SPDX-License-Identifier: GPL-2.0-or-later
 
-# <pep8 compliant>
+# Test that modules we ship with our Python installation are available,
+# both for Blender itself and the bundled Python executable.
 
-# Test that modules we ship with our Python installation are available
+import os
+import subprocess
+import sys
 
+app = "Blender" if sys.argv[-1] == "--inside-blender" else "Python"
+sys.stderr.write(f"Testing bundled modules in {app} executable.\n")
+
+# General purpose modules.
 import bz2
+import certifi
 import ctypes
+import cython
 import lzma
 import numpy
+import requests
 import sqlite3
 import ssl
+import urllib3
 import zlib
+import zstandard
+
+# Dynamically loaded modules, to ensure they have satisfactory dependencies.
+import _blake2
+
+# VFX platform modules.
+from pxr import Usd
+import MaterialX
+import OpenImageIO
+import PyOpenColorIO
+
+# Test both old and new names, remove when all 4.4 libs have landed.
+try:
+    import pyopenvdb
+except ModuleNotFoundError:
+    import openvdb
+    import oslquery
+
+# Test modules in bundled Python standalone executable.
+if app == "Blender":
+    script_filepath = os.path.abspath(__file__)
+    proc = subprocess.Popen([sys.executable, script_filepath])
+    sys.exit(proc.wait())

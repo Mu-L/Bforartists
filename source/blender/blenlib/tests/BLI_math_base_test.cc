@@ -1,8 +1,14 @@
-/* Apache License, Version 2.0 */
+/* SPDX-FileCopyrightText: 2023 Blender Authors
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "testing/testing.h"
 
-#include "BLI_math.h"
+#include "BLI_math_base.hh"
+#include "BLI_math_base_safe.h"
+#include "BLI_math_vector.hh"
+
+namespace blender::tests {
 
 /* In tests below, when we are using -1.0f as max_diff value, we actually turn the function into a
  * pure-ULP one. */
@@ -56,32 +62,57 @@ TEST(math_base, CompareFFRelativeZero)
 
   EXPECT_TRUE(compare_ff_relative(f0, f1, -1.0f, 3));
   EXPECT_TRUE(compare_ff_relative(f1, f0, -1.0f, 3));
+  EXPECT_FALSE(compare_ff_relative(f0, f1, -1.0f, 2));
+  EXPECT_FALSE(compare_ff_relative(f1, f0, -1.0f, 2));
+  EXPECT_TRUE(compare_ff_relative(f0, f1, max_diff, 2));
+  EXPECT_TRUE(compare_ff_relative(f1, f0, max_diff, 2));
 
-  EXPECT_FALSE(compare_ff_relative(f0, f1, -1.0f, 1));
-  EXPECT_FALSE(compare_ff_relative(f1, f0, -1.0f, 1));
+  EXPECT_TRUE(compare_ff_relative(fn0, f1, -1.0f, 3));
+  EXPECT_TRUE(compare_ff_relative(f1, fn0, -1.0f, 3));
+  EXPECT_FALSE(compare_ff_relative(fn0, f1, -1.0f, 2));
+  EXPECT_FALSE(compare_ff_relative(f1, fn0, -1.0f, 2));
+  EXPECT_TRUE(compare_ff_relative(fn0, f1, max_diff, 2));
+  EXPECT_TRUE(compare_ff_relative(f1, fn0, max_diff, 2));
 
-  EXPECT_TRUE(compare_ff_relative(fn0, fn1, -1.0f, 8));
-  EXPECT_TRUE(compare_ff_relative(fn1, fn0, -1.0f, 8));
+  EXPECT_TRUE(compare_ff_relative(fn0, fn1, -1.0f, 2));
+  EXPECT_TRUE(compare_ff_relative(fn1, fn0, -1.0f, 2));
+  EXPECT_FALSE(compare_ff_relative(fn0, fn1, -1.0f, 1));
+  EXPECT_FALSE(compare_ff_relative(fn1, fn0, -1.0f, 1));
+  EXPECT_TRUE(compare_ff_relative(fn0, fn1, max_diff, 1));
+  EXPECT_TRUE(compare_ff_relative(fn1, fn0, max_diff, 1));
 
-  EXPECT_TRUE(compare_ff_relative(f0, f1, max_diff, 1));
-  EXPECT_TRUE(compare_ff_relative(f1, f0, max_diff, 1));
-
-  EXPECT_TRUE(compare_ff_relative(fn0, f0, max_diff, 1));
-  EXPECT_TRUE(compare_ff_relative(f0, fn0, max_diff, 1));
-
+  EXPECT_TRUE(compare_ff_relative(f0, fn1, -1.0f, 2));
+  EXPECT_TRUE(compare_ff_relative(fn1, f0, -1.0f, 2));
+  EXPECT_FALSE(compare_ff_relative(f0, fn1, -1.0f, 1));
+  EXPECT_FALSE(compare_ff_relative(fn1, f0, -1.0f, 1));
   EXPECT_TRUE(compare_ff_relative(f0, fn1, max_diff, 1));
   EXPECT_TRUE(compare_ff_relative(fn1, f0, max_diff, 1));
 
-  /* NOTE: in theory, this should return false, since 0.0f  and -0.0f have 0x80000000 diff,
-   *       but overflow in subtraction seems to break something here
-   *       (abs(*(int *)&fn0 - *(int *)&f0) == 0x80000000 == fn0), probably because int32 cannot
-   * hold this abs value. this is yet another illustration of why one shall never use (near-)zero
-   * floats in pure-ULP comparison. */
-  //  EXPECT_FALSE(compare_ff_relative(fn0, f0, -1.0f, 1024));
-  //  EXPECT_FALSE(compare_ff_relative(f0, fn0, -1.0f, 1024));
+  EXPECT_TRUE(compare_ff_relative(fn0, f0, -1.0f, 0));
+  EXPECT_TRUE(compare_ff_relative(f0, fn0, -1.0f, 0));
+}
 
-  EXPECT_FALSE(compare_ff_relative(fn0, f1, -1.0f, 1024));
-  EXPECT_FALSE(compare_ff_relative(f1, fn0, -1.0f, 1024));
+TEST(math_base, UlpDiffFF)
+{
+  EXPECT_EQ(ulp_diff_ff(0.0, 0.0), 0);
+  EXPECT_EQ(ulp_diff_ff(0.0, -0.0), 0);
+  EXPECT_EQ(ulp_diff_ff(-0.0, -0.0), 0);
+  EXPECT_EQ(ulp_diff_ff(1.0, 1.0), 0);
+  EXPECT_EQ(ulp_diff_ff(1.0, 2.0), 1 << 23);
+  EXPECT_EQ(ulp_diff_ff(2.0, 4.0), 1 << 23);
+  EXPECT_EQ(ulp_diff_ff(-1.0, -2.0), 1 << 23);
+  EXPECT_EQ(ulp_diff_ff(-2.0, -4.0), 1 << 23);
+  EXPECT_EQ(ulp_diff_ff(-1.0, 1.0), 0x7f000000);
+  EXPECT_EQ(ulp_diff_ff(0.0, 1.0), 0x3f800000);
+  EXPECT_EQ(ulp_diff_ff(-0.0, 1.0), 0x3f800000);
+  EXPECT_EQ(ulp_diff_ff(0.0, -1.0), 0x3f800000);
+  EXPECT_EQ(ulp_diff_ff(-0.0, -1.0), 0x3f800000);
+  EXPECT_EQ(ulp_diff_ff(INFINITY, -INFINITY), 0xff000000);
+  EXPECT_EQ(ulp_diff_ff(NAN, NAN), 0xffffffff);
+  EXPECT_EQ(ulp_diff_ff(NAN, 1.0), 0xffffffff);
+  EXPECT_EQ(ulp_diff_ff(1.0, NAN), 0xffffffff);
+  EXPECT_EQ(ulp_diff_ff(-NAN, 1.0), 0xffffffff);
+  EXPECT_EQ(ulp_diff_ff(1.0, -NAN), 0xffffffff);
 }
 
 TEST(math_base, Log2FloorU)
@@ -131,3 +162,89 @@ TEST(math_base, FloorPowerOf10)
   EXPECT_NEAR(floor_power_of_10(100.1f), 100.0f, 1e-4f);
   EXPECT_NEAR(floor_power_of_10(99.9f), 10.0f, 1e-4f);
 }
+
+TEST(math_base, MinVectorAndFloat)
+{
+  EXPECT_EQ(math::min(1.0f, 2.0f), 1.0f);
+}
+
+TEST(math_base, ClampInt)
+{
+  EXPECT_EQ(math::clamp(111, -50, 101), 101);
+}
+
+TEST(math_base, StepLessThan)
+{
+  EXPECT_EQ(math::step(0.5f, 0.3f), 0.0f);
+}
+
+TEST(math_base, StepGreaterThan)
+{
+  EXPECT_EQ(math::step(0.5f, 0.6f), 1.0f);
+}
+
+TEST(math_base, StepExact)
+{
+  EXPECT_EQ(math::step(0.5f, 0.5f), 1.0f);
+}
+
+TEST(math_base, Midpoint)
+{
+  EXPECT_NEAR(math::midpoint(100.0f, 200.0f), 150.0f, 1e-4f);
+}
+
+TEST(math_base, InterpolateInt)
+{
+  EXPECT_EQ(math::interpolate(100, 200, 0.4f), 140);
+}
+
+TEST(math_base, FlooredFMod)
+{
+  EXPECT_FLOAT_EQ(floored_fmod(3.27f, 1.57f), 0.12999988f);
+  EXPECT_FLOAT_EQ(floored_fmod(327.f, 47.f), 45.f);
+  EXPECT_FLOAT_EQ(floored_fmod(-0.1f, 1.0f), 0.9f);
+  EXPECT_FLOAT_EQ(floored_fmod(-0.9f, 1.0f), 0.1f);
+  EXPECT_FLOAT_EQ(floored_fmod(-100.1f, 1.0f), 0.90000153f);
+  EXPECT_FLOAT_EQ(floored_fmod(-0.1f, 12345.0f), 12344.9f);
+  EXPECT_FLOAT_EQ(floored_fmod(12345.1f, 12345.0f), 0.099609375f);
+  EXPECT_FLOAT_EQ(floored_fmod(12344.999f, 12345.0f), 12344.999f);
+  EXPECT_FLOAT_EQ(floored_fmod(12345.0f, 12345.0f), 0.0f);
+}
+
+TEST(math_base, ModPeriodic)
+{
+  EXPECT_FLOAT_EQ(math::mod_periodic(3.27f, 1.57f), 0.12999988f);
+  EXPECT_FLOAT_EQ(math::mod_periodic(327.f, 47.f), 45.f);
+  EXPECT_FLOAT_EQ(math::mod_periodic(-0.1f, 1.0f), 0.9f);
+  EXPECT_FLOAT_EQ(math::mod_periodic(-0.9f, 1.0f), 0.1f);
+  EXPECT_FLOAT_EQ(math::mod_periodic(-100.1f, 1.0f), 0.90000153f);
+  EXPECT_FLOAT_EQ(math::mod_periodic(-0.1f, 12345.0f), 12344.9f);
+  EXPECT_FLOAT_EQ(math::mod_periodic(12345.1f, 12345.0f), 0.099609375f);
+  EXPECT_FLOAT_EQ(math::mod_periodic(12344.999f, 12345.0f), 12344.999f);
+  EXPECT_FLOAT_EQ(math::mod_periodic(12345.0f, 12345.0f), 0.0f);
+
+  EXPECT_EQ(math::mod_periodic(1, 10), 1);
+  EXPECT_EQ(math::mod_periodic(11, 10), 1);
+  EXPECT_EQ(math::mod_periodic(-1, 10), 9);
+  EXPECT_EQ(math::mod_periodic(-11, 10), 9);
+  EXPECT_EQ(math::mod_periodic(1, 1), 0);
+  EXPECT_EQ(math::mod_periodic(0, 99999), 0);
+  EXPECT_EQ(math::mod_periodic(99999, 99999), 0);
+
+  EXPECT_EQ(
+      math::mod_periodic(std::numeric_limits<int>::max() / 2, std::numeric_limits<int>::max() / 2),
+      0);
+  EXPECT_EQ(
+      math::mod_periodic(std::numeric_limits<int>::min() / 2, std::numeric_limits<int>::max() / 2),
+      std::numeric_limits<int>::max() / 2 - 1);
+
+  EXPECT_EQ(math::mod_periodic<int64_t>(1, 10), 1);
+  EXPECT_EQ(math::mod_periodic<int64_t>(11, 10), 1);
+  EXPECT_EQ(math::mod_periodic<int64_t>(-1, 10), 9);
+  EXPECT_EQ(math::mod_periodic<int64_t>(-11, 10), 9);
+  EXPECT_EQ(math::mod_periodic<int64_t>(1, 1), 0);
+  EXPECT_EQ(math::mod_periodic<int64_t>(0, 99999), 0);
+  EXPECT_EQ(math::mod_periodic<int64_t>(99999, 99999), 0);
+}
+
+}  // namespace blender::tests

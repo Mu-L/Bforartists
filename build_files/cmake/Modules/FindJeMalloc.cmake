@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2011 Blender Authors
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
 # - Find JeMalloc library
 # Find the native JeMalloc includes and library
 # This module defines
@@ -11,24 +15,21 @@
 # also defined, but not for general use are
 #  JEMALLOC_LIBRARY, where to find the JeMalloc library.
 
-#=============================================================================
-# Copyright 2011 Blender Foundation.
-#
-# Distributed under the OSI-approved BSD 3-Clause License,
-# see accompanying file BSD-3-Clause-license.txt for details.
-#=============================================================================
+# If `JEMALLOC_ROOT_DIR` was defined in the environment, use it.
+if(DEFINED JEMALLOC_ROOT_DIR)
+  # Pass.
+elseif(DEFINED ENV{JEMALLOC_ROOT_DIR})
+  set(JEMALLOC_ROOT_DIR $ENV{JEMALLOC_ROOT_DIR})
+else()
+  set(JEMALLOC_ROOT_DIR "")
+endif()
 
-# If JEMALLOC_ROOT_DIR was defined in the environment, use it.
-IF(NOT JEMALLOC_ROOT_DIR AND NOT $ENV{JEMALLOC_ROOT_DIR} STREQUAL "")
-  SET(JEMALLOC_ROOT_DIR $ENV{JEMALLOC_ROOT_DIR})
-ENDIF()
-
-SET(_jemalloc_SEARCH_DIRS
+set(_jemalloc_SEARCH_DIRS
   ${JEMALLOC_ROOT_DIR}
   /opt/lib/jemalloc
 )
 
-FIND_PATH(JEMALLOC_INCLUDE_DIR
+find_path(JEMALLOC_INCLUDE_DIR
   NAMES
     jemalloc.h
   HINTS
@@ -37,17 +38,17 @@ FIND_PATH(JEMALLOC_INCLUDE_DIR
     include/jemalloc
 )
 
-FIND_LIBRARY(JEMALLOC_LIBRARY
+find_library(JEMALLOC_LIBRARY
   NAMES
     jemalloc
   HINTS
     ${_jemalloc_SEARCH_DIRS}
   PATH_SUFFIXES
     lib64 lib
-  )
+)
 
 if(JEMALLOC_INCLUDE_DIR)
-  SET(_version_regex "^#define[ \t]+JEMALLOC_VERSION[ \t]+\"([^\"]+)\".*")
+  set(_version_regex "^#define[ \t]+JEMALLOC_VERSION[ \t]+\"([^\"]+)\".*")
   file(STRINGS "${JEMALLOC_INCLUDE_DIR}/jemalloc.h"
     JEMALLOC_VERSION REGEX "${_version_regex}")
   string(REGEX REPLACE "${_version_regex}" "\\1"
@@ -57,16 +58,18 @@ endif()
 
 # handle the QUIETLY and REQUIRED arguments and set JEMALLOC_FOUND to TRUE if
 # all listed variables are TRUE
-INCLUDE(FindPackageHandleStandardArgs)
-FIND_PACKAGE_HANDLE_STANDARD_ARGS(JeMalloc DEFAULT_MSG
-    JEMALLOC_LIBRARY JEMALLOC_INCLUDE_DIR)
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(JeMalloc DEFAULT_MSG
+  JEMALLOC_LIBRARY JEMALLOC_INCLUDE_DIR)
 
-IF(JEMALLOC_FOUND)
-  SET(JEMALLOC_LIBRARIES ${JEMALLOC_LIBRARY})
-  SET(JEMALLOC_INCLUDE_DIRS ${JEMALLOC_INCLUDE_DIR})
-ENDIF()
+if(JEMALLOC_FOUND)
+  set(JEMALLOC_LIBRARIES ${JEMALLOC_LIBRARY})
+  set(JEMALLOC_INCLUDE_DIRS ${JEMALLOC_INCLUDE_DIR})
+endif()
 
-MARK_AS_ADVANCED(
+mark_as_advanced(
   JEMALLOC_INCLUDE_DIR
   JEMALLOC_LIBRARY
 )
+
+unset(_jemalloc_SEARCH_DIRS)

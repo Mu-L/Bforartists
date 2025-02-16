@@ -1,4 +1,6 @@
-/* Apache License, Version 2.0 */
+/* SPDX-FileCopyrightText: 2023 Blender Authors
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "testing/testing.h"
 
@@ -6,8 +8,8 @@
 
 namespace blender::tests {
 
-/**
- * \name Conversions
+/* -------------------------------------------------------------------- */
+/** \name Conversions
  * \{ */
 
 TEST(color, ThemeByteToFloat)
@@ -128,6 +130,6 @@ TEST(color, SceneLinearByteDecoding)
   EXPECT_NEAR(0.5f, decoded.a, 0.01f);
 }
 
-/* \} */
+/** \} */
 
 }  // namespace blender::tests

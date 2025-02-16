@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2011 Blender Authors
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
 # - Find Fftw3 library
 # Find the native Fftw3 includes and library
 # This module defines
@@ -7,27 +11,27 @@
 #  FFTW3_ROOT_DIR, The base directory to search for Fftw3.
 #                    This can also be an environment variable.
 #  FFTW3_FOUND, If false, do not try to use Fftw3.
+#  WITH_FFTW3_THREADS_F_SUPPORT, if true, single precision Fftw3 supports threads.
 #
 # also defined, but not for general use are
-#  FFTW3_LIBRARY, where to find the Fftw3 library.
+#  FFTW3_LIBRARY_F, where to find the Fftw3 library (single precision float).
+#  FFTW3_LIBRARY_THREADS_F, where to find the Fftw3 threads library (single precision float).
+#  FFTW3_LIBRARY_D, where to find the Fftw3 library (double precision float).
 
-#=============================================================================
-# Copyright 2011 Blender Foundation.
-#
-# Distributed under the OSI-approved BSD 3-Clause License,
-# see accompanying file BSD-3-Clause-license.txt for details.
-#=============================================================================
+# If `FFTW3_ROOT_DIR` was defined in the environment, use it.
+if(DEFINED FFTW3_ROOT_DIR)
+  # Pass.
+elseif(DEFINED ENV{FFTW3_ROOT_DIR})
+  set(FFTW3_ROOT_DIR $ENV{FFTW3_ROOT_DIR})
+else()
+  set(FFTW3_ROOT_DIR "")
+endif()
 
-# If FFTW3_ROOT_DIR was defined in the environment, use it.
-IF(NOT FFTW3_ROOT_DIR AND NOT $ENV{FFTW3_ROOT_DIR} STREQUAL "")
-  SET(FFTW3_ROOT_DIR $ENV{FFTW3_ROOT_DIR})
-ENDIF()
-
-SET(_fftw3_SEARCH_DIRS
+set(_fftw3_SEARCH_DIRS
   ${FFTW3_ROOT_DIR}
 )
 
-FIND_PATH(FFTW3_INCLUDE_DIR
+find_path(FFTW3_INCLUDE_DIR
   NAMES
     fftw3.h
   HINTS
@@ -36,27 +40,64 @@ FIND_PATH(FFTW3_INCLUDE_DIR
     include
 )
 
-FIND_LIBRARY(FFTW3_LIBRARY
+set(_FFTW3_LIBRARIES)
+
+find_library(FFTW3_LIBRARY_F
+  NAMES
+    fftw3f
+  HINTS
+    ${_fftw3_SEARCH_DIRS}
+  PATH_SUFFIXES
+    lib64 lib
+)
+
+find_library(FFTW3_LIBRARY_THREADS_F
+  NAMES
+    fftw3f_threads
+  HINTS
+    ${_fftw3_SEARCH_DIRS}
+  PATH_SUFFIXES
+    lib64 lib
+)
+
+find_library(FFTW3_LIBRARY_D
   NAMES
     fftw3
   HINTS
     ${_fftw3_SEARCH_DIRS}
   PATH_SUFFIXES
     lib64 lib
-  )
+)
+
+list(APPEND _FFTW3_LIBRARIES "${FFTW3_LIBRARY_F}")
+list(APPEND _FFTW3_LIBRARIES "${FFTW3_LIBRARY_D}")
+if(FFTW3_LIBRARY_THREADS_F)
+  list(APPEND _FFTW3_LIBRARIES "${FFTW3_LIBRARY_THREADS_F}")
+endif()
 
 # handle the QUIETLY and REQUIRED arguments and set FFTW3_FOUND to TRUE if
 # all listed variables are TRUE
-INCLUDE(FindPackageHandleStandardArgs)
-FIND_PACKAGE_HANDLE_STANDARD_ARGS(Fftw3 DEFAULT_MSG
-    FFTW3_LIBRARY FFTW3_INCLUDE_DIR)
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(Fftw3 DEFAULT_MSG
+  _FFTW3_LIBRARIES FFTW3_INCLUDE_DIR)
 
-IF(FFTW3_FOUND)
-  SET(FFTW3_LIBRARIES ${FFTW3_LIBRARY})
-  SET(FFTW3_INCLUDE_DIRS ${FFTW3_INCLUDE_DIR})
-ENDIF()
+if(FFTW3_FOUND)
+  set(FFTW3_LIBRARIES ${_FFTW3_LIBRARIES})
+  set(FFTW3_INCLUDE_DIRS ${FFTW3_INCLUDE_DIR})
+  if(FFTW3_LIBRARY_THREADS_F)
+    set(WITH_FFTW3_THREADS_F_SUPPORT ON)
+  else()
+    set(WITH_FFTW3_THREADS_F_SUPPORT OFF)
+  endif()
+endif()
 
-MARK_AS_ADVANCED(
+
+mark_as_advanced(
   FFTW3_INCLUDE_DIR
-  FFTW3_LIBRARY
+  FFTW3_LIBRARY_F
+  FFTW3_LIBRARY_THREADS_F
+  FFTW3_LIBRARY_D
 )
+
+unset(_FFTW3_LIBRARIES)
+unset(_fftw3_SEARCH_DIRS)

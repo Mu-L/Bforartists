@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -26,8 +14,8 @@
 // I would like to avoid using deque because including ViewMap.h and <deque> or <vector>
 // separately results in redefinitions of identifiers. ViewMap.h already includes <vector>
 // so it should be a safe fall-back.
-//#include <vector>
-//#include <deque>
+// #include <vector>
+// #include <deque>
 
 #include "GridDensityProvider.h"
 #include "OccluderSource.h"
@@ -41,11 +29,9 @@
 
 #include "../winged_edge/WEdge.h"
 
-#include "BKE_global.h"
+#include "BKE_global.hh"
 
-#ifdef WITH_CXX_GUARDEDALLOC
-#  include "MEM_guardedalloc.h"
-#endif
+#include "MEM_guardedalloc.h"
 
 namespace Freestyle {
 
@@ -62,9 +48,7 @@ class BoxGrid {
     // temptation to save 4 or 8 bytes.
     WFace *face;
 
-#ifdef WITH_CXX_GUARDEDALLOC
     MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:BoxGrid:OccluderData")
-#endif
   };
 
  private:
@@ -125,9 +109,7 @@ class BoxGrid {
     // deque<OccluderData*>::iterator _current, _occludeeCandidate;
     vector<OccluderData *>::iterator _current, _occludeeCandidate;
 
-#ifdef WITH_CXX_GUARDEDALLOC
     MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:BoxGrid:Iterator")
-#endif
   };
 
   class Transform : public GridHelpers::Transform {
@@ -168,12 +150,12 @@ class BoxGrid {
   Transform transform;
 
  private:
-  void getCellCoordinates(const Vec3r &point, unsigned &x, unsigned &y);
+  void getCellCoordinates(const Vec3r &point, uint &x, uint &y);
 
   typedef PointerSequence<vector<Cell *>, Cell *> cellContainer;
   // typedef PointerSequence<deque<OccluderData*>, OccluderData*> occluderContainer;
   typedef PointerSequence<vector<OccluderData *>, OccluderData *> occluderContainer;
-  unsigned _cellsX, _cellsY;
+  uint _cellsX, _cellsY;
   float _cellSize;
   float _cellOrigin[2];
   cellContainer _cells;
@@ -181,9 +163,7 @@ class BoxGrid {
   Vec3r _viewpoint;
   bool _enableQI;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:BoxGrid")
-#endif
 };
 
 inline void BoxGrid::Iterator::initBeforeTarget()
@@ -229,7 +209,7 @@ inline bool BoxGrid::Iterator::testOccluder(bool wantOccludee)
 #if BOX_GRID_LOGGING
   if (G.debug & G_DEBUG_FREESTYLE) {
     std::cout << "\tTesting occluder " << (*_current)->poly.getVertices()[0];
-    for (unsigned int i = 1; i < (*_current)->poly.getVertices().size(); ++i) {
+    for (uint i = 1; i < (*_current)->poly.getVertices().size(); ++i) {
       std::cout << ", " << (*_current)->poly.getVertices()[i];
     }
     std::cout << " from shape " << (*_current)->face->GetVertex(0)->shape()->GetId() << std::endl;
@@ -277,7 +257,8 @@ inline bool BoxGrid::Iterator::testOccluder(bool wantOccludee)
   Vec3r bbMin, bbMax;
   (*_current)->poly.getBBox(bbMin, bbMax);
   if (_target[0] < bbMin[0] || _target[0] > bbMax[0] || _target[1] < bbMin[1] ||
-      _target[1] > bbMax[1]) {
+      _target[1] > bbMax[1])
+  {
 #if BOX_GRID_LOGGING
     if (G.debug & G_DEBUG_FREESTYLE) {
       std::cout << "\t\tSkipping: bounding box violation" << std::endl;
@@ -386,7 +367,7 @@ inline void BoxGrid::Cell::checkAndInsert(OccluderSource &source,
                                           OccluderData *&occluder)
 {
   if (GridHelpers::insideProscenium(boundary, poly)) {
-    if (occluder == NULL) {
+    if (occluder == nullptr) {
       // Disposal of occluder will be handled in BoxGrid::distributePolygons(),
       // or automatically by BoxGrid::_faces;
       occluder = new OccluderData(source, poly);
@@ -398,24 +379,24 @@ inline void BoxGrid::Cell::checkAndInsert(OccluderSource &source,
 inline bool BoxGrid::insertOccluder(OccluderSource &source, OccluderData *&occluder)
 {
   Polygon3r &poly(source.getGridSpacePolygon());
-  occluder = NULL;
+  occluder = nullptr;
 
   Vec3r bbMin, bbMax;
   poly.getBBox(bbMin, bbMax);
   // Check overlapping cells
-  unsigned startX, startY, endX, endY;
+  uint startX, startY, endX, endY;
   getCellCoordinates(bbMin, startX, startY);
   getCellCoordinates(bbMax, endX, endY);
 
-  for (unsigned int i = startX; i <= endX; ++i) {
-    for (unsigned int j = startY; j <= endY; ++j) {
-      if (_cells[i * _cellsY + j] != NULL) {
+  for (uint i = startX; i <= endX; ++i) {
+    for (uint j = startY; j <= endY; ++j) {
+      if (_cells[i * _cellsY + j] != nullptr) {
         _cells[i * _cellsY + j]->checkAndInsert(source, poly, occluder);
       }
     }
   }
 
-  return occluder != NULL;
+  return occluder != nullptr;
 }
 
 } /* namespace Freestyle */

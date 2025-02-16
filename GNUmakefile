@@ -1,25 +1,8 @@
-# -*- mode: gnumakefile; tab-width: 4; indent-tabs-mode: t; -*-
-# vim: tabstop=4
+# SPDX-FileCopyrightText: 2011-2023 Blender Authors
 #
-# ##### BEGIN GPL LICENSE BLOCK #####
-#
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ##### END GPL LICENSE BLOCK #####
+# SPDX-License-Identifier: GPL-2.0-or-later
 
-# This Makefile does an out-of-source CMake build in ../build_`OS`_`CPU`
+# This Makefile does an out-of-source CMake build in ../build_`OS`
 # eg:
 #   ../build_linux_i386
 # This is for users who like to configure & build blender with a single command.
@@ -27,10 +10,9 @@
 define HELP_TEXT
 
 Blender Convenience Targets
-   Provided for building Blender, (multiple at once can be used).
+   Provided for building Blender (multiple targets can be used at once).
 
    * debug:         Build a debug binary.
-   * release:       Builds the release cmake configuration.
    * full:          Enable all supported dependencies & options.
    * lite:          Disable non essential features for a smaller binary and faster build.
    * release:       Complete build with all options enabled including CUDA and Optix, matching the releases on blender.org
@@ -41,6 +23,8 @@ Blender Convenience Targets
    * ninja:         Use ninja build tool for faster builds.
    * ccache:        Use ccache for faster rebuilds.
 
+   Note: when passing in multiple targets their order is not important.
+   So for a fast build you can for e.g. run 'make lite ccache ninja'.
    Note: passing the argument 'BUILD_DIR=path' when calling make will override the default build dir.
    Note: passing the argument 'BUILD_CMAKE_ARGS=args' lets you add cmake arguments.
 
@@ -50,54 +34,63 @@ Other Convenience Targets
    * config:        Run cmake configuration tool to set build options.
    * deps:          Build library dependencies (intended only for platform maintainers).
 
-                    The existance of locally build dependancies overrides the pre-built dependencies from subversion.
-                    These must be manually removed from '../lib/' to go back to using the pre-compiled libraries.
+                    The existence of locally build dependencies overrides the pre-built dependencies from subversion.
+                    These must be manually removed from 'lib/' to go back to using the pre-compiled libraries.
 
 Project Files
    Generate project files for development environments.
 
    * project_qtcreator:     QtCreator Project Files.
-   * project_netbeans:      NetBeans Project Files.
    * project_eclipse:       Eclipse CDT4 Project Files.
 
 Package Targets
 
-   * package_debian:    Build a debian package.
-   * package_pacman:    Build an arch linux pacman package.
-   * package_archive:	Build an archive package.
+   * package_archive:   Build an archive package.
 
 Testing Targets
    Not associated with building Blender.
 
    * test:
      Run automated tests with ctest.
-   * test_cmake:
-     Runs our own cmake file checker
-     which detects errors in the cmake file list definitions
-   * test_pep8:
-     Checks all python script are pep8
-     which are tagged to use the stricter formatting
-   * test_deprecated:
-     Checks for deprecation tags in our code which may need to be removed
 
 Static Source Code Checking
    Not associated with building Blender.
 
-   * check_cppcheck:        Run blender source through cppcheck (C & C++).
+   * check_cppcheck:
+     Run blender source through cppcheck (C & C++).
+
+     To write log files into a user defined location append 'OUTPUT_DIR',
+     e.g. 'OUTPUT_DIR=/example/path'
+
    * check_clang_array:     Run blender source through clang array checking script (C & C++).
-   * check_splint:          Run blenders source through splint (C only).
-   * check_sparse:          Run blenders source through sparse (C only).
-   * check_smatch:          Run blenders source through smatch (C only).
+   * check_struct_comments: Check struct member comments are correct (C & C++).
+   * check_deprecated:      Check if there is any deprecated code to remove.
    * check_descriptions:    Check for duplicate/invalid descriptions.
+   * check_licenses:        Check license headers follow the SPDX license specification,
+                            using one of the accepted licenses in 'doc/license/SPDX-license-identifiers.txt'
+                            Append with 'SHOW_HEADERS=1' to show all unique headers
+                            which can be useful for spotting license irregularities.
+   * check_cmake:           Runs our own cmake file checker which detects errors in the cmake file list definitions.
+   * check_pep8:            Checks all Python script are pep8 which are tagged to use the stricter formatting.
+   * check_mypy:            Checks all Python scripts using mypy,
+                            see: tools/check_source/check_mypy_config.py scripts which are included.
+
+Documentation Checking
+
+   * check_docs_file_structure:
+     Check the documentation for the source-tree's file structure
+     matches Blender's source-code.
+     See: https://developer.blender.org/docs/features/code_layout/
 
 Spell Checkers
    This runs the spell checker from the developer tools repositor.
 
-   * check_spelling_c:      Check for spelling errors (C/C++ only),
-   * check_spelling_osl:    Check for spelling errors (OSL only).
-   * check_spelling_py:     Check for spelling errors (Python only).
+   * check_spelling_c:       Check for spelling errors (C/C++ only),
+   * check_spelling_py:      Check for spelling errors (Python only).
+   * check_spelling_shaders: Check for spelling errors (GLSL,OSL & MSL only).
+   * check_spelling_cmake:   Check for spelling errors (CMake only).
 
-   Note: an additional word-list is maintained at: 'source/tools/check_source/check_spelling_c_config.py'
+   Note: an additional word-list is maintained at: 'tools/check_source/check_spelling_c_config.py'
 
    Note: that spell checkers can take a 'CHECK_SPELLING_CACHE' filepath argument,
    so re-running does not need to re-check unchanged files.
@@ -107,15 +100,6 @@ Spell Checkers
 
 Utilities
    Not associated with building Blender.
-
-   * icons:
-     Updates PNG icons from SVG files.
-
-     Optionally pass in variables: 'BLENDER_BIN', 'INKSCAPE_BIN'
-     otherwise default paths are used.
-
-     Example
-        make icons INKSCAPE_BIN=/path/to/inkscape
 
    * icons_geom:
      Updates Geometry icons from BLEND file.
@@ -139,9 +123,13 @@ Utilities
      Updates git and all submodules but not svn.
 
    * format:
-     Format source code using clang (uses PATHS if passed in). For example::
+     Format source code using clang-format & autopep8 (uses PATHS if passed in). For example::
 
         make format PATHS="source/blender/blenlib source/blender/blenkernel"
+
+   * license:
+     Create a combined file with all the license information relative to the libraries and other
+     code depedencies.
 
 Environment Variables
 
@@ -149,6 +137,7 @@ Environment Variables
    * BUILD_DIR:             Override default build path.
    * PYTHON:                Use this for the Python command (used for checking tools).
    * NPROCS:                Number of processes to use building (auto-detect when omitted).
+   * AUTOPEP8:              Command used for Python code-formatting (used for the format target).
 
 Documentation Targets
    Not associated with building Blender.
@@ -168,7 +157,7 @@ endef
 
 # This makefile is not meant for Windows
 ifeq ($(OS),Windows_NT)
-    $(error On Windows, use "cmd //c make.bat" instead of "make")
+	$(error On Windows, use "cmd //c make.bat" instead of "make")
 endif
 
 # System Vars
@@ -176,66 +165,112 @@ OS:=$(shell uname -s)
 OS_NCASE:=$(shell uname -s | tr '[A-Z]' '[a-z]')
 CPU:=$(shell uname -m)
 
+# Use our OS and CPU architecture naming conventions.
+ifeq ($(CPU),x86_64)
+	CPU:=x64
+endif
+ifeq ($(CPU),aarch64)
+	CPU:=arm64
+endif
+ifeq ($(OS_NCASE),darwin)
+	OS_LIBDIR:=macos
+else
+	OS_LIBDIR:=$(OS_NCASE)
+endif
+
 
 # Source and Build DIR's
 BLENDER_DIR:=$(shell pwd -P)
 BUILD_TYPE:=Release
+BLENDER_IS_PYTHON_MODULE:=
 
 # CMake arguments, assigned to local variable to make it mutable.
 CMAKE_CONFIG_ARGS := $(BUILD_CMAKE_ARGS)
 
 ifndef BUILD_DIR
-	BUILD_DIR:=$(shell dirname "$(BLENDER_DIR)")/build_$(OS_NCASE)
+	BUILD_DIR:=$(shell dirname "$(BLENDER_DIR)")/bfa_build_$(OS_NCASE)
 endif
 
 # Dependencies DIR's
 DEPS_SOURCE_DIR:=$(BLENDER_DIR)/build_files/build_environment
 
 ifndef DEPS_BUILD_DIR
-	DEPS_BUILD_DIR:=$(BUILD_DIR)/deps
+	DEPS_BUILD_DIR:=$(BUILD_DIR)/deps_$(CPU)
 endif
 
 ifndef DEPS_INSTALL_DIR
-	DEPS_INSTALL_DIR:=$(shell dirname "$(BLENDER_DIR)")/lib/$(OS_NCASE)
+	DEPS_INSTALL_DIR:=$(BLENDER_DIR)/lib/$(OS_LIBDIR)_$(CPU)
+endif
 
-	# Add processor type to directory name, except for darwin x86_64
-	# which by convention does not have it.
-	ifeq ($(OS_NCASE),darwin)
-		ifneq ($(CPU),x86_64)
-			DEPS_INSTALL_DIR:=$(DEPS_INSTALL_DIR)_$(CPU)
+# Set the LIBDIR, an empty string when not found.
+LIBDIR:=$(wildcard $(BLENDER_DIR)/lib/${OS_LIBDIR}_${CPU})
+ifeq (, $(LIBDIR))
+	LIBDIR:=$(wildcard $(BLENDER_DIR)/lib/${OS_LIBDIR})
+endif
+
+# Find the newest Python version bundled in `LIBDIR`.
+PY_LIB_VERSION:=3.15
+ifeq (, $(wildcard $(LIBDIR)/python/bin/python$(PY_LIB_VERSION)))
+	PY_LIB_VERSION:=3.14
+	ifeq (, $(wildcard $(LIBDIR)/python/bin/python$(PY_LIB_VERSION)))
+		PY_LIB_VERSION:=3.13
+		ifeq (, $(wildcard $(LIBDIR)/python/bin/python$(PY_LIB_VERSION)))
+			PY_LIB_VERSION:=3.12
+			ifeq (, $(wildcard $(LIBDIR)/python/bin/python$(PY_LIB_VERSION)))
+				PY_LIB_VERSION:=3.11
+				ifeq (, $(wildcard $(LIBDIR)/python/bin/python$(PY_LIB_VERSION)))
+					PY_LIB_VERSION:=3.10
+				endif
+			endif
 		endif
-	else
-		DEPS_INSTALL_DIR:=$(DEPS_INSTALL_DIR)_$(CPU)
 	endif
 endif
 
 # Allow to use alternative binary (pypy3, etc)
 ifndef PYTHON
-	PYTHON:=python3
-endif
-
-# For macOS python3 is not installed by default, so fallback to python binary
-# in libraries, or python 2 for running make update to get it.
-ifeq ($(OS_NCASE),darwin)
-	ifeq (, $(shell command -v $(PYTHON)))
-		PYTHON:=$(DEPS_INSTALL_DIR)/python/bin/python3.7m
+	# If not overriden, first try using Python from LIBDIR.
+	PYTHON:=$(LIBDIR)/python/bin/python$(PY_LIB_VERSION)
+	ifeq (, $(wildcard $(PYTHON)))
+		# If not available, use system python3 or python command.
+		PYTHON:=python3
 		ifeq (, $(shell command -v $(PYTHON)))
 			PYTHON:=python
 		endif
+	else
+		# Don't generate __pycache__ files in lib folder, they
+		# can interfere with updates.
+		PYTHON:=$(PYTHON) -B
 	endif
 endif
 
-# -----------------------------------------------------------------------------
-# additional targets for the build configuration
+# Use the autopep8 module in ../lib/ (which can be executed via Python directly).
+# Otherwise the "autopep8" command can be used.
+ifndef AUTOPEP8
+	ifneq (, $(LIBDIR))
+		AUTOPEP8:=$(wildcard $(LIBDIR)/python/lib/python$(PY_LIB_VERSION)/site-packages/autopep8.py)
+	endif
+	ifeq (, $(AUTOPEP8))
+		AUTOPEP8:=autopep8
+	endif
+endif
 
-# support 'make debug'
+
+# -----------------------------------------------------------------------------
+# Additional targets for the build configuration
+
+# NOTE: These targets can be combined and are applied in reverse order listed here.
+# So it's important that `bpy` comes before `release` (for example)
+# `make bpy release` first loads `release` configuration, then `bpy`.
+# This is important as `bpy` will turn off some settings enabled by release.
+
+ifneq "$(findstring bpy, $(MAKECMDGOALS))" ""
+	BUILD_DIR:=$(BUILD_DIR)_bpy
+	CMAKE_CONFIG_ARGS:=-C"$(BLENDER_DIR)/build_files/cmake/config/bpy_module.cmake" $(CMAKE_CONFIG_ARGS)
+	BLENDER_IS_PYTHON_MODULE:=1
+endif
 ifneq "$(findstring debug, $(MAKECMDGOALS))" ""
 	BUILD_DIR:=$(BUILD_DIR)_debug
 	BUILD_TYPE:=Debug
-endif
-ifneq "$(findstring release, $(MAKECMDGOALS))" ""
-	BUILD_DIR:=$(BUILD_DIR)_release
-	CMAKE_CONFIG_ARGS:=-C"$(BLENDER_DIR)/build_files/cmake/config/blender_release.cmake" $(CMAKE_CONFIG_ARGS)
 endif
 ifneq "$(findstring full, $(MAKECMDGOALS))" ""
 	BUILD_DIR:=$(BUILD_DIR)_full
@@ -256,10 +291,6 @@ endif
 ifneq "$(findstring headless, $(MAKECMDGOALS))" ""
 	BUILD_DIR:=$(BUILD_DIR)_headless
 	CMAKE_CONFIG_ARGS:=-C"$(BLENDER_DIR)/build_files/cmake/config/blender_headless.cmake" $(CMAKE_CONFIG_ARGS)
-endif
-ifneq "$(findstring bpy, $(MAKECMDGOALS))" ""
-	BUILD_DIR:=$(BUILD_DIR)_bpy
-	CMAKE_CONFIG_ARGS:=-C"$(BLENDER_DIR)/build_files/cmake/config/bpy_module.cmake" $(CMAKE_CONFIG_ARGS)
 endif
 
 ifneq "$(findstring developer, $(MAKECMDGOALS))" ""
@@ -287,7 +318,11 @@ else
 	ifneq ("$(wildcard $(DEPS_BUILD_DIR)/build.ninja)","")
 		DEPS_BUILD_COMMAND:=ninja
 	else
-		DEPS_BUILD_COMMAND:=make -s
+		ifeq ($(OS), Darwin)
+			DEPS_BUILD_COMMAND:=make -s
+		else
+			DEPS_BUILD_COMMAND:="$(BLENDER_DIR)/build_files/build_environment/linux/make_deps_wrapper.sh" -s
+		endif
 	endif
 endif
 
@@ -297,9 +332,11 @@ endif
 # Allow passing in own BLENDER_BIN so developers who don't
 # use the default build path can still use utility helpers.
 ifeq ($(OS), Darwin)
-	BLENDER_BIN?="$(BUILD_DIR)/bin/bforartists.app/Contents/MacOS/bforartists"
+	BLENDER_BIN?="$(BUILD_DIR)/bin/Bforartists.app/Contents/MacOS/Bforartists"
+	BLENDER_BIN_DIR?="$(BUILD_DIR)/bin/Bforartists.app/Contents/MacOS/Bforartists"
 else
 	BLENDER_BIN?="$(BUILD_DIR)/bin/bforartists"
+	BLENDER_BIN_DIR?="$(BUILD_DIR)/bin"
 endif
 
 
@@ -331,7 +368,7 @@ CMAKE_CONFIG = cmake $(CMAKE_CONFIG_ARGS) \
 # -----------------------------------------------------------------------------
 # Tool for 'make config'
 
-# X11 spesific
+# X11 specific.
 ifdef DISPLAY
 	CMAKE_CONFIG_TOOL = cmake-gui
 else
@@ -356,8 +393,12 @@ all: .FORCE
 	@echo Building Bforartists ...
 	$(BUILD_COMMAND) -C "$(BUILD_DIR)" -j $(NPROCS) install
 	@echo
-	@echo edit build configuration with: "$(BUILD_DIR)/CMakeCache.txt" run make again to rebuild.
-	@echo Bforartists successfully built, run from: $(BLENDER_BIN)
+	@echo Edit build configuration with: \"$(BUILD_DIR)/CMakeCache.txt\" run make again to rebuild.
+	@if test -z "$(BLENDER_IS_PYTHON_MODULE)"; then \
+		echo Bforartists successfully built, run from: $(BLENDER_BIN); \
+	else \
+		echo Bforartists successfully built as a Python module, \"bpy\" can be imported from: $(BLENDER_BIN_DIR); \
+	fi
 	@echo
 
 debug: all
@@ -380,11 +421,11 @@ endif
 
 deps: .FORCE
 	@echo
-	@echo Configuring dependencies in \"$(DEPS_BUILD_DIR)\"
+	@echo Configuring dependencies in \"$(DEPS_BUILD_DIR)\", install to \"$(DEPS_INSTALL_DIR)\"
 
 	@cmake -H"$(DEPS_SOURCE_DIR)" \
 	       -B"$(DEPS_BUILD_DIR)" \
-		   -DHARVEST_TARGET=$(DEPS_INSTALL_DIR)
+	       -DHARVEST_TARGET=$(DEPS_INSTALL_DIR)
 
 	@echo
 	@echo Building dependencies ...
@@ -408,11 +449,6 @@ help: .FORCE
 # -----------------------------------------------------------------------------
 # Packages
 #
-package_debian: .FORCE
-	cd build_files/package_spec ; DEB_BUILD_OPTIONS="parallel=$(NPROCS)" sh ./build_debian.sh
-
-package_pacman: .FORCE
-	cd build_files/package_spec/pacman ; MAKEFLAGS="-j$(NPROCS)" makepkg
 
 package_archive: .FORCE
 	make -C "$(BUILD_DIR)" -s package_archive
@@ -423,21 +459,7 @@ package_archive: .FORCE
 # Tests
 #
 test: .FORCE
-	$(PYTHON) ./build_files/utils/make_test.py "$(BUILD_DIR)"
-
-# run pep8 check check on scripts we distribute.
-test_pep8: .FORCE
-	$(PYTHON) tests/python/pep8.py > test_pep8.log 2>&1
-	@echo "written: test_pep8.log"
-
-# run some checks on our cmakefiles.
-test_cmake: .FORCE
-	$(PYTHON) build_files/cmake/cmake_consistency_check.py > test_cmake_consistency.log 2>&1
-	@echo "written: test_cmake_consistency.log"
-
-# run deprecation tests, see if we have anything to remove.
-test_deprecated: .FORCE
-	$(PYTHON) tests/check_deprecated.py
+	@$(PYTHON) ./build_files/utils/make_test.py "$(BUILD_DIR)"
 
 
 # -----------------------------------------------------------------------------
@@ -445,10 +467,7 @@ test_deprecated: .FORCE
 #
 
 project_qtcreator: .FORCE
-	$(PYTHON) build_files/cmake/cmake_qtcreator_project.py --build-dir "$(BUILD_DIR)"
-
-project_netbeans: .FORCE
-	$(PYTHON) build_files/cmake/cmake_netbeans_project.py "$(BUILD_DIR)"
+	$(PYTHON) tools/utils_ide/cmake_qtcreator_project.py --build-dir "$(BUILD_DIR)"
 
 project_eclipse: .FORCE
 	cmake -G"Eclipse CDT4 - Unix Makefiles" -H"$(BLENDER_DIR)" -B"$(BUILD_DIR)"
@@ -459,97 +478,123 @@ project_eclipse: .FORCE
 #
 
 check_cppcheck: .FORCE
-	$(CMAKE_CONFIG)
-	cd "$(BUILD_DIR)" ; \
-	$(PYTHON) "$(BLENDER_DIR)/build_files/cmake/cmake_static_check_cppcheck.py" 2> \
-	    "$(BLENDER_DIR)/check_cppcheck.txt"
-	@echo "written: check_cppcheck.txt"
+	@$(CMAKE_CONFIG)
+	$(PYTHON) \
+	    "$(BLENDER_DIR)/tools/check_source/static_check_cppcheck.py" \
+	    --build-dir=$(BUILD_DIR) \
+	    --output-dir=$(OUTPUT_DIR)
+
+check_struct_comments: .FORCE
+	@$(CMAKE_CONFIG)
+	@cd "$(BUILD_DIR)" ; \
+	$(PYTHON) \
+	    "$(BLENDER_DIR)/tools/check_source/static_check_clang.py" \
+	    --checks=struct_comments --match=".*" --jobs=$(NPROCS)
 
 check_clang_array: .FORCE
-	$(CMAKE_CONFIG)
-	cd "$(BUILD_DIR)" ; \
-	$(PYTHON) "$(BLENDER_DIR)/build_files/cmake/cmake_static_check_clang_array.py"
-
-check_splint: .FORCE
-	$(CMAKE_CONFIG)
-	cd "$(BUILD_DIR)" ; \
-	$(PYTHON) "$(BLENDER_DIR)/build_files/cmake/cmake_static_check_splint.py"
-
-check_sparse: .FORCE
-	$(CMAKE_CONFIG)
-	cd "$(BUILD_DIR)" ; \
-	$(PYTHON) "$(BLENDER_DIR)/build_files/cmake/cmake_static_check_sparse.py"
-
-check_smatch: .FORCE
-	$(CMAKE_CONFIG)
-	cd "$(BUILD_DIR)" ; \
-	$(PYTHON) "$(BLENDER_DIR)/build_files/cmake/cmake_static_check_smatch.py"
+	@$(CMAKE_CONFIG)
+	@cd "$(BUILD_DIR)" ; \
+	$(PYTHON) "$(BLENDER_DIR)/tools/check_source/static_check_clang_array.py"
 
 check_mypy: .FORCE
-	$(PYTHON) "$(BLENDER_DIR)/source/tools/check_source/check_mypy.py"
+	@$(PYTHON) "$(BLENDER_DIR)/tools/check_source/check_mypy.py"
+
+check_docs_file_structure: .FORCE
+	@PYTHONIOENCODING=utf_8 $(PYTHON) \
+	    "$(BLENDER_DIR)/tools/check_docs/check_docs_code_layout.py"
 
 check_spelling_py: .FORCE
-	cd "$(BUILD_DIR)" ; \
-	PYTHONIOENCODING=utf_8 $(PYTHON) \
-	    "$(BLENDER_DIR)/source/tools/check_source/check_spelling.py" \
-	    "$(BLENDER_DIR)/release/scripts"
+	@PYTHONIOENCODING=utf_8 $(PYTHON) \
+	    "$(BLENDER_DIR)/tools/check_source/check_spelling.py" \
+	    --cache-file=$(CHECK_SPELLING_CACHE) \
+	    --match=".*\.(py)$$" \
+	    "$(BLENDER_DIR)/release" \
+	    "$(BLENDER_DIR)/scripts" \
+	    "$(BLENDER_DIR)/source" \
+	    "$(BLENDER_DIR)/tools" \
+	    "$(BLENDER_DIR)/doc" \
+	    "$(BLENDER_DIR)/build_files"
 
 check_spelling_c: .FORCE
-	cd "$(BUILD_DIR)" ; \
-	PYTHONIOENCODING=utf_8 $(PYTHON) \
-	    "$(BLENDER_DIR)/source/tools/check_source/check_spelling.py" \
+	@PYTHONIOENCODING=utf_8 $(PYTHON) \
+	    "$(BLENDER_DIR)/tools/check_source/check_spelling.py" \
 	    --cache-file=$(CHECK_SPELLING_CACHE) \
+	    --match=".*\.(c|cc|cpp|cxx|h|hh|hpp|hxx|inl|m|mm)$$" \
 	    "$(BLENDER_DIR)/source" \
 	    "$(BLENDER_DIR)/intern/cycles" \
 	    "$(BLENDER_DIR)/intern/guardedalloc" \
-	    "$(BLENDER_DIR)/intern/ghost" \
+	    "$(BLENDER_DIR)/intern/ghost"
 
-check_spelling_osl: .FORCE
-	cd "$(BUILD_DIR)" ;\
-	PYTHONIOENCODING=utf_8 $(PYTHON) \
-	    "$(BLENDER_DIR)/source/tools/check_source/check_spelling.py" \
+check_spelling_shaders: .FORCE
+	@PYTHONIOENCODING=utf_8 $(PYTHON) \
+	    "$(BLENDER_DIR)/tools/check_source/check_spelling.py" \
 	    --cache-file=$(CHECK_SPELLING_CACHE) \
-	    "$(BLENDER_DIR)/intern/cycles/kernel/shaders"
+	    --match=".*\.(osl|metal|msl|glsl)$$" \
+	    "$(BLENDER_DIR)/intern/" \
+	    "$(BLENDER_DIR)/source/"
+
+check_spelling_cmake: .FORCE
+	@PYTHONIOENCODING=utf_8 $(PYTHON) \
+	    "$(BLENDER_DIR)/tools/check_source/check_spelling.py" \
+	    --cache-file=$(CHECK_SPELLING_CACHE) \
+	    --match=".*\.(cmake)$$" \
+	    --match=".*\bCMakeLists\.(txt)$$" \
+	    "$(BLENDER_DIR)/build_files/" \
+	    "$(BLENDER_DIR)/intern/" \
+	    "$(BLENDER_DIR)/source/"
 
 check_descriptions: .FORCE
-	$(BLENDER_BIN) --background -noaudio --factory-startup --python \
-	    "$(BLENDER_DIR)/source/tools/check_source/check_descriptions.py"
+	@$(BLENDER_BIN) --background --factory-startup --python \
+	    "$(BLENDER_DIR)/tools/check_source/check_descriptions.py"
+
+check_deprecated: .FORCE
+	@PYTHONIOENCODING=utf_8 $(PYTHON) \
+	    tools/check_source/check_deprecated.py
+
+check_licenses: .FORCE
+	@PYTHONIOENCODING=utf_8 $(PYTHON) \
+	    "$(BLENDER_DIR)/tools/check_source/check_licenses.py" \
+	    "--show-headers=$(SHOW_HEADERS)"
+
+check_pep8: .FORCE
+	@PYTHONIOENCODING=utf_8 $(PYTHON) \
+	    tests/python/pep8.py
+
+check_cmake: .FORCE
+	@PYTHONIOENCODING=utf_8 $(PYTHON) \
+	    tools/check_source/check_cmake_consistency.py
+
 
 # -----------------------------------------------------------------------------
 # Utilities
 #
 
 source_archive: .FORCE
-	python3 ./build_files/utils/make_source_archive.py
+	@$(PYTHON) ./build_files/utils/make_source_archive.py
 
 source_archive_complete: .FORCE
-	cmake -S "$(BLENDER_DIR)/build_files/build_environment" -B"$(BUILD_DIR)/source_archive" \
-		-DCMAKE_BUILD_TYPE_INIT:STRING=$(BUILD_TYPE) -DPACKAGE_USE_UPSTREAM_SOURCES=OFF
+	@cmake \
+	    -S "$(BLENDER_DIR)/build_files/build_environment" -B"$(BUILD_DIR)/source_archive" \
+	    -DCMAKE_BUILD_TYPE_INIT:STRING=$(BUILD_TYPE) -DPACKAGE_USE_UPSTREAM_SOURCES=OFF
 # This assumes CMake is still using a default `PACKAGE_DIR` variable:
-	python3 ./build_files/utils/make_source_archive.py --include-packages "$(BUILD_DIR)/source_archive/packages"
-
-
-INKSCAPE_BIN?="inkscape"
-icons: .FORCE
-	BLENDER_BIN=$(BLENDER_BIN) INKSCAPE_BIN=$(INKSCAPE_BIN) \
-		"$(BLENDER_DIR)/release/datafiles/blender_icons_update.py"
-	BLENDER_BIN=$(BLENDER_BIN) INKSCAPE_BIN=$(INKSCAPE_BIN) \
-		"$(BLENDER_DIR)/release/datafiles/prvicons_update.py"
+	@$(PYTHON) ./build_files/utils/make_source_archive.py --include-packages "$(BUILD_DIR)/source_archive/packages"
 
 icons_geom: .FORCE
-	BLENDER_BIN=$(BLENDER_BIN) \
+	@BLENDER_BIN=$(BLENDER_BIN) \
 	    "$(BLENDER_DIR)/release/datafiles/blender_icons_geom_update.py"
 
 update: .FORCE
-	$(PYTHON) ./build_files/utils/make_update.py
+	@$(PYTHON) ./build_files/utils/make_update.py
 
 update_code: .FORCE
-	$(PYTHON) ./build_files/utils/make_update.py --no-libraries
+	@$(PYTHON) ./build_files/utils/make_update.py --no-libraries
 
 format: .FORCE
-	PATH="../lib/${OS_NCASE}_${CPU}/llvm/bin/:../lib/${OS_NCASE}_centos7_${CPU}/llvm/bin/:../lib/${OS_NCASE}/llvm/bin/:$(PATH)" \
-		$(PYTHON) source/tools/utils_maintenance/clang_format_paths.py $(PATHS)
+	@PATH="${LIBDIR}/llvm/bin/:$(PATH)" $(PYTHON) tools/utils_maintenance/clang_format_paths.py $(PATHS)
+	@$(PYTHON) tools/utils_maintenance/autopep8_format_paths.py --autopep8-command="$(AUTOPEP8)" $(PATHS)
 
+license: .FORCE
+	@$(PYTHON) tools/utils_maintenance/make_license.py
 
 # -----------------------------------------------------------------------------
 # Documentation
@@ -557,23 +602,25 @@ format: .FORCE
 
 # Simple version of ./doc/python_api/sphinx_doc_gen.sh with no PDF generation.
 doc_py: .FORCE
-	ASAN_OPTIONS=halt_on_error=0:${ASAN_OPTIONS} \
-	$(BLENDER_BIN) --background -noaudio --factory-startup \
-		--python doc/python_api/sphinx_doc_gen.py
-	sphinx-build -b html -j $(NPROCS) doc/python_api/sphinx-in doc/python_api/sphinx-out
+	@ASAN_OPTIONS=halt_on_error=0:${ASAN_OPTIONS} \
+	$(BLENDER_BIN) \
+	    --background --factory-startup \
+	    --python doc/python_api/sphinx_doc_gen.py
+	@sphinx-build -b html -j $(NPROCS) doc/python_api/sphinx-in doc/python_api/sphinx-out
 	@echo "docs written into: '$(BLENDER_DIR)/doc/python_api/sphinx-out/index.html'"
 
 doc_doxy: .FORCE
-	cd doc/doxygen; doxygen Doxyfile
+	@cd doc/doxygen; doxygen Doxyfile
 	@echo "docs written into: '$(BLENDER_DIR)/doc/doxygen/html/index.html'"
 
 doc_dna: .FORCE
-	$(BLENDER_BIN) --background -noaudio --factory-startup \
-		--python doc/blender_file_format/BlendFileDnaExporter_25.py
+	@$(BLENDER_BIN) \
+	    --background --factory-startup \
+	    --python doc/blender_file_format/BlendFileDnaExporter_25.py
 	@echo "docs written into: '$(BLENDER_DIR)/doc/blender_file_format/dna.html'"
 
 doc_man: .FORCE
-	$(PYTHON) doc/manpage/blender.1.py $(BLENDER_BIN) blender.1
+	@$(PYTHON) doc/manpage/blender.1.py --blender="$(BLENDER_BIN)" --output=blender.1 --verbose
 
 help_features: .FORCE
 	@$(PYTHON) "$(BLENDER_DIR)/build_files/cmake/cmake_print_build_options.py" $(BLENDER_DIR)"/CMakeLists.txt"

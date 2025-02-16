@@ -54,6 +54,7 @@
 #ifdef WITH_CONVOLUTION
 #include "fx/BinauralSound.h"
 #include "fx/ConvolverSound.h"
+#include "fx/Equalizer.h"
 #endif
 
 #include <cassert>
@@ -92,6 +93,40 @@ AUD_API int AUD_Sound_getLength(AUD_Sound* sound)
 	assert(sound);
 
 	return (*sound)->createReader()->getLength();
+}
+
+AUD_API int AUD_Sound_getFileStreams(AUD_Sound* sound, AUD_StreamInfo **stream_infos)
+{
+	assert(sound);
+
+	std::shared_ptr<File> file = std::dynamic_pointer_cast<File>(*sound);
+
+	if(file)
+	{
+		try
+		{
+			auto streams = file->queryStreams();
+
+			size_t size = sizeof(AUD_StreamInfo) * streams.size();
+
+			if(!size)
+			{
+				*stream_infos = nullptr;
+				return 0;
+			}
+
+			*stream_infos = reinterpret_cast<AUD_StreamInfo*>(std::malloc(size));
+			std::memcpy(*stream_infos, streams.data(), size);
+
+			return streams.size();
+		}
+		catch(Exception&)
+		{
+		}
+	}
+
+	*stream_infos = nullptr;
+	return 0;
 }
 
 AUD_API sample_t* AUD_Sound_data(AUD_Sound* sound, int* length, AUD_Specs* specs)
@@ -173,6 +208,8 @@ AUD_API const char* AUD_Sound_write(AUD_Sound* sound, const char* filename, AUD_
 				container = AUD_CONTAINER_OGG;
 			else if(extension == ".wav")
 				container = AUD_CONTAINER_WAV;
+			else if(extension == ".aac")
+				container = AUD_CONTAINER_AAC;
 			else
 				return invalid_container_error;
 		}
@@ -201,6 +238,9 @@ AUD_API const char* AUD_Sound_write(AUD_Sound* sound, const char* filename, AUD_
 				break;
 			case AUD_CONTAINER_WAV:
 				codec = AUD_CODEC_PCM;
+				break;
+			case AUD_CONTAINER_AAC:
+				codec = AUD_CODEC_AAC;
 				break;
 			default:
 				return "Unknown container, cannot select default codec.";
@@ -252,6 +292,12 @@ AUD_API AUD_Sound* AUD_Sound_bufferFile(unsigned char* buffer, int size)
 	return new AUD_Sound(new File(buffer, size));
 }
 
+AUD_API AUD_Sound* AUD_Sound_bufferFileStream(unsigned char* buffer, int size, int stream)
+{
+	assert(buffer);
+	return new AUD_Sound(new File(buffer, size, stream));
+}
+
 AUD_API AUD_Sound* AUD_Sound_cache(AUD_Sound* sound)
 {
 	assert(sound);
@@ -270,6 +316,12 @@ AUD_API AUD_Sound* AUD_Sound_file(const char* filename)
 {
 	assert(filename);
 	return new AUD_Sound(new File(filename));
+}
+
+AUD_API AUD_Sound* AUD_Sound_fileStream(const char* filename, int stream)
+{
+	assert(filename);
+	return new AUD_Sound(new File(filename, stream));
 }
 
 AUD_API AUD_Sound* AUD_Sound_sawtooth(float frequency, AUD_SampleRate rate)
@@ -513,7 +565,7 @@ AUD_API AUD_Sound* AUD_Sound_rechannel(AUD_Sound* sound, AUD_Channels channels)
 	}
 }
 
-AUD_API AUD_Sound* AUD_Sound_resample(AUD_Sound* sound, AUD_SampleRate rate, bool high_quality)
+AUD_API AUD_Sound* AUD_Sound_resample(AUD_Sound* sound, AUD_SampleRate rate, AUD_ResampleQuality quality)
 {
 	assert(sound);
 
@@ -523,10 +575,14 @@ AUD_API AUD_Sound* AUD_Sound_resample(AUD_Sound* sound, AUD_SampleRate rate, boo
 		specs.channels = CHANNELS_INVALID;
 		specs.rate = rate;
 		specs.format = FORMAT_INVALID;
-		if(high_quality)
-			return new AUD_Sound(new JOSResample(*sound, specs));
-		else
+		if (quality == AUD_RESAMPLE_QUALITY_FASTEST)
+		{
 			return new AUD_Sound(new LinearResample(*sound, specs));
+		}
+		else
+		{
+			return new AUD_Sound(new JOSResample(*sound, specs, static_cast<ResampleQuality>(quality)));
+		}
 	}
 	catch(Exception&)
 	{
@@ -720,6 +776,16 @@ AUD_API AUD_Sound* AUD_Sound_Binaural(AUD_Sound* sound, AUD_HRTF* hrtfs, AUD_Sou
 	{
 		return nullptr;
 	}
+}
+
+AUD_API AUD_Sound* AUD_Sound_equalize(AUD_Sound* sound, float *definition, int size, float maxFreqEq, int sizeConversion)
+{
+	assert(sound);
+
+	std::shared_ptr<Buffer> buf = std::shared_ptr<Buffer>(new Buffer(sizeof(float)*size));
+	std::memcpy(buf->getBuffer(), definition, sizeof(float)*size);
+	AUD_Sound *equalizer=new AUD_Sound(new Equalizer(*sound, buf, size, maxFreqEq, sizeConversion));
+	return equalizer;
 }
 
 #endif

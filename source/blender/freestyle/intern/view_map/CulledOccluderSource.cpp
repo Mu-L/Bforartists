@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2011-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -23,7 +11,9 @@
 
 #include "../geometry/GridHelpers.h"
 
-#include "BKE_global.h"
+#include "BLI_sys_types.h"
+
+#include "BKE_global.hh"
 
 namespace Freestyle {
 
@@ -63,14 +53,14 @@ bool CulledOccluderSource::next()
     }
   }
   if (G.debug & G_DEBUG_FREESTYLE) {
-    std::cout << "Finished generating occluders.  Rejected " << rejected << " faces." << std::endl;
+    std::cout << "Finished generating occluders. Rejected " << rejected << " faces." << std::endl;
   }
   return false;
 }
 
 void CulledOccluderSource::getOccluderProscenium(real proscenium[4])
 {
-  for (unsigned int i = 0; i < 4; ++i) {
+  for (uint i = 0; i < 4; ++i) {
     proscenium[i] = gridSpaceOccluderProscenium[i];
   }
 }
@@ -187,7 +177,7 @@ void CulledOccluderSource::cullViewEdges(ViewMap &viewMap, bool extensiveFEdgeSe
 
     // Either we have run out of FEdges, or we already have the one edge we need to determine
     // visibility Cull all remaining edges.
-    while (!ELEM(fe, NULL, festart)) {
+    while (!ELEM(fe, nullptr, festart)) {
       fe->setIsInImage(false);
       fe = fe->nextEdge();
     }
@@ -249,7 +239,7 @@ void CulledOccluderSource::cullViewEdges(ViewMap &viewMap, bool extensiveFEdgeSe
           expandGridSpaceOccluderProscenium(fe);
         }
         fe = fe->nextEdge();
-      } while (!ELEM(fe, NULL, festart));
+      } while (!ELEM(fe, nullptr, festart));
     }
   }
 

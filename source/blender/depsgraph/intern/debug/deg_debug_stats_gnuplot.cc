@@ -1,27 +1,12 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2017 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2017 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup depsgraph
  */
 
-#include "DEG_depsgraph_debug.h"
+#include "DEG_depsgraph_debug.hh"
 
 #include <algorithm>
 #include <cstdarg>
@@ -29,8 +14,8 @@
 #include "BLI_compiler_attrs.h"
 #include "BLI_math_base.h"
 
-#include "intern/depsgraph.h"
-#include "intern/node/deg_node_id.h"
+#include "intern/depsgraph.hh"
+#include "intern/node/deg_node_id.hh"
 
 #include "DNA_ID.h"
 
@@ -75,14 +60,14 @@ bool stat_entry_comparator(const StatsEntry &a, const StatsEntry &b)
   return a.time > b.time;
 }
 
-string gnuplotify_id_code(const string &name)
+std::string gnuplotify_id_code(const std::string &name)
 {
-  return string("") + name[0] + name[1];
+  return std::string("") + name[0] + name[1];
 }
 
-string gnuplotify_name(const string &name)
+std::string gnuplotify_name(const std::string &name)
 {
-  string result;
+  std::string result;
   const int length = name.length();
   for (int i = 0; i < length; i++) {
     const char ch = name[i];

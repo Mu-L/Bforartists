@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -31,17 +19,15 @@ class ArbitraryGridDensityProvider : public GridDensityProvider {
   ArbitraryGridDensityProvider &operator=(const ArbitraryGridDensityProvider &other);
 
  public:
-  ArbitraryGridDensityProvider(OccluderSource &source,
-                               const real proscenium[4],
-                               unsigned numCells);
+  ArbitraryGridDensityProvider(OccluderSource &source, const real proscenium[4], uint numCells);
   ArbitraryGridDensityProvider(OccluderSource &source,
                                const BBox<Vec3r> &bbox,
                                const GridHelpers::Transform &transform,
-                               unsigned numCells);
-  ArbitraryGridDensityProvider(OccluderSource &source, unsigned numCells);
+                               uint numCells);
+  ArbitraryGridDensityProvider(OccluderSource &source, uint numCells);
 
  protected:
-  unsigned numCells;
+  uint numCells;
 
  private:
   void initialize(const real proscenium[4]);
@@ -49,7 +35,7 @@ class ArbitraryGridDensityProvider : public GridDensityProvider {
 
 class ArbitraryGridDensityProviderFactory : public GridDensityProviderFactory {
  public:
-  ArbitraryGridDensityProviderFactory(unsigned numCells);
+  ArbitraryGridDensityProviderFactory(uint numCells);
 
   AutoPtr<GridDensityProvider> newGridDensityProvider(OccluderSource &source,
                                                       const real proscenium[4]);
@@ -59,7 +45,7 @@ class ArbitraryGridDensityProviderFactory : public GridDensityProviderFactory {
   AutoPtr<GridDensityProvider> newGridDensityProvider(OccluderSource &source);
 
  protected:
-  unsigned numCells;
+  uint numCells;
 };
 
 } /* namespace Freestyle */

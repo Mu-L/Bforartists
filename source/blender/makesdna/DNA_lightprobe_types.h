@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
@@ -25,10 +13,6 @@
 #include "DNA_listBase.h"
 
 #include "BLI_assert.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 struct AnimData;
 struct Object;
@@ -46,6 +30,9 @@ typedef struct LightProbe {
   char attenuation_type;
   /** Parallax type. */
   char parallax_type;
+  /** Grid specific flags. */
+  char grid_flag;
+  char _pad0[3];
 
   /** Influence Radius. */
   float distinf;
@@ -67,25 +54,40 @@ typedef struct LightProbe {
   int grid_resolution_x;
   int grid_resolution_y;
   int grid_resolution_z;
-  char _pad1[4];
+  /** Irradiance grid: number of directions to evaluate light transfer in. */
+  int grid_bake_samples;
+  /** Irradiance grid: Virtual offset parameters. */
+  float grid_surface_bias;
+  float grid_escape_bias;
+  /** Irradiance grid: Sampling biases. */
+  float grid_normal_bias;
+  float grid_view_bias;
+  float grid_facing_bias;
+  float grid_validity_threshold;
+  /** Irradiance grid: Dilation. */
+  float grid_dilation_threshold;
+  float grid_dilation_radius;
 
-  /** Object to use as a parallax origin. */
-  struct Object *parallax_ob;
-  /** Image to use on as lighting data. */
-  struct Image *image;
+  /** Light intensity clamp. */
+  float grid_clamp_direct;
+  float grid_clamp_indirect;
+
+  /** Surface element density for scene surface cache. In surfel per unit distance. */
+  int grid_surfel_density;
+
   /** Object visibility group, inclusive or exclusive. */
   struct Collection *visibility_grp;
 
-  /* Runtime display data */
-  float distfalloff, distgridinf;
-  char _pad[8];
+  /** LIGHTPROBE_FLAG_SHOW_DATA display size. */
+  float data_display_size;
+  char _pad1[4];
 } LightProbe;
 
 /* Probe->type */
 enum {
-  LIGHTPROBE_TYPE_CUBE = 0,
-  LIGHTPROBE_TYPE_PLANAR = 1,
-  LIGHTPROBE_TYPE_GRID = 2,
+  LIGHTPROBE_TYPE_SPHERE = 0,
+  LIGHTPROBE_TYPE_PLANE = 1,
+  LIGHTPROBE_TYPE_VOLUME = 2,
 };
 
 /* Probe->flag */
@@ -96,6 +98,13 @@ enum {
   LIGHTPROBE_FLAG_SHOW_CLIP_DIST = (1 << 3),
   LIGHTPROBE_FLAG_SHOW_DATA = (1 << 4),
   LIGHTPROBE_FLAG_INVERT_GROUP = (1 << 5),
+};
+
+/* Probe->grid_flag */
+enum {
+  LIGHTPROBE_GRID_CAPTURE_WORLD = (1 << 0),
+  LIGHTPROBE_GRID_CAPTURE_INDIRECT = (1 << 1),
+  LIGHTPROBE_GRID_CAPTURE_EMISSION = (1 << 2),
 };
 
 /* Probe->display */
@@ -149,7 +158,7 @@ BLI_STATIC_ASSERT_ALIGN(LightGridCache, 16)
 
 typedef struct LightCacheTexture {
   struct GPUTexture *tex;
-  /** Copy of GPU datas to create GPUTextures on file read. */
+  /** Copy of GPU data to create GPUTextures on file read. */
   char *data;
   int tex_size[3];
   char data_type;
@@ -179,7 +188,7 @@ typedef struct LightCache {
   LightCacheTexture cube_tx;
   /** Does not contains valid GPUTexture, only data. */
   LightCacheTexture *cube_mips;
-  /* All lightprobes data contained in the cache. */
+  /* All light-probes data contained in the cache. */
   LightProbeCache *cube_data;
   LightGridCache *grid_data;
 } LightCache;
@@ -216,6 +225,136 @@ enum {
   LIGHTCACHETEX_UINT = (1 << 2),
 };
 
-#ifdef __cplusplus
-}
-#endif
+/* -------------------------------------------------------------------- */
+/** \name Irradiance grid data storage
+ *
+ * Each spherical harmonic band is stored separately. This allow loading only a specific band.
+ * The layout of each array is set by the #LightProbeGridType.
+ * Any unavailable data is be set to nullptr.
+ * \{ */
+
+/**
+ * Irradiance data (RGB) stored along visibility (A).
+ * This is the format used during baking and is used for visualizing the baking process.
+ */
+typedef struct LightProbeBakingData {
+  float (*L0)[4];
+  float (*L1_a)[4];
+  float (*L1_b)[4];
+  float (*L1_c)[4];
+  float *validity;
+  /* Capture offset. Only for debugging. */
+  float (*virtual_offset)[4];
+} LightProbeBakingData;
+
+/**
+ * Irradiance stored as RGB triple using scene linear color space.
+ */
+typedef struct LightProbeIrradianceData {
+  float (*L0)[3];
+  float (*L1_a)[3];
+  float (*L1_b)[3];
+  float (*L1_c)[3];
+} LightProbeIrradianceData;
+
+/**
+ * Normalized visibility of distant light. Used for compositing grids together.
+ */
+typedef struct LightProbeVisibilityData {
+  float *L0;
+  float *L1_a;
+  float *L1_b;
+  float *L1_c;
+} LightProbeVisibilityData;
+
+/**
+ * Used to avoid light leaks. Validate visibility between each grid sample.
+ */
+typedef struct LightProbeConnectivityData {
+  /** Stores validity of the lighting for each grid sample. */
+  uint8_t *validity;
+} LightProbeConnectivityData;
+
+/**
+ * Defines one block of data inside the grid cache data arrays.
+ * The block size if the same for all the blocks.
+ */
+typedef struct LightProbeBlockData {
+  /* Offset inside the level-of-detail this block starts. */
+  int offset[3];
+  /* Level-of-detail this block is from. */
+  int level;
+} LightProbeBlockData;
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name LightProbeGridCacheFrame
+ *
+ * \{ */
+
+/**
+ * A frame worth of baked lighting data.
+ */
+typedef struct LightProbeGridCacheFrame {
+  /** Number of samples in the highest level of detail. */
+  int size[3];
+  /** Spatial layout type of the data stored inside the data arrays. */
+  int data_layout;
+
+  /** Sparse or adaptive layout only: number of blocks inside data arrays. */
+  int block_len;
+  /** Sparse or adaptive layout only: size of a block in samples. All 3 dimensions are equal. */
+  int block_size;
+  /** Sparse or adaptive layout only: specify the blocks positions. */
+  LightProbeBlockData *block_infos;
+
+  /** In-progress baked data. Not stored in file. */
+  LightProbeBakingData baking;
+  /** Baked data. */
+  LightProbeIrradianceData irradiance;
+  LightProbeVisibilityData visibility;
+  LightProbeConnectivityData connectivity;
+
+  char _pad[4];
+
+  /** Number of debug surfels. */
+  int surfels_len;
+  /** Debug surfels used to visualize the baking process. Not stored in file. */
+  void *surfels;
+} LightProbeGridCacheFrame;
+
+/** #LightProbeGridCacheFrame.data_layout (int) */
+enum {
+  /** Simple uniform grid. Raw output from GPU. Used during the baking process. */
+  LIGHTPROBE_CACHE_UNIFORM_GRID = 0,
+  /** Fills the space with different level of resolution. More efficient storage. */
+  LIGHTPROBE_CACHE_ADAPTIVE_RESOLUTION = 1,
+};
+
+/**
+ * Per object container of baked data.
+ * Should be called #LightProbeCache but name is already taken.
+ */
+typedef struct LightProbeObjectCache {
+  /** Allow correct versioning / different types of data for the same layout. */
+  int cache_type;
+  /** True if this cache references the original object's cache. */
+  char shared;
+  /** True if the cache has been tagged for automatic baking. */
+  char dirty;
+
+  char _pad0[2];
+
+  struct LightProbeGridCacheFrame *grid_static_cache;
+} LightProbeObjectCache;
+
+/** #LightProbeObjectCache.type (int) */
+enum {
+  /** Light cache was just created and is not yet baked. Keep as 0 for default value. */
+  LIGHTPROBE_CACHE_TYPE_NONE = 0,
+  /** Light cache is baked for one specific frame and capture all indirect lighting. */
+  LIGHTPROBE_CACHE_TYPE_STATIC = 1,
+};
+
+/** \} */

@@ -1,40 +1,20 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2013 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2013 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup depsgraph
  */
 
-#include "intern/node/deg_node.h"
+#include "intern/node/deg_node.hh"
 
-#include <cstdio>
-
-#include "BLI_utildefines.h"
-
-#include "intern/depsgraph.h"
-#include "intern/depsgraph_relation.h"
+#include "intern/depsgraph.hh"
+#include "intern/depsgraph_relation.hh"
 #include "intern/eval/deg_eval_copy_on_write.h"
-#include "intern/node/deg_node_component.h"
-#include "intern/node/deg_node_factory.h"
-#include "intern/node/deg_node_id.h"
-#include "intern/node/deg_node_operation.h"
-#include "intern/node/deg_node_time.h"
+#include "intern/node/deg_node_component.hh"
+#include "intern/node/deg_node_factory.hh"
+#include "intern/node/deg_node_id.hh"
+#include "intern/node/deg_node_time.hh"
 
 namespace blender::deg {
 
@@ -67,8 +47,6 @@ const char *nodeTypeAsString(NodeType type)
     /* **** Outer Types **** */
     case NodeType::PARAMETERS:
       return "PARAMETERS";
-    case NodeType::PROXY:
-      return "PROXY";
     case NodeType::ANIMATION:
       return "ANIMATION";
     case NodeType::TRANSFORM:
@@ -79,11 +57,13 @@ const char *nodeTypeAsString(NodeType type)
       return "SEQUENCER";
     case NodeType::LAYER_COLLECTIONS:
       return "LAYER_COLLECTIONS";
-    case NodeType::COPY_ON_WRITE:
-      return "COPY_ON_WRITE";
+    case NodeType::COPY_ON_EVAL:
+      return "COPY_ON_EVAL";
     case NodeType::OBJECT_FROM_LAYER:
       return "OBJECT_FROM_LAYER";
-    /* **** Evaluation-Related Outer Types (with Subdata) **** */
+    case NodeType::HIERARCHY:
+      return "HIERARCHY";
+    /* **** Evaluation-Related Outer Types (with Sub-data) **** */
     case NodeType::EVAL_POSE:
       return "EVAL_POSE";
     case NodeType::BONE:
@@ -94,8 +74,6 @@ const char *nodeTypeAsString(NodeType type)
       return "PARTICLE_SETTINGS";
     case NodeType::SHADING:
       return "SHADING";
-    case NodeType::SHADING_PARAMETERS:
-      return "SHADING_PARAMETERS";
     case NodeType::CACHE:
       return "CACHE";
     case NodeType::POINT_CACHE:
@@ -104,8 +82,8 @@ const char *nodeTypeAsString(NodeType type)
       return "IMAGE_ANIMATION";
     case NodeType::BATCH_CACHE:
       return "BATCH_CACHE";
-    case NodeType::DUPLI:
-      return "DUPLI";
+    case NodeType::INSTANCING:
+      return "INSTANCING";
     case NodeType::SYNCHRONIZATION:
       return "SYNCHRONIZATION";
     case NodeType::AUDIO:
@@ -114,8 +92,14 @@ const char *nodeTypeAsString(NodeType type)
       return "ARMATURE";
     case NodeType::GENERIC_DATABLOCK:
       return "GENERIC_DATABLOCK";
-    case NodeType::SIMULATION:
-      return "SIMULATION";
+    case NodeType::SCENE:
+      return "SCENE";
+    case NodeType::VISIBILITY:
+      return "VISIBILITY";
+    case NodeType::NTREE_OUTPUT:
+      return "NTREE_OUTPUT";
+    case NodeType::NTREE_GEOMETRY_PREPROCESS:
+      return "NTREE_GEOMETRY_PREPROCESS";
 
     /* Total number of meaningful node types. */
     case NodeType::NUM_TYPES:
@@ -152,18 +136,19 @@ eDepsSceneComponentType nodeTypeToSceneComponent(NodeType type)
     case NodeType::TIMESOURCE:
     case NodeType::ID_REF:
     case NodeType::LAYER_COLLECTIONS:
-    case NodeType::COPY_ON_WRITE:
+    case NodeType::COPY_ON_EVAL:
     case NodeType::OBJECT_FROM_LAYER:
+    case NodeType::HIERARCHY:
     case NodeType::AUDIO:
     case NodeType::ARMATURE:
     case NodeType::GENERIC_DATABLOCK:
+    case NodeType::SCENE:
     case NodeType::PARTICLE_SYSTEM:
     case NodeType::PARTICLE_SETTINGS:
-    case NodeType::SHADING_PARAMETERS:
     case NodeType::POINT_CACHE:
     case NodeType::IMAGE_ANIMATION:
     case NodeType::BATCH_CACHE:
-    case NodeType::DUPLI:
+    case NodeType::INSTANCING:
     case NodeType::SYNCHRONIZATION:
     case NodeType::UNDEFINED:
     case NodeType::NUM_TYPES:
@@ -173,11 +158,15 @@ eDepsSceneComponentType nodeTypeToSceneComponent(NodeType type)
     case NodeType::BONE:
     case NodeType::SHADING:
     case NodeType::CACHE:
-    case NodeType::PROXY:
-    case NodeType::SIMULATION:
+    case NodeType::NTREE_OUTPUT:
+    case NodeType::NTREE_GEOMETRY_PREPROCESS:
+      return DEG_SCENE_COMP_PARAMETERS;
+
+    case NodeType::VISIBILITY:
+      BLI_assert_msg(0, "Visibility component is supposed to be only used internally.");
       return DEG_SCENE_COMP_PARAMETERS;
   }
-  BLI_assert_msg(0, "Unhandled node type, not suppsed to happen.");
+  BLI_assert_msg(0, "Unhandled node type, not supposed to happen.");
   return DEG_SCENE_COMP_PARAMETERS;
 }
 
@@ -188,8 +177,6 @@ NodeType nodeTypeFromObjectComponent(eDepsObjectComponentType component_type)
       return NodeType::UNDEFINED;
     case DEG_OB_COMP_PARAMETERS:
       return NodeType::PARAMETERS;
-    case DEG_OB_COMP_PROXY:
-      return NodeType::PROXY;
     case DEG_OB_COMP_ANIMATION:
       return NodeType::ANIMATION;
     case DEG_OB_COMP_TRANSFORM:
@@ -213,8 +200,6 @@ eDepsObjectComponentType nodeTypeToObjectComponent(NodeType type)
   switch (type) {
     case NodeType::PARAMETERS:
       return DEG_OB_COMP_PARAMETERS;
-    case NodeType::PROXY:
-      return DEG_OB_COMP_PROXY;
     case NodeType::ANIMATION:
       return DEG_OB_COMP_ANIMATION;
     case NodeType::TRANSFORM:
@@ -235,22 +220,28 @@ eDepsObjectComponentType nodeTypeToObjectComponent(NodeType type)
     case NodeType::ID_REF:
     case NodeType::SEQUENCER:
     case NodeType::LAYER_COLLECTIONS:
-    case NodeType::COPY_ON_WRITE:
+    case NodeType::COPY_ON_EVAL:
     case NodeType::OBJECT_FROM_LAYER:
+    case NodeType::HIERARCHY:
     case NodeType::AUDIO:
     case NodeType::ARMATURE:
     case NodeType::GENERIC_DATABLOCK:
+    case NodeType::SCENE:
     case NodeType::PARTICLE_SYSTEM:
     case NodeType::PARTICLE_SETTINGS:
-    case NodeType::SHADING_PARAMETERS:
     case NodeType::POINT_CACHE:
     case NodeType::IMAGE_ANIMATION:
     case NodeType::BATCH_CACHE:
-    case NodeType::DUPLI:
+    case NodeType::INSTANCING:
     case NodeType::SYNCHRONIZATION:
-    case NodeType::SIMULATION:
+    case NodeType::NTREE_OUTPUT:
+    case NodeType::NTREE_GEOMETRY_PREPROCESS:
     case NodeType::UNDEFINED:
     case NodeType::NUM_TYPES:
+      return DEG_OB_COMP_PARAMETERS;
+
+    case NodeType::VISIBILITY:
+      BLI_assert_msg(0, "Visibility component is supposed to be only used internally.");
       return DEG_OB_COMP_PARAMETERS;
   }
   BLI_assert_msg(0, "Unhandled node type, not suppsed to happen.");
@@ -305,10 +296,9 @@ Node::~Node()
   }
 }
 
-/* Generic identifier for Depsgraph Nodes. */
-string Node::identifier() const
+std::string Node::identifier() const
 {
-  return string(nodeTypeAsString(type)) + " : " + name;
+  return std::string(nodeTypeAsString(type)) + " : " + name;
 }
 
 NodeClass Node::get_class() const

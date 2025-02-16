@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2001-2002 NaN Holding BV. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
@@ -28,20 +13,57 @@
 #pragma once
 
 #include "DNA_ID.h"
+#include "DNA_armature_types.h"
 #include "DNA_listBase.h"
-#include "DNA_session_uuid_types.h"
+#include "DNA_session_uid_types.h"
 #include "DNA_userdef_types.h" /* ThemeWireColor */
 #include "DNA_vec_types.h"
 #include "DNA_view2d_types.h"
 
 #ifdef __cplusplus
-extern "C" {
+#  include <type_traits>
 #endif
 
+struct AnimData;
 struct Collection;
+struct FCurve;
 struct GHash;
 struct Object;
 struct SpaceLink;
+#ifdef __cplusplus
+namespace blender::gpu {
+class VertBuf;
+class Batch;
+}  // namespace blender::gpu
+using GPUBatchHandle = blender::gpu::Batch;
+using GPUVertBufHandle = blender::gpu::VertBuf;
+#else
+typedef struct GPUBatchHandle GPUBatchHandle;
+typedef struct GPUVertBufHandle GPUVertBufHandle;
+#endif
+
+/* Forward declarations so the actual declarations can happen top-down. */
+struct ActionLayer;
+struct ActionSlot;
+struct ActionStrip;
+struct ActionChannelbag;
+
+/* Declarations of the C++ wrappers. */
+#ifdef __cplusplus
+namespace blender::animrig {
+class Action;
+class Slot;
+class SlotRuntime;
+class Channelbag;
+class ChannelGroup;
+class Layer;
+class Strip;
+class StripKeyframeData;
+}  // namespace blender::animrig
+using ActionSlotRuntimeHandle = blender::animrig::SlotRuntime;
+#else
+typedef struct ActionSlotRuntimeHandle ActionSlotRuntimeHandle;
+#endif
 
 /* ************************************************ */
 /* Visualization */
@@ -49,7 +71,7 @@ struct SpaceLink;
 /* Motion Paths ------------------------------------ */
 /* (used for Pose Channels and Objects) */
 
-/* Data point for motion path (mpv) */
+/** Data point for motion path (`mpv`). */
 typedef struct bMotionPathVert {
   /** Coordinates of point in 3D-space. */
   float co[3];
@@ -57,7 +79,7 @@ typedef struct bMotionPathVert {
   int flag;
 } bMotionPathVert;
 
-/* bMotionPathVert->flag */
+/** #bMotionPathVert::flag */
 typedef enum eMotionPathVert_Flag {
   /* vert is selected */
   MOTIONPATH_VERT_SEL = (1 << 0),
@@ -75,22 +97,24 @@ typedef struct bMotionPath {
   /** The number of cached verts. */
   int length;
 
-  /** For drawing paths, the start frame number. */
+  /** For drawing paths, the start frame number. Inclusive. */
   int start_frame;
-  /** For drawing paths, the end frame number. */
+  /** For drawing paths, the end frame number. Exclusive. */
   int end_frame;
 
   /** Optional custom color. */
   float color[3];
+  float color_post[3];
   /** Line thickness. */
   int line_thickness;
   /** Baking settings - eMotionPath_Flag. */
   int flag;
 
+  char _pad2[4];
   /* Used for drawing. */
-  struct GPUVertBuf *points_vbo;
-  struct GPUBatch *batch_line;
-  struct GPUBatch *batch_points;
+  GPUVertBufHandle *points_vbo;
+  GPUBatchHandle *batch_line;
+  GPUBatchHandle *batch_points;
   void *_pad;
 } bMotionPath;
 
@@ -104,6 +128,8 @@ typedef enum eMotionPath_Flag {
   MOTIONPATH_FLAG_CUSTOM = (1 << 2),
   /* Draw lines or only points */
   MOTIONPATH_FLAG_LINES = (1 << 3),
+  /* Bake to scene camera. */
+  MOTIONPATH_FLAG_BAKE_CAMERA = (1 << 4),
 } eMotionPath_Flag;
 
 /* Visualization General --------------------------- */
@@ -120,14 +146,16 @@ typedef struct bAnimVizSettings {
   short path_type;
   /** Number of frames between points indicated on the paths. */
   short path_step;
+  /** #eMotionPath_Ranges. */
+  short path_range;
 
   /** #eMotionPaths_ViewFlag. */
   short path_viewflag;
   /** #eMotionPaths_BakeFlag. */
   short path_bakeflag;
-  char _pad[6];
+  char _pad[4];
 
-  /** Start and end frames of path-calculation range. */
+  /** Start and end frames of path-calculation range. Both are inclusive. */
   int path_sf, path_ef;
   /** Number of frames before/after current frame to show. */
   int path_bc, path_ac;
@@ -146,6 +174,15 @@ typedef enum eMotionPaths_Types {
   /* only show the parts of the paths around the current frame */
   MOTIONPATH_TYPE_ACFRA = 1,
 } eMotionPath_Types;
+
+/* bAnimVizSettings->path_range */
+typedef enum eMotionPath_Ranges {
+  /* Default is scene */
+  MOTIONPATH_RANGE_SCENE = 0,
+  MOTIONPATH_RANGE_KEYS_SELECTED = 1,
+  MOTIONPATH_RANGE_KEYS_ALL = 2,
+  MOTIONPATH_RANGE_MANUAL = 3,
+} eMotionPath_Ranges;
 
 /* bAnimVizSettings->path_viewflag */
 typedef enum eMotionPaths_ViewFlag {
@@ -170,6 +207,8 @@ typedef enum eMotionPaths_BakeFlag {
   /** motion paths exist for AnimVizSettings instance - set when calc for first time,
    * and unset when clearing */
   MOTIONPATH_BAKE_HAS_PATHS = (1 << 2),
+  /* Bake the path in camera space. */
+  MOTIONPATH_BAKE_CAMERA_SPACE = (1 << 3),
 } eMotionPath_BakeFlag;
 
 /* runtime */
@@ -187,14 +226,34 @@ typedef struct bPoseChannelDrawData {
 struct DualQuat;
 struct Mat4;
 
+/* Describes a plane in pose space that delimits B-Bone segments. */
+typedef struct bPoseChannel_BBoneSegmentBoundary {
+  /* Boundary data in pose space. */
+  float point[3];
+  float plane_normal[3];
+  /* Dot product of point and plane_normal to speed up distance computation. */
+  float plane_offset;
+
+  /**
+   * Inverse width of the smoothing at this level in head-tail space.
+   * Optimization: this value is actually indexed by BSP depth (0 to `bsp_depth - 1`), not joint
+   * index. It's put here to avoid allocating a separate array by utilizing the padding space.
+   */
+  float depth_scale;
+} bPoseChannel_BBoneSegmentBoundary;
+
 typedef struct bPoseChannel_Runtime {
-  SessionUUID session_uuid;
+  SessionUID session_uid;
 
   /* Cached dual quaternion for deformation. */
   struct DualQuat deform_dual_quat;
 
   /* B-Bone shape data: copy of the segment count for validation. */
   int bbone_segments;
+
+  /* Inverse of the total length of the segment polyline. */
+  float bbone_arc_length_reciprocal;
+  char _pad1[4];
 
   /* Rest and posed matrices for segments. */
   struct Mat4 *bbone_rest_mats;
@@ -203,6 +262,10 @@ typedef struct bPoseChannel_Runtime {
   /* Delta from rest to pose in matrix and DualQuat form. */
   struct Mat4 *bbone_deform_mats;
   struct DualQuat *bbone_dual_quats;
+
+  /* Segment boundaries for curved mode. */
+  struct bPoseChannel_BBoneSegmentBoundary *bbone_segment_boundaries;
+  void *_pad;
 } bPoseChannel_Runtime;
 
 /* ************************************************ */
@@ -217,6 +280,8 @@ typedef struct bPoseChannel_Runtime {
  * with respect to the rest-position of #bArmature bones.
  */
 typedef struct bPoseChannel {
+  DNA_DEFINE_CXX_METHODS(bPoseChannel)
+
   struct bPoseChannel *next, *prev;
 
   /** User-Defined Properties on this PoseChannel. */
@@ -257,18 +322,25 @@ typedef struct bPoseChannel {
 
   /** Motion path cache for this bone. */
   bMotionPath *mpath;
-  /** Draws custom object instead of default bone shape. */
+  /**
+   * Draws custom object instead of default bone shape.
+   *
+   * \note For the purpose of user interaction (selection, display etc),
+   * it's important this value is treated as NULL when #ARM_NO_CUSTOM is set.
+   */
   struct Object *custom;
   /**
-   * Odd feature, display with another bones transform.
-   * needed in rare cases for advanced rigs,
-   * since the alternative is highly complicated - campbell
+   * This is a specific feature to display with another bones transform.
+   * Needed in rare cases for advanced rigs, since alternative solutions are highly complicated.
+   *
+   * \note This depends #bPoseChannel.custom being set and the #ARM_NO_CUSTOM flag being unset.
    */
   struct bPoseChannel *custom_tx;
   float custom_scale; /* Deprecated */
   float custom_scale_xyz[3];
   float custom_translation[3];
   float custom_rotation_euler[3];
+  float custom_shape_wire_width;
 
   /** Transforms - written in by actions or transform. */
   float loc[3];
@@ -286,16 +358,17 @@ typedef struct bPoseChannel {
   float rotAxis[3], rotAngle;
   /** #eRotationModes - rotation representation to use. */
   short rotmode;
-  char _pad[2];
+  char _pad[6];
 
   /**
-   * Matrix result of location/rotation/scale components & constraints.
+   * Matrix result of location/rotation/scale components, and evaluation of
+   * animation data and constraints.
+   *
    * This is the dynamic component of `pose_mat` (without #Bone.arm_mat).
    */
   float chan_mat[4][4];
   /**
-   * Constraints accumulate here. in the end, `pose_mat = bone->arm_mat * chan_mat`
-   * this matrix is object space.
+   * Channel matrix in the armature object space, i.e. `pose_mat = bone->arm_mat * chan_mat`.
    */
   float pose_mat[4][4];
   /** For display, pose_mat with bone length applied. */
@@ -347,6 +420,8 @@ typedef struct bPoseChannel {
   /** Points to an original pose channel. */
   struct bPoseChannel *orig_pchan;
 
+  BoneColor color; /* MUST be named the same as in Bone and EditBone structs. */
+
   /** Runtime data (keep last). */
   struct bPoseChannel_Runtime runtime;
 } bPoseChannel;
@@ -385,16 +460,15 @@ typedef enum ePchan_Flag {
 
 /* PoseChannel constflag (constraint detection) */
 typedef enum ePchan_ConstFlag {
-  PCHAN_HAS_IK = (1 << 0),
-  PCHAN_HAS_CONST = (1 << 1),
-  /* only used for drawing Posemode, not stored in channel */
+  PCHAN_HAS_IK = (1 << 0),           /* Has IK constraint. */
+  PCHAN_HAS_CONST = (1 << 1),        /* Has any constraint. */
   /* PCHAN_HAS_ACTION = (1 << 2), */ /* UNUSED */
-  PCHAN_HAS_TARGET = (1 << 3),
-  /* only for drawing Posemode too */
+  PCHAN_HAS_NO_TARGET = (1 << 3),    /* Has (spline) IK constraint but no target is set. */
   /* PCHAN_HAS_STRIDE = (1 << 4), */ /* UNUSED */
-  /* spline IK */
-  PCHAN_HAS_SPLINEIK = (1 << 5),
+  PCHAN_HAS_SPLINEIK = (1 << 5),     /* Has Spline IK constraint. */
+  PCHAN_INFLUENCED_BY_IK = (1 << 6), /* Is part of a (non-spline) IK chain. */
 } ePchan_ConstFlag;
+ENUM_OPERATORS(ePchan_ConstFlag, PCHAN_INFLUENCED_BY_IK);
 
 /* PoseChannel->ikflag */
 typedef enum ePchan_IkFlag {
@@ -417,6 +491,7 @@ typedef enum ePchan_IkFlag {
 /* PoseChannel->drawflag */
 typedef enum ePchan_DrawFlag {
   PCHAN_DRAW_NO_CUSTOM_BONE_SIZE = (1 << 0),
+  PCHAN_DRAW_SHOW_OUTLINER = (1 << 1), /* bfa - hide pose bones */
 } ePchan_DrawFlag;
 
 /* NOTE: It doesn't take custom_scale_xyz into account. */
@@ -439,7 +514,7 @@ typedef enum ePchan_BBoneFlag {
 typedef enum eRotationModes {
   /* quaternion rotations (default, and for older Blender versions) */
   ROT_MODE_QUAT = 0,
-  /* euler rotations - keep in sync with enum in BLI_math.h */
+  /* euler rotations - keep in sync with enum in BLI_math_rotation.h */
   /** Blender 'default' (classic) - must be as 1 to sync with BLI_math_rotation.h defines */
   ROT_MODE_EUL = 1,
   ROT_MODE_XYZ = 1,
@@ -468,7 +543,7 @@ typedef enum eRotationModes {
 typedef struct bPose {
   /** List of pose channels, PoseBones in RNA. */
   ListBase chanbase;
-  /** Ghash for quicker string lookups. */
+  /** Use a hash-table for quicker string lookups. */
   struct GHash *chanhash;
 
   /* Flat array of pose channels. It references pointers from
@@ -478,9 +553,6 @@ typedef struct bPose {
 
   short flag;
   char _pad[2];
-  /** Proxy layer: copy from armature, gets synced. */
-  unsigned int proxy_layer;
-  char _pad1[4];
 
   /** Local action time of this pose. */
   float ctime;
@@ -503,8 +575,6 @@ typedef struct bPose {
 
   /** Settings for visualization of bone animation. */
   bAnimVizSettings avs;
-  /** Proxy active bone name, MAXBONENAME. */
-  char proxy_act_bone[64];
 } bPose;
 
 /* Pose->flag */
@@ -570,6 +640,11 @@ typedef enum eItasc_Flags {
   ITASC_INITIAL_REITERATION = (1 << 1),
   ITASC_REITERATION = (1 << 2),
   ITASC_SIMULATION = (1 << 3),
+  /**
+   * Set this flag to always translate root bones (i.e. bones without a parent) to (0, 0, 0).
+   * This was the pre-3.6 behavior, and this flag was introduced for backward compatibility.
+   */
+  ITASC_TRANSLATE_ROOT_BONES = (1 << 4),
 } eItasc_Flags;
 
 /* bItasc->solver */
@@ -583,7 +658,8 @@ typedef enum eItasc_Solver {
 
 /* Groups -------------------------------------- */
 
-/* Action-Channel Group (agrp)
+/**
+ * Action-Channel Group (agrp)
  *
  * These are stored as a list per-Action, and are only used to
  * group that Action's channels in an Animation Editor.
@@ -602,10 +678,35 @@ typedef struct bActionGroup {
   struct bActionGroup *next, *prev;
 
   /**
+   * List of channels in this group for legacy actions.
+   *
    * NOTE: this must not be touched by standard listbase functions
    * which would clear links to other channels.
    */
   ListBase channels;
+
+  /**
+   * Span of channels in this group for layered actions.
+   *
+   * This specifies that span as a range of items in a Channelbag's fcurve
+   * array.
+   *
+   * Note that empty groups (`fcurve_range_length == 0`) are allowed, and they
+   * still have a position in the fcurves array, as specified by
+   * `fcurve_range_start`. You can imagine these cases as a zero-width range
+   * that sits at the border between the element at `fcurve_range_start` and the
+   * element just before it.
+   */
+  int fcurve_range_start;
+  int fcurve_range_length;
+
+  /**
+   * For layered actions: the Channelbag this group belongs to.
+   *
+   * This is needed in the keyframe drawing code, etc., to give direct access to
+   * the fcurves in this group.
+   */
+  struct ActionChannelbag *channelbag;
 
   /** Settings for this action-group. */
   int flag;
@@ -619,6 +720,11 @@ typedef struct bActionGroup {
 
   /** Color set to use when customCol == -1. */
   ThemeWireColor cs;
+
+#ifdef __cplusplus
+  blender::animrig::ChannelGroup &wrap();
+  const blender::animrig::ChannelGroup &wrap() const;
+#endif
 } bActionGroup;
 
 /* Action Group flags */
@@ -647,30 +753,54 @@ typedef enum eActionGroup_Flag {
 
 /* Actions -------------------------------------- */
 
-/* Action - reusable F-Curve 'bag'  (act)
+/**
+ * Container of animation data.
  *
- * This contains F-Curves that may affect settings from more than one ID blocktype and/or datablock
- * (i.e. sub-data linked/used directly to the ID block that the animation data is linked to),
- * but with the restriction that the other unrelated data (i.e. data that is not directly used or
- * linked to by the source ID block).
- *
- * It serves as a 'unit' of reusable animation information (i.e. keyframes/motion data),
- * that affects a group of related settings (as defined by the user).
+ * \see blender::animrig::Action for more detailed documentation.
  */
 typedef struct bAction {
   /** ID-serialization for relinking. */
   ID id;
 
-  /** Function-curves (FCurve). */
+  struct ActionLayer **layer_array; /* Array of 'layer_array_num' layers. */
+  int layer_array_num;
+  int layer_active_index; /* Index into layer_array, -1 means 'no active'. */
+
+  struct ActionSlot **slot_array; /* Array of 'slot_array_num` slots. */
+  int slot_array_num;
+  int32_t last_slot_handle;
+
+  /* Storage for the underlying data of strips. Each strip type has its own
+   * array, and strips reference this data with an enum indicating the strip
+   * type and an int containing the index in the array to use. */
+  struct ActionStripKeyframeData **strip_keyframe_data_array;
+  int strip_keyframe_data_array_num;
+
+  char _pad0[4];
+
+  /* Note about legacy animation data:
+   *
+   * Blender 2.5 introduced a new animation system 'Animato'. This replaced the
+   * IPO ('interpolation') curves with F-Curves. Both are considered 'legacy' at
+   * different levels:
+   *
+   * - Actions with F-Curves in `curves`, as introduced in Blender 2.5, are
+   *   considered 'legacy' but still functional in current Blender.
+   * - Pre-2.5 data are deprecated and old files are automatically converted to
+   *   the post-2.5 data model.
+   */
+
+  /** Legacy F-Curves (FCurve), introduced in Blender 2.5. */
   ListBase curves;
-  /** Legacy data - Action Channels (bActionChannel) in pre-2.5 animation system. */
+  /** Legacy Action Channels (bActionChannel) from pre-2.5 animation system. */
   ListBase chanbase DNA_DEPRECATED;
-  /** Groups of function-curves (bActionGroup). */
+  /** Legacy Groups of function-curves (bActionGroup), introduced in Blender 2.5. */
   ListBase groups;
+
   /** Markers local to the Action (used to provide Pose-Libraries). */
   ListBase markers;
 
-  /** Settings for this action. */
+  /** Settings for this action. \see eAction_Flags */
   int flag;
   /** Index of the active marker. */
   int active_marker;
@@ -680,12 +810,23 @@ typedef struct bAction {
    * (if 0, will be set to whatever ID first evaluates it).
    */
   int idroot;
-  char _pad[4];
+  char _pad1[4];
+
+  /**
+   * Start and end of the manually set intended playback frame range. Used by UI and
+   * some editing tools, but doesn't directly affect animation evaluation in any way.
+   */
+  float frame_start, frame_end;
 
   PreviewImage *preview;
+
+#ifdef __cplusplus
+  blender::animrig::Action &wrap();
+  const blender::animrig::Action &wrap() const;
+#endif
 } bAction;
 
-/* Flags for the action */
+/** Flags for the action. */
 typedef enum eAction_Flags {
   /* flags for displaying in UI */
   ACT_COLLAPSED = (1 << 0),
@@ -695,12 +836,16 @@ typedef enum eAction_Flags {
   ACT_MUTED = (1 << 9),
   /* ACT_PROTECTED = (1 << 10), */ /* UNUSED */
   /* ACT_DISABLED = (1 << 11), */  /* UNUSED */
+  /** The action has a manually set intended playback frame range. */
+  ACT_FRAME_RANGE = (1 << 12),
+  /** The action is intended to be a cycle (requires ACT_FRAME_RANGE). */
+  ACT_CYCLIC = (1 << 13),
 } eAction_Flags;
 
 /* ************************************************ */
 /* Action/Dopesheet Editor */
 
-/* Storage for Dopesheet/Grease-Pencil Editor data */
+/** Storage for Dopesheet/Grease-Pencil Editor data. */
 typedef struct bDopeSheet {
   /** Currently ID_SCE (for Dopesheet), and ID_SC (for Grease Pencil). */
   ID *source;
@@ -723,7 +868,7 @@ typedef struct bDopeSheet {
   int renameIndex;
 } bDopeSheet;
 
-/* DopeSheet filter-flag */
+/** DopeSheet filter-flag. */
 typedef enum eDopeSheet_FilterFlag {
   /* general filtering */
   /** only include channels relating to selected data */
@@ -740,6 +885,12 @@ typedef enum eDopeSheet_FilterFlag {
   /* general filtering */
   /** for 'DopeSheet' Editors - include 'summary' line */
   ADS_FILTER_SUMMARY = (1 << 4),
+
+  /**
+   * Show all Action slots; if not set, only show the Slot of the
+   * data-block that's being animated by the Action.
+   */
+  ADS_FILTER_ONLY_SLOTS_OF_ACTIVE = (1 << 5),
 
   /* datatype-based filtering */
   ADS_FILTER_NOSHAPEKEYS = (1 << 6),
@@ -789,6 +940,9 @@ typedef enum eDopeSheet_FilterFlag2 {
   ADS_FILTER_NOHAIR = (1 << 3),
   ADS_FILTER_NOPOINTCLOUD = (1 << 4),
   ADS_FILTER_NOVOLUME = (1 << 5),
+
+  /** Include working drivers with variables using their fallback values into Only Show Errors. */
+  ADS_FILTER_DRIVER_FALLBACK_AS_ERROR = (1 << 6),
 } eDopeSheet_FilterFlag2;
 
 /* DopeSheet general flags */
@@ -825,8 +979,11 @@ typedef struct SpaceAction {
   /** Copied to region. */
   View2D v2d DNA_DEPRECATED;
 
-  /** The currently active action. */
+  /** The currently active action and its slot. */
   bAction *action;
+  int32_t action_slot_handle;
+  char _pad2[4];
+
   /** The currently active context (when not showing action). */
   bDopeSheet ads;
 
@@ -838,8 +995,8 @@ typedef struct SpaceAction {
   char mode;
   /* Storage for sub-space types. */
   char mode_prev;
-  /** Automatic keyframe snapping mode. */
-  char autosnap;
+  /* Snapping now lives on the Scene. */
+  char autosnap DNA_DEPRECATED;
   /** (eTimeline_Cache_Flag). */
   char cache_display;
   char _pad1[6];
@@ -856,11 +1013,11 @@ typedef enum eSAction_Flag {
   /* draw time in seconds instead of time in frames */
   SACTION_DRAWTIME = (1 << 2),
   /* don't filter action channels according to visibility */
-  // SACTION_NOHIDE = (1 << 3), /* XXX deprecated... old animation systems. */
+  // SACTION_NOHIDE = (1 << 3), /* Deprecated, old animation systems. */
   /* don't kill overlapping keyframes after transform */
   SACTION_NOTRANSKEYCULL = (1 << 4),
   /* don't include keyframes that are out of view */
-  // SACTION_HORIZOPTIMISEON = (1 << 5), // XXX deprecated... old irrelevant trick
+  // SACTION_HORIZOPTIMISEON = (1 << 5), /* Deprecated, old irrelevant trick. */
   /* show pose-markers (local to action) in Action Editor mode. */
   SACTION_POSEMARKERS_SHOW = (1 << 6),
   /* don't draw action channels using group colors (where applicable) */
@@ -878,34 +1035,32 @@ typedef enum eSAction_Flag {
   SACTION_SHOW_MARKERS = (1 << 14),
 } eSAction_Flag;
 
-/* SpaceAction_Runtime.flag */
+/** #SpaceAction_Runtime.flag */
 typedef enum eSAction_Runtime_Flag {
   /** Temporary flag to force channel selections to be synced with main */
   SACTION_RUNTIME_FLAG_NEED_CHAN_SYNC = (1 << 0),
 } eSAction_Runtime_Flag;
 
-/* SpaceAction Mode Settings */
+/** #SpaceAction.mode */
 typedef enum eAnimEdit_Context {
-  /* action on the active object */
+  /** Action on the active object. */
   SACTCONT_ACTION = 0,
-  /* list of all shapekeys on the active object, linked with their F-Curves */
+  /** List of all shape-keys on the active object, linked with their F-Curves. */
   SACTCONT_SHAPEKEY = 1,
-  /* editing of gpencil data */
+  /** Editing of grease-pencil data. */
   SACTCONT_GPENCIL = 2,
-  /* dopesheet (default) */
+  /** Dope-sheet (default). */
   SACTCONT_DOPESHEET = 3,
-  /* mask */
+  /** Mask. */
   SACTCONT_MASK = 4,
-  /* cache file */
+  /** Cache file */
   SACTCONT_CACHEFILE = 5,
-  /* timeline - replacement for the standalone "timeline editor" */
+  /** Timeline - replacement for the standalone "timeline editor". */
   SACTCONT_TIMELINE = 6,
 } eAnimEdit_Context;
 
-/* SpaceAction AutoSnap Settings (also used by other Animation Editors) */
+/* Old snapping enum that is only needed because of the versioning code. */
 typedef enum eAnimEdit_AutoSnap {
-  /* no auto-snap */
-  SACTSNAP_OFF = 0,
   /* snap to 1.0 frame/second intervals */
   SACTSNAP_STEP = 1,
   /* snap to actual frames/seconds (nla-action time) */
@@ -916,7 +1071,7 @@ typedef enum eAnimEdit_AutoSnap {
   SACTSNAP_SECOND = 4,
   /* snap to 1.0 second increments */
   SACTSNAP_TSTEP = 5,
-} eAnimEdit_AutoSnap;
+} eAnimEdit_AutoSnap DNA_DEPRECATED;
 
 /* SAction->cache_display */
 typedef enum eTimeline_Cache_Flag {
@@ -927,6 +1082,7 @@ typedef enum eTimeline_Cache_Flag {
   TIME_CACHE_SMOKE = (1 << 4),
   TIME_CACHE_DYNAMICPAINT = (1 << 5),
   TIME_CACHE_RIGIDBODY = (1 << 6),
+  TIME_CACHE_SIMULATION_NODES = (1 << 7),
 } eTimeline_Cache_Flag;
 
 /* ************************************************ */
@@ -961,6 +1117,198 @@ typedef struct bActionChannel {
   int temp;
 } bActionChannel;
 
+/* ************************************************ */
+/* Layered Animation data-types. */
+
+/**
+ * \see #blender::animrig::Layer
+ */
+typedef struct ActionLayer {
+  /** User-Visible identifier, unique within the Animation. */
+  char name[64]; /* MAX_NAME. */
+
+  float influence; /* [0-1] */
+
+  /** \see #blender::animrig::Layer::flags() */
+  uint8_t layer_flags;
+
+  /** \see #blender::animrig::Layer::mixmode() */
+  int8_t layer_mix_mode;
+
+  uint8_t _pad0[2];
+
+  /**
+   * The layer's array of strips. See the documentation of
+   * #blender::animrig::Layer for the invariants of this array.
+   */
+  struct ActionStrip **strip_array; /* Array of 'strip_array_num' strips. */
+  int strip_array_num;
+
+  uint8_t _pad1[4];
+
 #ifdef __cplusplus
-}
+  blender::animrig::Layer &wrap();
+  const blender::animrig::Layer &wrap() const;
+#endif
+} ActionLayer;
+
+/**
+ * \see #blender::animrig::Slot
+ */
+typedef struct ActionSlot {
+  /**
+   * The string identifier of this Slot within the Action.
+   *
+   * The first two characters are the two-letter code corresponding to `idtype`
+   * below (e.g. 'OB', 'ME', 'LA'), and the remaining characters store slot's
+   * display name. Since the combination of the `idtype` and display name are
+   * always unique within an action, this string identifier is as well.
+   *
+   * Typically this matches the ID name this slot was created for, including the
+   * two letters indicating the ID type.
+   *
+   * \see #AnimData::slot_name
+   */
+  char identifier[66]; /* MAX_ID_NAME */
+
+  /**
+   * Type of ID-block that this slot is intended for.
+   *
+   * If 0, will be set to whatever ID is first assigned.
+   */
+  int16_t idtype;
+
+  /**
+   * Numeric identifier of this Slot within the Action.
+   *
+   * This number allows reorganization of the #bAction::slot_array without
+   * invalidating references. Also these remain valid when copy-on-evaluate
+   * copies are made.
+   *
+   * Unlike `identifier` above, this cannot be set by the user and never changes
+   * after initial assignment, and thus serves as a "forever" identifier of the
+   * slot.
+   *
+   * Only valid within the Action that owns this Slot.
+   *
+   * NOTE: keep this type in sync with `slot_handle_t` in BKE_action.hh.
+   *
+   * \see #blender::animrig::Action::slot_for_handle()
+   */
+  int32_t handle;
+
+  /** \see #blender::animrig::Slot::flags() */
+  int8_t slot_flags;
+  uint8_t _pad1[7];
+
+  /** Runtime data. Set to nullptr when writing to disk. */
+  ActionSlotRuntimeHandle *runtime;
+
+#ifdef __cplusplus
+  blender::animrig::Slot &wrap();
+  const blender::animrig::Slot &wrap() const;
+#endif
+} ActionSlot;
+
+/**
+ * \see #blender::animrig::Strip
+ */
+typedef struct ActionStrip {
+  /**
+   * \see #blender::animrig::Strip::type()
+   */
+  int8_t strip_type;
+  uint8_t _pad0[3];
+
+  /**
+   * The index of the "strip data" item that this strip uses, in the array of
+   * strip data that corresponds to `strip_type`.
+   *
+   * Note that -1 indicates "no data".  This is an invalid state outside of
+   * specific internal APIs, but it's the default value and therefore helps us
+   * catch when strips aren't fully initialized before making their way outside
+   * of those APIs.
+   */
+  int data_index;
+
+  float frame_start; /** Start frame of the strip, in Animation time. */
+  float frame_end;   /** End frame of the strip, in Animation time. */
+
+  /**
+   * Offset applied to the contents of the strip, in frames.
+   *
+   * This offset determines the difference between "Animation time" (which would
+   * typically be the same as the scene time, until the animation system
+   * supports strips referencing other Actions).
+   */
+  float frame_offset;
+
+  uint8_t _pad1[4];
+
+#ifdef __cplusplus
+  blender::animrig::Strip &wrap();
+  const blender::animrig::Strip &wrap() const;
+#endif
+} ActionStrip;
+
+/**
+ * #ActionStrip::type = #Strip::Type::Keyframe.
+ *
+ * \see #blender::animrig::StripKeyframeData
+ */
+typedef struct ActionStripKeyframeData {
+  struct ActionChannelbag **channelbag_array;
+  int channelbag_array_num;
+
+  uint8_t _pad[4];
+
+#ifdef __cplusplus
+  blender::animrig::StripKeyframeData &wrap();
+  const blender::animrig::StripKeyframeData &wrap() const;
+#endif
+} ActionStripKeyframeData;
+
+/**
+ * \see #blender::animrig::Channelbag
+ */
+typedef struct ActionChannelbag {
+  int32_t slot_handle;
+
+  /* Channel groups. These index into the `fcurve_array` below to specify group
+   * membership of the fcurves.
+   *
+   * Note that although the fcurves also have pointers back to the groups they
+   * belong to, those pointers are not the source of truth. The source of truth
+   * for membership is the information in the channel groups here.
+   *
+   * Invariants:
+   * 1. The groups are sorted by their `fcurve_range_start` field. In other
+   *    words, they are in the same order as their starting positions in the
+   *    fcurve array.
+   * 2. The grouped fcurves are tightly packed, starting at the first fcurve and
+   *    having no gaps of ungrouped fcurves between them. Ungrouped fcurves come
+   *    at the end, after all of the grouped fcurves. */
+  int group_array_num;
+  struct bActionGroup **group_array;
+
+  uint8_t _pad[4];
+
+  int fcurve_array_num;
+  struct FCurve **fcurve_array; /* Array of 'fcurve_array_num' FCurves. */
+
+  /* TODO: Design & implement a way to integrate other channel types as well,
+   * and still have them map to a certain slot */
+#ifdef __cplusplus
+  blender::animrig::Channelbag &wrap();
+  const blender::animrig::Channelbag &wrap() const;
+#endif
+} ActionChannelbag;
+
+#ifdef __cplusplus
+/* Some static assertions that things that should have the same type actually do. */
+static_assert(std::is_same_v<decltype(ActionSlot::handle), decltype(bAction::last_slot_handle)>);
+static_assert(
+    std::is_same_v<decltype(ActionSlot::handle), decltype(ActionChannelbag::slot_handle)>);
+static_assert(
+    std::is_same_v<decltype(ActionSlot::handle), decltype(SpaceAction::action_slot_handle)>);
 #endif

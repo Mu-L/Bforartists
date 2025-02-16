@@ -1,36 +1,19 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2020 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * Copyright 2020, Blender Foundation.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup gpu
  */
 
-#include "BKE_global.h"
+#include "BKE_global.hh"
 
 #include "BLI_math_base.h"
 #include "BLI_math_bits.h"
 
-#include "GPU_capabilities.h"
-
-#include "glew-mx.h"
+#include "GPU_capabilities.hh"
 
 #include "gl_context.hh"
-#include "gl_debug.hh"
 #include "gl_framebuffer.hh"
 #include "gl_texture.hh"
 
@@ -47,19 +30,16 @@ GLStateManager::GLStateManager()
   /* Set other states that never change. */
   glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
   glEnable(GL_MULTISAMPLE);
-  glEnable(GL_PRIMITIVE_RESTART);
 
   glDisable(GL_DITHER);
 
   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+  glPixelStorei(GL_PACK_ALIGNMENT, 1);
   glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 
-  glPrimitiveRestartIndex((GLuint)0xFFFFFFFF);
-  /* TODO: Should become default. But needs at least GL 4.3 */
-  if (GLContext::fixed_restart_index_support) {
-    /* Takes precedence over #GL_PRIMITIVE_RESTART. */
-    glEnable(GL_PRIMITIVE_RESTART_FIXED_INDEX);
-  }
+  /* Takes precedence over #GL_PRIMITIVE_RESTART.
+   * Sets restart index correctly following the IBO type. */
+  glEnable(GL_PRIMITIVE_RESTART_FIXED_INDEX);
 
   /* Limits. */
   glGetFloatv(GL_ALIASED_LINE_WIDTH_RANGE, line_width_range_);
@@ -83,7 +63,6 @@ void GLStateManager::apply_state()
   active_fb->apply_state();
 };
 
-/* Will set all the states regardless of the current ones. */
 void GLStateManager::force_state()
 {
   /* Little exception for clip distances since they need to keep the old count correct. */
@@ -167,18 +146,19 @@ void GLStateManager::set_mutable_state(const GPUStateMutable &state)
     }
   }
 
-  if (changed.line_width != 0) {
+  if (float_as_uint(changed.line_width) != 0) {
     /* TODO: remove, should use wide line shader. */
     glLineWidth(clamp_f(state.line_width, line_width_range_[0], line_width_range_[1]));
   }
 
-  if (changed.depth_range[0] != 0 || changed.depth_range[1] != 0) {
+  if (float_as_uint(changed.depth_range[0]) != 0 || float_as_uint(changed.depth_range[1]) != 0) {
     /* TODO: remove, should modify the projection matrix instead. */
     glDepthRange(UNPACK2(state.depth_range));
   }
 
   if (changed.stencil_compare_mask != 0 || changed.stencil_reference != 0 ||
-      changed.stencil_write_mask != 0) {
+      changed.stencil_write_mask != 0)
+  {
     set_stencil_mask((eGPUStencilTest)current_.stencil_test, state);
   }
 
@@ -268,7 +248,7 @@ void GLStateManager::set_stencil_test(const eGPUStencilTest test, const eGPUSten
   }
 }
 
-void GLStateManager::set_stencil_mask(const eGPUStencilTest test, const GPUStateMutable state)
+void GLStateManager::set_stencil_mask(const eGPUStencilTest test, const GPUStateMutable &state)
 {
   GLenum func;
   switch (test) {
@@ -377,7 +357,7 @@ void GLStateManager::set_blend(const eGPUBlend value)
       break;
     }
     case GPU_BLEND_ADDITIVE: {
-      /* Do not let alpha accumulate but premult the source RGB by it. */
+      /* Do not let alpha accumulate but pre-multiply the source RGB by it. */
       src_rgb = GL_SRC_ALPHA;
       dst_rgb = GL_ONE;
       src_alpha = GL_ZERO;
@@ -462,7 +442,7 @@ void GLStateManager::set_blend(const eGPUBlend value)
 /** \name Texture State Management
  * \{ */
 
-void GLStateManager::texture_bind(Texture *tex_, eGPUSamplerState sampler_type, int unit)
+void GLStateManager::texture_bind(Texture *tex_, GPUSamplerState sampler_state, int unit)
 {
   BLI_assert(unit < GPU_max_textures());
   GLTexture *tex = static_cast<GLTexture *>(tex_);
@@ -471,17 +451,17 @@ void GLStateManager::texture_bind(Texture *tex_, eGPUSamplerState sampler_type, 
   }
   /* Eliminate redundant binds. */
   if ((textures_[unit] == tex->tex_id_) &&
-      (samplers_[unit] == GLTexture::samplers_[sampler_type])) {
+      (samplers_[unit] == GLTexture::get_sampler(sampler_state)))
+  {
     return;
   }
   targets_[unit] = tex->target_;
   textures_[unit] = tex->tex_id_;
-  samplers_[unit] = GLTexture::samplers_[sampler_type];
+  samplers_[unit] = GLTexture::get_sampler(sampler_state);
   tex->is_bound_ = true;
   dirty_texture_binds_ |= 1ULL << unit;
 }
 
-/* Bind the texture to slot 0 for editing purpose. Used by legacy pipeline. */
 void GLStateManager::texture_bind_temp(GLTexture *tex)
 {
   glActiveTexture(GL_TEXTURE0);
@@ -575,21 +555,21 @@ uint64_t GLStateManager::bound_texture_slots()
 void GLStateManager::image_bind(Texture *tex_, int unit)
 {
   /* Minimum support is 8 image in the fragment shader. No image for other stages. */
-  BLI_assert(GPU_shader_image_load_store_support() && unit < 8);
+  BLI_assert(unit < 8);
   GLTexture *tex = static_cast<GLTexture *>(tex_);
   if (G.debug & G_DEBUG_GPU) {
     tex->check_feedback_loop();
   }
   images_[unit] = tex->tex_id_;
   formats_[unit] = to_gl_internal_format(tex->format_);
-  tex->is_bound_ = true;
+  tex->is_bound_image_ = true;
   dirty_image_binds_ |= 1ULL << unit;
 }
 
 void GLStateManager::image_unbind(Texture *tex_)
 {
   GLTexture *tex = static_cast<GLTexture *>(tex_);
-  if (!tex->is_bound_) {
+  if (!tex->is_bound_image_) {
     return;
   }
 
@@ -600,7 +580,7 @@ void GLStateManager::image_unbind(Texture *tex_)
       dirty_image_binds_ |= 1ULL << i;
     }
   }
-  tex->is_bound_ = false;
+  tex->is_bound_image_ = false;
 }
 
 void GLStateManager::image_unbind_all()
@@ -626,7 +606,7 @@ void GLStateManager::image_bind_apply()
   int last = 32 - bitscan_reverse_uint(dirty_bind);
   int count = last - first;
 
-  if (GLContext::multi_bind_support) {
+  if (GLContext::multi_bind_image_support) {
     glBindImageTextures(first, count, images_ + first);
   }
   else {
@@ -660,6 +640,34 @@ void GLStateManager::issue_barrier(eGPUBarrier barrier_bits)
   glMemoryBarrier(to_gl(barrier_bits));
 }
 
+GLFence::~GLFence()
+{
+  if (gl_sync_ != nullptr) {
+    glDeleteSync(gl_sync_);
+    gl_sync_ = nullptr;
+  }
+}
+
+void GLFence::signal()
+{
+  /* If fence is already signalled, create a newly signalled fence primitive. */
+  if (gl_sync_) {
+    glDeleteSync(gl_sync_);
+  }
+
+  gl_sync_ = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+  signalled_ = true;
+}
+
+void GLFence::wait()
+{
+  /* Do not wait if fence does not yet exist. */
+  if (gl_sync_ == nullptr) {
+    return;
+  }
+  glWaitSync(gl_sync_, 0, GL_TIMEOUT_IGNORED);
+  signalled_ = false;
+}
 /** \} */
 
 }  // namespace blender::gpu

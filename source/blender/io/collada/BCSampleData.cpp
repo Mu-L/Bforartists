@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2008 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2008 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "BCSampleData.h"
 #include "collada_utils.h"
@@ -39,7 +24,6 @@ void BCSample::add_bone_matrix(Bone *bone, Matrix &mat)
   bonemats[bone] = matrix;
 }
 
-/* Get channel value */
 bool BCSample::get_value(std::string channel_target, const int array_index, float *val) const
 {
   std::string bname = bc_string_before(channel_target, ".");
@@ -68,7 +52,7 @@ bool BCSample::get_value(std::string channel_target, const int array_index, floa
   else if (channel_type == "scale") {
     *val = matrix->scale()[array_index];
   }
-  else if (channel_type == "rotation" || channel_type == "rotation_euler") {
+  else if (ELEM(channel_type, "rotation", "rotation_euler")) {
     *val = matrix->rotation()[array_index];
   }
   else if (channel_type == "rotation_quaternion") {

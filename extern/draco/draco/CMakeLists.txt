@@ -1,6 +1,15 @@
+# SPDX-FileCopyrightText: 2019-2022 Blender Foundation
+#
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 remove_strict_flags()
 
+set(INC
+  src
+)
+
 set(SRC
+
   src/draco/animation/keyframe_animation.cc
   src/draco/animation/keyframe_animation.h
   src/draco/animation/keyframe_animation_decoder.cc
@@ -228,6 +237,7 @@ set(SRC
   src/draco/core/varint_decoding.h
   src/draco/core/varint_encoding.h
   src/draco/core/vector_d.h
+  src/draco/draco_features.h
   src/draco/mesh/corner_table.cc
   src/draco/mesh/corner_table.h
   src/draco/mesh/corner_table_iterators.h
@@ -261,10 +271,6 @@ set(SRC
 )
 
 set(LIB
-)
-
-set(INC
-  src
 )
 
 blender_add_lib(draco "${SRC}" "${INC}" "" "${LIB}")

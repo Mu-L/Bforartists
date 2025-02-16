@@ -1,69 +1,64 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2023 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(INC
   ../include
-  ../../blenkernel
-  ../../blenlib
-  ../../blentranslation
-  ../../depsgraph
-  ../../gpu
-  ../../makesdna
   ../../makesrna
-  ../../windowmanager
-  ../../../../intern/glew-mx
-  ../../../../intern/guardedalloc
+
+  # RNA_prototypes.hh
+  ${CMAKE_BINARY_DIR}/source/blender/makesrna
+)
+
+set(INC_SYS
 )
 
 set(SRC
-  graph_buttons.c
-  graph_draw.c
-  graph_edit.c
-  graph_ops.c
-  graph_select.c
-  graph_slider_ops.c
-  graph_utils.c
-  graph_view.c
-  space_graph.c
+  graph_buttons.cc
+  graph_draw.cc
+  graph_edit.cc
+  graph_ops.cc
+  graph_select.cc
+  graph_slider_ops.cc
+  graph_utils.cc
+  graph_view.cc
+  space_graph.cc
 
-  graph_intern.h
+  graph_intern.hh
 )
 
 set(LIB
-  bf_blenkernel
-  bf_blenlib
+  PRIVATE bf::blenkernel
+  PRIVATE bf::blenlib
+  PRIVATE bf::blenloader
+  PRIVATE bf::blentranslation
+  PRIVATE bf::depsgraph
+  PRIVATE bf::dna
+  PRIVATE bf::extern::fmtlib
+  PRIVATE bf::gpu
+  PRIVATE bf::intern::guardedalloc
+  PRIVATE bf::animrig
+  PRIVATE bf::windowmanager
 )
 
 if(WITH_AUDASPACE)
+  list(APPEND LIB
+    bf_intern_audaspace
+  )
   list(APPEND INC_SYS
     ${AUDASPACE_C_INCLUDE_DIRS}
   )
-  list(APPEND LIB
-    bf_intern_audaspace
-
-    ${AUDASPACE_C_LIBRARIES}
-    ${AUDASPACE_PY_LIBRARIES}
-  )
+  if(WITH_SYSTEM_AUDASPACE)
+    list(APPEND LIB
+      ${AUDASPACE_C_LIBRARIES}
+      ${AUDASPACE_PY_LIBRARIES}
+    )
+  endif()
   add_definitions(-DWITH_AUDASPACE)
-endif()
-
-if(WITH_INTERNATIONAL)
-  add_definitions(-DWITH_INTERNATIONAL)
 endif()
 
 
 blender_add_lib(bf_editor_space_graph "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+
+# RNA_prototypes.hh dna_type_offsets.h
+add_dependencies(bf_editor_space_graph bf_rna)

@@ -1,30 +1,10 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2012 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# The Original Code is Copyright (C) 2012, Blender Foundation
-# All rights reserved.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(INC
   .
-  ../glew-mx
-  ../guardedalloc
-  ../../source/blender/blenlib
-  ../../source/blender/gpu
-  ../../source/blender/makesdna
+  ../../source/blender/gpu/intern
 )
 
 set(INC_SYS
@@ -37,9 +17,14 @@ set(SRC
 
   ocio_capi.h
   ocio_impl.h
+  ocio_shader_shared.hh
 )
 
 set(LIB
+  PRIVATE bf::blenlib
+  PRIVATE bf::dna
+  PRIVATE bf::gpu
+  PRIVATE bf::intern::guardedalloc
 )
 
 if(WITH_OPENCOLORIO)
@@ -47,12 +32,11 @@ if(WITH_OPENCOLORIO)
     -DWITH_OCIO
   )
 
-  add_definitions(${GL_DEFINITIONS})
   add_definitions(${OPENCOLORIO_DEFINITIONS})
 
   list(APPEND INC_SYS
     ${OPENCOLORIO_INCLUDE_DIRS}
-    ${GLEW_INCLUDE_PATH}
+    ${Epoxy_INCLUDE_DIRS}
   )
 
   list(APPEND SRC
@@ -64,17 +48,38 @@ if(WITH_OPENCOLORIO)
     ${OPENCOLORIO_LIBRARIES}
   )
 
-  if(WIN32)
-    list(APPEND INC_SYS
-      ${BOOST_INCLUDE_DIR}
-    )
-    list(APPEND LIB
-      ${BOOST_LIBRARIES}
-    )
-  endif()
+  set(GLSL_SRC
+    gpu_shader_display_transform_vert.glsl
+    gpu_shader_display_transform_frag.glsl
 
-  data_to_c_simple(gpu_shader_display_transform.glsl SRC)
-  data_to_c_simple(gpu_shader_display_transform_vertex.glsl SRC)
+    ocio_shader_shared.hh
+  )
+
+  set(GLSL_C)
+  foreach(GLSL_FILE ${GLSL_SRC})
+    glsl_to_c(${GLSL_FILE} GLSL_C)
+  endforeach()
+
+  blender_add_lib(bf_ocio_shaders "${GLSL_C}" "" "" "")
+
+  list(APPEND LIB
+    bf_ocio_shaders
+  )
+
+  set(GLSL_SOURCE_CONTENT "")
+  foreach(GLSL_FILE ${GLSL_SRC})
+    get_filename_component(GLSL_FILE_NAME ${GLSL_FILE} NAME)
+    string(REPLACE "." "_" GLSL_FILE_NAME_UNDERSCORES ${GLSL_FILE_NAME})
+    string(APPEND GLSL_SOURCE_CONTENT "SHADER_SOURCE\(datatoc_${GLSL_FILE_NAME_UNDERSCORES}, \"${GLSL_FILE_NAME}\", \"${GLSL_FILE}\"\)\n")
+  endforeach()
+
+  set(glsl_source_list_file "${CMAKE_CURRENT_BINARY_DIR}/glsl_ocio_source_list.h")
+  file(GENERATE OUTPUT ${glsl_source_list_file} CONTENT "${GLSL_SOURCE_CONTENT}")
+  list(APPEND SRC ${glsl_source_list_file})
+  list(APPEND INC ${CMAKE_CURRENT_BINARY_DIR})
+
+  target_include_directories(bf_ocio_shaders PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+
 endif()
 
 

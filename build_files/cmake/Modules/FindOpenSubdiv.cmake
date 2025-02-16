@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2013 Blender Authors
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
 # - Find OpenSubdiv library
 # Find the native OpenSubdiv includes and library
 # This module defines
@@ -8,30 +12,27 @@
 #                        This can also be an environment variable.
 #  OPENSUBDIV_FOUND, if false, do not try to use OpenSubdiv.
 
-#=============================================================================
-# Copyright 2013 Blender Foundation.
-#
-# Distributed under the OSI-approved BSD 3-Clause License,
-# see accompanying file BSD-3-Clause-license.txt for details.
-#=============================================================================
+# If `OPENSUBDIV_ROOT_DIR` was defined in the environment, use it.
+if(DEFINED OPENSUBDIV_ROOT_DIR)
+  # Pass.
+elseif(DEFINED ENV{OPENSUBDIV_ROOT_DIR})
+  set(OPENSUBDIV_ROOT_DIR $ENV{OPENSUBDIV_ROOT_DIR})
+else()
+  set(OPENSUBDIV_ROOT_DIR "")
+endif()
 
-# If OPENSUBDIV_ROOT_DIR was defined in the environment, use it.
-IF(NOT OPENSUBDIV_ROOT_DIR AND NOT $ENV{OPENSUBDIV_ROOT_DIR} STREQUAL "")
-  SET(OPENSUBDIV_ROOT_DIR $ENV{OPENSUBDIV_ROOT_DIR})
-ENDIF()
-
-SET(_opensubdiv_FIND_COMPONENTS
+set(_opensubdiv_FIND_COMPONENTS
   osdGPU
   osdCPU
 )
 
-SET(_opensubdiv_SEARCH_DIRS
+set(_opensubdiv_SEARCH_DIRS
   ${OPENSUBDIV_ROOT_DIR}
   /opt/lib/opensubdiv
   /opt/lib/osd # install_deps.sh
 )
 
-FIND_PATH(OPENSUBDIV_INCLUDE_DIR
+find_path(OPENSUBDIV_INCLUDE_DIR
   NAMES
     opensubdiv/osd/mesh.h
   HINTS
@@ -40,62 +41,54 @@ FIND_PATH(OPENSUBDIV_INCLUDE_DIR
     include
 )
 
-SET(_opensubdiv_LIBRARIES)
-FOREACH(COMPONENT ${_opensubdiv_FIND_COMPONENTS})
-  STRING(TOUPPER ${COMPONENT} UPPERCOMPONENT)
+set(_opensubdiv_LIBRARIES)
+foreach(COMPONENT ${_opensubdiv_FIND_COMPONENTS})
+  string(TOUPPER ${COMPONENT} UPPERCOMPONENT)
 
-  FIND_LIBRARY(OPENSUBDIV_${UPPERCOMPONENT}_LIBRARY
+  find_library(OPENSUBDIV_${UPPERCOMPONENT}_LIBRARY
     NAMES
       ${COMPONENT}
     HINTS
       ${_opensubdiv_SEARCH_DIRS}
     PATH_SUFFIXES
       lib64 lib
-    )
-  LIST(APPEND _opensubdiv_LIBRARIES "${OPENSUBDIV_${UPPERCOMPONENT}_LIBRARY}")
-ENDFOREACH()
+  )
+  list(APPEND _opensubdiv_LIBRARIES "${OPENSUBDIV_${UPPERCOMPONENT}_LIBRARY}")
+endforeach()
 
-MACRO(OPENSUBDIV_CHECK_CONTROLLER
+macro(OPENSUBDIV_CHECK_CONTROLLER
       controller_include_file
       variable_name)
-  IF(EXISTS "${OPENSUBDIV_INCLUDE_DIR}/opensubdiv/osd/${controller_include_file}")
-    SET(${variable_name} TRUE)
-  ELSE()
-    SET(${variable_name} FALSE)
-  ENDIF()
-ENDMACRO()
+  if(EXISTS "${OPENSUBDIV_INCLUDE_DIR}/opensubdiv/osd/${controller_include_file}")
+    set(${variable_name} TRUE)
+  else()
+    set(${variable_name} FALSE)
+  endif()
+endmacro()
 
 
 # handle the QUIETLY and REQUIRED arguments and set OPENSUBDIV_FOUND to TRUE if
 # all listed variables are TRUE
-INCLUDE(FindPackageHandleStandardArgs)
-FIND_PACKAGE_HANDLE_STANDARD_ARGS(OpenSubdiv DEFAULT_MSG
-    _opensubdiv_LIBRARIES OPENSUBDIV_INCLUDE_DIR)
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(OpenSubdiv DEFAULT_MSG
+  _opensubdiv_LIBRARIES OPENSUBDIV_INCLUDE_DIR)
 
-IF(OPENSUBDIV_FOUND)
-  SET(OPENSUBDIV_LIBRARIES ${_opensubdiv_LIBRARIES})
-  SET(OPENSUBDIV_INCLUDE_DIRS ${OPENSUBDIV_INCLUDE_DIR})
+if(OPENSUBDIV_FOUND)
+  set(OPENSUBDIV_LIBRARIES ${_opensubdiv_LIBRARIES})
+  set(OPENSUBDIV_INCLUDE_DIRS ${OPENSUBDIV_INCLUDE_DIR})
+endif()
 
-  # Find available compute controllers.
-
-  FIND_PACKAGE(OpenMP)
-  IF(OPENMP_FOUND)
-    SET(OPENSUBDIV_HAS_OPENMP TRUE)
-  ELSE()
-    SET(OPENSUBDIV_HAS_OPENMP FALSE)
-  ENDIF()
-
-  OPENSUBDIV_CHECK_CONTROLLER("tbbEvaluator.h" OPENSUBDIV_HAS_TBB)
-  OPENSUBDIV_CHECK_CONTROLLER("clEvaluator.h" OPENSUBDIV_HAS_OPENCL)
-  OPENSUBDIV_CHECK_CONTROLLER("cudaEvaluator.h" OPENSUBDIV_HAS_CUDA)
-  OPENSUBDIV_CHECK_CONTROLLER("glXFBEvaluator.h" OPENSUBDIV_HAS_GLSL_TRANSFORM_FEEDBACK)
-  OPENSUBDIV_CHECK_CONTROLLER("glComputeEvaluator.h" OPENSUBDIV_HAS_GLSL_COMPUTE)
-ENDIF()
-
-MARK_AS_ADVANCED(
+mark_as_advanced(
   OPENSUBDIV_INCLUDE_DIR
 )
-FOREACH(COMPONENT ${_opensubdiv_FIND_COMPONENTS})
-  STRING(TOUPPER ${COMPONENT} UPPERCOMPONENT)
-  MARK_AS_ADVANCED(OPENSUBDIV_${UPPERCOMPONENT}_LIBRARY)
-ENDFOREACH()
+foreach(COMPONENT ${_opensubdiv_FIND_COMPONENTS})
+  string(TOUPPER ${COMPONENT} UPPERCOMPONENT)
+  mark_as_advanced(OPENSUBDIV_${UPPERCOMPONENT}_LIBRARY)
+endforeach()
+
+unset(COMPONENT)
+unset(UPPERCOMPONENT)
+
+unset(_opensubdiv_FIND_COMPONENTS)
+unset(_opensubdiv_SEARCH_DIRS)
+unset(_opensubdiv_LIBRARIES)

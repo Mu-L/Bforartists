@@ -1,28 +1,19 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2020-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
- * \ingroup MEM
+ * \ingroup intern_mem
  */
 
+#include <any>
 #include <cstdio> /* Needed for `printf` on WIN32/APPLE. */
 #include <cstdlib>
+#include <mutex>
+#include <vector>
 
 #include "MEM_guardedalloc.h"
-#include "mallocn_intern.h"
+#include "mallocn_intern.hh"
 
 bool leak_detector_has_run = false;
 char free_after_leak_detection_message[] =
@@ -50,12 +41,17 @@ class MemLeakPrinter {
     const size_t mem_in_use = MEM_get_memory_in_use();
     printf("Error: Not freed memory blocks: %u, total unfreed memory %f MB\n",
            leaked_blocks,
-           (double)mem_in_use / 1024 / 1024);
+           double(mem_in_use) / 1024 / 1024);
     MEM_printmemlist();
+
+    /* In guarded implementation, the fact that all allocated memory blocks are stored in the
+     * static `membase` listbase is enough for LSAN to not detect them as leaks. Clearing it solves
+     * that issue. */
+    mem_clearmemlist();
 
     if (fail_on_memleak) {
       /* There are many other ways to change the exit code to failure here:
-       * - Make the destructor noexcept(false) and throw an exception.
+       * - Make the destructor `noexcept(false)` and throw an exception.
        * - Call exit(EXIT_FAILURE).
        * - Call terminate().
        */
@@ -65,8 +61,16 @@ class MemLeakPrinter {
 };
 }  // namespace
 
-void MEM_init_memleak_detection(void)
+void MEM_init_memleak_detection()
 {
+  /* Calling this ensures that the memory usage counters outlive the memory leak detection. */
+  memory_usage_init();
+
+  /* Ensure that the static memleak data storage is initialized before the #MemLeakPrinter one, so
+   * that it outlives the memory leak detection. */
+  std::any any_data = std::make_any<int>(0);
+  mem_guarded::internal::add_memleak_data(any_data);
+
   /**
    * This variable is constructed when this function is first called. This should happen as soon as
    * possible when the program starts.
@@ -84,7 +88,15 @@ void MEM_use_memleak_detection(bool enabled)
   ignore_memleak = !enabled;
 }
 
-void MEM_enable_fail_on_memleak(void)
+void MEM_enable_fail_on_memleak()
 {
   fail_on_memleak = true;
+}
+
+void mem_guarded::internal::add_memleak_data(std::any data)
+{
+  static std::mutex mutex;
+  static std::vector<std::any> data_vec;
+  std::lock_guard lock{mutex};
+  data_vec.push_back(std::move(data));
 }

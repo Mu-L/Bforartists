@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2001-2002 NaN Holding BV. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -23,12 +8,6 @@
  * \ingroup bke
  * \brief display list (or rather multi purpose list) stuff.
  */
-#include "BKE_customdata.h"
-#include "DNA_customdata_types.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 /** #DispList.type */
 enum {
@@ -40,8 +19,6 @@ enum {
   DL_SURF = 2,
   /** Triangles. */
   DL_INDEX3 = 4,
-  /** Quads, with support for triangles (when values of the 3rd and 4th indices match). */
-  DL_INDEX4 = 5,
   // DL_VERTCOL = 6, /* UNUSED */
   /** Isolated points. */
   DL_VERTS = 7,
@@ -61,7 +38,6 @@ enum {
 
 struct Depsgraph;
 struct ListBase;
-struct Mesh;
 struct Object;
 struct Scene;
 
@@ -77,41 +53,33 @@ typedef struct DispList {
   int totindex; /* indexed array drawing surfaces */
 } DispList;
 
-void BKE_displist_copy(struct ListBase *lbn, const struct ListBase *lb);
 DispList *BKE_displist_find(struct ListBase *lb, int type);
-void BKE_displist_normals_add(struct ListBase *lb);
-void BKE_displist_count(const struct ListBase *lb, int *totvert, int *totface, int *tottri);
 void BKE_displist_free(struct ListBase *lb);
-bool BKE_displist_has_faces(const struct ListBase *lb);
 
 void BKE_displist_make_curveTypes(struct Depsgraph *depsgraph,
                                   const struct Scene *scene,
                                   struct Object *ob,
-                                  const bool for_render);
-void BKE_displist_make_curveTypes_forRender(struct Depsgraph *depsgraph,
-                                            const struct Scene *scene,
-                                            struct Object *ob,
-                                            struct ListBase *dispbase,
-                                            struct Mesh **r_final);
-void BKE_displist_make_mball(struct Depsgraph *depsgraph, struct Scene *scene, struct Object *ob);
-void BKE_displist_make_mball_forRender(struct Depsgraph *depsgraph,
-                                       struct Scene *scene,
-                                       struct Object *ob,
-                                       struct ListBase *dispbase);
+                                  bool for_render);
 
-bool BKE_curve_calc_modifiers_pre(struct Depsgraph *depsgraph,
+void BKE_curve_calc_modifiers_pre(struct Depsgraph *depsgraph,
                                   const struct Scene *scene,
                                   struct Object *ob,
                                   struct ListBase *source_nurb,
                                   struct ListBase *target_nurb,
-                                  const bool for_render);
+                                  bool for_render);
 bool BKE_displist_surfindex_get(
     const struct DispList *dl, int a, int *b, int *p1, int *p2, int *p3, int *p4);
 
+/**
+ * \param normal_proj: Optional normal that's used to project the scan-fill verts into 2D coords.
+ * Pass this along if known since it saves time calculating the normal.
+ * This is also used to initialize #DispList.nors (one normal per display list).
+ * \param flip_normal: Flip the normal (same as passing \a normal_proj negated).
+ */
 void BKE_displist_fill(const struct ListBase *dispbase,
                        struct ListBase *to,
                        const float normal_proj[3],
-                       const bool flip_normal);
+                       bool flip_normal);
 
 float BKE_displist_calc_taper(struct Depsgraph *depsgraph,
                               const struct Scene *scene,
@@ -120,7 +88,3 @@ float BKE_displist_calc_taper(struct Depsgraph *depsgraph,
                               int tot);
 
 void BKE_displist_minmax(const struct ListBase *dispbase, float min[3], float max[3]);
-
-#ifdef __cplusplus
-}
-#endif

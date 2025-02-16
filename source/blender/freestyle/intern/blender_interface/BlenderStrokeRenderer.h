@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -51,14 +39,12 @@ class BlenderStrokeRenderer : public StrokeRenderer {
   Object *NewMesh() const;
 
   struct StrokeGroup {
-    explicit StrokeGroup() : totvert(0), totedge(0), totpoly(0), totloop(0)
-    {
-    }
+    explicit StrokeGroup() : totvert(0), totedge(0), faces_num(0), totloop(0) {}
     vector<StrokeRep *> strokes;
     blender::Map<Material *, int> materials;
     int totvert;
     int totedge;
-    int totpoly;
+    int faces_num;
     int totloop;
   };
   vector<StrokeGroup *> strokeGroups, texturedStrokeGroups;
@@ -79,7 +65,7 @@ class BlenderStrokeRenderer : public StrokeRenderer {
   bContext *_context;
   float _width, _height;
   float _z, _z_delta;
-  unsigned int _mesh_id;
+  uint _mesh_id;
   bool _use_shading_nodes;
   struct GHash *_nodetree_hash;
 
@@ -87,7 +73,7 @@ class BlenderStrokeRenderer : public StrokeRenderer {
 
   int get_stroke_count() const;
   float get_stroke_vertex_z(void) const;
-  unsigned int get_stroke_mesh_id(void) const;
+  uint get_stroke_mesh_id(void) const;
   bool test_triangle_visibility(StrokeVertexRep *svRep[3]) const;
   void test_strip_visibility(Strip::vertex_container &strip_vertices,
                              int *visible_faces,
@@ -95,9 +81,7 @@ class BlenderStrokeRenderer : public StrokeRenderer {
 
   vector<StrokeRep *> _strokeReps;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:BlenderStrokeRenderer")
-#endif
 };
 
 } /* namespace Freestyle */

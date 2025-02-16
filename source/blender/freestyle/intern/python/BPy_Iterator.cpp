@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2004-2022 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -32,10 +20,6 @@
 #include "Iterator/BPy_ViewEdgeIterator.h"
 #include "Iterator/BPy_orientedViewEdgeIterator.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 using namespace Freestyle;
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -50,81 +34,74 @@ int Iterator_Init(PyObject *module)
   if (PyType_Ready(&Iterator_Type) < 0) {
     return -1;
   }
-  Py_INCREF(&Iterator_Type);
-  PyModule_AddObject(module, "Iterator", (PyObject *)&Iterator_Type);
+  PyModule_AddObjectRef(module, "Iterator", (PyObject *)&Iterator_Type);
 
   if (PyType_Ready(&AdjacencyIterator_Type) < 0) {
     return -1;
   }
-  Py_INCREF(&AdjacencyIterator_Type);
-  PyModule_AddObject(module, "AdjacencyIterator", (PyObject *)&AdjacencyIterator_Type);
+  PyModule_AddObjectRef(module, "AdjacencyIterator", (PyObject *)&AdjacencyIterator_Type);
 
   if (PyType_Ready(&Interface0DIterator_Type) < 0) {
     return -1;
   }
-  Py_INCREF(&Interface0DIterator_Type);
-  PyModule_AddObject(module, "Interface0DIterator", (PyObject *)&Interface0DIterator_Type);
+  PyModule_AddObjectRef(module, "Interface0DIterator", (PyObject *)&Interface0DIterator_Type);
 
   if (PyType_Ready(&CurvePointIterator_Type) < 0) {
     return -1;
   }
-  Py_INCREF(&CurvePointIterator_Type);
-  PyModule_AddObject(module, "CurvePointIterator", (PyObject *)&CurvePointIterator_Type);
+  PyModule_AddObjectRef(module, "CurvePointIterator", (PyObject *)&CurvePointIterator_Type);
 
   if (PyType_Ready(&StrokeVertexIterator_Type) < 0) {
     return -1;
   }
-  Py_INCREF(&StrokeVertexIterator_Type);
-  PyModule_AddObject(module, "StrokeVertexIterator", (PyObject *)&StrokeVertexIterator_Type);
+  PyModule_AddObjectRef(module, "StrokeVertexIterator", (PyObject *)&StrokeVertexIterator_Type);
 
   if (PyType_Ready(&SVertexIterator_Type) < 0) {
     return -1;
   }
-  Py_INCREF(&SVertexIterator_Type);
-  PyModule_AddObject(module, "SVertexIterator", (PyObject *)&SVertexIterator_Type);
+  PyModule_AddObjectRef(module, "SVertexIterator", (PyObject *)&SVertexIterator_Type);
 
   if (PyType_Ready(&orientedViewEdgeIterator_Type) < 0) {
     return -1;
   }
-  Py_INCREF(&orientedViewEdgeIterator_Type);
-  PyModule_AddObject(
+  PyModule_AddObjectRef(
       module, "orientedViewEdgeIterator", (PyObject *)&orientedViewEdgeIterator_Type);
 
   if (PyType_Ready(&ViewEdgeIterator_Type) < 0) {
     return -1;
   }
-  Py_INCREF(&ViewEdgeIterator_Type);
-  PyModule_AddObject(module, "ViewEdgeIterator", (PyObject *)&ViewEdgeIterator_Type);
+  PyModule_AddObjectRef(module, "ViewEdgeIterator", (PyObject *)&ViewEdgeIterator_Type);
 
   if (PyType_Ready(&ChainingIterator_Type) < 0) {
     return -1;
   }
-  Py_INCREF(&ChainingIterator_Type);
-  PyModule_AddObject(module, "ChainingIterator", (PyObject *)&ChainingIterator_Type);
+  PyModule_AddObjectRef(module, "ChainingIterator", (PyObject *)&ChainingIterator_Type);
 
   if (PyType_Ready(&ChainPredicateIterator_Type) < 0) {
     return -1;
   }
-  Py_INCREF(&ChainPredicateIterator_Type);
-  PyModule_AddObject(module, "ChainPredicateIterator", (PyObject *)&ChainPredicateIterator_Type);
+  PyModule_AddObjectRef(
+      module, "ChainPredicateIterator", (PyObject *)&ChainPredicateIterator_Type);
 
   if (PyType_Ready(&ChainSilhouetteIterator_Type) < 0) {
     return -1;
   }
-  Py_INCREF(&ChainSilhouetteIterator_Type);
-  PyModule_AddObject(module, "ChainSilhouetteIterator", (PyObject *)&ChainSilhouetteIterator_Type);
+  PyModule_AddObjectRef(
+      module, "ChainSilhouetteIterator", (PyObject *)&ChainSilhouetteIterator_Type);
 
   return 0;
 }
 
 //------------------------INSTANCE METHODS ----------------------------------
 
-PyDoc_STRVAR(Iterator_doc,
-             "Base class to define iterators.\n"
-             "\n"
-             ".. method:: __init__()\n"
-             "\n"
-             "   Default constructor.");
+PyDoc_STRVAR(
+    /* Wrap. */
+    Iterator_doc,
+    "Base class to define iterators.\n"
+    "\n"
+    ".. method:: __init__()\n"
+    "\n"
+    "   Default constructor.");
 
 static int Iterator_init(BPy_Iterator *self, PyObject *args, PyObject *kwds)
 {
@@ -148,10 +125,12 @@ static PyObject *Iterator_repr(BPy_Iterator *self)
   return PyUnicode_FromFormat("type: %s - address: %p", Py_TYPE(self)->tp_name, self->it);
 }
 
-PyDoc_STRVAR(Iterator_increment_doc,
-             ".. method:: increment()\n"
-             "\n"
-             "   Makes the iterator point the next element.");
+PyDoc_STRVAR(
+    /* Wrap. */
+    Iterator_increment_doc,
+    ".. method:: increment()\n"
+    "\n"
+    "   Makes the iterator point the next element.");
 
 static PyObject *Iterator_increment(BPy_Iterator *self)
 {
@@ -163,10 +142,12 @@ static PyObject *Iterator_increment(BPy_Iterator *self)
   Py_RETURN_NONE;
 }
 
-PyDoc_STRVAR(Iterator_decrement_doc,
-             ".. method:: decrement()\n"
-             "\n"
-             "   Makes the iterator point the previous element.");
+PyDoc_STRVAR(
+    /* Wrap. */
+    Iterator_decrement_doc,
+    ".. method:: decrement()\n"
+    "\n"
+    "   Makes the iterator point the previous element.");
 
 static PyObject *Iterator_decrement(BPy_Iterator *self)
 {
@@ -186,32 +167,38 @@ static PyMethodDef BPy_Iterator_methods[] = {
 
 /*----------------------Iterator get/setters ----------------------------*/
 
-PyDoc_STRVAR(Iterator_name_doc,
-             "The string of the name of this iterator.\n"
-             "\n"
-             ":type: str");
+PyDoc_STRVAR(
+    /* Wrap. */
+    Iterator_name_doc,
+    "The string of the name of this iterator.\n"
+    "\n"
+    ":type: str");
 
-static PyObject *Iterator_name_get(BPy_Iterator *self, void *UNUSED(closure))
+static PyObject *Iterator_name_get(BPy_Iterator *self, void * /*closure*/)
 {
   return PyUnicode_FromString(Py_TYPE(self)->tp_name);
 }
 
-PyDoc_STRVAR(Iterator_is_begin_doc,
-             "True if the iterator points to the first element.\n"
-             "\n"
-             ":type: bool");
+PyDoc_STRVAR(
+    /* Wrap. */
+    Iterator_is_begin_doc,
+    "True if the iterator points to the first element.\n"
+    "\n"
+    ":type: bool");
 
-static PyObject *Iterator_is_begin_get(BPy_Iterator *self, void *UNUSED(closure))
+static PyObject *Iterator_is_begin_get(BPy_Iterator *self, void * /*closure*/)
 {
   return PyBool_from_bool(self->it->isBegin());
 }
 
-PyDoc_STRVAR(Iterator_is_end_doc,
-             "True if the iterator points to the last element.\n"
-             "\n"
-             ":type: bool");
+PyDoc_STRVAR(
+    /* Wrap. */
+    Iterator_is_end_doc,
+    "True if the iterator points to the last element.\n"
+    "\n"
+    ":type: bool");
 
-static PyObject *Iterator_is_end_get(BPy_Iterator *self, void *UNUSED(closure))
+static PyObject *Iterator_is_end_get(BPy_Iterator *self, void * /*closure*/)
 {
   return PyBool_from_bool(self->it->isEnd());
 }
@@ -226,47 +213,44 @@ static PyGetSetDef BPy_Iterator_getseters[] = {
 /*-----------------------BPy_Iterator type definition ------------------------------*/
 
 PyTypeObject Iterator_Type = {
-    PyVarObject_HEAD_INIT(nullptr, 0) "Iterator", /* tp_name */
-    sizeof(BPy_Iterator),                         /* tp_basicsize */
-    0,                                            /* tp_itemsize */
-    (destructor)Iterator_dealloc,                 /* tp_dealloc */
-    0,                                            /* tp_vectorcall_offset */
-    nullptr,                                      /* tp_getattr */
-    nullptr,                                      /* tp_setattr */
-    nullptr,                                      /* tp_reserved */
-    (reprfunc)Iterator_repr,                      /* tp_repr */
-    nullptr,                                      /* tp_as_number */
-    nullptr,                                      /* tp_as_sequence */
-    nullptr,                                      /* tp_as_mapping */
-    nullptr,                                      /* tp_hash */
-    nullptr,                                      /* tp_call */
-    nullptr,                                      /* tp_str */
-    nullptr,                                      /* tp_getattro */
-    nullptr,                                      /* tp_setattro */
-    nullptr,                                      /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,     /* tp_flags */
-    Iterator_doc,                                 /* tp_doc */
-    nullptr,                                      /* tp_traverse */
-    nullptr,                                      /* tp_clear */
-    nullptr,                                      /* tp_richcompare */
-    0,                                            /* tp_weaklistoffset */
-    nullptr,                                      /* tp_iter */
-    nullptr,                                      /* tp_iternext */
-    BPy_Iterator_methods,                         /* tp_methods */
-    nullptr,                                      /* tp_members */
-    BPy_Iterator_getseters,                       /* tp_getset */
-    nullptr,                                      /* tp_base */
-    nullptr,                                      /* tp_dict */
-    nullptr,                                      /* tp_descr_get */
-    nullptr,                                      /* tp_descr_set */
-    0,                                            /* tp_dictoffset */
-    (initproc)Iterator_init,                      /* tp_init */
-    nullptr,                                      /* tp_alloc */
-    PyType_GenericNew,                            /* tp_new */
+    /*ob_base*/ PyVarObject_HEAD_INIT(nullptr, 0)
+    /*tp_name*/ "Iterator",
+    /*tp_basicsize*/ sizeof(BPy_Iterator),
+    /*tp_itemsize*/ 0,
+    /*tp_dealloc*/ (destructor)Iterator_dealloc,
+    /*tp_vectorcall_offset*/ 0,
+    /*tp_getattr*/ nullptr,
+    /*tp_setattr*/ nullptr,
+    /*tp_as_async*/ nullptr,
+    /*tp_repr*/ (reprfunc)Iterator_repr,
+    /*tp_as_number*/ nullptr,
+    /*tp_as_sequence*/ nullptr,
+    /*tp_as_mapping*/ nullptr,
+    /*tp_hash*/ nullptr,
+    /*tp_call*/ nullptr,
+    /*tp_str*/ nullptr,
+    /*tp_getattro*/ nullptr,
+    /*tp_setattro*/ nullptr,
+    /*tp_as_buffer*/ nullptr,
+    /*tp_flags*/ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    /*tp_doc*/ Iterator_doc,
+    /*tp_traverse*/ nullptr,
+    /*tp_clear*/ nullptr,
+    /*tp_richcompare*/ nullptr,
+    /*tp_weaklistoffset*/ 0,
+    /*tp_iter*/ nullptr,
+    /*tp_iternext*/ nullptr,
+    /*tp_methods*/ BPy_Iterator_methods,
+    /*tp_members*/ nullptr,
+    /*tp_getset*/ BPy_Iterator_getseters,
+    /*tp_base*/ nullptr,
+    /*tp_dict*/ nullptr,
+    /*tp_descr_get*/ nullptr,
+    /*tp_descr_set*/ nullptr,
+    /*tp_dictoffset*/ 0,
+    /*tp_init*/ (initproc)Iterator_init,
+    /*tp_alloc*/ nullptr,
+    /*tp_new*/ PyType_GenericNew,
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////
-
-#ifdef __cplusplus
-}
-#endif

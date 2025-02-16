@@ -1,11 +1,9 @@
-/** \file itasc/Armature.cpp
- * \ingroup itasc
- */
-/*
- * Armature.cpp
+/* SPDX-FileCopyrightText: 2009 Benoit Bolsee
  *
- *  Created on: Feb 3, 2009
- *      Author: benoitbolsee
+ * SPDX-License-Identifier: LGPL-2.1-or-later */
+
+/** \file
+ * \ingroup intern_itasc
  */
 
 #include "Armature.hpp"

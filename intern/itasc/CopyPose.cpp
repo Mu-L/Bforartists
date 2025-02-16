@@ -1,11 +1,9 @@
-/** \file itasc/CopyPose.cpp
- * \ingroup itasc
- */
-/*
- * CopyPose.cpp
+/* SPDX-FileCopyrightText: 2009 Benoit Bolsee
  *
- *  Created on: Mar 17, 2009
- *      Author: benoit bolsee
+ * SPDX-License-Identifier: LGPL-2.1-or-later */
+
+/** \file
+ * \ingroup intern_itasc
  */
 
 #include "CopyPose.hpp"

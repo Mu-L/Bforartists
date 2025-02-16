@@ -1,23 +1,26 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2008 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2008 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
+
+#include "DNA_anim_types.h"
+#include "DNA_camera_types.h"
+#include "DNA_light_types.h"
+#include "DNA_material_types.h"
+
+#include "BLI_string.h"
+
+#include "BKE_material.hh"
+
+#include "RNA_access.hh"
+#include "RNA_path.hh"
+
+#include "ANIM_fcurve.hh"
 
 #include "BCAnimationCurve.h"
+
+#include "collada_utils.h"
+
+#include <algorithm>
 
 BCAnimationCurve::BCAnimationCurve()
 {
@@ -63,23 +66,28 @@ void BCAnimationCurve::init_pointer_rna(Object *ob)
   switch (this->curve_key.get_animation_type()) {
     case BC_ANIMATION_TYPE_BONE: {
       bArmature *arm = (bArmature *)ob->data;
-      RNA_id_pointer_create(&arm->id, &id_ptr);
-    } break;
+      id_ptr = RNA_id_pointer_create(&arm->id);
+      break;
+    }
     case BC_ANIMATION_TYPE_OBJECT: {
-      RNA_id_pointer_create(&ob->id, &id_ptr);
-    } break;
+      id_ptr = RNA_id_pointer_create(&ob->id);
+      break;
+    }
     case BC_ANIMATION_TYPE_MATERIAL: {
       Material *ma = BKE_object_material_get(ob, curve_key.get_subindex() + 1);
-      RNA_id_pointer_create(&ma->id, &id_ptr);
-    } break;
+      id_ptr = RNA_id_pointer_create(&ma->id);
+      break;
+    }
     case BC_ANIMATION_TYPE_CAMERA: {
       Camera *camera = (Camera *)ob->data;
-      RNA_id_pointer_create(&camera->id, &id_ptr);
-    } break;
+      id_ptr = RNA_id_pointer_create(&camera->id);
+      break;
+    }
     case BC_ANIMATION_TYPE_LIGHT: {
       Light *lamp = (Light *)ob->data;
-      RNA_id_pointer_create(&lamp->id, &id_ptr);
-    } break;
+      id_ptr = RNA_id_pointer_create(&lamp->id);
+      break;
+    }
     default:
       fprintf(
           stderr, "BC_animation_curve_type %d not supported", this->curve_key.get_array_index());
@@ -95,7 +103,7 @@ void BCAnimationCurve::delete_fcurve(FCurve *fcu)
 FCurve *BCAnimationCurve::create_fcurve(int array_index, const char *rna_path)
 {
   FCurve *fcu = BKE_fcurve_create();
-  fcu->flag = (FCURVE_VISIBLE | FCURVE_AUTO_HANDLES | FCURVE_SELECTED);
+  fcu->flag = (FCURVE_VISIBLE | FCURVE_SELECTED);
   fcu->rna_path = BLI_strdupn(rna_path, strlen(rna_path));
   fcu->array_index = array_index;
   return fcu;
@@ -111,8 +119,8 @@ void BCAnimationCurve::create_bezt(float frame, float output)
   bez.ipo = U.ipo_new; /* use default interpolation mode here... */
   bez.f1 = bez.f2 = bez.f3 = SELECT;
   bez.h1 = bez.h2 = HD_AUTO;
-  insert_bezt_fcurve(fcu, &bez, INSERTKEY_NOFLAGS);
-  calchandles_fcurve(fcu);
+  blender::animrig::insert_bezt_fcurve(fcu, &bez, INSERTKEY_NOFLAGS);
+  BKE_fcurve_handles_recalc(fcu);
 }
 
 BCAnimationCurve::~BCAnimationCurve()
@@ -166,39 +174,38 @@ std::string BCAnimationCurve::get_animation_name(Object *ob) const
   switch (curve_key.get_animation_type()) {
     case BC_ANIMATION_TYPE_OBJECT: {
       name = id_name(ob);
-    } break;
-
+      break;
+    }
     case BC_ANIMATION_TYPE_BONE: {
       if (fcurve == nullptr || fcurve->rna_path == nullptr) {
         name = "";
       }
       else {
-        char *boneName = BLI_str_quoted_substrN(fcurve->rna_path, "pose.bones[");
-        if (boneName) {
+        char boneName[MAXBONENAME];
+        if (BLI_str_quoted_substr(fcurve->rna_path, "pose.bones[", boneName, sizeof(boneName))) {
           name = id_name(ob) + "_" + std::string(boneName);
-          MEM_freeN(boneName);
         }
         else {
           name = "";
         }
       }
-    } break;
-
+      break;
+    }
     case BC_ANIMATION_TYPE_CAMERA: {
       Camera *camera = (Camera *)ob->data;
       name = id_name(ob) + "-" + id_name(camera) + "-camera";
-    } break;
-
+      break;
+    }
     case BC_ANIMATION_TYPE_LIGHT: {
       Light *lamp = (Light *)ob->data;
       name = id_name(ob) + "-" + id_name(lamp) + "-light";
-    } break;
-
+      break;
+    }
     case BC_ANIMATION_TYPE_MATERIAL: {
       Material *ma = BKE_object_material_get(ob, this->curve_key.get_subindex() + 1);
       name = id_name(ob) + "-" + id_name(ma) + "-material";
-    } break;
-
+      break;
+    }
     default: {
       name = "";
     }
@@ -310,9 +317,12 @@ FCurve *BCAnimationCurve::get_edit_fcurve()
 
 void BCAnimationCurve::clean_handles()
 {
+  using namespace blender::animrig;
   if (fcurve == nullptr) {
     fcurve = get_edit_fcurve();
   }
+
+  const KeyframeSettings settings = get_keyframe_settings(true);
 
   /* Keep old bezt data for copy). */
   BezTriple *old_bezts = fcurve->bezt;
@@ -324,7 +334,7 @@ void BCAnimationCurve::clean_handles()
     BezTriple *bezt = &old_bezts[i];
     float x = bezt->vec[1][0];
     float y = bezt->vec[1][1];
-    insert_vert_fcurve(fcurve, x, y, (eBezTriple_KeyframeType)BEZKEYTYPE(bezt), INSERTKEY_NOFLAGS);
+    insert_vert_fcurve(fcurve, {x, y}, settings, INSERTKEY_NOFLAGS);
     BezTriple *lastb = fcurve->bezt + (fcurve->totvert - 1);
     lastb->f1 = lastb->f2 = lastb->f3 = 0;
   }
@@ -344,8 +354,7 @@ bool BCAnimationCurve::is_transform_curve() const
 bool BCAnimationCurve::is_rotation_curve() const
 {
   std::string channel_type = this->get_channel_type();
-  return (channel_type == "rotation" || channel_type == "rotation_euler" ||
-          channel_type == "rotation_quaternion");
+  return ELEM(channel_type, "rotation", "rotation_euler", "rotation_quaternion");
 }
 
 float BCAnimationCurve::get_value(const float frame)
@@ -358,12 +367,8 @@ float BCAnimationCurve::get_value(const float frame)
 
 void BCAnimationCurve::update_range(float val)
 {
-  if (val < min) {
-    min = val;
-  }
-  if (val > max) {
-    max = val;
-  }
+  min = std::min(val, min);
+  max = std::max(val, max);
 }
 
 void BCAnimationCurve::init_range(float val)
@@ -388,9 +393,11 @@ void BCAnimationCurve::adjust_range(const int frame_index)
 
 void BCAnimationCurve::add_value(const float val, const int frame_index)
 {
+  using namespace blender::animrig;
+  const KeyframeSettings settings = get_keyframe_settings(true);
   FCurve *fcu = get_edit_fcurve();
   fcu->auto_smoothing = U.auto_smoothing_new;
-  insert_vert_fcurve(fcu, frame_index, val, BEZT_KEYTYPE_KEYFRAME, INSERTKEY_NOFLAGS);
+  insert_vert_fcurve(fcu, {float(frame_index), val}, settings, INSERTKEY_NOFLAGS);
 
   if (fcu->totvert == 1) {
     init_range(val);
@@ -441,10 +448,10 @@ bool BCAnimationCurve::add_value_from_rna(const int frame_index)
       if ((array_index >= 0) && (array_index < RNA_property_array_length(&ptr, prop))) {
         switch (RNA_property_type(prop)) {
           case PROP_BOOLEAN:
-            value = (float)RNA_property_boolean_get_index(&ptr, prop, array_index);
+            value = float(RNA_property_boolean_get_index(&ptr, prop, array_index));
             break;
           case PROP_INT:
-            value = (float)RNA_property_int_get_index(&ptr, prop, array_index);
+            value = float(RNA_property_int_get_index(&ptr, prop, array_index));
             break;
           case PROP_FLOAT:
             value = RNA_property_float_get_index(&ptr, prop, array_index);
@@ -464,16 +471,16 @@ bool BCAnimationCurve::add_value_from_rna(const int frame_index)
       /* not an array */
       switch (RNA_property_type(prop)) {
         case PROP_BOOLEAN:
-          value = (float)RNA_property_boolean_get(&ptr, prop);
+          value = float(RNA_property_boolean_get(&ptr, prop));
           break;
         case PROP_INT:
-          value = (float)RNA_property_int_get(&ptr, prop);
+          value = float(RNA_property_int_get(&ptr, prop));
           break;
         case PROP_FLOAT:
           value = RNA_property_float_get(&ptr, prop);
           break;
         case PROP_ENUM:
-          value = (float)RNA_property_enum_get(&ptr, prop);
+          value = float(RNA_property_enum_get(&ptr, prop));
           break;
         default:
           fprintf(stderr,
@@ -644,9 +651,7 @@ bool BCCurveKey::operator<(const BCCurveKey &other) const
   return this->curve_array_index < other.curve_array_index;
 }
 
-BCBezTriple::BCBezTriple(BezTriple &bezt) : bezt(bezt)
-{
-}
+BCBezTriple::BCBezTriple(BezTriple &bezt) : bezt(bezt) {}
 
 float BCBezTriple::get_frame() const
 {

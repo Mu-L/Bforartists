@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright 2009-2016 Jörg Müller
+ * Copyright 2009-2024 Jörg Müller
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -135,7 +135,7 @@ public:
 	 * \exception Exception Thrown if the file specified does not exist or
 	 *            cannot be read with ffmpeg.
 	 */
-	FFMPEGWriter(std::string filename, DeviceSpecs specs, Container format, Codec codec, unsigned int bitrate);
+	FFMPEGWriter(const std::string &filename, DeviceSpecs specs, Container format, Codec codec, unsigned int bitrate);
 
 	/**
 	 * Destroys the writer and closes the file.

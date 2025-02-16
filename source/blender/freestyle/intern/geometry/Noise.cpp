@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2011-2022 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -26,6 +14,7 @@
 
 #include "BLI_compiler_attrs.h"
 #include "BLI_rand.h"
+#include "BLI_sys_types.h"
 
 #include "Noise.h"
 
@@ -37,8 +26,9 @@ namespace Freestyle {
 #  define REALSCALE (2.0 / 65536.0)
 #  define NREALSCALE (2.0 / 4096.0)
 
-#  define HASH3D(a, b, c) hashTable[hashTable[hashTable[(a)&0xfff] ^ ((b)&0xfff)] ^ ((c)&0xfff)]
-#  define HASH(a, b, c) (xtab[(xtab[(xtab[(a)&0xff] ^ (b)) & 0xff] ^ (c)) & 0xff] & 0xff)
+#  define HASH3D(a, b, c) \
+    hashTable[hashTable[hashTable[(a) & 0xfff] ^ ((b) & 0xfff)] ^ ((c) & 0xfff)]
+#  define HASH(a, b, c) (xtab[(xtab[(xtab[(a) & 0xff] ^ (b)) & 0xff] ^ (c)) & 0xff] & 0xff)
 #  define INCRSUM(m, s, x, y, z) \
     ((s) * (RTable[m] * 0.5 + RTable[m + 1] * (x) + RTable[m + 2] * (y) + RTable[m + 3] * (z)))
 
@@ -59,7 +49,7 @@ namespace Freestyle {
     (t) = (i) + (N); \
     (r0) = modff((t), &(u)); \
     (r1) = (r0)-1.0; \
-    (b0) = ((int)(u)) & BM; \
+    (b0) = int(u) & BM; \
     (b1) = ((b0) + 1) & BM; \
   } \
   (void)0
@@ -83,7 +73,7 @@ static void normalize3(float v[3])
   v[2] = v[2] / s;
 }
 
-float Noise::turbulence1(float arg, float freq, float amp, unsigned oct)
+float Noise::turbulence1(float arg, float freq, float amp, uint oct)
 {
   float t;
   float vec;
@@ -95,7 +85,7 @@ float Noise::turbulence1(float arg, float freq, float amp, unsigned oct)
   return t;
 }
 
-float Noise::turbulence2(Vec2f &v, float freq, float amp, unsigned oct)
+float Noise::turbulence2(Vec2f &v, float freq, float amp, uint oct)
 {
   float t;
   Vec2f vec;
@@ -108,7 +98,7 @@ float Noise::turbulence2(Vec2f &v, float freq, float amp, unsigned oct)
   return t;
 }
 
-float Noise::turbulence3(Vec3f &v, float freq, float amp, unsigned oct)
+float Noise::turbulence3(Vec3f &v, float freq, float amp, uint oct)
 {
   float t;
   Vec3f vec;
@@ -159,7 +149,7 @@ float Noise::smoothNoise2(Vec2f &vec)
   sx = SCURVE(rx0);
   sy = SCURVE(ry0);
 
-#define AT2(rx, ry) ((rx)*q[0] + (ry)*q[1])
+#define AT2(rx, ry) ((rx) * q[0] + (ry) * q[1])
 
   q = g2[b00];
   u = AT2(rx0, ry0);
@@ -200,7 +190,7 @@ float Noise::smoothNoise3(Vec3f &vec)
   sy = SCURVE(ry0);
   sz = SCURVE(rz0);
 
-#define AT3(rx, ry, rz) ((rx)*q[0] + (ry)*q[1] + (rz)*q[2])
+#define AT3(rx, ry, rz) ((rx) * q[0] + (ry) * q[1] + (rz) * q[2])
 
   q = g3[b00 + bz0];
   u = AT3(rx0, ry0, rz0);
@@ -243,15 +233,15 @@ Noise::Noise(long seed)
 
   for (i = 0; i < _NOISE_B; i++) {
     p[i] = i;
-    g1[i] = (float)((BLI_rng_get_int(rng) % (_NOISE_B + _NOISE_B)) - _NOISE_B) / _NOISE_B;
+    g1[i] = float((BLI_rng_get_int(rng) % (_NOISE_B + _NOISE_B)) - _NOISE_B) / _NOISE_B;
 
     for (j = 0; j < 2; j++) {
-      g2[i][j] = (float)((BLI_rng_get_int(rng) % (_NOISE_B + _NOISE_B)) - _NOISE_B) / _NOISE_B;
+      g2[i][j] = float((BLI_rng_get_int(rng) % (_NOISE_B + _NOISE_B)) - _NOISE_B) / _NOISE_B;
     }
     normalize2(g2[i]);
 
     for (j = 0; j < 3; j++) {
-      g3[i][j] = (float)((BLI_rng_get_int(rng) % (_NOISE_B + _NOISE_B)) - _NOISE_B) / _NOISE_B;
+      g3[i][j] = float((BLI_rng_get_int(rng) % (_NOISE_B + _NOISE_B)) - _NOISE_B) / _NOISE_B;
     }
     normalize3(g3[i]);
   }

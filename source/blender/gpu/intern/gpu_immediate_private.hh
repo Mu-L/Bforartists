@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2016 by Mike Erwin. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2016 by Mike Erwin.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup gpu
@@ -25,17 +10,19 @@
 
 #pragma once
 
-#include "GPU_batch.h"
-#include "GPU_primitive.h"
-#include "GPU_shader.h"
-#include "GPU_vertex_format.h"
+#include <optional>
+
+#include "GPU_batch.hh"
+#include "GPU_primitive.hh"
+#include "GPU_shader.hh"
+#include "GPU_vertex_format.hh"
 
 namespace blender::gpu {
 
 class Immediate {
  public:
   /** Pointer to the mapped buffer data for the current vertex. */
-  uchar *vertex_data = NULL;
+  uchar *vertex_data = nullptr;
   /** Current vertex index. */
   uint vertex_idx = 0;
   /** Length of the buffer in vertices. */
@@ -48,31 +35,33 @@ class Immediate {
   /** Current draw call specification. */
   GPUPrimType prim_type = GPU_PRIM_NONE;
   GPUVertFormat vertex_format = {};
-  GPUShader *shader = NULL;
+  GPUShader *shader = nullptr;
   /** Enforce strict vertex count (disabled when using #immBeginAtMost). */
   bool strict_vertex_len = true;
 
   /** Batch in construction when using #immBeginBatch. */
-  GPUBatch *batch = NULL;
+  Batch *batch = nullptr;
 
   /** Wide Line workaround. */
 
   /** Previously bound shader to restore after drawing. */
-  eGPUBuiltinShader prev_builtin_shader = GPU_SHADER_TEXT;
-  /** Builtin shader index. Used to test if the workaround can be done. */
-  eGPUBuiltinShader builtin_shader_bound = GPU_SHADER_TEXT;
+  std::optional<eGPUBuiltinShader> prev_builtin_shader;
+  /** Builtin shader index. Used to test if the line width workaround can be done. */
+  std::optional<eGPUBuiltinShader> builtin_shader_bound;
   /** Uniform color: Kept here to update the wide-line shader just before #immBegin. */
   float uniform_color[4];
 
- public:
-  Immediate(){};
-  virtual ~Immediate(){};
+  Immediate() = default;
+  virtual ~Immediate() = default;
 
-  virtual uchar *begin(void) = 0;
-  virtual void end(void) = 0;
+  virtual uchar *begin() = 0;
+  virtual void end() = 0;
+
+  /* To be called after polyline SSBO binding. */
+  void polyline_draw_workaround(uint64_t offset);
 };
 
 }  // namespace blender::gpu
 
-void immActivate(void);
-void immDeactivate(void);
+void immActivate();
+void immDeactivate();

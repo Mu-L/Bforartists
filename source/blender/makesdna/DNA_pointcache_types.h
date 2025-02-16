@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
@@ -22,10 +10,6 @@
 
 #include "DNA_listBase.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /**
  * Point cache file data types:
  * - Used as `(1 << flag)` so poke jahka if you reach the limit of 15.
@@ -33,23 +17,27 @@ extern "C" {
  *   - #BKE_ptcache_data_size()
  *   - #ptcache_file_pointers_init()
  */
-#define BPHYS_DATA_INDEX 0
-#define BPHYS_DATA_LOCATION 1
-#define BPHYS_DATA_SMOKE_LOW 1
-#define BPHYS_DATA_VELOCITY 2
-#define BPHYS_DATA_SMOKE_HIGH 2
-#define BPHYS_DATA_ROTATION 3
-#define BPHYS_DATA_DYNAMICPAINT 3
-#define BPHYS_DATA_AVELOCITY 4 /* used for particles */
-#define BPHYS_DATA_XCONST 4    /* used for cloth */
-#define BPHYS_DATA_SIZE 5
-#define BPHYS_DATA_TIMES 6
-#define BPHYS_DATA_BOIDS 7
+enum {
+  BPHYS_DATA_INDEX = 0,
+  BPHYS_DATA_LOCATION = 1,
+  BPHYS_DATA_SMOKE_LOW = 1,
+  BPHYS_DATA_VELOCITY = 2,
+  BPHYS_DATA_SMOKE_HIGH = 2,
+  BPHYS_DATA_ROTATION = 3,
+  BPHYS_DATA_DYNAMICPAINT = 3,
+  BPHYS_DATA_AVELOCITY = 4, /* Used for particles. */
+  BPHYS_DATA_XCONST = 4,    /* Used for cloth. */
+  BPHYS_DATA_SIZE = 5,
+  BPHYS_DATA_TIMES = 6,
+  BPHYS_DATA_BOIDS = 7,
 
 #define BPHYS_TOT_DATA 8
+};
 
-#define BPHYS_EXTRA_FLUID_SPRINGS 1
-#define BPHYS_EXTRA_CLOTH_ACCELERATION 2
+enum {
+  BPHYS_EXTRA_FLUID_SPRINGS = 1,
+  BPHYS_EXTRA_CLOTH_ACCELERATION = 2,
+};
 
 typedef struct PTCacheExtra {
   struct PTCacheExtra *next, *prev;
@@ -107,6 +95,7 @@ typedef struct PointCache {
   int totpoint;
   /** Modifier stack index. */
   int index;
+  /** #PTCACHE_COMPRESS_NO and others. */
   short compression;
   char _pad0[2];
 
@@ -131,8 +120,8 @@ typedef struct PointCache {
   void (*free_edit)(struct PTCacheEdit *edit);
 } PointCache;
 
+/** #PointCache.flag */
 enum {
-  /* pointcache->flag */
   PTCACHE_BAKED = 1 << 0,
   PTCACHE_OUTDATED = 1 << 1,
   PTCACHE_SIMULATION_VALID = 1 << 2,
@@ -140,12 +129,12 @@ enum {
   //  PTCACHE_BAKE_EDIT = 1 << 4,
   //  PTCACHE_BAKE_EDIT_ACTIVE = 1 << 5,
   PTCACHE_DISK_CACHE = 1 << 6,
-  /* removed since 2.64 - T30974, could be added back in a more useful way */
+  /* removed since 2.64 - #30974, could be added back in a more useful way */
   //  PTCACHE_QUICK_CACHE = 1 << 7,
   PTCACHE_FRAMES_SKIPPED = 1 << 8,
   PTCACHE_EXTERNAL = 1 << 9,
   PTCACHE_READ_INFO = 1 << 10,
-  /** Don't use the filename of the blend-file the data is linked from (write a local cache). */
+  /** Don't use the file-path of the blend-file the data is linked from (write a local cache). */
   PTCACHE_IGNORE_LIBPATH = 1 << 11,
   /**
    * High resolution cache is saved for smoke for backwards compatibility,
@@ -160,10 +149,8 @@ enum {
   PTCACHE_FLAGS_COPY = PTCACHE_DISK_CACHE | PTCACHE_EXTERNAL | PTCACHE_IGNORE_LIBPATH,
 };
 
-#define PTCACHE_COMPRESS_NO 0
-#define PTCACHE_COMPRESS_LZO 1
-#define PTCACHE_COMPRESS_LZMA 2
-
-#ifdef __cplusplus
-}
-#endif
+enum {
+  PTCACHE_COMPRESS_NO = 0,
+  PTCACHE_COMPRESS_LZO = 1,
+  PTCACHE_COMPRESS_LZMA = 2,
+};

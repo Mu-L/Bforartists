@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 #pragma once
 
 /** \file
@@ -38,11 +26,10 @@
  */
 
 #include <algorithm>
-#include <stdlib.h>
+#include <cstdlib>
 
 #include "MEM_guardedalloc.h"
 
-#include "BLI_math_base.h"
 #include "BLI_utildefines.h"
 
 namespace blender {
@@ -66,6 +53,26 @@ class GuardedAllocator {
 };
 
 /**
+ * Like #GuardedAllocator, but makes sure each allocation has a minimum alignment. One use case is
+ * reusing an allocation between multiple types that have different alignment requirements. The
+ * default alignment template parameter should be large enough for any type in practice.
+ */
+template<size_t Alignment = 64ul> class GuardedAlignedAllocator {
+ public:
+  static constexpr size_t min_alignment = Alignment;
+
+  void *allocate(size_t size, size_t alignment, const char *name)
+  {
+    return MEM_mallocN_aligned(size, std::max(alignment, min_alignment), name);
+  }
+
+  void deallocate(void *ptr)
+  {
+    MEM_freeN(ptr);
+  }
+};
+
+/**
  * This is a wrapper around malloc/free. Only use this when the GuardedAllocator cannot be
  * used. This can be the case when the allocated memory might live longer than Blender's
  * allocator. For example, when the memory is owned by a static variable.
@@ -77,15 +84,14 @@ class RawAllocator {
   };
 
  public:
-  void *allocate(size_t size, size_t alignment, const char *UNUSED(name))
+  void *allocate(size_t size, size_t alignment, const char * /*name*/)
   {
-    BLI_assert(is_power_of_2_i(static_cast<int>(alignment)));
+    BLI_assert(is_power_of_2(int(alignment)));
     void *ptr = malloc(size + alignment + sizeof(MemHead));
     void *used_ptr = reinterpret_cast<void *>(
-        reinterpret_cast<uintptr_t>(POINTER_OFFSET(ptr, alignment + sizeof(MemHead))) &
-        ~(static_cast<uintptr_t>(alignment) - 1));
-    int offset = static_cast<int>((intptr_t)used_ptr - (intptr_t)ptr);
-    BLI_assert(offset >= static_cast<int>(sizeof(MemHead)));
+        uintptr_t(POINTER_OFFSET(ptr, alignment + sizeof(MemHead))) & ~(uintptr_t(alignment) - 1));
+    int offset = int(intptr_t(used_ptr) - intptr_t(ptr));
+    BLI_assert(offset >= int(sizeof(MemHead)));
     (static_cast<MemHead *>(used_ptr) - 1)->offset = offset;
     return used_ptr;
   }

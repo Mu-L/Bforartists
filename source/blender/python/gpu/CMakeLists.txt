@@ -1,82 +1,77 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2023 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(INC
   .
-  ../../blenkernel
-  ../../blenlib
   ../../editors/include
-  ../../gpu
-  ../../imbuf
-  ../../makesdna
-  ../../../../intern/glew-mx
-  ../../../../intern/guardedalloc
 )
 
 set(INC_SYS
-  ${GLEW_INCLUDE_PATH}
   ${PYTHON_INCLUDE_DIRS}
 )
 
 set(SRC
-  gpu_py.c
-  gpu_py_api.c
-  gpu_py_batch.c
-  gpu_py_buffer.c
-  gpu_py_capabilities.c
-  gpu_py_element.c
-  gpu_py_framebuffer.c
-  gpu_py_matrix.c
-  gpu_py_offscreen.c
-  gpu_py_platform.c
-  gpu_py_select.c
-  gpu_py_shader.c
-  gpu_py_state.c
-  gpu_py_texture.c
-  gpu_py_types.c
-  gpu_py_uniformbuffer.c
-  gpu_py_vertex_buffer.c
-  gpu_py_vertex_format.c
+  gpu_py.cc
+  gpu_py_api.cc
+  gpu_py_batch.cc
+  gpu_py_buffer.cc
+  gpu_py_capabilities.cc
+  gpu_py_compute.cc
+  gpu_py_element.cc
+  gpu_py_framebuffer.cc
+  gpu_py_matrix.cc
+  gpu_py_offscreen.cc
+  gpu_py_platform.cc
+  gpu_py_select.cc
+  gpu_py_shader.cc
+  gpu_py_shader_create_info.cc
+  gpu_py_state.cc
+  gpu_py_texture.cc
+  gpu_py_types.cc
+  gpu_py_uniformbuffer.cc
+  gpu_py_vertex_buffer.cc
+  gpu_py_vertex_format.cc
 
-  gpu_py.h
-  gpu_py_api.h
-  gpu_py_batch.h
-  gpu_py_buffer.h
-  gpu_py_capabilities.h
-  gpu_py_element.h
-  gpu_py_framebuffer.h
-  gpu_py_matrix.h
-  gpu_py_offscreen.h
-  gpu_py_platform.h
-  gpu_py_select.h
-  gpu_py_shader.h
-  gpu_py_state.h
-  gpu_py_texture.h
-  gpu_py_types.h
-  gpu_py_uniformbuffer.h
-  gpu_py_vertex_buffer.h
-  gpu_py_vertex_format.h
+  gpu_py.hh
+  gpu_py_api.hh
+  gpu_py_batch.hh
+  gpu_py_buffer.hh
+  gpu_py_capabilities.hh
+  gpu_py_compute.hh
+  gpu_py_element.hh
+  gpu_py_framebuffer.hh
+  gpu_py_matrix.hh
+  gpu_py_offscreen.hh
+  gpu_py_platform.hh
+  gpu_py_select.hh
+  gpu_py_shader.hh
+  gpu_py_state.hh
+  gpu_py_texture.hh
+  gpu_py_types.hh
+  gpu_py_uniformbuffer.hh
+  gpu_py_vertex_buffer.hh
+  gpu_py_vertex_format.hh
 )
 
 set(LIB
   ${PYTHON_LINKFLAGS}
   ${PYTHON_LIBRARIES}
+  PRIVATE bf::blenkernel
+  PRIVATE bf::blenlib
+  PRIVATE bf::dna
+  PRIVATE bf::gpu
+  PRIVATE bf::imbuf
+  PRIVATE bf::intern::guardedalloc
 )
 
-add_definitions(${GL_DEFINITIONS})
+if(WITH_OPENGL_BACKEND)
+  list(APPEND INC_SYS
+    ${Epoxy_INCLUDE_DIRS}
+  )
+  list(APPEND LIB
+    ${Epoxy_LIBRARIES}
+  )
+endif()
 
 blender_add_lib(bf_python_gpu "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")

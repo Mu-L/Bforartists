@@ -1,22 +1,18 @@
+/* SPDX-FileCopyrightText: 2020-2022 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-uniform sampler2D colorBuf;
-uniform sampler2D revealBuf;
-uniform sampler2D maskBuf;
-uniform int blendMode;
-uniform float blendOpacity;
+#include "infos/gpencil_info.hh"
 
-in vec4 uvcoordsvar;
+FRAGMENT_SHADER_CREATE_INFO(gpencil_layer_blend)
 
-/* Reminder: This is considered SRC color in blend equations.
- * Same operation on all buffers. */
-layout(location = 0) out vec4 fragColor;
-layout(location = 1) out vec4 fragRevealage;
+#include "gpencil_common_lib.glsl"
 
 void main()
 {
   vec4 color;
 
-  /* Remember, this is associated alpha (aka. premult). */
+  /* Remember, this is associated alpha (aka. pre-multiply). */
   color.rgb = textureLod(colorBuf, uvcoordsvar.xy, 0).rgb;
   /* Stroke only render mono-chromatic revealage. We convert to alpha. */
   color.a = 1.0 - textureLod(revealBuf, uvcoordsvar.xy, 0).r;

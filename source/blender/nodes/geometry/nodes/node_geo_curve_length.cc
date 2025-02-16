@@ -1,58 +1,75 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#include "BKE_spline.hh"
+#include "BKE_curves.hh"
+#include "BKE_grease_pencil.hh"
+
 #include "node_geometry_util.hh"
 
-static bNodeSocketTemplate geo_node_curve_length_in[] = {
-    {SOCK_GEOMETRY, N_("Curve")},
-    {-1, ""},
-};
+namespace blender::nodes::node_geo_curve_length_cc {
 
-static bNodeSocketTemplate geo_node_curve_length_out[] = {
-    {SOCK_FLOAT, N_("Length")},
-    {-1, ""},
-};
-
-namespace blender::nodes {
-
-static void geo_node_curve_length_exec(GeoNodeExecParams params)
+static void node_declare(NodeDeclarationBuilder &b)
 {
-  GeometrySet curve_set = params.extract_input<GeometrySet>("Curve");
-  curve_set = bke::geometry_set_realize_instances(curve_set);
-  if (!curve_set.has_curve()) {
-    params.set_output("Length", 0.0f);
+  b.add_input<decl::Geometry>("Curve").supported_type(
+      {GeometryComponent::Type::Curve, GeometryComponent::Type::GreasePencil});
+  b.add_output<decl::Float>("Length");
+}
+
+static float curves_total_length(const bke::CurvesGeometry &curves)
+{
+  const VArray<bool> cyclic = curves.cyclic();
+  curves.ensure_evaluated_lengths();
+
+  float total_length = 0.0f;
+  for (const int i : curves.curves_range()) {
+    total_length += curves.evaluated_length_total_for_curve(i, cyclic[i]);
+  }
+  return total_length;
+}
+
+static void node_geo_exec(GeoNodeExecParams params)
+{
+  GeometrySet geometry_set = params.extract_input<GeometrySet>("Curve");
+  float length = 0.0f;
+  if (geometry_set.has_curves()) {
+    const Curves &curves_id = *geometry_set.get_curves();
+    const bke::CurvesGeometry &curves = curves_id.geometry.wrap();
+    length += curves_total_length(curves);
+  }
+  else if (geometry_set.has_grease_pencil()) {
+    using namespace bke::greasepencil;
+    const GreasePencil &grease_pencil = *geometry_set.get_grease_pencil();
+    for (const int layer_index : grease_pencil.layers().index_range()) {
+      const Drawing *drawing = grease_pencil.get_eval_drawing(grease_pencil.layer(layer_index));
+      if (drawing == nullptr) {
+        continue;
+      }
+      const bke::CurvesGeometry &curves = drawing->strokes();
+      length += curves_total_length(curves);
+    }
+  }
+  else {
+    params.set_default_remaining_outputs();
     return;
   }
-  const CurveEval &curve = *curve_set.get_curve_for_read();
-  float length = 0.0f;
-  for (const SplinePtr &spline : curve.splines()) {
-    length += spline->length();
-  }
+
   params.set_output("Length", length);
 }
 
-}  // namespace blender::nodes
-
-void register_node_type_geo_curve_length()
+static void node_register()
 {
-  static bNodeType ntype;
+  static blender::bke::bNodeType ntype;
 
-  geo_node_type_base(&ntype, GEO_NODE_CURVE_LENGTH, "Curve Length", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(&ntype, geo_node_curve_length_in, geo_node_curve_length_out);
-  ntype.geometry_node_execute = blender::nodes::geo_node_curve_length_exec;
-  nodeRegisterType(&ntype);
+  geo_node_type_base(&ntype, "GeometryNodeCurveLength", GEO_NODE_CURVE_LENGTH);
+  ntype.ui_name = "Curve Length";
+  ntype.ui_description = "Retrieve the length of all splines added together";
+  ntype.enum_name_legacy = "CURVE_LENGTH";
+  ntype.nclass = NODE_CLASS_GEOMETRY;
+  ntype.declare = node_declare;
+  ntype.geometry_node_execute = node_geo_exec;
+  blender::bke::node_register_type(&ntype);
 }
+NOD_REGISTER_NODE(node_register)
+
+}  // namespace blender::nodes::node_geo_curve_length_cc

@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2001-2002 NaN Holding BV. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
@@ -26,10 +11,6 @@
 #include "DNA_ID.h"
 #include "DNA_defs.h"
 #include "DNA_listBase.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 struct AnimData;
 struct BoundBox;
@@ -58,7 +39,7 @@ typedef struct MetaElem {
   float rad2;
   /** Stiffness, how much of the element to fill. */
   float s;
-  /** Old, only used for backwards compat. use dimensions now. */
+  /** Old, only used for backwards compatibility. use dimensions now. */
   float len;
 
   /** Matrix and inverted matrix. */
@@ -70,7 +51,6 @@ typedef struct MetaBall {
   struct AnimData *adt;
 
   ListBase elems;
-  ListBase disp;
   /** Not saved in files, note we use pointer for editmode check. */
   ListBase *editelems;
   /** Old animation system, deprecated for 2.5. */
@@ -79,12 +59,12 @@ typedef struct MetaBall {
   /* material of the mother ball will define the material used of all others */
   struct Material **mat;
 
-  /** Flag is enum for updates, flag2 is bitflags for settings. */
+  /** Flag is enum for updates, flag2 is bit-flags for settings. */
   char flag, flag2;
   short totcol;
-  /** Used to store MB_AUTOSPACE. */
-  short texflag;
-  char _pad[1];
+  /** Used to store #MB_TEXTURE_FLAG_AUTO. */
+  char texspace_flag;
+  char _pad[2];
 
   /**
    * ID data is older than edit-mode data (TODO: move to edit-mode struct).
@@ -92,10 +72,8 @@ typedef struct MetaBall {
    */
   char needs_flush_to_id;
 
-  /* texture space, copied as one block in editobject.c */
-  float loc[3];
-  float size[3];
-  float rot[3];
+  float texspace_location[3];
+  float texspace_size[3];
 
   /** Display and render res. */
   float wiresize, rendersize;
@@ -105,44 +83,50 @@ typedef struct MetaBall {
    * but these may also have their own thresh as an offset */
   float thresh;
 
-  /* used in editmode */
-  // ListBase edit_elems;
+  char _pad0[4];
+
+  /** The active meta-element (used in edit-mode). */
   MetaElem *lastelem;
 
-  void *batch_cache;
 } MetaBall;
 
 /* **************** METABALL ********************* */
 
-/* texflag */
-#define MB_AUTOSPACE 1
+/** #MetaBall::texspace_flag */
+enum {
+  MB_TEXSPACE_FLAG_AUTO = 1 << 0,
+};
 
-/* mb->flag */
-#define MB_UPDATE_ALWAYS 0
-#define MB_UPDATE_HALFRES 1
-#define MB_UPDATE_FAST 2
-#define MB_UPDATE_NEVER 3
+/** #MetaBall::flag */
+enum {
+  MB_UPDATE_ALWAYS = 0,
+  MB_UPDATE_HALFRES = 1,
+  MB_UPDATE_FAST = 2,
+  MB_UPDATE_NEVER = 3,
+};
 
-/* mb->flag2 */
-#define MB_DS_EXPAND (1 << 0)
+/** #MetaBall::flag2 */
+enum {
+  MB_DS_EXPAND = 1 << 0,
+};
 
-/* ml->type */
-#define MB_BALL 0
-#define MB_TUBEX 1 /* deprecated. */
-#define MB_TUBEY 2 /* deprecated. */
-#define MB_TUBEZ 3 /* deprecated. */
-#define MB_TUBE 4
-#define MB_PLANE 5
-#define MB_ELIPSOID 6
-#define MB_CUBE 7
+/** #MetaElem::type */
+enum {
+  MB_BALL = 0,
+  MB_TUBEX = 1, /* Deprecated. */
+  MB_TUBEY = 2, /* Deprecated. */
+  MB_TUBEZ = 3, /* Deprecated. */
+  MB_TUBE = 4,
+  MB_PLANE = 5,
+  MB_ELIPSOID = 6,
+  MB_CUBE = 7,
+};
 
-#define MB_TYPE_SIZE_SQUARED(type) (type == MB_ELIPSOID)
+#define MB_TYPE_SIZE_SQUARED(type) ((type) == MB_ELIPSOID)
 
-/* ml->flag */
-#define MB_NEGATIVE 2
-#define MB_HIDE 8
-#define MB_SCALE_RAD 16
-
-#ifdef __cplusplus
-}
-#endif
+/** #MetaElem::flag */
+enum {
+  MB_NEGATIVE = 1 << 1,
+  MB_HIDE = 1 << 3,
+  MB_SCALE_RAD = 1 << 4,
+};

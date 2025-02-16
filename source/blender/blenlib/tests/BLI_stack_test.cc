@@ -1,9 +1,10 @@
-/* Apache License, Version 2.0 */
+/* SPDX-FileCopyrightText: 2023 Blender Authors
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "testing/testing.h"
 #include <cstring>
 
-#include "BLI_array.h"
 #include "BLI_stack.h"
 #include "BLI_utildefines.h"
 
@@ -28,7 +29,7 @@ TEST(stack, Empty)
 TEST(stack, One)
 {
   BLI_Stack *stack;
-  unsigned int in = -1, out = 1;
+  uint in = -1, out = 1;
 
   stack = BLI_stack_new(sizeof(in), __func__);
 

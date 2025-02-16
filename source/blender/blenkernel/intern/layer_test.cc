@@ -1,37 +1,22 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2020 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2020 by Blender Foundation.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "testing/testing.h"
 
-#include "MEM_guardedalloc.h"
-
-#include "BKE_appdir.h"
-#include "BKE_idtype.h"
-#include "BKE_layer.h"
+#include "BKE_appdir.hh"
+#include "BKE_idtype.hh"
+#include "BKE_layer.hh"
 
 #include "BLI_string.h"
 
 #include "RE_engine.h"
 
-#include "IMB_imbuf.h"
+#include "IMB_imbuf.hh"
 
 #include "CLG_log.h"
 
-#include "RNA_access.h"
+#include "RNA_access.hh"
+#include "RNA_prototypes.hh"
 
 namespace blender::bke::tests {
 
@@ -69,16 +54,16 @@ TEST(view_layer, aov_unique_names)
   EXPECT_FALSE((aov1->flag & AOV_CONFLICT) != 0);
   EXPECT_FALSE((aov2->flag & AOV_CONFLICT) != 0);
   EXPECT_TRUE(STREQ(aov1->name, "AOV"));
-  EXPECT_TRUE(STREQ(aov2->name, "AOV.001"));
+  EXPECT_TRUE(STREQ(aov2->name, "AOV_001"));
 
   /* Revert previous resolution */
-  BLI_strncpy(aov2->name, "AOV", MAX_NAME);
+  STRNCPY(aov2->name, "AOV");
   BKE_view_layer_verify_aov(engine, &scene, view_layer);
   EXPECT_TRUE(BKE_view_layer_has_valid_aov(view_layer));
   EXPECT_FALSE((aov1->flag & AOV_CONFLICT) != 0);
   EXPECT_FALSE((aov2->flag & AOV_CONFLICT) != 0);
   EXPECT_TRUE(STREQ(aov1->name, "AOV"));
-  EXPECT_TRUE(STREQ(aov2->name, "AOV.001"));
+  EXPECT_TRUE(STREQ(aov2->name, "AOV_001"));
 
   /* Resolve by removing AOV resolution */
   BKE_view_layer_remove_aov(view_layer, aov2);
@@ -103,12 +88,11 @@ static void test_render_pass_conflict(Scene *scene,
                                       const char *render_pass_name,
                                       const char *rna_prop_name)
 {
-  PointerRNA ptr;
-  RNA_pointer_create(&scene->id, &RNA_ViewLayer, view_layer, &ptr);
+  PointerRNA ptr = RNA_pointer_create_discrete(&scene->id, &RNA_ViewLayer, view_layer);
   RNA_boolean_set(&ptr, rna_prop_name, false);
 
   /* Rename to Conflicting name */
-  BLI_strncpy(aov->name, render_pass_name, MAX_NAME);
+  STRNCPY(aov->name, render_pass_name);
   BKE_view_layer_verify_aov(engine, scene, view_layer);
   EXPECT_TRUE(BKE_view_layer_has_valid_aov(view_layer));
   EXPECT_FALSE((aov->flag & AOV_CONFLICT) != 0);

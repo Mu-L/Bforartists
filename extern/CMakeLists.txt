@@ -1,25 +1,10 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2006 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# The Original Code is Copyright (C) 2006, Blender Foundation
-# All rights reserved.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 # Libs that adhere to strict flags
 add_subdirectory(curve_fit_nd)
+add_subdirectory(fmtlib)
 
 # Otherwise we get warnings here that we cant fix in external projects
 remove_strict_flags()
@@ -29,11 +14,25 @@ if(CMAKE_COMPILER_IS_GNUCC)
   remove_cc_flag(
     "-Wmisleading-indentation"
   )
+elseif(CMAKE_C_COMPILER_ID MATCHES "Clang")
+  remove_cc_flag(
+    "-Weverything"
+  )
+endif()
+
+if(WITH_COMPILER_ASAN AND NOT WITH_COMPILER_ASAN_EXTERN)
+  # Disable ASAN for extern dependencies, as it can lead to linking issues due to too large binaries.
+  string(APPEND CMAKE_CXX_FLAGS_RELWITHDEBINFO " -fno-sanitize=all")
+  string(APPEND CMAKE_C_FLAGS_RELWITHDEBINFO " -fno-sanitize=all")
+  string(APPEND CMAKE_CXX_FLAGS_DEBUG " -fno-sanitize=all")
+  string(APPEND CMAKE_C_FLAGS_DEBUG " -fno-sanitize=all")
 endif()
 
 
 add_subdirectory(rangetree)
+add_subdirectory(nanosvg)
 add_subdirectory(wcwidth)
+add_subdirectory(xxhash)
 
 if(WITH_BULLET)
   if(NOT WITH_SYSTEM_BULLET)
@@ -49,14 +48,6 @@ if(WITH_BINRELOC)
   add_subdirectory(binreloc)
 endif()
 
-if(NOT WITH_SYSTEM_GLEW)
-  if(WITH_GLEW_ES)
-    add_subdirectory(glew-es)
-  else()
-    add_subdirectory(glew)
-  endif()
-endif()
-
 if(WITH_LZO AND NOT WITH_SYSTEM_LZO)
   add_subdirectory(lzo)
 endif()
@@ -65,10 +56,12 @@ if(WITH_LZMA)
   add_subdirectory(lzma)
 endif()
 
-if(WITH_CYCLES OR WITH_COMPOSITOR OR WITH_OPENSUBDIV)
-  add_subdirectory(clew)
-  if(WITH_CUDA_DYNLOAD)
+if(WITH_CYCLES OR WITH_OPENSUBDIV)
+  if((WITH_CYCLES_DEVICE_CUDA OR WITH_CYCLES_DEVICE_OPTIX) AND WITH_CUDA_DYNLOAD)
     add_subdirectory(cuew)
+  endif()
+  if(WITH_CYCLES_DEVICE_HIP AND WITH_HIP_DYNLOAD)
+    add_subdirectory(hipew)
   endif()
 endif()
 
@@ -92,13 +85,11 @@ if(WITH_GTESTS)
   add_subdirectory(gmock)
 endif()
 
-if(WITH_SDL AND WITH_SDL_DYNLOAD)
-  add_subdirectory(sdlew)
-endif()
-
 if(WITH_AUDASPACE AND NOT WITH_SYSTEM_AUDASPACE)
   set(AUDASPACE_CMAKE_CFG ${CMAKE_CURRENT_SOURCE_DIR}/audaspace/blender_config.cmake)
+  set(LIB_SUFFIX "")  # Quiet uninitialized warning.
   add_subdirectory(audaspace)
+  unset(LIB_SUFFIX)
 endif()
 
 if(WITH_QUADRIFLOW)
@@ -110,6 +101,6 @@ if(WITH_MOD_FLUID)
   add_subdirectory(mantaflow)
 endif()
 
-if (WITH_COMPOSITOR)
-	add_subdirectory(smaa_areatex)
+if(WITH_VULKAN_BACKEND)
+  add_subdirectory(vulkan_memory_allocator)
 endif()

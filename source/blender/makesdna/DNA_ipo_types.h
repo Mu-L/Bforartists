@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2001-2002 NaN Holding BV. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
@@ -35,10 +20,6 @@
 #include "DNA_ID.h"
 
 #include "BLI_compiler_attrs.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 /* -------------------------- Type Defines --------------------------- */
 
@@ -71,8 +52,12 @@ typedef struct IpoCurve {
   /** Bounding boxes. */
   rctf maxrct, totrct;
 
-  /** Blocktype= ipo-blocktype; adrcode= type of ipo-curve; vartype= 'format' of data. */
-  short blocktype, adrcode, vartype;
+  /** Block-type of the curve (#ID_Type). */
+  short blocktype;
+  /** Type of ipo-curve. */
+  short adrcode;
+  /** Format of data. */
+  short vartype;
   /** Total number of BezTriples (i.e. keyframes) on curve. */
   short totvert;
   /** Interpolation and extrapolation modes. */
@@ -82,7 +67,7 @@ typedef struct IpoCurve {
   char _pad0[2];
   /** Minimum/maximum y-extents for curve. */
   float ymin, ymax;
-  /** ???. */
+  /** Unused since the first available revision. */
   unsigned int bitmask;
 
   /** Minimum/maximum values for sliders (in action editor). */
@@ -105,10 +90,11 @@ typedef struct Ipo {
   /** Rect defining extents of keyframes? */
   rctf cur;
 
-  /** Blocktype: self-explanatory; showkey: either 0 or 1
-   * (show vertical yellow lines for editing). */
-  short blocktype, showkey;
-  /** Muteipo: either 0 or 1 (whether ipo block is muted). */
+  /** #ID_Type. */
+  short blocktype;
+  /** Either 0 or 1 (show vertical yellow lines for editing). */
+  short showkey;
+  /** Mute-IPO: either 0 or 1 (whether ipo block is muted). */
   short muteipo;
   char _pad[2];
 } Ipo;
@@ -281,14 +267,14 @@ typedef struct Ipo {
 
 /* ******** Sequence (ID_SEQ) ********** */
 
-#define SEQ_TOTIPO 1
-#define SEQ_TOTNAM 1
+#define STRIP_TOTIPO 1
+#define STRIP_TOTNAM 1
 
-#define SEQ_FAC1 1
-#define SEQ_FAC_SPEED 2
-#define SEQ_FAC_OPACITY 3
+#define STRIP_FAC1 1
+#define STRIP_FAC_SPEED 2
+#define STRIP_FAC_OPACITY 3
 
-/* ********* Curve (ID_CU) *********** */
+/* ********* Curve (ID_CU_LEGACY) *********** */
 
 #define CU_TOTIPO 1
 #define CU_TOTNAM 1
@@ -322,12 +308,12 @@ typedef struct Ipo {
 #define WO_MISTSTA 10
 #define WO_MISTHI 11
 
-/* Stars are deprecated */
-#define WO_STAR_R 12
-#define WO_STAR_G 13
-#define WO_STAR_B 14
-#define WO_STARDIST 15
-#define WO_STARSIZE 16
+/* Stars are deprecated & unused. */
+// #define WO_STAR_R 12
+// #define WO_STAR_G 13
+// #define WO_STAR_B 14
+// #define WO_STARDIST 15
+// #define WO_STARSIZE 16
 
 /* ********** Light (ID_LA) ********** */
 
@@ -354,7 +340,7 @@ typedef struct Ipo {
 #define CAM_STA 2
 #define CAM_END 3
 
-/* yafray aperture & focal distance curves */
+/* YAFRAY aperture & focal distance curves. */
 #define CAM_YF_APERT 4
 #define CAM_YF_FDIST 5
 
@@ -486,7 +472,7 @@ typedef struct Ipo {
 #define IPO_SHORT_BIT 17
 #define IPO_INT_BIT 18
 
-/* icu->ipo:  the type of curve */
+/* icu->ipo: the type of curve. */
 #define IPO_CONST 0
 #define IPO_LIN 1
 #define IPO_BEZ 2
@@ -521,7 +507,3 @@ typedef struct Ipo {
 /* driver->flag */
 /* invalid flag: currently only used for buggy pydriver expressions */
 #define IPO_DRIVER_FLAG_INVALID (1 << 0)
-
-#ifdef __cplusplus
-}
-#endif

@@ -1,33 +1,17 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2020 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * Copyright 2020, Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup gpu
  */
 
 #include "BLI_assert.h"
-#include "BLI_system.h"
 #include "BLI_utildefines.h"
 
-#include "BKE_global.h"
+#include "BKE_global.hh"
 
-#include "GPU_framebuffer.h"
+#include "GPU_framebuffer.hh"
 
 #include "GHOST_C-api.h"
 
@@ -67,7 +51,7 @@ GLContext::GLContext(void *ghost_window, GLSharedOrphanLists &shared_orphan_list
   ghost_window_ = ghost_window;
 
   if (ghost_window) {
-    GLuint default_fbo = GHOST_GetDefaultOpenGLFramebuffer((GHOST_WindowHandle)ghost_window);
+    GLuint default_fbo = GHOST_GetDefaultGPUFramebuffer((GHOST_WindowHandle)ghost_window);
     GHOST_RectangleHandle bounds = GHOST_GetClientBounds((GHOST_WindowHandle)ghost_window);
     int w = GHOST_GetWidthRectangle(bounds);
     int h = GHOST_GetHeightRectangle(bounds);
@@ -93,17 +77,20 @@ GLContext::GLContext(void *ghost_window, GLSharedOrphanLists &shared_orphan_list
     }
   }
   else {
-    /* For offscreen contexts. Default framebuffer is NULL. */
+    /* For off-screen contexts. Default frame-buffer is null. */
     back_left = new GLFrameBuffer("back_left", this, GL_NONE, 0, 0, 0);
   }
 
   active_fb = back_left;
   static_cast<GLStateManager *>(state_manager)->active_fb = static_cast<GLFrameBuffer *>(
       active_fb);
+
+  compiler = GLBackend::get()->get_compiler();
 }
 
 GLContext::~GLContext()
 {
+  free_framebuffers();
   BLI_assert(orphaned_framebuffers_.is_empty());
   BLI_assert(orphaned_vertarrays_.is_empty());
   /* For now don't allow GPUFrameBuffers to be reuse in another context. */
@@ -156,6 +143,7 @@ void GLContext::activate()
   /* Not really following the state but we should consider
    * no ubo bound when activating a context. */
   bound_ubo_slots = 0;
+  bound_ssbo_slots = 0;
 
   immActivate();
 }
@@ -164,6 +152,16 @@ void GLContext::deactivate()
 {
   immDeactivate();
   is_active_ = false;
+}
+
+void GLContext::begin_frame()
+{
+  /* No-op. */
+}
+
+void GLContext::end_frame()
+{
+  /* No-op. */
 }
 
 /** \} */
@@ -198,11 +196,11 @@ void GLSharedOrphanLists::orphans_clear()
 
   lists_mutex.lock();
   if (!buffers.is_empty()) {
-    glDeleteBuffers((uint)buffers.size(), buffers.data());
+    glDeleteBuffers(uint(buffers.size()), buffers.data());
     buffers.clear();
   }
   if (!textures.is_empty()) {
-    glDeleteTextures((uint)textures.size(), textures.data());
+    glDeleteTextures(uint(textures.size()), textures.data());
     textures.clear();
   }
   lists_mutex.unlock();
@@ -215,11 +213,11 @@ void GLContext::orphans_clear()
 
   lists_mutex_.lock();
   if (!orphaned_vertarrays_.is_empty()) {
-    glDeleteVertexArrays((uint)orphaned_vertarrays_.size(), orphaned_vertarrays_.data());
+    glDeleteVertexArrays(uint(orphaned_vertarrays_.size()), orphaned_vertarrays_.data());
     orphaned_vertarrays_.clear();
   }
   if (!orphaned_framebuffers_.is_empty()) {
-    glDeleteFramebuffers((uint)orphaned_framebuffers_.size(), orphaned_framebuffers_.data());
+    glDeleteFramebuffers(uint(orphaned_framebuffers_.size()), orphaned_framebuffers_.data());
     orphaned_framebuffers_.clear();
   }
   lists_mutex_.unlock();
@@ -310,13 +308,12 @@ void GLContext::vao_cache_unregister(GLVaoCache *cache)
 
 void GLContext::memory_statistics_get(int *r_total_mem, int *r_free_mem)
 {
-  /* TODO(merwin): use Apple's platform API to get this info. */
-  if (GLEW_NVX_gpu_memory_info) {
+  if (epoxy_has_gl_extension("GL_NVX_gpu_memory_info")) {
     /* Returned value in Kb. */
     glGetIntegerv(GL_GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX, r_total_mem);
     glGetIntegerv(GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX, r_free_mem);
   }
-  else if (GLEW_ATI_meminfo) {
+  else if (epoxy_has_gl_extension("GL_ATI_meminfo")) {
     int stats[4];
     glGetIntegerv(GL_TEXTURE_FREE_MEMORY_ATI, stats);
 

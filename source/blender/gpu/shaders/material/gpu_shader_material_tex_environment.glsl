@@ -1,19 +1,8 @@
-void node_tex_environment_texco(vec3 viewvec, out vec3 worldvec)
-{
-#ifdef MESH_SHADER
-  worldvec = worldPosition;
-#else
-  vec4 v = (ProjectionMatrix[3][3] == 0.0) ? vec4(viewvec, 1.0) : vec4(0.0, 0.0, 1.0, 1.0);
-  vec4 co_homogenous = (ProjectionMatrixInverse * v);
+/* SPDX-FileCopyrightText: 2019-2022 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-  vec3 co = co_homogenous.xyz / co_homogenous.w;
-#  if defined(WORLD_BACKGROUND) || defined(PROBE_CAPTURE)
-  worldvec = mat3(ViewMatrixInverse) * co;
-#  else
-  worldvec = mat3(ModelMatrixInverse) * (mat3(ViewMatrixInverse) * co);
-#  endif
-#endif
-}
+#include "gpu_shader_common_math_utils.glsl"
 
 void node_tex_environment_equirectangular(vec3 co, out vec3 uv)
 {

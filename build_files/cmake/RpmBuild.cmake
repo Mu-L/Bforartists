@@ -1,6 +1,9 @@
+# SPDX-FileCopyrightText: 2011-2022 Blender Authors
+#
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 # VLMC RPM Finder
 # Authors: Rohit Yadav <rohityadav89@gmail.com>
-#
 
 if(NOT DEFINED RPMBUILD)
 

@@ -1,28 +1,12 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2020 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2020 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "dupli_parent_finder.hh"
 
 #include <climits>
-#include <cstring>
-#include <ostream>
-#include <sstream>
+
+#include <fmt/format.h>
 
 namespace blender::io {
 
@@ -87,7 +71,7 @@ PersistentID PersistentID::instancer_pid() const
 
 std::string PersistentID::as_object_name_suffix() const
 {
-  std::stringstream stream;
+  fmt::basic_memory_buffer<char, 64> buf;
 
   /* Find one past the last index. */
   int index;
@@ -98,13 +82,13 @@ std::string PersistentID::as_object_name_suffix() const
   /* Iterate backward to construct the string. */
   --index;
   for (; index >= 0; --index) {
-    stream << persistent_id_[index];
+    fmt::format_to(fmt::appender(buf), "{}", persistent_id_[index]);
     if (index > 0) {
-      stream << "-";
+      fmt::format_to(fmt::appender(buf), "-");
     }
   }
 
-  return stream.str();
+  return fmt::to_string(buf);
 }
 
 bool operator<(const PersistentID &persistent_id_a, const PersistentID &persistent_id_b)
@@ -146,22 +130,6 @@ bool operator==(const PersistentID &persistent_id_a, const PersistentID &persist
     }
   }
   return true;
-}
-
-std::ostream &operator<<(std::ostream &os, const PersistentID &persistent_id)
-{
-  if (persistent_id.persistent_id_[0] == INT_MAX) {
-    return os;
-  }
-
-  const PersistentID::PIDArray &pid_array = persistent_id.persistent_id_;
-  for (int index = 0; index < PersistentID::array_length_ && pid_array[index] < INT_MAX; ++index) {
-    if (index > 0) {
-      os << "-";
-    }
-    os << pid_array[index];
-  }
-  return os;
 }
 
 }  // namespace blender::io

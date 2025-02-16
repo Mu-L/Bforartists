@@ -1,13 +1,10 @@
+/* SPDX-FileCopyrightText: 2018-2022 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-uniform mat4 ModelViewProjectionMatrix;
+#include "infos/gpu_shader_2D_area_borders_info.hh"
 
-uniform vec4 rect;
-uniform int cornerLen;
-uniform float scale;
-
-in vec2 pos;
-
-out vec2 uv;
+VERTEX_SHADER_CREATE_INFO(gpu_shader_2D_area_borders)
 
 void main()
 {

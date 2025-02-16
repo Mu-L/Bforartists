@@ -1,6 +1,10 @@
+/* SPDX-FileCopyrightText: 2020-2022 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-uniform sampler2D depthBuf;
-uniform bool strokeOrder3d;
+#include "infos/gpencil_info.hh"
+
+FRAGMENT_SHADER_CREATE_INFO(gpencil_depth_merge)
 
 void main()
 {

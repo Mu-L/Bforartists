@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -23,14 +11,15 @@
 /* The boolean functions in Blenlib use exact arithmetic, so require GMP. */
 #ifdef WITH_GMP
 
+#  include "BLI_function_ref.hh"
 #  include "BLI_mesh_intersect.hh"
-#  include <functional>
 
 namespace blender::meshintersect {
 
 /**
  * Enum values after BOOLEAN_NONE need to match BMESH_ISECT_BOOLEAN_... values in
- * editmesh_intersect.c. */
+ * `editmesh_intersect.cc`.
+ */
 enum class BoolOpType {
   None = -1,
   /* Aligned with #BooleanModifierOp. */
@@ -57,7 +46,7 @@ enum class BoolOpType {
 IMesh boolean_mesh(IMesh &imesh,
                    BoolOpType op,
                    int nshapes,
-                   std::function<int(int)> shape_fn,
+                   FunctionRef<int(int)> shape_fn,
                    bool use_self,
                    bool hole_tolerant,
                    IMesh *imesh_triangulated,
@@ -67,11 +56,16 @@ IMesh boolean_mesh(IMesh &imesh,
  * This is like boolean, but operates on #IMesh's whose faces are all triangles.
  * It is exposed mainly for unit testing, at the moment: boolean_mesh() uses
  * it to do most of its work.
+ *
+ * This function does a boolean operation on a #TriMesh with `nshapes` inputs.
+ * All the shapes are combined in `tm_in`.
+ * The shape_fn function should take a triangle index in `tm_in` and return
+ * a number in the range 0 to `nshapes - 1`, to say which shape that triangle is in.
  */
 IMesh boolean_trimesh(IMesh &tm_in,
                       BoolOpType op,
                       int nshapes,
-                      std::function<int(int)> shape_fn,
+                      FunctionRef<int(int)> shape_fn,
                       bool use_self,
                       bool hole_tolerant,
                       IMeshArena *arena);

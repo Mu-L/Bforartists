@@ -1,41 +1,22 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 #pragma once
 
 /** \file
  * \ingroup bke
  */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "BLI_math_vector_types.hh"
 
 struct BVHTree;
 struct Collection;
 struct CollisionModifierData;
 struct Depsgraph;
-struct MVert;
-struct MVertTri;
 struct Object;
 
 ////////////////////////////////////////
-// used for collisions in collision.c
+// used for collisions in collision.cc
 ////////////////////////////////////////
 
 /* COLLISION FLAGS */
@@ -49,9 +30,9 @@ typedef enum {
 } COLLISION_FLAGS;
 
 ////////////////////////////////////////
-// used for collisions in collision.c
+// used for collisions in collision.cc
 ////////////////////////////////////////
-/* used for collisions in collision.c */
+/* used for collisions in collision.cc */
 typedef struct CollPair {
   unsigned int face1; /* cloth face */
   unsigned int face2; /* object face */
@@ -70,10 +51,12 @@ typedef struct CollPair {
 #else
   int ap1, ap2, ap3, bp1, bp2, bp3;
 #endif
+  /* Barycentric weights of the collision point. */
+  float aw1, aw2, aw3, bw1, bw2, bw3;
   int pointsb[4];
 } CollPair;
 
-/* used for collisions in collision.c */
+/* used for collisions in collision.cc */
 typedef struct EdgeCollPair {
   unsigned int p11, p12, p21, p22;
   float normal[3];
@@ -83,7 +66,7 @@ typedef struct EdgeCollPair {
   float pa[3], pb[3]; /* collision point p1 on face1, p2 on face2 */
 } EdgeCollPair;
 
-/* used for collisions in collision.c */
+/* used for collisions in collision.cc */
 typedef struct FaceCollPair {
   unsigned int p11, p12, p13, p21;
   float normal[3];
@@ -100,28 +83,31 @@ typedef struct FaceCollPair {
 /////////////////////////////////////////////////
 
 /////////////////////////////////////////////////
-// used in modifier.c from collision.c
+// used in modifier.cc from collision.cc
 /////////////////////////////////////////////////
 
-struct BVHTree *bvhtree_build_from_mvert(const struct MVert *mvert,
-                                         const struct MVertTri *tri,
+struct BVHTree *bvhtree_build_from_mvert(const float (*positions)[3],
+                                         const blender::int3 *vert_tris,
                                          int tri_num,
                                          float epsilon);
 void bvhtree_update_from_mvert(struct BVHTree *bvhtree,
-                               const struct MVert *mvert,
-                               const struct MVert *mvert_moving,
-                               const struct MVertTri *tri,
+                               const float (*positions)[3],
+                               const float (*positions_moving)[3],
+                               const blender::int3 *vert_tris,
                                int tri_num,
                                bool moving);
 
 /////////////////////////////////////////////////
 
-/* move Collision modifier object inter-frame with step = [0,1]
- * defined in collisions.c */
+/**
+ * Move Collision modifier object inter-frame with step = [0,1]
+ *
+ * \param step: is limited from 0 (frame start position) to 1 (frame end position).
+ */
 void collision_move_object(struct CollisionModifierData *collmd,
-                           const float step,
-                           const float prevstep,
-                           const bool moving_bvh);
+                           float step,
+                           float prevstep,
+                           bool moving_bvh);
 
 void collision_get_collider_velocity(float vel_old[3],
                                      float vel_new[3],
@@ -135,6 +121,11 @@ typedef struct CollisionRelation {
   struct Object *ob;
 } CollisionRelation;
 
+/**
+ * Create list of collision relations in the collection or entire scene.
+ * This is used by the depsgraph to build relations, as well as faster
+ * lookup of colliders during evaluation.
+ */
 struct ListBase *BKE_collision_relations_create(struct Depsgraph *depsgraph,
                                                 struct Collection *collection,
                                                 unsigned int modifier_type);
@@ -142,6 +133,10 @@ void BKE_collision_relations_free(struct ListBase *relations);
 
 /* Collision object lists for physics simulation evaluation. */
 
+/**
+ * Create effective list of colliders from relations built beforehand.
+ * Self will be excluded.
+ */
 struct Object **BKE_collision_objects_create(struct Depsgraph *depsgraph,
                                              struct Object *self,
                                              struct Collection *collection,
@@ -155,6 +150,10 @@ typedef struct ColliderCache {
   struct CollisionModifierData *collmd;
 } ColliderCache;
 
+/**
+ * Create effective list of colliders from relations built beforehand.
+ * Self will be excluded.
+ */
 struct ListBase *BKE_collider_cache_create(struct Depsgraph *depsgraph,
                                            struct Object *self,
                                            struct Collection *collection);
@@ -163,7 +162,3 @@ void BKE_collider_cache_free(struct ListBase **colliders);
 /////////////////////////////////////////////////
 
 /////////////////////////////////////////////////
-
-#ifdef __cplusplus
-}
-#endif

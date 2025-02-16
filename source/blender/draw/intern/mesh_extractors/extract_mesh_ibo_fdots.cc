@@ -1,119 +1,73 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2021 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2021 by Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup draw
  */
 
-#include "draw_cache_extract_mesh_private.h"
+#include "GPU_index_buffer.hh"
 
-#include "BLI_vector.hh"
-
-#include "MEM_guardedalloc.h"
+#include "extract_mesh.hh"
 
 namespace blender::draw {
-/* ---------------------------------------------------------------------- */
-/** \name Extract Face-dots Indices
- * \{ */
 
-static void extract_fdots_init(const MeshRenderData *mr,
-                               struct MeshBatchCache *UNUSED(cache),
-                               void *UNUSED(buf),
-                               void *tls_data)
+static IndexMask calc_face_visibility_mesh(const MeshRenderData &mr, IndexMaskMemory &memory)
 {
-  GPUIndexBufBuilder *elb = static_cast<GPUIndexBufBuilder *>(tls_data);
-  GPU_indexbuf_init(elb, GPU_PRIM_POINTS, mr->poly_len, mr->poly_len);
+  IndexMask visible(mr.faces_num);
+  if (!mr.hide_poly.is_empty()) {
+    visible = IndexMask::from_bools_inverse(visible, mr.hide_poly, memory);
+  }
+  if (mr.use_subsurf_fdots) {
+    const OffsetIndices faces = mr.faces;
+    const Span<int> corner_verts = mr.corner_verts;
+    const BitSpan facedot_tags = mr.mesh->runtime->subsurf_face_dot_tags;
+    visible = IndexMask::from_predicate(visible, GrainSize(4096), memory, [&](const int i) {
+      const Span<int> face_verts = corner_verts.slice(faces[i]);
+      return std::any_of(face_verts.begin(), face_verts.end(), [&](const int vert) {
+        return facedot_tags[vert];
+      });
+    });
+  }
+  return visible;
 }
 
-static void extract_fdots_iter_poly_bm(const MeshRenderData *UNUSED(mr),
-                                       const BMFace *f,
-                                       const int f_index,
-                                       void *_userdata)
+static void index_mask_to_ibo(const IndexMask &mask, gpu::IndexBuf &ibo)
 {
-  GPUIndexBufBuilder *elb = static_cast<GPUIndexBufBuilder *>(_userdata);
-  if (!BM_elem_flag_test(f, BM_ELEM_HIDDEN)) {
-    GPU_indexbuf_set_point_vert(elb, f_index, f_index);
+  const int max_index = mask.min_array_size();
+  GPUIndexBufBuilder builder;
+  GPU_indexbuf_init(&builder, GPU_PRIM_POINTS, mask.size(), max_index);
+  MutableSpan<uint> data = GPU_indexbuf_get_data(&builder);
+  mask.to_indices<int>(data.cast<int>());
+  GPU_indexbuf_build_in_place_ex(&builder, 0, max_index, false, &ibo);
+}
+
+static void extract_face_dots_mesh(const MeshRenderData &mr, gpu::IndexBuf &face_dots)
+{
+  IndexMaskMemory memory;
+  const IndexMask visible_faces = calc_face_visibility_mesh(mr, memory);
+  index_mask_to_ibo(visible_faces, face_dots);
+}
+
+static void extract_face_dots_bm(const MeshRenderData &mr, gpu::IndexBuf &face_dots)
+{
+  BMesh &bm = *mr.bm;
+  IndexMaskMemory memory;
+  const IndexMask visible_faces = IndexMask::from_predicate(
+      IndexRange(bm.totface), GrainSize(4096), memory, [&](const int i) {
+        return !BM_elem_flag_test_bool(BM_face_at_index(&bm, i), BM_ELEM_HIDDEN);
+      });
+  index_mask_to_ibo(visible_faces, face_dots);
+}
+
+void extract_face_dots(const MeshRenderData &mr, gpu::IndexBuf &face_dots)
+{
+  if (mr.extract_type == MeshExtractType::Mesh) {
+    extract_face_dots_mesh(mr, face_dots);
   }
   else {
-    GPU_indexbuf_set_point_restart(elb, f_index);
+    extract_face_dots_bm(mr, face_dots);
   }
 }
 
-static void extract_fdots_iter_poly_mesh(const MeshRenderData *mr,
-                                         const MPoly *mp,
-                                         const int mp_index,
-                                         void *_userdata)
-{
-  GPUIndexBufBuilder *elb = static_cast<GPUIndexBufBuilder *>(_userdata);
-  if (mr->use_subsurf_fdots) {
-    /* Check #ME_VERT_FACEDOT. */
-    const MLoop *mloop = mr->mloop;
-    const int ml_index_end = mp->loopstart + mp->totloop;
-    for (int ml_index = mp->loopstart; ml_index < ml_index_end; ml_index += 1) {
-      const MLoop *ml = &mloop[ml_index];
-      const MVert *mv = &mr->mvert[ml->v];
-      if ((mv->flag & ME_VERT_FACEDOT) && !(mr->use_hide && (mp->flag & ME_HIDE))) {
-        GPU_indexbuf_set_point_vert(elb, mp_index, mp_index);
-        return;
-      }
-    }
-    GPU_indexbuf_set_point_restart(elb, mp_index);
-  }
-  else {
-    if (!(mr->use_hide && (mp->flag & ME_HIDE))) {
-      GPU_indexbuf_set_point_vert(elb, mp_index, mp_index);
-    }
-    else {
-      GPU_indexbuf_set_point_restart(elb, mp_index);
-    }
-  }
-}
-
-static void extract_fdots_finish(const MeshRenderData *UNUSED(mr),
-                                 struct MeshBatchCache *UNUSED(cache),
-                                 void *buf,
-                                 void *_userdata)
-{
-  GPUIndexBufBuilder *elb = static_cast<GPUIndexBufBuilder *>(_userdata);
-  GPUIndexBuf *ibo = static_cast<GPUIndexBuf *>(buf);
-  GPU_indexbuf_build_in_place(elb, ibo);
-}
-
-constexpr MeshExtract create_extractor_fdots()
-{
-  MeshExtract extractor = {nullptr};
-  extractor.init = extract_fdots_init;
-  extractor.iter_poly_bm = extract_fdots_iter_poly_bm;
-  extractor.iter_poly_mesh = extract_fdots_iter_poly_mesh;
-  extractor.finish = extract_fdots_finish;
-  extractor.data_type = MR_DATA_NONE;
-  extractor.data_size = sizeof(GPUIndexBufBuilder);
-  extractor.use_threading = false;
-  extractor.mesh_buffer_offset = offsetof(MeshBufferCache, ibo.fdots);
-  return extractor;
-}
-
-/** \} */
 }  // namespace blender::draw
-
-extern "C" {
-const MeshExtract extract_fdots = blender::draw::create_extractor_fdots();
-}
-
-/** \} */

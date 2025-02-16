@@ -1,35 +1,11 @@
-/*
- * ***** BEGIN GPL LICENSE BLOCK *****
+/* SPDX-FileCopyrightText: 2010 Blender Authors
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2010 Blender Foundation.
- * All rights reserved.
- *
- * The Original Code is: all of this file.
- *
- * Contributor(s): none yet.
- *
- * ***** END GPL LICENSE BLOCK *****
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#ifndef __DNA_LRT_TYPES_H__
-#define __DNA_LRT_TYPES_H__
+#pragma once
 
-/** \file DNA_lineart_types.h
- *  \ingroup DNA
+/** \file
+ * \ingroup DNA
  */
 
 #include "DNA_ID.h"
@@ -39,37 +15,63 @@
  * Edge flags and usage flags are used by with scene/object/gpencil modifier bits, and those values
  * needs to stay consistent throughout. */
 
-/* These flags are used for 1 time calculation, not stroke selection afterwards. */
+/** These flags are used for 1 time calculation, not stroke selection afterwards. */
 typedef enum eLineartMainFlags {
-  LRT_INTERSECTION_AS_CONTOUR = (1 << 0),
-  LRT_EVERYTHING_AS_CONTOUR = (1 << 1),
-  LRT_ALLOW_DUPLI_OBJECTS = (1 << 2),
-  LRT_ALLOW_OVERLAPPING_EDGES = (1 << 3),
-  LRT_ALLOW_CLIPPING_BOUNDARIES = (1 << 4),
-  LRT_REMOVE_DOUBLES = (1 << 5),
-  LRT_LOOSE_AS_CONTOUR = (1 << 6),
-  LRT_GPENCIL_INVERT_SOURCE_VGROUP = (1 << 7),
-  LRT_GPENCIL_MATCH_OUTPUT_VGROUP = (1 << 8),
-  LRT_FILTER_FACE_MARK = (1 << 9),
-  LRT_FILTER_FACE_MARK_INVERT = (1 << 10),
-  LRT_FILTER_FACE_MARK_BOUNDARIES = (1 << 11),
-  LRT_CHAIN_LOOSE_EDGES = (1 << 12),
-  LRT_CHAIN_GEOMETRY_SPACE = (1 << 13),
-  LRT_ALLOW_OVERLAP_EDGE_TYPES = (1 << 14),
+  MOD_LINEART_INTERSECTION_AS_CONTOUR = (1 << 0),
+  MOD_LINEART_EVERYTHING_AS_CONTOUR = (1 << 1),
+  MOD_LINEART_ALLOW_DUPLI_OBJECTS = (1 << 2),
+  MOD_LINEART_ALLOW_OVERLAPPING_EDGES = (1 << 3),
+  MOD_LINEART_ALLOW_CLIPPING_BOUNDARIES = (1 << 4),
+  /* LRT_REMOVE_DOUBLES = (1 << 5), Deprecated */
+  MOD_LINEART_LOOSE_AS_CONTOUR = (1 << 6),
+  MOD_LINEART_INVERT_SOURCE_VGROUP = (1 << 7),
+  MOD_LINEART_MATCH_OUTPUT_VGROUP = (1 << 8),
+  MOD_LINEART_FILTER_FACE_MARK = (1 << 9),
+  MOD_LINEART_FILTER_FACE_MARK_INVERT = (1 << 10),
+  MOD_LINEART_FILTER_FACE_MARK_BOUNDARIES = (1 << 11),
+  MOD_LINEART_CHAIN_LOOSE_EDGES = (1 << 12),
+  MOD_LINEART_CHAIN_GEOMETRY_SPACE = (1 << 13),
+  MOD_LINEART_ALLOW_OVERLAP_EDGE_TYPES = (1 << 14),
+  MOD_LINEART_USE_CREASE_ON_SMOOTH_SURFACES = (1 << 15),
+  MOD_LINEART_USE_CREASE_ON_SHARP_EDGES = (1 << 16),
+  MOD_LINEART_USE_CUSTOM_CAMERA = (1 << 17),
+  MOD_LINEART_FILTER_FACE_MARK_KEEP_CONTOUR = (1 << 18),
+  MOD_LINEART_USE_BACK_FACE_CULLING = (1 << 19),
+  MOD_LINEART_USE_IMAGE_BOUNDARY_TRIMMING = (1 << 20),
+  MOD_LINEART_CHAIN_PRESERVE_DETAILS = (1 << 22),
+  MOD_LINEART_SHADOW_USE_SILHOUETTE = (1 << 24),
 } eLineartMainFlags;
 
 typedef enum eLineartEdgeFlag {
-  LRT_EDGE_FLAG_EDGE_MARK = (1 << 0),
-  LRT_EDGE_FLAG_CONTOUR = (1 << 1),
-  LRT_EDGE_FLAG_CREASE = (1 << 2),
-  LRT_EDGE_FLAG_MATERIAL = (1 << 3),
-  LRT_EDGE_FLAG_INTERSECTION = (1 << 4),
-  LRT_EDGE_FLAG_LOOSE = (1 << 5),
-  LRT_EDGE_FLAG_CHAIN_PICKED = (1 << 6),
-  LRT_EDGE_FLAG_CLIPPED = (1 << 7),
-  /** Limited to 8 bits, DON'T ADD ANYMORE until improvements on the data structure. */
+  MOD_LINEART_EDGE_FLAG_EDGE_MARK = (1 << 0),
+  MOD_LINEART_EDGE_FLAG_CONTOUR = (1 << 1),
+  MOD_LINEART_EDGE_FLAG_CREASE = (1 << 2),
+  MOD_LINEART_EDGE_FLAG_MATERIAL = (1 << 3),
+  MOD_LINEART_EDGE_FLAG_INTERSECTION = (1 << 4),
+  MOD_LINEART_EDGE_FLAG_LOOSE = (1 << 5),
+  MOD_LINEART_EDGE_FLAG_LIGHT_CONTOUR = (1 << 6),
+  /* MOD_LINEART_EDGE_FLAG_FOR_FUTURE = (1 << 7), */
+  /**
+   * It's a legacy limit of 8 bits for feature lines that come from original mesh edges. It should
+   * not be needed in current object loading scheme, but might still be relevant if we are to
+   * implement edit-mesh loading, so don't exceed 8 bits just yet.
+   */
+  MOD_LINEART_EDGE_FLAG_PROJECTED_SHADOW = (1 << 8),
+  /* To determine an edge to be occluded from the front or back face it's lying on. */
+  MOD_LINEART_EDGE_FLAG_SHADOW_FACING_LIGHT = (1 << 9),
+  /** Also used as discarded line mark. */
+  MOD_LINEART_EDGE_FLAG_CHAIN_PICKED = (1 << 10),
+  MOD_LINEART_EDGE_FLAG_CLIPPED = (1 << 11),
+  /** Used to specify contour from viewing camera when computing shadows. */
+  MOD_LINEART_EDGE_FLAG_CONTOUR_SECONDARY = (1 << 12),
+  /** Limited to 16 bits for the entire thing. */
+
+  /** For object loading code to use only. */
+  MOD_LINEART_EDGE_FLAG_INHIBIT = (1 << 14),
+  /** For discarding duplicated edge types in culling stage. */
+  MOD_LINEART_EDGE_FLAG_NEXT_IS_DUPLICATION = (1 << 15),
 } eLineartEdgeFlag;
 
-#define LRT_EDGE_FLAG_ALL_TYPE 0x3f
-
-#endif
+#define MOD_LINEART_EDGE_FLAG_ALL_TYPE 0x01ff
+#define MOD_LINEART_EDGE_FLAG_INIT_TYPE 0x37 /* Without material & light contour */
+#define MOD_LINEART_EDGE_FLAG_TYPE_MAX_BITS 7

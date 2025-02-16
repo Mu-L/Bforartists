@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2008-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -26,6 +14,8 @@
 #include "ViewMap.h"
 
 #include "../winged_edge/WXEdge.h"
+
+#include "BLI_sys_types.h"
 
 using namespace std;
 
@@ -62,7 +52,8 @@ void ViewEdgeXBuilder::BuildViewEdges(WXShape *iWShape,
   // Reinit structures
   Init(oVShape);
 
-  /* ViewEdge *vedge; */ /* UNUSED */
+  // ViewEdge *vedge; /* UNUSED. */
+
   // Let us build the smooth stuff
   //----------------------------------------
   // We parse all faces to find the ones that contain smooth edges
@@ -71,18 +62,19 @@ void ViewEdgeXBuilder::BuildViewEdges(WXShape *iWShape,
   WXFace *wxf;
   for (wf = wfaces.begin(), wfend = wfaces.end(); wf != wfend; wf++) {
     wxf = dynamic_cast<WXFace *>(*wf);
-    if (false == ((wxf))->hasSmoothEdges()) {  // does it contain at least one smooth edge ?
+    if (false == (wxf)->hasSmoothEdges()) {  // does it contain at least one smooth edge ?
       continue;
     }
     // parse all smooth layers:
     vector<WXFaceLayer *> &smoothLayers = wxf->getSmoothLayers();
     for (vector<WXFaceLayer *>::iterator sl = smoothLayers.begin(), slend = smoothLayers.end();
          sl != slend;
-         ++sl) {
+         ++sl)
+    {
       if (!(*sl)->hasSmoothEdge()) {
         continue;
       }
-      if (stopSmoothViewEdge((*sl))) {  // has it been parsed already ?
+      if (stopSmoothViewEdge(*sl)) {  // has it been parsed already ?
         continue;
       }
       // here we know that we're dealing with a face layer that has not been processed yet and that
@@ -142,7 +134,7 @@ ViewEdge *ViewEdgeXBuilder::BuildSmoothViewEdge(const OWXFaceLayer &iFaceLayer)
   // bidirectional chaining.
   // first direction
   list<OWXFaceLayer> facesChain;
-  unsigned size = 0;
+  uint size = 0;
   while (!stopSmoothViewEdge(currentFace.fl)) {
     facesChain.push_back(currentFace);
     ++size;
@@ -180,7 +172,8 @@ ViewEdge *ViewEdgeXBuilder::BuildSmoothViewEdge(const OWXFaceLayer &iFaceLayer)
   FEdge *fefirst = nullptr;
   FEdge *fe = nullptr;
   for (list<OWXFaceLayer>::iterator fl = facesChain.begin(), flend = facesChain.end(); fl != flend;
-       ++fl) {
+       ++fl)
+  {
     fe = BuildSmoothFEdge(feprevious, (*fl));
     if (feprevious && fe == feprevious) {
       continue;
@@ -224,13 +217,13 @@ ViewEdge *ViewEdgeXBuilder::BuildSharpViewEdge(const OWXEdge &iWEdge)
   ViewEdge *newVEdge = new ViewEdge;
   newVEdge->setId(_currentViewId);
   ++_currentViewId;
-  unsigned size = 0;
+  uint size = 0;
 
   _pCurrentVShape->AddEdge(newVEdge);
 
   // Find first edge:
   OWXEdge firstWEdge = iWEdge;
-  /* OWXEdge previousWEdge = firstWEdge; */ /* UNUSED */
+  // OWXEdge previousWEdge = firstWEdge; /* UNUSED */
   OWXEdge currentWEdge = firstWEdge;
   list<OWXEdge> edgesChain;
 #if 0 /* TK 02-Sep-2012 Experimental fix for incorrect view edge visibility. */
@@ -266,7 +259,8 @@ ViewEdge *ViewEdgeXBuilder::BuildSharpViewEdge(const OWXEdge &iWEdge)
   FEdge *fefirst = nullptr;
   FEdge *fe = nullptr;
   for (list<OWXEdge>::iterator we = edgesChain.begin(), weend = edgesChain.end(); we != weend;
-       ++we) {
+       ++we)
+  {
     fe = BuildSharpFEdge(feprevious, (*we));
     fe->setViewEdge(newVEdge);
     if (!fefirst) {
@@ -364,7 +358,7 @@ OWXFaceLayer ViewEdgeXBuilder::FindNextFaceLayer(const OWXFaceLayer &iFaceLayer)
     vector<WXFaceLayer *> sameNatureLayers;
     nextFace->retrieveSmoothEdgesLayers(iFaceLayer.fl->nature(), sameNatureLayers);
     // don't know how to deal with several edges of same nature on a single face
-    if ((sameNatureLayers.empty()) || (sameNatureLayers.size() != 1)) {
+    if (sameNatureLayers.empty() || (sameNatureLayers.size() != 1)) {
       return OWXFaceLayer(nullptr, true);
     }
 
@@ -445,7 +439,7 @@ OWXFaceLayer ViewEdgeXBuilder::FindPreviousFaceLayer(const OWXFaceLayer &iFaceLa
     vector<WXFaceLayer *> sameNatureLayers;
     previousFace->retrieveSmoothEdgesLayers(iFaceLayer.fl->nature(), sameNatureLayers);
     // don't know how to deal with several edges of same nature on a single face
-    if ((sameNatureLayers.empty()) || (sameNatureLayers.size() != 1)) {
+    if (sameNatureLayers.empty() || (sameNatureLayers.size() != 1)) {
       return OWXFaceLayer(nullptr, true);
     }
 
@@ -487,8 +481,9 @@ FEdge *ViewEdgeXBuilder::BuildSmoothFEdge(FEdge *feprevious, const OWXFaceLayer 
 
   Vec3r normal;
   // Make the 2 Svertices
-  if (feprevious ==
-      nullptr) {  // that means that we don't have any vertex already built for that face
+
+  /* That means that we don't have any vertex already built for that face. */
+  if (feprevious == nullptr) {
     Vec3r A1(woea->GetaVertex()->GetVertex());
     Vec3r A2(woea->GetbVertex()->GetVertex());
     Vec3r A(A1 + ta * (A2 - A1));
@@ -601,7 +596,7 @@ OWXEdge ViewEdgeXBuilder::FindNextWEdge(const OWXEdge &iEdge)
   }
 
   if (((WXVertex *)v)->isFeature()) {
-    return nullptr; /* XXX eeek? NULL? OWXEdge(NULL, true/false)? */
+    return nullptr; /* XXX eeek? nullptr? OWXEdge(nullptr, true/false)? */
   }
 
   int faceMarks = retrieveFaceMarks(iEdge.e);
@@ -699,26 +694,26 @@ FEdge *ViewEdgeXBuilder::BuildSharpFEdge(FEdge *feprevious, const OWXEdge &iwe)
 
   // get the faces normals and the material indices
   Vec3r normalA, normalB;
-  unsigned matA(0), matB(0);
+  uint matA(0), matB(0);
   bool faceMarkA = false, faceMarkB = false;
   if (iwe.order) {
-    normalB = (iwe.e->GetbFace()->GetNormal());
-    matB = (iwe.e->GetbFace()->frs_materialIndex());
-    faceMarkB = (iwe.e->GetbFace()->GetMark());
+    normalB = iwe.e->GetbFace()->GetNormal();
+    matB = iwe.e->GetbFace()->frs_materialIndex();
+    faceMarkB = iwe.e->GetbFace()->GetMark();
     if (!(iwe.e->nature() & Nature::BORDER)) {
-      normalA = (iwe.e->GetaFace()->GetNormal());
-      matA = (iwe.e->GetaFace()->frs_materialIndex());
-      faceMarkA = (iwe.e->GetaFace()->GetMark());
+      normalA = iwe.e->GetaFace()->GetNormal();
+      matA = iwe.e->GetaFace()->frs_materialIndex();
+      faceMarkA = iwe.e->GetaFace()->GetMark();
     }
   }
   else {
-    normalA = (iwe.e->GetbFace()->GetNormal());
-    matA = (iwe.e->GetbFace()->frs_materialIndex());
-    faceMarkA = (iwe.e->GetbFace()->GetMark());
+    normalA = iwe.e->GetbFace()->GetNormal();
+    matA = iwe.e->GetbFace()->frs_materialIndex();
+    faceMarkA = iwe.e->GetbFace()->GetMark();
     if (!(iwe.e->nature() & Nature::BORDER)) {
-      normalB = (iwe.e->GetaFace()->GetNormal());
-      matB = (iwe.e->GetaFace()->frs_materialIndex());
-      faceMarkB = (iwe.e->GetaFace()->GetMark());
+      normalB = iwe.e->GetaFace()->GetNormal();
+      matB = iwe.e->GetaFace()->frs_materialIndex();
+      faceMarkB = iwe.e->GetaFace()->GetMark();
     }
   }
   // Creates the corresponding feature edge

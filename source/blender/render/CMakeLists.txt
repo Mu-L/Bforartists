@@ -1,73 +1,74 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2006 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# The Original Code is Copyright (C) 2006, Blender Foundation
-# All rights reserved.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 
 set(INC
-  .
+  PUBLIC .
   intern
-  ../blenkernel
-  ../blenlib
-  ../blentranslation
-  ../depsgraph
-  ../draw
-  ../gpu
-  ../imbuf
-  ../makesdna
+  ../compositor
+  ../compositor/cached_resources
+  ../compositor/derived_resources
+  ../draw/intern
+  ../gpu/intern
   ../makesrna
-  ../nodes
-  ../sequencer
   ../simulation
-  ../../../intern/atomic
-  ../../../intern/guardedalloc
   ../../../intern/mikktspace
   ../../../intern/mantaflow/extern
 )
 
+set(INC_SYS
+)
 
 set(SRC
-  intern/bake.c
-  intern/engine.c
-  intern/initrender.c
-  intern/multires_bake.c
-  intern/pipeline.c
-  intern/render_result.c
-  intern/texture_image.c
-  intern/texture_pointdensity.c
-  intern/texture_procedural.c
-  intern/zbuf.c
+  intern/bake.cc
+  intern/compositor.cc
+  intern/engine.cc
+  intern/initrender.cc
+  intern/multires_bake.cc
+  intern/pipeline.cc
+  intern/render_result.cc
+  intern/render_types.cc
+  intern/texture_image.cc
+  intern/texture_margin.cc
+  intern/texture_pointdensity.cc
+  intern/texture_procedural.cc
+  intern/tile_highlight.cc
+  intern/zbuf.cc
 
   RE_bake.h
+  RE_compositor.hh
   RE_engine.h
   RE_multires_bake.h
   RE_pipeline.h
   RE_texture.h
+  RE_texture_margin.h
 
-  intern/initrender.h
-  intern/pipeline.h
+  intern/pipeline.hh
   intern/render_result.h
   intern/render_types.h
   intern/texture_common.h
+  intern/tile_highlight.h
   intern/zbuf.h
 )
 
 set(LIB
+  PRIVATE bf::blenkernel
+  PRIVATE bf::blenlib
+  PRIVATE bf::blentranslation
+  PRIVATE bf::depsgraph
+  PRIVATE bf::dna
+  PRIVATE bf::draw
+  PRIVATE bf::extern::fmtlib
+  PRIVATE bf::gpu
+  PRIVATE bf::imbuf
+  PRIVATE bf::imbuf::movie
+  PRIVATE bf::intern::guardedalloc
+  bf_compositor
+  PRIVATE bf::intern::atomic
+  PRIVATE bf::nodes
+  PRIVATE bf::sequencer
+  PRIVATE bf::windowmanager
 )
 
 if(WITH_PYTHON)
@@ -94,9 +95,9 @@ if(WITH_FREESTYLE)
   add_definitions(-DWITH_FREESTYLE)
 endif()
 
-if(WITH_INTERNATIONAL)
-  add_definitions(-DWITH_INTERNATIONAL)
+if(WITH_HYDRA)
+  add_subdirectory(hydra)
 endif()
 
-
 blender_add_lib_nolist(bf_render "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+add_library(bf::render ALIAS bf_render)

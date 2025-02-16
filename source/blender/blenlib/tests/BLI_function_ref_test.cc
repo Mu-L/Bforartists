@@ -1,4 +1,6 @@
-/* Apache License, Version 2.0 */
+/* SPDX-FileCopyrightText: 2023 Blender Authors
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "BLI_function_ref.hh"
 
@@ -99,29 +101,55 @@ TEST(function_ref, ReferenceAnotherFunctionRef)
   EXPECT_EQ(y(), 2);
 }
 
-TEST(function_ref, CallSafe)
+TEST(function_ref, InitializeWithNull)
 {
-  FunctionRef<int()> f;
-  EXPECT_FALSE(f.call_safe().has_value());
-  auto func = []() { return 10; };
-  f = func;
-  EXPECT_TRUE(f.call_safe().has_value());
-  EXPECT_EQ(*f.call_safe(), 10);
-  f = {};
-  EXPECT_FALSE(f.call_safe().has_value());
-  BLI_STATIC_ASSERT((std::is_same_v<decltype(f.call_safe()), std::optional<int>>), "");
+  FunctionRef<int(int, int)> f{nullptr};
+  EXPECT_FALSE(f);
 }
 
-TEST(function_ref, CallSafeVoid)
+static int overload_test(const FunctionRef<void(std::string)> /*fn*/)
 {
-  FunctionRef<void()> f;
-  BLI_STATIC_ASSERT((std::is_same_v<decltype(f.call_safe()), void>), "");
-  f.call_safe();
-  int value = 0;
-  auto func = [&]() { value++; };
-  f = func;
-  f.call_safe();
-  EXPECT_EQ(value, 1);
+  return 1;
+}
+
+static int overload_test(const FunctionRef<void(int)> /*fn*/)
+{
+  return 2;
+}
+
+TEST(function_ref, OverloadSelection)
+{
+  const auto fn_1 = [](std::string /*x*/) {};
+  const auto fn_2 = [](int /*x*/) {};
+
+  EXPECT_EQ(overload_test(fn_1), 1);
+  EXPECT_EQ(overload_test(fn_2), 2);
+}
+
+TEST(function_ref, FalsyStdFunction)
+{
+  const std::function<void()> fn1;
+  const std::function<void()> fn2 = [&]() {};
+  const FunctionRef<void()> fn_ref1(fn1);
+  const FunctionRef<void()> fn_ref2(fn2);
+  EXPECT_FALSE(fn_ref1);
+  EXPECT_TRUE(fn_ref2);
+
+  const FunctionRef<void()> fn_ref3(fn1);
+  const FunctionRef<void()> fn_ref4(fn2);
+  EXPECT_FALSE(fn_ref3);
+  EXPECT_TRUE(fn_ref4);
+}
+
+TEST(function_ref, FalsyFunctionPointer)
+{
+  using Fn = void (*)();
+  const Fn fn1 = nullptr;
+  const Fn fn2 = []() {};
+  const FunctionRef<void()> fn_ref1(fn1);
+  const FunctionRef<void()> fn_ref2(fn2);
+  EXPECT_FALSE(fn_ref1);
+  EXPECT_TRUE(fn_ref2);
 }
 
 }  // namespace blender::tests

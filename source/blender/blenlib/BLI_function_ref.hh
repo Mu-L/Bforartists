@@ -1,25 +1,13 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
-#include <optional>
 #include <type_traits>
 #include <utility>
 
+#include "BLI_build_config.h"
 #include "BLI_utildefines.h"
 
 /** \file
@@ -77,7 +65,6 @@
  *
  *   void some_function(FunctionRef<int()> f);
  *   some_function([]() { return 0; });
- *
  */
 
 namespace blender {
@@ -110,6 +97,8 @@ template<typename Ret, typename... Params> class FunctionRef<Ret(Params...)> {
  public:
   FunctionRef() = default;
 
+  FunctionRef(std::nullptr_t) {}
+
   /**
    * A `FunctionRef` itself is a callable as well. However, we don't want that this
    * constructor is called when `Callable` is a `FunctionRef`. If we would allow this, it
@@ -121,12 +110,34 @@ template<typename Ret, typename... Params> class FunctionRef<Ret(Params...)> {
    * another lambda.
    */
   template<typename Callable,
-           std::enable_if_t<!std::is_same_v<std::remove_cv_t<std::remove_reference_t<Callable>>,
-                                            FunctionRef>> * = nullptr>
+           BLI_ENABLE_IF((
+               !std::is_same_v<std::remove_cv_t<std::remove_reference_t<Callable>>, FunctionRef>)),
+           BLI_ENABLE_IF((std::is_invocable_r_v<Ret, Callable, Params...>))>
   FunctionRef(Callable &&callable)
       : callback_(callback_fn<typename std::remove_reference_t<Callable>>),
-        callable_(reinterpret_cast<intptr_t>(&callable))
+        callable_(intptr_t(&callable))
   {
+    if constexpr (std::is_constructible_v<bool, Callable>) {
+      /* For some types, the compiler can be sure that the callable is always truthy. Good!
+       * Then the entire check can be optimized away. */
+#if COMPILER_CLANG || COMPILER_GCC
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Waddress"
+#  if COMPILER_GCC
+#    pragma GCC diagnostic ignored "-Wnonnull-compare"
+#  endif
+#endif
+      /* Make sure the #FunctionRef is falsy if the callback is falsy.
+       * That can happen when passing in null or empty std::function. */
+      const bool is_truthy = bool(callable);
+      if (!is_truthy) {
+        callback_ = nullptr;
+        callable_ = 0;
+      }
+#if COMPILER_CLANG || COMPILER_GCC
+#  pragma GCC diagnostic pop
+#endif
+    }
   }
 
   /**
@@ -138,29 +149,6 @@ template<typename Ret, typename... Params> class FunctionRef<Ret(Params...)> {
   {
     BLI_assert(callback_ != nullptr);
     return callback_(callable_, std::forward<Params>(params)...);
-  }
-
-  using OptionalReturnValue = std::conditional_t<std::is_void_v<Ret>, void, std::optional<Ret>>;
-
-  /**
-   * Calls the referenced function if it is available.
-   * The return value is of type `std::optional<Ret>` if `Ret` is not `void`.
-   * Otherwise the return type is `void`.
-   */
-  OptionalReturnValue call_safe(Params... params) const
-  {
-    if constexpr (std::is_void_v<Ret>) {
-      if (callback_ == nullptr) {
-        return;
-      }
-      callback_(callable_, std::forward<Params>(params)...);
-    }
-    else {
-      if (callback_ == nullptr) {
-        return {};
-      }
-      return callback_(callable_, std::forward<Params>(params)...);
-    }
   }
 
   /**

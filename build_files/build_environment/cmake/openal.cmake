@@ -1,20 +1,6 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2002-2022 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 if(BUILD_MODE STREQUAL Release)
   set(OPENAL_EXTRA_ARGS
@@ -22,8 +8,8 @@ if(BUILD_MODE STREQUAL Release)
     -DALSOFT_NO_CONFIG_UTIL=ON
     -DALSOFT_EXAMPLES=OFF
     -DALSOFT_TESTS=OFF
-    -DALSOFT_CONFIG=OFF
-    -DALSOFT_HRTF_DEFS=OFF
+    -DALSOFT_INSTALL_CONFIG=OFF
+    -DALSOFT_INSTALL_HRTF_DATA=OFF
     -DALSOFT_INSTALL=ON
     -DALSOFT_BACKEND_SNDIO=OFF
   )
@@ -50,17 +36,33 @@ if(BUILD_MODE STREQUAL Release)
     DOWNLOAD_DIR ${DOWNLOAD_DIR}
     URL_HASH ${OPENAL_HASH_TYPE}=${OPENAL_HASH}
     PREFIX ${BUILD_DIR}/openal
-    CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${LIBDIR}/openal ${DEFAULT_CMAKE_FLAGS} ${OPENAL_EXTRA_ARGS}
+
+    CMAKE_ARGS
+      -DCMAKE_INSTALL_PREFIX=${LIBDIR}/openal
+      ${DEFAULT_CMAKE_FLAGS}
+      ${OPENAL_EXTRA_ARGS}
+
     INSTALL_DIR ${LIBDIR}/openal
   )
 
   if(WIN32)
     ExternalProject_Add_Step(external_openal after_install
-      COMMAND ${CMAKE_COMMAND} -E copy ${LIBDIR}/openal/lib/openal32.lib ${HARVEST_TARGET}/openal/lib/openal32.lib
-      COMMAND ${CMAKE_COMMAND} -E copy ${LIBDIR}/openal/bin/openal32.dll ${HARVEST_TARGET}/openal/lib/openal32.dll
-      COMMAND ${CMAKE_COMMAND} -E copy_directory ${LIBDIR}/openal/include/ ${HARVEST_TARGET}/openal/include/
+      COMMAND ${CMAKE_COMMAND} -E copy
+        ${LIBDIR}/openal/lib/openal32.lib
+        ${HARVEST_TARGET}/openal/lib/openal32.lib
+      COMMAND ${CMAKE_COMMAND} -E copy
+        ${LIBDIR}/openal/bin/openal32.dll
+        ${HARVEST_TARGET}/openal/lib/openal32.dll
+      COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${LIBDIR}/openal/include/
+        ${HARVEST_TARGET}/openal/include/
+
       DEPENDEES install
     )
+  else()
+    harvest(external_openal openal/include openal/include "*.h")
+    if(UNIX AND NOT APPLE)
+      harvest(external_openal openal/lib openal/lib "*.a")
+    endif()
   endif()
-
 endif()

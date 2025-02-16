@@ -1,37 +1,26 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup spoutliner
  */
 
 #include "DNA_ID.h"
+#include "DNA_space_types.h"
 
 #include "BLI_listbase.h"
 #include "BLI_listbase_wrapper.hh"
-#include "BLI_utildefines.h"
 
-#include "BKE_main.h"
+#include "BKE_idtype.hh"
+#include "BKE_main.hh"
 
-#include "../outliner_intern.h"
+#include "../outliner_intern.hh"
+#include "common.hh"
 #include "tree_display.hh"
 
 namespace blender::ed::outliner {
 
-/* Convenience/readability. */
 template<typename T> using List = ListBaseWrapper<T>;
 
 TreeDisplayIDOrphans::TreeDisplayIDOrphans(SpaceOutliner &space_outliner)
@@ -39,24 +28,22 @@ TreeDisplayIDOrphans::TreeDisplayIDOrphans(SpaceOutliner &space_outliner)
 {
 }
 
-ListBase TreeDisplayIDOrphans::buildTree(const TreeSourceData &source_data)
+ListBase TreeDisplayIDOrphans::build_tree(const TreeSourceData &source_data)
 {
   ListBase tree = {nullptr};
-  ListBase *lbarray[INDEX_ID_MAX];
   short filter_id_type = (space_outliner_.filter & SO_FILTER_ID_TYPE) ?
                              space_outliner_.filter_id_type :
                              0;
 
-  int tot;
+  Vector<ListBase *> lbarray;
   if (filter_id_type) {
-    lbarray[0] = which_libbase(source_data.bmain, filter_id_type);
-    tot = 1;
+    lbarray.append(which_libbase(source_data.bmain, filter_id_type));
   }
   else {
-    tot = set_listbasepointers(source_data.bmain, lbarray);
+    lbarray.extend(BKE_main_lists_get(*source_data.bmain));
   }
 
-  for (int a = 0; a < tot; a++) {
+  for (int a = 0; a < lbarray.size(); a++) {
     if (BLI_listbase_is_empty(lbarray[a])) {
       continue;
     }
@@ -68,16 +55,15 @@ ListBase TreeDisplayIDOrphans::buildTree(const TreeSourceData &source_data)
     TreeElement *te = nullptr;
     if (!filter_id_type) {
       ID *id = (ID *)lbarray[a]->first;
-      te = outliner_add_element(&space_outliner_, &tree, lbarray[a], nullptr, TSE_ID_BASE, 0);
+      te = add_element(&tree, nullptr, lbarray[a], nullptr, TSE_ID_BASE, 0);
       te->directdata = lbarray[a];
       te->name = outliner_idcode_to_plural(GS(id->name));
     }
 
     /* Add the orphaned data-blocks - these will not be added with any subtrees attached. */
     for (ID *id : List<ID>(lbarray[a])) {
-      if (ID_REAL_USERS(id) <= 0) {
-        outliner_add_element(
-            &space_outliner_, (te) ? &te->subtree : &tree, id, te, TSE_SOME_ID, 0);
+      if (ID_REFCOUNTING_USERS(id) <= 0) {
+        add_element((te) ? &te->subtree : &tree, id, nullptr, te, TSE_SOME_ID, 0, false);
       }
     }
   }
@@ -87,8 +73,17 @@ ListBase TreeDisplayIDOrphans::buildTree(const TreeSourceData &source_data)
 
 bool TreeDisplayIDOrphans::datablock_has_orphans(ListBase &lb) const
 {
+  if (BLI_listbase_is_empty(&lb)) {
+    return false;
+  }
+  const IDTypeInfo *id_type = BKE_idtype_get_info_from_id(static_cast<ID *>(lb.first));
+  if (id_type->flags & IDTYPE_FLAGS_NEVER_UNUSED) {
+    /* These ID types are never unused. */
+    return false;
+  }
+
   for (ID *id : List<ID>(lb)) {
-    if (ID_REAL_USERS(id) <= 0) {
+    if (ID_REFCOUNTING_USERS(id) <= 0) {
       return true;
     }
   }

@@ -1,60 +1,58 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2023 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(INC
   ../include
-  ../../blenkernel
-  ../../blenlib
-  ../../blentranslation
-  ../../bmesh
-  ../../depsgraph
-  ../../gpu
-  ../../makesdna
   ../../makesrna
-  ../../windowmanager
   ../../../../intern/eigen
-  ../../../../intern/glew-mx
-  ../../../../intern/guardedalloc
+  # RNA_prototypes.hh
+  ${CMAKE_BINARY_DIR}/source/blender/makesrna
 )
 
+set(INC_SYS
+)
 
 set(SRC
-  uvedit_buttons.c
-  uvedit_draw.c
-  uvedit_islands.c
-  uvedit_ops.c
-  uvedit_parametrizer.c
-  uvedit_path.c
-  uvedit_rip.c
-  uvedit_select.c
-  uvedit_smart_stitch.c
-  uvedit_unwrap_ops.c
+  uvedit_buttons.cc
+  uvedit_clipboard.cc
+  uvedit_clipboard_graph_iso.cc
+  uvedit_draw.cc
+  uvedit_islands.cc
+  uvedit_ops.cc
+  uvedit_path.cc
+  uvedit_rip.cc
+  uvedit_select.cc
+  uvedit_smart_stitch.cc
+  uvedit_unwrap_ops.cc
 
-  uvedit_intern.h
-  uvedit_parametrizer.h
+  uvedit_clipboard_graph_iso.hh
+  uvedit_intern.hh
 )
 
 set(LIB
-  bf_bmesh
+  PRIVATE bf::blenkernel
+  PRIVATE bf::blenlib
+  PRIVATE bf::blentranslation
+  PRIVATE bf::bmesh
+  PRIVATE bf::depsgraph
+  PRIVATE bf::dna
+  PRIVATE bf::extern::fmtlib
+  PRIVATE bf::geometry
+  PRIVATE bf::gpu
+  PRIVATE bf::intern::guardedalloc
+  PRIVATE bf::windowmanager
 )
 
-if(WITH_INTERNATIONAL)
-  add_definitions(-DWITH_INTERNATIONAL)
+if(WITH_UV_SLIM)
+  list(APPEND LIB
+    bf_intern_slim
+  )
+  add_definitions(-DWITH_UV_SLIM)
 endif()
 
 
 blender_add_lib(bf_editor_uvedit "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+
+# RNA_prototypes.hh
+add_dependencies(bf_editor_uvedit bf_rna)

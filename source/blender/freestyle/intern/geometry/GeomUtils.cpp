@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2009-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -21,10 +9,12 @@
 
 #include "GeomUtils.h"
 
+#include "BLI_sys_types.h"
+
 namespace Freestyle::GeomUtils {
 
 // This internal procedure is defined below.
-bool intersect2dSegPoly(Vec2r *seg, Vec2r *poly, unsigned n);
+bool intersect2dSegPoly(Vec2r *seg, Vec2r *poly, uint n);
 
 bool intersect2dSeg2dArea(const Vec2r &min, const Vec2r &max, const Vec2r &A, const Vec2r &B)
 {
@@ -50,7 +40,8 @@ bool intersect2dSeg2dArea(const Vec2r &min, const Vec2r &max, const Vec2r &A, co
 bool include2dSeg2dArea(const Vec2r &min, const Vec2r &max, const Vec2r &A, const Vec2r &B)
 {
   if ((((max[0] > A[0]) && (A[0] > min[0])) && ((max[0] > B[0]) && (B[0] > min[0]))) &&
-      (((max[1] > A[1]) && (A[1] > min[1])) && ((max[1] > B[1]) && (B[1] > min[1])))) {
+      (((max[1] > A[1]) && (A[1] > min[1])) && ((max[1] > B[1]) && (B[1] > min[1]))))
+  {
     return true;
   }
   return false;
@@ -350,14 +341,20 @@ intersection_test intersect2dSeg2dSegParametric(const Vec2r &p1,
   (void)0
 
 // This internal procedure is defined below.
-bool overlapPlaneBox(Vec3r &normal, real d, Vec3r &maxbox);
+bool overlapPlaneBox(const Vec3r &normal, const real d, const Vec3r &maxbox);
 
-// Use separating axis theorem to test overlap between triangle and box need to test for overlap in
-// these directions: 1) the {x,y,z}-directions (actually, since we use the AABB of the triangle we
-// do not even need to test these) 2) normal of the triangle 3) crossproduct(edge from tri,
-// {x,y,z}-directin) this gives 3x3=9 more tests
-bool overlapTriangleBox(Vec3r &boxcenter, Vec3r &boxhalfsize, Vec3r triverts[3])
+bool overlapTriangleBox(const Vec3r &boxcenter, const Vec3r &boxhalfsize, const Vec3r triverts[3])
 {
+  /* Use separating axis theorem to test overlap between triangle and box need to test for overlap
+   * in these directions:
+   *
+   * 1) The {x,y,z}-directions
+   *    (actually, since we use the AABB of the triangle we do not even need to test these).
+   * 2) Normal of the triangle.
+   * 3) `crossproduct(edge from tri, {x,y,z}-directin)` this gives 3x3=9 more tests.
+   *
+   * Adapted from Tomas Akenine-Möller code. */
+
   Vec3r v0, v1, v2, normal, e0, e1, e2;
   real min, max, d, p0, p1, p2, rad, fex, fey, fez;
 
@@ -430,17 +427,6 @@ bool overlapTriangleBox(Vec3r &boxcenter, Vec3r &boxhalfsize, Vec3r triverts[3])
   return true;  // box and triangle overlaps
 }
 
-// Fast, Minimum Storage Ray-Triangle Intersection
-//
-// Tomas Möller
-// Prosolvia Clarus AB
-// Sweden
-// <tompa@clarus.se>
-//
-// Ben Trumbore
-// Cornell University
-// Ithaca, New York
-// <wbt@graphics.cornell.edu>
 bool intersectRayTriangle(const Vec3r &orig,
                           const Vec3r &dir,
                           const Vec3r &v0,
@@ -451,6 +437,12 @@ bool intersectRayTriangle(const Vec3r &orig,
                           real &v,
                           const real epsilon)
 {
+  /* Fast, Minimum Storage Ray-Triangle Intersection.
+   * Adapted from Tomas Möller and Ben Trumbore code.
+   *
+   * Tomas Möller, Prosolvia Clarus AB, Sweden, <tompa@clarus.se>.
+   * Ben Trumbore, Cornell University, Ithaca, New York <wbt@graphics.cornell.edu>. */
+
   Vec3r edge1, edge2, tvec, pvec, qvec;
   real det, inv_det;
 
@@ -506,9 +498,6 @@ bool intersectRayTriangle(const Vec3r &orig,
   return true;
 }
 
-// Intersection between plane and ray, adapted from Graphics Gems, Didier Badouel
-// The plane is represented by a set of points P implicitly defined as dot(norm, P) + d = 0.
-// The ray is represented as r(t) = orig + dir * t.
 intersection_test intersectRayPlane(const Vec3r &orig,
                                     const Vec3r &dir,
                                     const Vec3r &norm,
@@ -516,6 +505,10 @@ intersection_test intersectRayPlane(const Vec3r &orig,
                                     real &t,
                                     const real epsilon)
 {
+  /* Intersection between plane and ray, adapted from Graphics Gems, Didier Badouel
+   * The plane is represented by a set of points P implicitly defined as `dot(norm, P) + d = 0`.
+   * The ray is represented as `r(t) = orig + dir * t`. */
+
   real denom = norm * dir;
 
   if (fabs(denom) <= epsilon) {  // plane and ray are parallel
@@ -621,9 +614,9 @@ void transformVertex(const Vec3r &vert, const Matrix44r &matrix, Vec3r &res)
 {
   HVec3r hvert(vert), res_tmp;
   real scale;
-  for (unsigned int j = 0; j < 4; j++) {
+  for (uint j = 0; j < 4; j++) {
     scale = hvert[j];
-    for (unsigned int i = 0; i < 4; i++) {
+    for (uint i = 0; i < 4; i++) {
       res_tmp[i] += matrix(i, j) * scale;
     }
   }
@@ -645,9 +638,9 @@ void transformVertices(const vector<Vec3r> &vertices, const Matrix44r &trans, ve
 Vec3r rotateVector(const Matrix44r &mat, const Vec3r &v)
 {
   Vec3r res;
-  for (unsigned int i = 0; i < 3; i++) {
+  for (uint i = 0; i < 3; i++) {
     res[i] = 0;
-    for (unsigned int j = 0; j < 3; j++) {
+    for (uint j = 0; j < 3; j++) {
       res[i] += mat(i, j) * v[j];
     }
   }
@@ -732,9 +725,9 @@ void fromCameraToWorld(const Vec3r &p, Vec3r &q, const real model_view_matrix[4]
       model_view_matrix[1][3],
       model_view_matrix[2][3],
   };
-  for (unsigned short i = 0; i < 3; i++) {
+  for (ushort i = 0; i < 3; i++) {
     q[i] = 0.0;
-    for (unsigned short j = 0; j < 3; j++) {
+    for (ushort j = 0; j < 3; j++) {
       q[i] += model_view_matrix[j][i] * (p[j] - translation[j]);
     }
   }
@@ -753,7 +746,7 @@ void fromCameraToWorld(const Vec3r &p, Vec3r &q, const real model_view_matrix[4]
 
 #define PERP(u, v) ((u)[0] * (v)[1] - (u)[1] * (v)[0])  // 2D perp product
 
-inline bool intersect2dSegPoly(Vec2r *seg, Vec2r *poly, unsigned n)
+inline bool intersect2dSegPoly(Vec2r *seg, Vec2r *poly, uint n)
 {
   if (seg[0] == seg[1]) {
     return false;
@@ -765,7 +758,7 @@ inline bool intersect2dSegPoly(Vec2r *seg, Vec2r *poly, unsigned n)
   Vec2r dseg = seg[1] - seg[0];  // the segment direction vector
   Vec2r e;                       // edge vector
 
-  for (unsigned int i = 0; i < n; i++) {  // process polygon edge poly[i]poly[i+1]
+  for (uint i = 0; i < n; i++) {  // process polygon edge poly[i]poly[i+1]
     e = poly[i + 1] - poly[i];
     N = PERP(e, seg[0] - poly[i]);
     D = -PERP(e, dseg);
@@ -800,11 +793,11 @@ inline bool intersect2dSegPoly(Vec2r *seg, Vec2r *poly, unsigned n)
   return true;
 }
 
-inline bool overlapPlaneBox(Vec3r &normal, real d, Vec3r &maxbox)
+inline bool overlapPlaneBox(const Vec3r &normal, const real d, const Vec3r &maxbox)
 {
   Vec3r vmin, vmax;
 
-  for (unsigned int q = X; q <= Z; q++) {
+  for (uint q = X; q <= Z; q++) {
     if (normal[q] > 0.0f) {
       vmin[q] = -maxbox[q];
       vmax[q] = maxbox[q];
@@ -828,8 +821,8 @@ inline void fromCoordAToCoordB(const Vec3r &p, Vec3r &q, const real transform[4]
   HVec3r hp(p);
   HVec3r hq(0, 0, 0, 0);
 
-  for (unsigned int i = 0; i < 4; i++) {
-    for (unsigned int j = 0; j < 4; j++) {
+  for (uint i = 0; i < 4; i++) {
+    for (uint j = 0; j < 4; j++) {
       hq[i] += transform[i][j] * hp[j];
     }
   }
@@ -839,7 +832,7 @@ inline void fromCoordAToCoordB(const Vec3r &p, Vec3r &q, const real transform[4]
     return;
   }
 
-  for (unsigned int k = 0; k < 3; k++) {
+  for (uint k = 0; k < 3; k++) {
     q[k] = hq[k] / hq[3];
   }
 }

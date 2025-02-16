@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -25,9 +13,7 @@
 
 #include "../geometry/Geom.h"
 
-#ifdef WITH_CXX_GUARDEDALLOC
-#  include "MEM_guardedalloc.h"
-#endif
+#include "MEM_guardedalloc.h"
 
 #include "DNA_material_types.h"  // for MAX_MTEX
 struct bNodeTree;
@@ -37,7 +23,7 @@ namespace Freestyle {
 using namespace Geometry;
 
 #if 0
-//symbolic constant to call the appropriate renderers and textures
+// symbolic constant to call the appropriate renderers and textures
 #  define NO_TEXTURE_WITH_BLEND_STROKE -2
 #  define NO_TEXTURE_STROKE -1
 #  define PSEUDO_CHARCOAL_STROKE 0
@@ -57,9 +43,7 @@ using namespace Geometry;
 
 class StrokeVertexRep {
  public:
-  StrokeVertexRep()
-  {
-  }
+  StrokeVertexRep() {}
 
   StrokeVertexRep(const Vec2r &iPoint2d)
   {
@@ -68,9 +52,7 @@ class StrokeVertexRep {
 
   StrokeVertexRep(const StrokeVertexRep &iBrother);
 
-  virtual ~StrokeVertexRep()
-  {
-  }
+  virtual ~StrokeVertexRep() {}
 
   inline Vec2r &point2d()
   {
@@ -129,9 +111,7 @@ class StrokeVertexRep {
   Vec3r _color;
   float _alpha;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:StrokeVertexRep")
-#endif
 };
 
 class Strip {
@@ -172,9 +152,7 @@ class Strip {
     return _vertices;
   }
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:Strip")
-#endif
 };
 
 class StrokeRep {
@@ -182,7 +160,7 @@ class StrokeRep {
   Stroke *_stroke;
   vector<Strip *> _strips;
   Stroke::MediumType _strokeType;
-  unsigned int _textureId;
+  uint _textureId;
   float _textureStep;
   MTex *_mtex[MAX_MTEX];
   bNodeTree *_nodeTree;
@@ -209,7 +187,7 @@ class StrokeRep {
     return _strokeType;
   }
 
-  inline unsigned getTextureId() const
+  inline uint getTextureId() const
   {
     return _textureId;
   }
@@ -239,7 +217,7 @@ class StrokeRep {
     return _strips;
   }
 
-  inline unsigned int getNumberOfStrips() const
+  inline uint getNumberOfStrips() const
   {
     return _strips.size();
   }
@@ -255,7 +233,7 @@ class StrokeRep {
     _strokeType = itype;
   }
 
-  inline void setTextureId(unsigned textureId)
+  inline void setTextureId(uint textureId)
   {
     _textureId = textureId;
   }
@@ -271,9 +249,7 @@ class StrokeRep {
   }
 #endif
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:StrokeRep")
-#endif
 };
 
 } /* namespace Freestyle */

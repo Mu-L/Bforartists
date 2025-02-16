@@ -1,33 +1,20 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2002-2023 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 ExternalProject_Add(external_ogg
   URL file://${PACKAGE_DIR}/${OGG_FILE}
   DOWNLOAD_DIR ${DOWNLOAD_DIR}
   URL_HASH ${OGG_HASH_TYPE}=${OGG_HASH}
   PREFIX ${BUILD_DIR}/ogg
-  PATCH_COMMAND ${PATCH_CMD} --verbose -p 1 -N -d ${BUILD_DIR}/ogg/src/external_ogg < ${PATCH_DIR}/ogg.diff
-  CONFIGURE_COMMAND ${CONFIGURE_ENV} && cd ${BUILD_DIR}/ogg/src/external_ogg/ && ${CONFIGURE_COMMAND} --prefix=${LIBDIR}/ogg --disable-shared --enable-static
-  BUILD_COMMAND ${CONFIGURE_ENV} && cd ${BUILD_DIR}/ogg/src/external_ogg/ && make -j${MAKE_THREADS}
-  INSTALL_COMMAND ${CONFIGURE_ENV} && cd ${BUILD_DIR}/ogg/src/external_ogg/ && make install
+
+  CMAKE_ARGS
+    -DCMAKE_INSTALL_PREFIX=${LIBDIR}/ogg
+    ${DEFAULT_CMAKE_FLAGS}
+
   INSTALL_DIR ${LIBDIR}/ogg
 )
 
-if(MSVC)
-  set_target_properties(external_ogg PROPERTIES FOLDER Mingw)
+if(NOT WIN32)
+  harvest(external_ogg ogg/lib ffmpeg/lib "*.a")
 endif()

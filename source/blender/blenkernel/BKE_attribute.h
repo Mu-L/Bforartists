@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2006 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2006 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup bke
@@ -24,64 +9,156 @@
 
 #pragma once
 
+#include <optional>
+#include <string>
+
+#include "BLI_string_ref.hh"
 #include "BLI_sys_types.h"
 
-#include "BKE_customdata.h"
+#include "DNA_customdata_types.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
+namespace blender::bke {
+enum class AttrDomain : int8_t;
+class AttributeAccessor;
+}  // namespace blender::bke
 struct CustomData;
 struct CustomDataLayer;
 struct ID;
 struct ReportList;
+struct Mesh;
+struct PointCloud;
+struct Curves;
+struct GreasePencil;
+struct GreasePencilDrawing;
 
-/* Attribute.domain */
+typedef enum AttrDomainMask {
+  ATTR_DOMAIN_MASK_POINT = (1 << 0),
+  ATTR_DOMAIN_MASK_EDGE = (1 << 1),
+  ATTR_DOMAIN_MASK_FACE = (1 << 2),
+  ATTR_DOMAIN_MASK_CORNER = (1 << 3),
+  ATTR_DOMAIN_MASK_CURVE = (1 << 4),
+  ATTR_DOMAIN_MASK_GREASE_PENCIL_LAYER = (1 << 6),
+  ATTR_DOMAIN_MASK_ALL = (1 << 7) - 1
+} AttrDomainMask;
+ENUM_OPERATORS(AttrDomainMask, ATTR_DOMAIN_MASK_ALL);
+
+enum class AttributeOwnerType {
+  Mesh,
+  PointCloud,
+  Curves,
+  GreasePencil,
+  GreasePencilDrawing,
+};
+
+class AttributeOwner {
+  AttributeOwnerType type_;
+  void *ptr_ = nullptr;
+
+ public:
+  AttributeOwner(){};
+  AttributeOwner(AttributeOwnerType type, void *ptr) : type_(type), ptr_(ptr){};
+
+  static AttributeOwner from_id(ID *id);
+
+  AttributeOwnerType type() const;
+  bool is_valid() const;
+
+  Mesh *get_mesh() const;
+  PointCloud *get_pointcloud() const;
+  Curves *get_curves() const;
+  GreasePencil *get_grease_pencil() const;
+  GreasePencilDrawing *get_grease_pencil_drawing() const;
+};
+
+#define ATTR_DOMAIN_AS_MASK(domain) ((AttrDomainMask)((1 << (int)(domain))))
+
+/* All domains that support color attributes. */
+#define ATTR_DOMAIN_MASK_COLOR \
+  ((AttrDomainMask)((ATTR_DOMAIN_MASK_POINT | ATTR_DOMAIN_MASK_CORNER)))
+
+/* Attributes. */
+
 /**
- * \warning Careful when changing existing items.
- * Arrays may be initialized from this (e.g. #DATASET_layout_hierarchy).
+ * Create a new attribute layer.
  */
-typedef enum AttributeDomain {
-  ATTR_DOMAIN_AUTO = -1,  /* Use for nodes to choose automatically based on other data. */
-  ATTR_DOMAIN_POINT = 0,  /* Mesh, Hair or PointCloud Point */
-  ATTR_DOMAIN_EDGE = 1,   /* Mesh Edge */
-  ATTR_DOMAIN_FACE = 2,   /* Mesh Face */
-  ATTR_DOMAIN_CORNER = 3, /* Mesh Corner */
-  ATTR_DOMAIN_CURVE = 4,  /* Hair Curve */
+struct CustomDataLayer *BKE_attribute_new(AttributeOwner &owner,
+                                          blender::StringRef name,
+                                          eCustomDataType type,
+                                          blender::bke::AttrDomain domain,
+                                          struct ReportList *reports);
+bool BKE_attribute_remove(AttributeOwner &owner,
+                          blender::StringRef name,
+                          struct ReportList *reports);
 
-  ATTR_DOMAIN_NUM
-} AttributeDomain;
+/**
+ * Creates a duplicate attribute layer.
+ */
+struct CustomDataLayer *BKE_attribute_duplicate(AttributeOwner &owner,
+                                                blender::StringRef name,
+                                                struct ReportList *reports);
 
-/* Attributes */
+struct CustomDataLayer *BKE_attribute_find(const AttributeOwner &owner,
+                                           blender::StringRef name,
+                                           eCustomDataType type,
+                                           blender::bke::AttrDomain domain);
 
-bool BKE_id_attributes_supported(struct ID *id);
+const struct CustomDataLayer *BKE_attribute_search(const AttributeOwner &owner,
+                                                   blender::StringRef name,
+                                                   eCustomDataMask type,
+                                                   AttrDomainMask domain_mask);
 
-struct CustomDataLayer *BKE_id_attribute_new(struct ID *id,
-                                             const char *name,
-                                             const int type,
-                                             const AttributeDomain domain,
-                                             struct ReportList *reports);
-bool BKE_id_attribute_remove(struct ID *id,
-                             struct CustomDataLayer *layer,
-                             struct ReportList *reports);
+struct CustomDataLayer *BKE_attribute_search_for_write(AttributeOwner &owner,
+                                                       blender::StringRef name,
+                                                       eCustomDataMask type,
+                                                       AttrDomainMask domain_mask);
 
-AttributeDomain BKE_id_attribute_domain(struct ID *id, struct CustomDataLayer *layer);
-int BKE_id_attribute_data_length(struct ID *id, struct CustomDataLayer *layer);
-bool BKE_id_attribute_required(struct ID *id, struct CustomDataLayer *layer);
-bool BKE_id_attribute_rename(struct ID *id,
-                             struct CustomDataLayer *layer,
-                             const char *new_name,
-                             struct ReportList *reports);
+blender::bke::AttrDomain BKE_attribute_domain(const AttributeOwner &owner,
+                                              const struct CustomDataLayer *layer);
+int BKE_attribute_domain_size(const AttributeOwner &owner, int domain);
+int BKE_attribute_data_length(AttributeOwner &owner, struct CustomDataLayer *layer);
+bool BKE_attribute_required(const AttributeOwner &owner, blender::StringRef name);
+bool BKE_attribute_rename(AttributeOwner &owner,
+                          blender::StringRef old_name,
+                          blender::StringRef new_name,
+                          struct ReportList *reports);
 
-int BKE_id_attributes_length(struct ID *id, const CustomDataMask mask);
+int BKE_attributes_length(const AttributeOwner &owner,
+                          AttrDomainMask domain_mask,
+                          eCustomDataMask mask);
 
-struct CustomDataLayer *BKE_id_attributes_active_get(struct ID *id);
-void BKE_id_attributes_active_set(struct ID *id, struct CustomDataLayer *layer);
-int *BKE_id_attributes_active_index_p(struct ID *id);
+struct CustomDataLayer *BKE_attributes_active_get(AttributeOwner &owner);
+void BKE_attributes_active_set(AttributeOwner &owner, blender::StringRef name);
+void BKE_attributes_active_clear(AttributeOwner &owner);
+int *BKE_attributes_active_index_p(AttributeOwner &owner);
 
-CustomData *BKE_id_attributes_iterator_next_domain(struct ID *id, struct CustomDataLayer *layers);
+CustomData *BKE_attributes_iterator_next_domain(AttributeOwner &owner,
+                                                struct CustomDataLayer *layers);
+CustomDataLayer *BKE_attribute_from_index(AttributeOwner &owner,
+                                          int lookup_index,
+                                          AttrDomainMask domain_mask,
+                                          eCustomDataMask layer_mask);
 
-#ifdef __cplusplus
-}
-#endif
+/** Layer is allowed to be nullptr; if so -1 (layer not found) will be returned. */
+int BKE_attribute_to_index(const AttributeOwner &owner,
+                           const CustomDataLayer *layer,
+                           AttrDomainMask domain_mask,
+                           eCustomDataMask layer_mask);
+
+std::optional<blender::StringRef> BKE_id_attributes_active_color_name(const struct ID *id);
+std::optional<blender::StringRef> BKE_id_attributes_default_color_name(const struct ID *id);
+void BKE_id_attributes_active_color_set(struct ID *id, std::optional<blender::StringRef> name);
+void BKE_id_attributes_active_color_clear(struct ID *id);
+void BKE_id_attributes_default_color_set(struct ID *id, std::optional<blender::StringRef> name);
+
+const struct CustomDataLayer *BKE_id_attributes_color_find(const struct ID *id,
+                                                           blender::StringRef name);
+bool BKE_color_attribute_supported(const struct Mesh &mesh, blender::StringRef name);
+
+std::string BKE_attribute_calc_unique_name(const AttributeOwner &owner, blender::StringRef name);
+
+[[nodiscard]] blender::StringRef BKE_uv_map_vert_select_name_get(blender::StringRef uv_map_name,
+                                                                 char *buffer);
+[[nodiscard]] blender::StringRef BKE_uv_map_edge_select_name_get(blender::StringRef uv_map_name,
+                                                                 char *buffer);
+[[nodiscard]] blender::StringRef BKE_uv_map_pin_name_get(blender::StringRef uv_map_name,
+                                                         char *buffer);

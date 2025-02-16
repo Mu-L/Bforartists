@@ -1,22 +1,6 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2006 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# The Original Code is Copyright (C) 2006, Blender Foundation
-# All rights reserved.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(SRC
   FRS_freestyle.h
@@ -525,8 +509,6 @@ set(SRC
   intern/view_map/ViewMapAdvancedIterators.h
   intern/view_map/ViewMapBuilder.cpp
   intern/view_map/ViewMapBuilder.h
-  intern/view_map/ViewMapIO.cpp
-  intern/view_map/ViewMapIO.h
   intern/view_map/ViewMapIterators.h
   intern/view_map/ViewMapTesselator.cpp
   intern/view_map/ViewMapTesselator.h
@@ -548,43 +530,44 @@ set(SRC
 )
 
 set(LIB
+  PRIVATE bf::blenkernel
+  PRIVATE bf::blenlib
+  PRIVATE bf::blentranslation
+  PRIVATE bf::depsgraph
+  PRIVATE bf::dna
+  PRIVATE bf::imbuf
+  PRIVATE bf::intern::guardedalloc
   bf_python_mathutils
 
   ${PYTHON_LINKFLAGS}
   ${PYTHON_LIBRARIES}
+  PRIVATE bf::render
 )
 
 set(INC
   .
-  ../blenkernel
-  ../blenlib
-  ../blentranslation
-  ../depsgraph
-  ../imbuf
-  ../makesdna
   ../makesrna
   ../python
   ../python/intern
-  ../render
   ../render/intern
-  ../../../extern/glew/include
-  ../../../intern/guardedalloc
+
+  # RNA_prototypes.hh
+  ${CMAKE_BINARY_DIR}/source/blender/makesrna
 )
 
 set(INC_SYS
   ${PYTHON_INCLUDE_DIRS}
-  ${PNG_INC}
 )
 
 add_definitions(-DWITH_FREESTYLE)
 
-if(WITH_PYTHON_SAFETY)
-  # For bpy_rna.h access.
-  add_definitions(-DWITH_PYTHON_SAFETY)
+if(WITH_PYTHON_MODULE)
+  add_definitions(-DPy_ENABLE_SHARED)
 endif()
 
-if(WITH_INTERNATIONAL)
-  add_definitions(-DWITH_INTERNATIONAL)
+if(WITH_PYTHON_SAFETY)
+  # For bpy_rna.hh access.
+  add_definitions(-DWITH_PYTHON_SAFETY)
 endif()
 
 if(WIN32)
@@ -594,4 +577,10 @@ if(WIN32)
 endif()
 
 blender_add_lib(bf_freestyle "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
-blender_precompile_headers(bf_freestyle FRS_precomp.cpp FRS_precomp.h)
+
+if(COMMAND target_precompile_headers)
+  target_precompile_headers(bf_freestyle PRIVATE FRS_precomp.h)
+endif()
+
+# RNA_prototypes.hh
+add_dependencies(bf_freestyle bf_rna)

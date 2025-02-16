@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2013 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2013 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup depsgraph
@@ -23,37 +8,31 @@
  * Core routines for how the Depsgraph works.
  */
 
-#include "intern/depsgraph.h" /* own include */
+#include "intern/depsgraph.hh" /* own include */
 
-#include <algorithm>
 #include <cstring>
 
-#include "MEM_guardedalloc.h"
-
-#include "BLI_console.h"
-#include "BLI_hash.h"
 #include "BLI_utildefines.h"
 
-#include "BKE_global.h"
-#include "BKE_idtype.h"
-#include "BKE_scene.h"
+#include "BKE_global.hh"
+#include "BKE_idtype.hh"
+#include "BKE_scene.hh"
 
-#include "DEG_depsgraph.h"
-#include "DEG_depsgraph_debug.h"
+#include "DEG_depsgraph.hh"
+#include "DEG_depsgraph_debug.hh"
 
-#include "intern/depsgraph_physics.h"
-#include "intern/depsgraph_registry.h"
-#include "intern/depsgraph_relation.h"
-#include "intern/depsgraph_update.h"
+#include "intern/depsgraph_physics.hh"
+#include "intern/depsgraph_registry.hh"
+#include "intern/depsgraph_relation.hh"
 
 #include "intern/eval/deg_eval_copy_on_write.h"
 
-#include "intern/node/deg_node.h"
-#include "intern/node/deg_node_component.h"
-#include "intern/node/deg_node_factory.h"
-#include "intern/node/deg_node_id.h"
-#include "intern/node/deg_node_operation.h"
-#include "intern/node/deg_node_time.h"
+#include "intern/node/deg_node.hh"
+#include "intern/node/deg_node_component.hh"
+#include "intern/node/deg_node_factory.hh"
+#include "intern/node/deg_node_id.hh"
+#include "intern/node/deg_node_operation.hh"
+#include "intern/node/deg_node_time.hh"
 
 namespace deg = blender::deg;
 
@@ -61,9 +40,11 @@ namespace blender::deg {
 
 Depsgraph::Depsgraph(Main *bmain, Scene *scene, ViewLayer *view_layer, eEvaluationMode mode)
     : time_source(nullptr),
-      need_update(true),
-      need_visibility_update(true),
-      need_visibility_time_update(false),
+      has_animated_visibility(false),
+      need_update_relations(true),
+      need_update_nodes_visibility(true),
+      need_tag_id_on_graph_visibility_update(true),
+      need_tag_id_on_graph_visibility_time_update(false),
       bmain(bmain),
       scene(scene),
       view_layer(view_layer),
@@ -72,12 +53,15 @@ Depsgraph::Depsgraph(Main *bmain, Scene *scene, ViewLayer *view_layer, eEvaluati
       ctime(BKE_scene_ctime_get(scene)),
       scene_cow(nullptr),
       is_active(false),
+      use_visibility_optimization(true),
       is_evaluating(false),
       is_render_pipeline_depsgraph(false),
-      use_editors_update(false)
+      use_editors_update(false),
+      update_count(0)
 {
   BLI_spin_init(&lock);
   memset(id_type_updated, 0, sizeof(id_type_updated));
+  memset(id_type_updated_backup, 0, sizeof(id_type_updated_backup));
   memset(id_type_exist, 0, sizeof(id_type_exist));
   memset(physics_relations, 0, sizeof(physics_relations));
 
@@ -119,12 +103,12 @@ IDNode *Depsgraph::find_id_node(const ID *id) const
 
 IDNode *Depsgraph::add_id_node(ID *id, ID *id_cow_hint)
 {
-  BLI_assert((id->tag & LIB_TAG_COPIED_ON_WRITE) == 0);
+  BLI_assert((id->tag & ID_TAG_COPIED_ON_EVAL) == 0);
   IDNode *id_node = find_id_node(id);
   if (!id_node) {
     DepsNodeFactory *factory = type_get_factory(NodeType::ID_REF);
     id_node = (IDNode *)factory->create_node(id, "", id->name);
-    id_node->init_copy_on_write(id_cow_hint);
+    id_node->init_copy_on_write(*this, id_cow_hint);
     /* Register node in ID hash.
      *
      * NOTE: We address ID nodes by the original ID pointer they are
@@ -142,19 +126,19 @@ static void clear_id_nodes_conditional(Depsgraph::IDDepsNodes *id_nodes, const F
 {
   for (IDNode *id_node : *id_nodes) {
     if (id_node->id_cow == nullptr) {
-      /* This means builder "stole" ownership of the copy-on-written
-       * datablock for her own dirty needs. */
+      /* This means builder "stole" ownership of the evaluated
+       * datablock for its own dirty needs. */
       continue;
     }
     if (id_node->id_cow == id_node->id_orig) {
-      /* Copy-on-write version is not needed for this ID type.
+      /* Evaluated copy is not needed for this ID type.
        *
        * NOTE: Is important to not de-reference the original datablock here because it might be
        * freed already (happens during main database free when some IDs are freed prior to a
        * scene). */
       continue;
     }
-    if (!deg_copy_on_write_is_expanded(id_node->id_cow)) {
+    if (!deg_eval_copy_is_expanded(id_node->id_cow)) {
       continue;
     }
     const ID_Type id_type = GS(id_node->id_cow->name);
@@ -180,9 +164,10 @@ void Depsgraph::clear_id_nodes()
   id_nodes.clear();
   /* Clear physics relation caches. */
   clear_physics_relations(this);
+
+  light_linking_cache.clear();
 }
 
-/* Add new relation between two nodes */
 Relation *Depsgraph::add_new_relation(Node *from, Node *to, const char *description, int flags)
 {
   Relation *rel = nullptr;
@@ -198,8 +183,8 @@ Relation *Depsgraph::add_new_relation(Node *from, Node *to, const char *descript
   if (from->type == NodeType::OPERATION && to->type == NodeType::OPERATION) {
     OperationNode *operation_from = static_cast<OperationNode *>(from);
     OperationNode *operation_to = static_cast<OperationNode *>(to);
-    BLI_assert(operation_to->owner->type != NodeType::COPY_ON_WRITE ||
-               operation_from->owner->type == NodeType::COPY_ON_WRITE);
+    BLI_assert(operation_to->owner->type != NodeType::COPY_ON_EVAL ||
+               operation_from->owner->type == NodeType::COPY_ON_EVAL);
   }
 #endif
 
@@ -228,7 +213,6 @@ Relation *Depsgraph::check_nodes_connected(const Node *from,
 
 /* Low level tagging -------------------------------------- */
 
-/* Tag a specific node as needing updates. */
 void Depsgraph::add_entry_tag(OperationNode *node)
 {
   /* Sanity check. */
@@ -254,12 +238,12 @@ ID *Depsgraph::get_cow_id(const ID *id_orig) const
   IDNode *id_node = find_id_node(id_orig);
   if (id_node == nullptr) {
     /* This function is used from places where we expect ID to be either
-     * already a copy-on-write version or have a corresponding copy-on-write
+     * already a copy-on-evaluation version or have a corresponding copy-on-evaluation
      * version.
      *
      * We try to enforce that in debug builds, for release we play a bit
      * safer game here. */
-    if ((id_orig->tag & LIB_TAG_COPIED_ON_WRITE) == 0) {
+    if ((id_orig->tag & ID_TAG_COPIED_ON_EVAL) == 0) {
       /* TODO(sergey): This is nice sanity check to have, but it fails
        * in following situations:
        *
@@ -268,7 +252,7 @@ ID *Depsgraph::get_cow_id(const ID *id_orig) const
        * - Object or mesh has material at a slot which is not used (for
        *   example, object has material slot by materials are set to
        *   object data). */
-      // BLI_assert_msg(0, "Request for non-existing copy-on-write ID");
+      // BLI_assert_msg(0, "Request for non-existing copy-on-evaluation ID");
     }
     return (ID *)id_orig;
   }
@@ -280,7 +264,6 @@ ID *Depsgraph::get_cow_id(const ID *id_orig) const
 /* **************** */
 /* Public Graph API */
 
-/* Initialize a new Depsgraph */
 Depsgraph *DEG_graph_new(Main *bmain, Scene *scene, ViewLayer *view_layer, eEvaluationMode mode)
 {
   deg::Depsgraph *deg_depsgraph = new deg::Depsgraph(bmain, scene, view_layer, mode);
@@ -288,11 +271,7 @@ Depsgraph *DEG_graph_new(Main *bmain, Scene *scene, ViewLayer *view_layer, eEval
   return reinterpret_cast<Depsgraph *>(deg_depsgraph);
 }
 
-/* Replace the "owner" pointers (currently Main/Scene/ViewLayer) of this depsgraph.
- * Used for:
- * - Undo steps when we do want to re-use the old depsgraph data as much as possible.
- * - Rendering where we want to re-use objects between different view layers. */
-void DEG_graph_replace_owners(struct Depsgraph *depsgraph,
+void DEG_graph_replace_owners(Depsgraph *depsgraph,
                               Main *bmain,
                               Scene *scene,
                               ViewLayer *view_layer)
@@ -313,7 +292,6 @@ void DEG_graph_replace_owners(struct Depsgraph *depsgraph,
   }
 }
 
-/* Free graph's contents and graph itself */
 void DEG_graph_free(Depsgraph *graph)
 {
   if (graph == nullptr) {
@@ -325,13 +303,13 @@ void DEG_graph_free(Depsgraph *graph)
   delete deg_depsgraph;
 }
 
-bool DEG_is_evaluating(const struct Depsgraph *depsgraph)
+bool DEG_is_evaluating(const Depsgraph *depsgraph)
 {
   const deg::Depsgraph *deg_graph = reinterpret_cast<const deg::Depsgraph *>(depsgraph);
   return deg_graph->is_evaluating;
 }
 
-bool DEG_is_active(const struct Depsgraph *depsgraph)
+bool DEG_is_active(const Depsgraph *depsgraph)
 {
   if (depsgraph == nullptr) {
     /* Happens for such cases as work object in what_does_obaction(),
@@ -344,15 +322,27 @@ bool DEG_is_active(const struct Depsgraph *depsgraph)
   return deg_graph->is_active;
 }
 
-void DEG_make_active(struct Depsgraph *depsgraph)
+void DEG_make_active(Depsgraph *depsgraph)
 {
   deg::Depsgraph *deg_graph = reinterpret_cast<deg::Depsgraph *>(depsgraph);
   deg_graph->is_active = true;
   /* TODO(sergey): Copy data from evaluated state to original. */
 }
 
-void DEG_make_inactive(struct Depsgraph *depsgraph)
+void DEG_make_inactive(Depsgraph *depsgraph)
 {
   deg::Depsgraph *deg_graph = reinterpret_cast<deg::Depsgraph *>(depsgraph);
   deg_graph->is_active = false;
+}
+
+void DEG_disable_visibility_optimization(Depsgraph *depsgraph)
+{
+  deg::Depsgraph *deg_graph = reinterpret_cast<deg::Depsgraph *>(depsgraph);
+  deg_graph->use_visibility_optimization = false;
+}
+
+uint64_t DEG_get_update_count(const Depsgraph *depsgraph)
+{
+  const deg::Depsgraph *deg_graph = reinterpret_cast<const deg::Depsgraph *>(depsgraph);
+  return deg_graph->update_count;
 }

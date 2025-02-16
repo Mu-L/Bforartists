@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2020 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2020 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "abc_hierarchy_iterator.h"
 #include "abc_writer_abstract.h"
@@ -34,18 +19,16 @@
 
 #include "BLI_assert.h"
 
-#include "DEG_depsgraph_query.h"
-
-#include "DNA_ID.h"
 #include "DNA_layer_types.h"
 #include "DNA_object_types.h"
 
 namespace blender::io::alembic {
 
-ABCHierarchyIterator::ABCHierarchyIterator(Depsgraph *depsgraph,
+ABCHierarchyIterator::ABCHierarchyIterator(Main *bmain,
+                                           Depsgraph *depsgraph,
                                            ABCArchive *abc_archive,
                                            const AlembicExportParams &params)
-    : AbstractHierarchyIterator(depsgraph), abc_archive_(abc_archive), params_(params)
+    : AbstractHierarchyIterator(bmain, depsgraph), abc_archive_(abc_archive), params_(params)
 {
 }
 
@@ -99,6 +82,7 @@ std::string ABCHierarchyIterator::make_valid_name(const std::string &name) const
   std::replace(abc_name.begin(), abc_name.end(), ' ', '_');
   std::replace(abc_name.begin(), abc_name.end(), '.', '_');
   std::replace(abc_name.begin(), abc_name.end(), ':', '_');
+  std::replace(abc_name.begin(), abc_name.end(), '/', '_');
   return abc_name;
 }
 
@@ -206,7 +190,8 @@ ABCAbstractWriter *ABCHierarchyIterator::create_data_writer_for_object_type(
       return new ABCMeshWriter(writer_args);
     case OB_CAMERA:
       return new ABCCameraWriter(writer_args);
-    case OB_CURVE:
+    case OB_CURVES_LEGACY:
+    case OB_CURVES:
       if (params_.curves_as_mesh) {
         return new ABCCurveMeshWriter(writer_args);
       }
@@ -226,7 +211,6 @@ ABCAbstractWriter *ABCHierarchyIterator::create_data_writer_for_object_type(
     case OB_LIGHTPROBE:
     case OB_LATTICE:
     case OB_ARMATURE:
-    case OB_GPENCIL:
       return nullptr;
     case OB_TYPE_MAX:
       BLI_assert_msg(0, "OB_TYPE_MAX should not be used");

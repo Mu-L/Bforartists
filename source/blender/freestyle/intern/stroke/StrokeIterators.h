@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -47,9 +35,7 @@ namespace StrokeInternal {
 class StrokeVertexIterator : public Interface0DIteratorNested {
  public:
   /** Default constructor. */
-  StrokeVertexIterator()
-  {
-  }
+  StrokeVertexIterator() {}
 
   /** Copy constructor. */
   StrokeVertexIterator(const StrokeVertexIterator &vi)
@@ -68,9 +54,7 @@ class StrokeVertexIterator : public Interface0DIteratorNested {
     _end = end;
   }
 
-  virtual ~StrokeVertexIterator()
-  {
-  }
+  virtual ~StrokeVertexIterator() {}
 
   /** Casts this StrokeVertexIterator into an Interface0DIterator.
    *  Useful for any call to a function of the type UnaryFunction0D.

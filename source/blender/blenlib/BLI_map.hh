@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -62,12 +50,9 @@
  *   memory usage of the map.
  * - The method names don't follow the std::unordered_map names in many cases. Searching for such
  *   names in this file will usually let you discover the new name.
- * - There is a StdUnorderedMapWrapper class, that wraps std::unordered_map and gives it the same
- *   interface as blender::Map. This is useful for benchmarking.
  */
 
 #include <optional>
-#include <unordered_map>
 
 #include "BLI_array.hh"
 #include "BLI_hash.hh"
@@ -76,6 +61,28 @@
 #include "BLI_probing_strategies.hh"
 
 namespace blender {
+
+/**
+ * A key-value-pair stored in a #Map. This is used when looping over Map.items().
+ */
+template<typename Key, typename Value> struct MapItem {
+  const Key &key;
+  const Value &value;
+};
+
+/**
+ * Same as #MapItem, but the value is mutable. The key is still const because changing it might
+ * change its hash value which would lead to undefined behavior in the #Map.
+ */
+template<typename Key, typename Value> struct MutableMapItem {
+  const Key &key;
+  Value &value;
+
+  operator MapItem<Key, Value>() const
+  {
+    return {this->key, this->value};
+  }
+};
 
 template<
     /**
@@ -106,7 +113,7 @@ template<
      * The equality operator used to compare keys. By default it will simply compare keys using the
      * `==` operator.
      */
-    typename IsEqual = DefaultEquality,
+    typename IsEqual = DefaultEquality<Key>,
     /**
      * This is what will actually be stored in the hash table array. At a minimum a slot has to be
      * able to hold a key, a value and information about whether the slot is empty, occupied or
@@ -122,6 +129,8 @@ template<
 class Map {
  public:
   using size_type = int64_t;
+  using Item = MapItem<Key, Value>;
+  using MutableItem = MutableMapItem<Key, Value>;
 
  private:
   /**
@@ -144,10 +153,10 @@ class Map {
   uint64_t slot_mask_;
 
   /** This is called to hash incoming keys. */
-  Hash hash_;
+  BLI_NO_UNIQUE_ADDRESS Hash hash_;
 
   /** This is called to check equality of two keys. */
-  IsEqual is_equal_;
+  BLI_NO_UNIQUE_ADDRESS IsEqual is_equal_;
 
   /** The max load factor is 1/2 = 50% by default. */
 #define LOAD_FACTOR 1, 2
@@ -185,9 +194,7 @@ class Map {
   {
   }
 
-  Map(NoExceptConstructor, Allocator allocator = {}) noexcept : Map(allocator)
-  {
-  }
+  Map(NoExceptConstructor, Allocator allocator = {}) noexcept : Map(allocator) {}
 
   ~Map() = default;
 
@@ -215,6 +222,30 @@ class Map {
     hash_ = std::move(other.hash_);
     is_equal_ = std::move(other.is_equal_);
     other.noexcept_reset();
+  }
+
+  /**
+   * Initializes the Map based on some key-value-pairs:
+   *   `Map<int, std::string> map = {{1, "where"}, {3, "when"}, {5, "why"}};`
+   *
+   * If the same key appears multiple times, only the first one is used and the others are ignored.
+   * Note that keys and values are copied. Use the `add_*` functions after the constructor to move
+   * keys and values into the map.
+   */
+  Map(const Span<std::pair<Key, Value>> items, Allocator allocator = {}) : Map(allocator)
+  {
+    for (const std::pair<Key, Value> &item : items) {
+      this->add(item.first, item.second);
+    }
+  }
+
+  /**
+   * This is pretty much the same as the constructor with a #Span above. It helps with type
+   * inferencing when initializer lists are used.
+   */
+  Map(const std::initializer_list<std::pair<Key, Value>> items, Allocator allocator = {})
+      : Map(Span(items), allocator)
+  {
   }
 
   Map &operator=(const Map &other)
@@ -248,7 +279,7 @@ class Map {
     this->add_new_as(std::move(key), std::move(value));
   }
   template<typename ForwardKey, typename... ForwardValue>
-  void add_new_as(ForwardKey &&key, ForwardValue &&... value)
+  void add_new_as(ForwardKey &&key, ForwardValue &&...value)
   {
     this->add_new__impl(
         std::forward<ForwardKey>(key), hash_(key), std::forward<ForwardValue>(value)...);
@@ -278,7 +309,7 @@ class Map {
     return this->add_as(std::move(key), std::move(value));
   }
   template<typename ForwardKey, typename... ForwardValue>
-  bool add_as(ForwardKey &&key, ForwardValue &&... value)
+  bool add_as(ForwardKey &&key, ForwardValue &&...value)
   {
     return this->add__impl(
         std::forward<ForwardKey>(key), hash_(key), std::forward<ForwardValue>(value)...);
@@ -308,7 +339,7 @@ class Map {
     return this->add_overwrite_as(std::move(key), std::move(value));
   }
   template<typename ForwardKey, typename... ForwardValue>
-  bool add_overwrite_as(ForwardKey &&key, ForwardValue &&... value)
+  bool add_overwrite_as(ForwardKey &&key, ForwardValue &&...value)
   {
     return this->add_overwrite__impl(
         std::forward<ForwardKey>(key), hash_(key), std::forward<ForwardValue>(value)...);
@@ -414,7 +445,7 @@ class Map {
     return this->pop_default_as(key, std::move(default_value));
   }
   template<typename ForwardKey, typename... ForwardValue>
-  Value pop_default_as(const ForwardKey &key, ForwardValue &&... default_value)
+  Value pop_default_as(const ForwardKey &key, ForwardValue &&...default_value)
   {
     Slot *slot = this->lookup_slot_ptr(key, hash_(key));
     if (slot == nullptr) {
@@ -493,6 +524,21 @@ class Map {
   }
 
   /**
+   * Returns a copy of the value that corresponds to the given key, or std::nullopt if the key is
+   * not in the map. In some cases, one may not want a copy but an actual reference to the value.
+   * In that case it's better to use #lookup_ptr instead.
+   */
+  std::optional<Value> lookup_try(const Key &key) const
+  {
+    return this->lookup_try_as(key);
+  }
+  template<typename ForwardKey> std::optional<Value> lookup_try_as(const ForwardKey &key) const
+  {
+    const Slot *slot = this->lookup_slot_ptr(key, hash_(key));
+    return (slot != nullptr) ? std::optional<Value>(*slot->value()) : std::nullopt;
+  }
+
+  /**
    * Returns a reference to the value that corresponds to the given key. This invokes undefined
    * behavior when the key is not in the map.
    */
@@ -526,15 +572,13 @@ class Map {
     return this->lookup_default_as(key, default_value);
   }
   template<typename ForwardKey, typename... ForwardValue>
-  Value lookup_default_as(const ForwardKey &key, ForwardValue &&... default_value) const
+  Value lookup_default_as(const ForwardKey &key, ForwardValue &&...default_value) const
   {
     const Value *ptr = this->lookup_ptr_as(key);
     if (ptr != nullptr) {
       return *ptr;
     }
-    else {
-      return Value(std::forward<ForwardValue>(default_value)...);
-    }
+    return Value(std::forward<ForwardValue>(default_value)...);
   }
 
   /**
@@ -558,7 +602,7 @@ class Map {
     return this->lookup_or_add_as(std::move(key), std::move(value));
   }
   template<typename ForwardKey, typename... ForwardValue>
-  Value &lookup_or_add_as(ForwardKey &&key, ForwardValue &&... value)
+  Value &lookup_or_add_as(ForwardKey &&key, ForwardValue &&...value)
   {
     return this->lookup_or_add__impl(
         std::forward<ForwardKey>(key), hash_(key), std::forward<ForwardValue>(value)...);
@@ -683,10 +727,10 @@ class Map {
       return *this;
     }
 
-    BaseIterator operator++(int) const
+    BaseIterator operator++(int)
     {
       BaseIterator copied_iterator = *this;
-      ++copied_iterator;
+      ++(*this);
       return copied_iterator;
     }
 
@@ -787,21 +831,6 @@ class Map {
     }
   };
 
-  struct Item {
-    const Key &key;
-    const Value &value;
-  };
-
-  struct MutableItem {
-    const Key &key;
-    Value &value;
-
-    operator Item() const
-    {
-      return Item{key, value};
-    }
-  };
-
   class ItemIterator final : public BaseIteratorRange<ItemIterator> {
    public:
     using value_type = Item;
@@ -842,7 +871,7 @@ class Map {
    * Allows writing a range-for loop that iterates over all keys. The iterator is invalidated, when
    * the map is changed.
    */
-  KeyIterator keys() const
+  KeyIterator keys() const &
   {
     return KeyIterator(slots_.data(), slots_.size(), 0);
   }
@@ -851,7 +880,7 @@ class Map {
    * Returns an iterator over all values in the map. The iterator is invalidated, when the map is
    * changed.
    */
-  ValueIterator values() const
+  ValueIterator values() const &
   {
     return ValueIterator(slots_.data(), slots_.size(), 0);
   }
@@ -860,32 +889,41 @@ class Map {
    * Returns an iterator over all values in the map and allows you to change the values. The
    * iterator is invalidated, when the map is changed.
    */
-  MutableValueIterator values()
+  MutableValueIterator values() &
   {
     return MutableValueIterator(slots_.data(), slots_.size(), 0);
   }
 
   /**
-   * Returns an iterator over all key-value-pairs in the map. The key-value-pairs are stored in
-   * a temporary struct with a .key and a .value field.The iterator is invalidated, when the map is
-   * changed.
+   * Returns an iterator over all key-value-pairs in the map. The key-value-pairs are stored in a
+   * #MapItem. The iterator is invalidated, when the map is changed.
    */
-  ItemIterator items() const
+  ItemIterator items() const &
   {
     return ItemIterator(slots_.data(), slots_.size(), 0);
   }
 
   /**
-   * Returns an iterator over all key-value-pairs in the map. The key-value-pairs are stored in
-   * a temporary struct with a .key and a .value field. The iterator is invalidated, when the map
-   * is changed.
+   * Returns an iterator over all key-value-pairs in the map. The key-value-pairs are stored in a
+   * #MutableMapItem. The iterator is invalidated, when the map is changed.
    *
    * This iterator also allows you to modify the value (but not the key).
    */
-  MutableItemIterator items()
+  MutableItemIterator items() &
   {
     return MutableItemIterator(slots_.data(), slots_.size(), 0);
   }
+
+  /**
+   * Avoid common bug when trying to do something like this: `for (auto key : get_map().keys())`.
+   * This does not work, because the compiler does not extend the lifetime of the map for the
+   * duration of the loop.
+   */
+  KeyIterator keys() const && = delete;
+  MutableValueIterator values() && = delete;
+  ValueIterator values() const && = delete;
+  ItemIterator items() const && = delete;
+  MutableItemIterator items() && = delete;
 
   /**
    * Remove the key-value-pair that the iterator is currently pointing at.
@@ -901,9 +939,31 @@ class Map {
   }
 
   /**
+   * Remove all key-value-pairs for that the given predicate is true and return the number of
+   * removed pairs.
+   *
+   * This is similar to std::erase_if.
+   */
+  template<typename Predicate> int64_t remove_if(Predicate &&predicate)
+  {
+    const int64_t prev_size = this->size();
+    for (Slot &slot : slots_) {
+      if (slot.is_occupied()) {
+        const Key &key = *slot.key();
+        Value &value = *slot.value();
+        if (predicate(MutableItem{key, value})) {
+          slot.remove();
+          removed_slots_++;
+        }
+      }
+    }
+    return prev_size - this->size();
+  }
+
+  /**
    * Print common statistics like size and collision count. This is useful for debugging purposes.
    */
-  void print_stats(StringRef name = "") const
+  void print_stats(const char *name) const
   {
     HashTableStats stats(*this, this->keys());
     stats.print(name);
@@ -957,7 +1017,7 @@ class Map {
    */
   int64_t size_in_bytes() const
   {
-    return static_cast<int64_t>(sizeof(Slot) * slots_.size());
+    return int64_t(sizeof(Slot) * slots_.size());
   }
 
   /**
@@ -972,11 +1032,30 @@ class Map {
   }
 
   /**
-   * Removes all key-value-pairs from the map.
+   * Remove all elements. Under some circumstances #clear_and_keep_capacity may be more efficient.
    */
   void clear()
   {
-    this->noexcept_reset();
+    std::destroy_at(this);
+    new (this) Map(NoExceptConstructor{});
+  }
+
+  /**
+   * Remove all elements, but don't free the underlying memory.
+   *
+   * This can be more efficient than using #clear if approximately the same or more elements are
+   * added again afterwards. If way fewer elements are added instead, the cost of maintaining a
+   * large hash table can lead to very bad worst-case performance.
+   */
+  void clear_and_keep_capacity()
+  {
+    for (Slot &slot : slots_) {
+      slot.~Slot();
+      new (&slot) Slot();
+    }
+
+    removed_slots_ = 0;
+    occupied_and_removed_slots_ = 0;
   }
 
   /**
@@ -988,6 +1067,33 @@ class Map {
     return this->count_collisions__impl(key, hash_(key));
   }
 
+  /**
+   * True if both maps have the same key-value-pairs.
+   */
+  friend bool operator==(const Map &a, const Map &b)
+  {
+    if (a.size() != b.size()) {
+      return false;
+    }
+    for (const Item item : a.items()) {
+      const Key &key = item.key;
+      const Value &value_a = item.value;
+      const Value *value_b = b.lookup_ptr(key);
+      if (value_b == nullptr) {
+        return false;
+      }
+      if (value_a != *value_b) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  friend bool operator!=(const Map &a, const Map &b)
+  {
+    return !(a == b);
+  }
+
  private:
   BLI_NOINLINE void realloc_and_reinsert(int64_t min_usable_slots)
   {
@@ -995,7 +1101,7 @@ class Map {
     max_load_factor_.compute_total_and_usable_slots(
         SlotArray::inline_buffer_capacity(), min_usable_slots, &total_slots, &usable_slots);
     BLI_assert(total_slots >= 1);
-    const uint64_t new_slot_mask = static_cast<uint64_t>(total_slots) - 1;
+    const uint64_t new_slot_mask = uint64_t(total_slots) - 1;
 
     /**
      * Optimize the case when the map was empty beforehand. We can avoid some copies here.
@@ -1058,7 +1164,7 @@ class Map {
   }
 
   template<typename ForwardKey, typename... ForwardValue>
-  void add_new__impl(ForwardKey &&key, uint64_t hash, ForwardValue &&... value)
+  void add_new__impl(ForwardKey &&key, uint64_t hash, ForwardValue &&...value)
   {
     BLI_assert(!this->contains_as(key));
 
@@ -1067,6 +1173,7 @@ class Map {
     MAP_SLOT_PROBING_BEGIN (hash, slot) {
       if (slot.is_empty()) {
         slot.occupy(std::forward<ForwardKey>(key), hash, std::forward<ForwardValue>(value)...);
+        BLI_assert(hash_(*slot.key()) == hash);
         occupied_and_removed_slots_++;
         return;
       }
@@ -1075,13 +1182,14 @@ class Map {
   }
 
   template<typename ForwardKey, typename... ForwardValue>
-  bool add__impl(ForwardKey &&key, uint64_t hash, ForwardValue &&... value)
+  bool add__impl(ForwardKey &&key, uint64_t hash, ForwardValue &&...value)
   {
     this->ensure_can_add();
 
     MAP_SLOT_PROBING_BEGIN (hash, slot) {
       if (slot.is_empty()) {
         slot.occupy(std::forward<ForwardKey>(key), hash, std::forward<ForwardValue>(value)...);
+        BLI_assert(hash_(*slot.key()) == hash);
         occupied_and_removed_slots_++;
         return true;
       }
@@ -1137,6 +1245,7 @@ class Map {
     MAP_SLOT_PROBING_BEGIN (hash, slot) {
       if (slot.is_empty()) {
         slot.occupy(std::forward<ForwardKey>(key), hash, create_value());
+        BLI_assert(hash_(*slot.key()) == hash);
         occupied_and_removed_slots_++;
         return *slot.value();
       }
@@ -1148,13 +1257,14 @@ class Map {
   }
 
   template<typename ForwardKey, typename... ForwardValue>
-  Value &lookup_or_add__impl(ForwardKey &&key, uint64_t hash, ForwardValue &&... value)
+  Value &lookup_or_add__impl(ForwardKey &&key, uint64_t hash, ForwardValue &&...value)
   {
     this->ensure_can_add();
 
     MAP_SLOT_PROBING_BEGIN (hash, slot) {
       if (slot.is_empty()) {
         slot.occupy(std::forward<ForwardKey>(key), hash, std::forward<ForwardValue>(value)...);
+        BLI_assert(hash_(*slot.key()) == hash);
         occupied_and_removed_slots_++;
         return *slot.value();
       }
@@ -1166,7 +1276,7 @@ class Map {
   }
 
   template<typename ForwardKey, typename... ForwardValue>
-  bool add_overwrite__impl(ForwardKey &&key, uint64_t hash, ForwardValue &&... value)
+  bool add_overwrite__impl(ForwardKey &&key, uint64_t hash, ForwardValue &&...value)
   {
     auto create_func = [&](Value *ptr) {
       new (static_cast<void *>(ptr)) Value(std::forward<ForwardValue>(value)...);
@@ -1252,78 +1362,9 @@ template<typename Key,
                                                                        sizeof(Value)),
          typename ProbingStrategy = DefaultProbingStrategy,
          typename Hash = DefaultHash<Key>,
-         typename IsEqual = DefaultEquality,
+         typename IsEqual = DefaultEquality<Key>,
          typename Slot = typename DefaultMapSlot<Key, Value>::type>
 using RawMap =
     Map<Key, Value, InlineBufferCapacity, ProbingStrategy, Hash, IsEqual, Slot, RawAllocator>;
-
-/**
- * A wrapper for std::unordered_map with the API of blender::Map. This can be used for
- * benchmarking.
- */
-template<typename Key, typename Value> class StdUnorderedMapWrapper {
- private:
-  using MapType = std::unordered_map<Key, Value, blender::DefaultHash<Key>>;
-  MapType map_;
-
- public:
-  int64_t size() const
-  {
-    return static_cast<int64_t>(map_.size());
-  }
-
-  bool is_empty() const
-  {
-    return map_.empty();
-  }
-
-  void reserve(int64_t n)
-  {
-    map_.reserve(n);
-  }
-
-  template<typename ForwardKey, typename... ForwardValue>
-  void add_new(ForwardKey &&key, ForwardValue &&... value)
-  {
-    map_.insert({std::forward<ForwardKey>(key), Value(std::forward<ForwardValue>(value)...)});
-  }
-
-  template<typename ForwardKey, typename... ForwardValue>
-  bool add(ForwardKey &&key, ForwardValue &&... value)
-  {
-    return map_
-        .insert({std::forward<ForwardKey>(key), Value(std::forward<ForwardValue>(value)...)})
-        .second;
-  }
-
-  bool contains(const Key &key) const
-  {
-    return map_.find(key) != map_.end();
-  }
-
-  bool remove(const Key &key)
-  {
-    return (bool)map_.erase(key);
-  }
-
-  Value &lookup(const Key &key)
-  {
-    return map_.find(key)->second;
-  }
-
-  const Value &lookup(const Key &key) const
-  {
-    return map_.find(key)->second;
-  }
-
-  void clear()
-  {
-    map_.clear();
-  }
-
-  void print_stats(StringRef UNUSED(name) = "") const
-  {
-  }
-};
 
 }  // namespace blender

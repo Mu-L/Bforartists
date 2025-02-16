@@ -1,59 +1,47 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2023 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(INC
   ../include
-  ../../blenkernel
-  ../../blenlib
-  ../../blentranslation
-  ../../depsgraph
-  ../../gpu
-  ../../makesdna
   ../../makesrna
-  ../../windowmanager
-  ../../../../intern/clog
-  ../../../../intern/glew-mx
-  ../../../../intern/guardedalloc
-  ../../../../extern/curve_fit_nd
+  # RNA_prototypes.hh
+  ${CMAKE_BINARY_DIR}/source/blender/makesrna
+)
+
+set(INC_SYS
 )
 
 set(SRC
-  curve_ops.c
-  editcurve.c
-  editcurve_add.c
-  editcurve_paint.c
-  editcurve_query.c
-  editcurve_select.c
-  editcurve_undo.c
-  editfont.c
-  editfont_undo.c
+  curve_ops.cc
+  editcurve.cc
+  editcurve_add.cc
+  editcurve_paint.cc
+  editcurve_pen.cc
+  editcurve_query.cc
+  editcurve_select.cc
+  editcurve_undo.cc
+  editfont.cc
+  editfont_undo.cc
 
-  curve_intern.h
+  curve_intern.hh
 )
 
 set(LIB
-  bf_blenkernel
-  bf_blenlib
-  extern_curve_fit_nd
+  PRIVATE bf::blenkernel
+  PRIVATE bf::animrig
+  PRIVATE bf::blenlib
+  PRIVATE bf::blentranslation
+  PRIVATE bf::depsgraph
+  PRIVATE bf::dna
+  PRIVATE bf::extern::curve_fit_nd
+  PRIVATE bf::gpu
+  PRIVATE bf::intern::clog
+  PRIVATE bf::intern::guardedalloc
+  PRIVATE bf::windowmanager
 )
 
-if(WITH_INTERNATIONAL)
-  add_definitions(-DWITH_INTERNATIONAL)
-endif()
-
-
 blender_add_lib(bf_editor_curve "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+
+# RNA_prototypes.hh
+add_dependencies(bf_editor_curve bf_rna)

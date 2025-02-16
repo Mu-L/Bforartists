@@ -1,59 +1,53 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2023 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(INC
   ../include
-  ../../blenkernel
-  ../../blenlib
-  ../../blentranslation
-  ../../bmesh
-  ../../depsgraph
-  ../../gpu
-  ../../makesdna
   ../../makesrna
-  ../../windowmanager
   ../../../../intern/eigen
-  ../../../../intern/glew-mx
-  ../../../../intern/guardedalloc
+  # RNA_prototypes.hh
+  ${CMAKE_BINARY_DIR}/source/blender/makesrna
+)
+
+set(INC_SYS
 )
 
 set(SRC
-  gizmo_draw_utils.c
+  gizmo_draw_utils.cc
   gizmo_geometry.h
-  gizmo_library_intern.h
-  gizmo_library_presets.c
-  gizmo_library_utils.c
-  geometry/geom_arrow_gizmo.c
-  geometry/geom_cube_gizmo.c
-  geometry/geom_dial_gizmo.c
-  gizmo_types/arrow3d_gizmo.c
-  gizmo_types/blank3d_gizmo.c
-  gizmo_types/button2d_gizmo.c
-  gizmo_types/cage2d_gizmo.c
-  gizmo_types/cage3d_gizmo.c
-  gizmo_types/dial3d_gizmo.c
-  gizmo_types/move3d_gizmo.c
-  gizmo_types/primitive3d_gizmo.c
-  gizmo_types/snap3d_gizmo.c
+  gizmo_library_intern.hh
+  gizmo_library_presets.cc
+  gizmo_library_utils.cc
+  geometry/geom_arrow_gizmo.cc
+  geometry/geom_cube_gizmo.cc
+  geometry/geom_dial_gizmo.cc
+  gizmo_types/arrow3d_gizmo.cc
+  gizmo_types/blank3d_gizmo.cc
+  gizmo_types/button2d_gizmo.cc
+  gizmo_types/cage2d_gizmo.cc
+  gizmo_types/cage3d_gizmo.cc
+  gizmo_types/dial3d_gizmo.cc
+  gizmo_types/move3d_gizmo.cc
+  gizmo_types/primitive3d_gizmo.cc
+  gizmo_types/snap3d_gizmo.cc
 )
 
 set(LIB
+  PRIVATE bf::blenkernel
+  PRIVATE bf::blenlib
+  PRIVATE bf::blentranslation
+  PRIVATE bf::bmesh
+  PRIVATE bf::depsgraph
+  PRIVATE bf::dna
+  PRIVATE bf::gpu
+  PRIVATE bf::intern::clog
+  PRIVATE bf::intern::guardedalloc
+  PRIVATE bf::windowmanager
 )
 
 
 blender_add_lib(bf_editor_gizmo_library "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+
+# RNA_prototypes.hh
+add_dependencies(bf_editor_gizmo_library bf_rna)

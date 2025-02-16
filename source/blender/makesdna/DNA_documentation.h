@@ -1,25 +1,10 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2001-2002 NaN Holding BV. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
- * \page makesdna makesdna
+ * \page makesdna Make Struct DNA (`makesdna`)
  *
  * \section aboutdna About the DNA module
  *
@@ -34,7 +19,7 @@
  * - Function pointers:
  *
  *   Because of historical reasons, some function pointers were
- *   untyped. The parser/dna generator has been modified to explicitly
+ *   untyped. The parser/DNA generator has been modified to explicitly
  *   handle these special cases. Most pointers have been given proper
  *   proto's by now. DNA_space_types.h::Spacefile::returnfunc may still
  *   be badly defined. The reason for this is that it is called with
@@ -56,7 +41,7 @@
  *
  *   Ignored structs can only be referred to from non-ignored structs
  *   when referred to as a pointer (where they're usually allocated
- *   and cleared in `readfile.c`).
+ *   and cleared in `readfile.cc`).
  *
  * - %Path to the header files
  *
@@ -75,7 +60,7 @@
  *
  * PLEASE READ INSTRUCTIONS ABOUT ADDING VARIABLES IN 'DNA' STRUCTS IN
  *
- * intern/dna_genfile.c
+ * intern/dna_genfile.cc
  * (ton)
  */
 

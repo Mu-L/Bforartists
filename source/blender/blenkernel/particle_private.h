@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2018 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2018 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup bke
@@ -23,9 +8,7 @@
 
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "BKE_particle.h"
 
 struct CurveMapping;
 
@@ -53,7 +36,7 @@ void do_kink(ParticleKey *state,
              float flat,
              short type,
              short axis,
-             float obmat[4][4],
+             const float obmat[4][4],
              int smooth_start);
 float do_clump(ParticleKey *state,
                const float par_co[3],
@@ -64,12 +47,8 @@ float do_clump(ParticleKey *state,
                float pa_clump,
                bool use_clump_noise,
                float clump_noise_size,
-               struct CurveMapping *clumpcurve);
+               const struct CurveMapping *clumpcurve);
 void do_child_modifiers(const ParticleChildModifierContext *modifier_ctx,
                         float mat[4][4],
                         ParticleKey *state,
                         float t);
-
-#ifdef __cplusplus
-}
-#endif

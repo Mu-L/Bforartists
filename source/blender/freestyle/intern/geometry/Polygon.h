@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -26,9 +14,7 @@
 #include "Geom.h"
 #include "GeomUtils.h"
 
-#ifdef WITH_CXX_GUARDEDALLOC
-#  include "MEM_guardedalloc.h"
-#endif
+#include "MEM_guardedalloc.h"
 
 using namespace std;
 
@@ -59,7 +45,8 @@ template<class Point> class Polygon {
     Point p;
     for (typename vector<Point>::const_iterator it = poly.getVertices().begin();
          it != poly.getVertices().end();
-         it++) {
+         it++)
+    {
       p = *it;
       _vertices.push_back(p);
     }
@@ -70,9 +57,7 @@ template<class Point> class Polygon {
     userdata2 = 0;
   }
 
-  virtual ~Polygon()
-  {
-  }
+  virtual ~Polygon() {}
 
   //
   // Accessors
@@ -106,7 +91,7 @@ template<class Point> class Polygon {
     return result;
   }
 
-  inline unsigned getId() const
+  inline uint getId() const
   {
     return _id;
   }
@@ -119,15 +104,15 @@ template<class Point> class Polygon {
   {
     _vertices.clear();
     Point p;
-    for (typename vector<Point>::const_iterator it = vertices.begin(); it != vertices.end();
-         it++) {
+    for (typename vector<Point>::const_iterator it = vertices.begin(); it != vertices.end(); it++)
+    {
       p = *it;
       _vertices.push_back(p);
     }
     computeBBox();
   }
 
-  inline void setId(unsigned id)
+  inline void setId(uint id)
   {
     _id = id;
   }
@@ -146,7 +131,7 @@ template<class Point> class Polygon {
     _min = _vertices[0];
 
     for (typename vector<Point>::iterator it = _vertices.begin(); it != _vertices.end(); it++) {
-      for (unsigned int i = 0; i < Point::dim(); i++) {
+      for (uint i = 0; i < Point::dim(); i++) {
         if ((*it)[i] > _max[i]) {
           _max[i] = (*it)[i];
         }
@@ -165,11 +150,9 @@ template<class Point> class Polygon {
   vector<Point> _vertices;
   Point _min;
   Point _max;
-  unsigned _id;
+  uint _id;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:Geometry:Polygon")
-#endif
 };
 
 //
@@ -178,22 +161,16 @@ template<class Point> class Polygon {
 ///////////////////////////////////////////////////////////////////////////////
 class Polygon3r : public Polygon<Vec3r> {
  public:
-  inline Polygon3r() : Polygon<Vec3r>()
-  {
-  }
+  inline Polygon3r() : Polygon<Vec3r>() {}
 
   inline Polygon3r(const vector<Vec3r> &vertices, const Vec3r &normal) : Polygon<Vec3r>(vertices)
   {
     setNormal(normal);
   }
 
-  inline Polygon3r(const Polygon3r &poly) : Polygon<Vec3r>(poly), _normal(poly._normal)
-  {
-  }
+  inline Polygon3r(const Polygon3r &poly) : Polygon<Vec3r>(poly), _normal(poly._normal) {}
 
-  virtual ~Polygon3r()
-  {
-  }
+  virtual ~Polygon3r() {}
 
   void setNormal(const Vec3r &normal)
   {

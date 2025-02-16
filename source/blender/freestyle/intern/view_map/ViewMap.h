@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -32,9 +20,7 @@
 #include "../system/BaseIterator.h"
 #include "../system/FreestyleConfig.h"
 
-#ifdef WITH_CXX_GUARDEDALLOC
-#  include "MEM_guardedalloc.h"
-#endif
+#include "MEM_guardedalloc.h"
 
 namespace Freestyle {
 
@@ -46,17 +32,16 @@ namespace Freestyle {
 /*                                */
 /**********************************/
 
-/* Density
- * Mean area depth value
- * distance to a point
- */
-
 class ViewVertex;
 class ViewEdge;
 class ViewShape;
 class TVertex;
 
-/** Class defining the ViewMap. */
+/**
+ * Class defining the ViewMap.
+ *
+ * \note density is the mean area depth value distance to a point.
+ */
 class ViewMap {
  public:
   typedef vector<ViewEdge *> viewedges_container;
@@ -88,7 +73,7 @@ class ViewMap {
   ViewMap()
   {
     _pInstance = this;
-    userdata = NULL;
+    userdata = nullptr;
   }
 
   /** Destructor. */
@@ -153,7 +138,7 @@ class ViewMap {
     return _VEdges.size();
   }
 
-  ViewShape *viewShape(unsigned id);
+  ViewShape *viewShape(uint id);
 
   id_to_index_map &shapeIdToIndexMap()
   {
@@ -234,9 +219,7 @@ class ViewMap {
   /* Clean temporary FEdges created by chaining */
   virtual void Clean();
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:ViewMap")
-#endif
 };
 
 /**********************************/
@@ -298,13 +281,13 @@ class ViewVertex : public Interface0D {
   /** Default constructor. */
   inline ViewVertex()
   {
-    userdata = NULL;
+    userdata = nullptr;
     _Nature = Nature::VIEW_VERTEX;
   }
 
   inline ViewVertex(Nature::VertexNature nature)
   {
-    userdata = NULL;
+    userdata = nullptr;
     _Nature = Nature::VIEW_VERTEX | nature;
   }
 
@@ -314,7 +297,7 @@ class ViewVertex : public Interface0D {
   {
     _Nature = iBrother._Nature;
     iBrother.userdata = this;
-    userdata = NULL;
+    userdata = nullptr;
   }
 
   /** Cloning method. */
@@ -322,9 +305,7 @@ class ViewVertex : public Interface0D {
 
  public:
   /** Destructor. */
-  virtual ~ViewVertex()
-  {
-  }
+  virtual ~ViewVertex() {}
 
   /* accessors */
   /** Returns the nature of the vertex. */
@@ -341,9 +322,7 @@ class ViewVertex : public Interface0D {
   }
 
   /* Replaces old edge by new edge */
-  virtual void Replace(ViewEdge *, ViewEdge *)
-  {
-  }
+  virtual void Replace(ViewEdge *, ViewEdge *) {}
 
  public:
   /* iterators access */
@@ -371,9 +350,7 @@ class ViewVertex : public Interface0D {
   /** Returns an orientedViewEdgeIterator pointing to the ViewEdge given as argument. */
   virtual ViewVertexInternal::orientedViewEdgeIterator edgesIterator(ViewEdge *iEdge) = 0;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:ViewVertex")
-#endif
 };
 
 /**********************************/
@@ -490,8 +467,8 @@ class TVertex : public ViewVertex {
   /** Default constructor. */
   inline TVertex() : ViewVertex(Nature::T_VERTEX)
   {
-    _FrontSVertex = NULL;
-    _BackSVertex = NULL;
+    _FrontSVertex = nullptr;
+    _BackSVertex = nullptr;
     _FrontEdgeA.first = 0;
     _FrontEdgeB.first = 0;
     _BackEdgeA.first = 0;
@@ -607,7 +584,7 @@ class TVertex : public ViewVertex {
         return _BackSVertex;
       }
     }
-    return NULL;
+    return nullptr;
   }
 
   virtual void Replace(ViewEdge *iOld, ViewEdge *iNew);
@@ -630,7 +607,7 @@ class TVertex : public ViewVertex {
     if (iEdgeA == _BackEdgeB.first) {
       return _BackEdgeA.first;
     }
-    return NULL;
+    return nullptr;
   }
 
   /* iterators access */
@@ -655,9 +632,7 @@ class TVertex : public ViewVertex {
   /** Returns an orientedViewEdgeIterator pointing to the ViewEdge given as argument. */
   virtual ViewVertexInternal::orientedViewEdgeIterator edgesIterator(ViewEdge *iEdge);
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:TVertex")
-#endif
 };
 
 /**********************************/
@@ -709,19 +684,19 @@ class NonTVertex : public ViewVertex {
     return _SVertex->getPoint3D();
   }
 
-  /** Returns the projected 3D  x coordinate of the vertex. */
+  /** Returns the projected 3D. Y coordinate of the vertex. */
   virtual real getProjectedX() const
   {
     return _SVertex->point2D().x();
   }
 
-  /** Returns the projected 3D  y coordinate of the vertex. */
+  /** Returns the projected 3D. Y coordinate of the vertex. */
   virtual real getProjectedY() const
   {
     return _SVertex->point2D().y();
   }
 
-  /** Returns the projected 3D  z coordinate of the vertex. */
+  /** Returns the projected 3D. Z coordinate of the vertex. */
   virtual real getProjectedZ() const
   {
     return _SVertex->point2D().z();
@@ -765,7 +740,7 @@ class NonTVertex : public ViewVertex {
   /** Default constructor. */
   inline NonTVertex() : ViewVertex(Nature::NON_T_VERTEX)
   {
-    _SVertex = NULL;
+    _SVertex = nullptr;
   }
 
   /** Builds a NonTVertex from a SVertex. */
@@ -793,9 +768,7 @@ class NonTVertex : public ViewVertex {
 
  public:
   /** destructor. */
-  virtual ~NonTVertex()
-  {
-  }
+  virtual ~NonTVertex() {}
 
   /* accessors */
   /** Returns the SVertex on top of which this NonTVertex is built. */
@@ -840,7 +813,8 @@ class NonTVertex : public ViewVertex {
   {
     edges_container::iterator insertedve;
     for (edges_container::iterator ve = _ViewEdges.begin(), vend = _ViewEdges.end(); ve != vend;
-         ve++) {
+         ve++)
+    {
       if ((ve)->first == iOld) {
         insertedve = _ViewEdges.insert(
             ve, directedViewEdge(iNew, ve->second));  // inserts e2 before ve.
@@ -875,9 +849,7 @@ class NonTVertex : public ViewVertex {
   /** Returns an orientedViewEdgeIterator pointing to the ViewEdge given as argument. */
   virtual ViewVertexInternal::orientedViewEdgeIterator edgesIterator(ViewEdge *iEdge);
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:NonTVertex")
-#endif
 };
 
 /**********************************/
@@ -951,8 +923,8 @@ class ViewEdge : public Interface1D {
   FEdge *_FEdgeA;              // first edge of the embedded fedges chain
   FEdge *_FEdgeB;              // last edge of the embedded fedges chain
   Id _Id;
-  unsigned _ChainingTimeStamp;
-  // The silhouette view edge separates 2 2D spaces. The one on the left is necessarly the Shape
+  uint _ChainingTimeStamp;
+  // The silhouette view edge separates two 2D spaces. The one on the left is necessarily the Shape
   // _Shape (the one to which this edge belongs to) and _aShape is the one on its right NOT HANDLED
   // BY THE COPY CONSTRUCTOR
   ViewShape *_aShape;
@@ -972,15 +944,15 @@ class ViewEdge : public Interface1D {
   /** Default constructor. */
   inline ViewEdge()
   {
-    __A = NULL;
-    __B = NULL;
-    _FEdgeA = NULL;
-    _FEdgeB = NULL;
+    __A = nullptr;
+    __B = nullptr;
+    _FEdgeA = nullptr;
+    _FEdgeB = nullptr;
     _ChainingTimeStamp = 0;
     _qi = 0;
-    _aShape = NULL;
-    userdata = NULL;
-    _splittingId = NULL;
+    _aShape = nullptr;
+    userdata = nullptr;
+    _splittingId = nullptr;
     _isInImage = true;
   }
 
@@ -988,14 +960,14 @@ class ViewEdge : public Interface1D {
   {
     __A = iA;
     __B = iB;
-    _FEdgeA = NULL;
-    _FEdgeB = NULL;
+    _FEdgeA = nullptr;
+    _FEdgeB = nullptr;
     _Shape = 0;
     _ChainingTimeStamp = 0;
     _qi = 0;
-    _aShape = NULL;
-    userdata = NULL;
-    _splittingId = NULL;
+    _aShape = nullptr;
+    userdata = nullptr;
+    _splittingId = nullptr;
     _isInImage = true;
   }
 
@@ -1004,13 +976,13 @@ class ViewEdge : public Interface1D {
     __A = iA;
     __B = iB;
     _FEdgeA = iFEdgeA;
-    _FEdgeB = NULL;
-    _Shape = NULL;
+    _FEdgeB = nullptr;
+    _Shape = nullptr;
     _ChainingTimeStamp = 0;
     _qi = 0;
-    _aShape = NULL;
-    userdata = NULL;
-    _splittingId = NULL;
+    _aShape = nullptr;
+    userdata = nullptr;
+    _splittingId = nullptr;
     _isInImage = true;
   }
 
@@ -1024,9 +996,9 @@ class ViewEdge : public Interface1D {
     _Shape = iShape;
     _ChainingTimeStamp = 0;
     _qi = 0;
-    _aShape = NULL;
-    userdata = NULL;
-    _splittingId = NULL;
+    _aShape = nullptr;
+    userdata = nullptr;
+    _splittingId = nullptr;
     _isInImage = true;
     UpdateFEdges();  // tells every FEdge between iFEdgeA and iFEdgeB that this is theit ViewEdge
   }
@@ -1040,15 +1012,15 @@ class ViewEdge : public Interface1D {
     _FEdgeA = iBrother._FEdgeA;
     _FEdgeB = iBrother._FEdgeB;
     _Nature = iBrother._Nature;
-    _Shape = NULL;
+    _Shape = nullptr;
     _Id = iBrother._Id;
     _ChainingTimeStamp = iBrother._ChainingTimeStamp;
     _aShape = iBrother._aShape;
     _qi = iBrother._qi;
-    _splittingId = NULL;
+    _splittingId = nullptr;
     _isInImage = iBrother._isInImage;
     iBrother.userdata = this;
-    userdata = NULL;
+    userdata = nullptr;
   }
 
   /** Cloning method. */
@@ -1065,7 +1037,7 @@ class ViewEdge : public Interface1D {
 #if 0
     if (_aFace) {
       delete _aFace;
-      _aFace = NULL;
+      _aFace = nullptr;
     }
 #endif
     // only the last splitted deletes this id
@@ -1108,7 +1080,7 @@ class ViewEdge : public Interface1D {
   }
 
   /** Returns the shape that is occluded by the ViewShape to which this ViewEdge belongs to. If no
-   * object is occluded, NULL is returned. \return The occluded ViewShape.
+   * object is occluded, nullptr is returned. \return The occluded ViewShape.
    */
   inline ViewShape *aShape()
   {
@@ -1125,7 +1097,7 @@ class ViewEdge : public Interface1D {
   }
 
   /** Returns the time stamp of this ViewEdge. */
-  inline unsigned getChainingTimeStamp()
+  inline uint getChainingTimeStamp()
   {
     return _ChainingTimeStamp;
   }
@@ -1214,7 +1186,7 @@ class ViewEdge : public Interface1D {
   }
 
   /** Sets the time stamp value. */
-  inline void setChainingTimeStamp(unsigned ts)
+  inline void setChainingTimeStamp(uint ts)
   {
     _ChainingTimeStamp = ts;
   }
@@ -1244,7 +1216,8 @@ class ViewEdge : public Interface1D {
               iMin,
               iMax,
               Vec2r(current->vertexA()->point2D()[0], current->vertexA()->point2D()[1]),
-              Vec2r(current->vertexB()->point2D()[0], current->vertexB()->point2D()[1]))) {
+              Vec2r(current->vertexB()->point2D()[0], current->vertexB()->point2D()[1])))
+      {
         return true;
       }
       current = current->nextEdge();
@@ -1263,7 +1236,8 @@ class ViewEdge : public Interface1D {
               iMin,
               iMax,
               Vec2r(current->vertexA()->point2D()[0], current->vertexA()->point2D()[1]),
-              Vec2r(current->vertexB()->point2D()[0], current->vertexB()->point2D()[1]))) {
+              Vec2r(current->vertexB()->point2D()[0], current->vertexB()->point2D()[1])))
+      {
         return false;
       }
       current = current->nextEdge();
@@ -1394,9 +1368,7 @@ class ViewEdge : public Interface1D {
    */
   virtual Interface0DIterator pointsEnd(float t = 0.0f);
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:ViewEdge")
-#endif
 };
 
 /**********************************/
@@ -1424,14 +1396,14 @@ class ViewShape {
   /** Default constructor. */
   inline ViewShape()
   {
-    userdata = NULL;
-    _SShape = NULL;
+    userdata = nullptr;
+    _SShape = nullptr;
   }
 
   /** Builds a ViewShape from a SShape. */
   inline ViewShape(SShape *iSShape)
   {
-    userdata = NULL;
+    userdata = nullptr;
     _SShape = iSShape;
     //_SShape->setViewShape(this);
   }
@@ -1439,7 +1411,7 @@ class ViewShape {
   /** Copy constructor. */
   inline ViewShape(ViewShape &iBrother)
   {
-    userdata = NULL;
+    userdata = nullptr;
     vector<ViewVertex *>::iterator vv, vvend;
     vector<ViewEdge *>::iterator ve, veend;
 
@@ -1475,7 +1447,8 @@ class ViewShape {
           v->setFrontEdgeB(veFrontB, v->frontEdgeB().second);
           v->setBackEdgeA(veBackA, v->backEdgeA().second);
           v->setBackEdgeB(veBackB, v->backEdgeB().second);
-        } break;
+          break;
+        }
         case Nature::NON_T_VERTEX: {
           NonTVertex *v = (NonTVertex *)(*vv);
           vector<ViewVertex::directedViewEdge> &vedges = (v)->viewedges();
@@ -1483,7 +1456,8 @@ class ViewShape {
           for (vector<ViewVertex::directedViewEdge>::iterator ve = vedges.begin(),
                                                               veend = vedges.end();
                ve != veend;
-               ve++) {
+               ve++)
+          {
             ViewEdge *current = (ViewEdge *)((ve)->first)->userdata;
             newEdges.push_back(ViewVertex::directedViewEdge(current, ve->second));
           }
@@ -1506,20 +1480,20 @@ class ViewShape {
       (*ve)->UpdateFEdges();
     }
 
-    // reset all brothers userdata to NULL:
+    // reset all brothers userdata to nullptr:
     //-------------------------------------
     //---------
     // vertices
     //---------
     for (vv = vvertices.begin(), vvend = vvertices.end(); vv != vvend; vv++) {
-      (*vv)->userdata = NULL;
+      (*vv)->userdata = nullptr;
     }
 
     //------
     // edges
     //------
     for (ve = vvedges.begin(), veend = vvedges.end(); ve != veend; ve++) {
-      (*ve)->userdata = NULL;
+      (*ve)->userdata = nullptr;
     }
   }
 
@@ -1633,9 +1607,7 @@ class ViewShape {
   /* removes the view vertex iViewVertex in the View Shape. */
   void RemoveVertex(ViewVertex *iViewVertex);
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:ViewShape")
-#endif
 };
 
 /*

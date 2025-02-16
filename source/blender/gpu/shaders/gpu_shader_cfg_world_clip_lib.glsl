@@ -1,34 +1,29 @@
+/* SPDX-FileCopyrightText: 2019-2022 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
+
+#pragma once
+
+#include "infos/gpu_clip_planes_info.hh"
+
+#ifdef GPU_FRAGMENT_SHADER
+#  error File should not be included in fragment shader
+#endif
+
 #ifdef USE_WORLD_CLIP_PLANES
-#  if defined(GPU_VERTEX_SHADER) || defined(GPU_GEOMETRY_SHADER)
 
-uniform vec4 WorldClipPlanes[6];
+VERTEX_SHADER_CREATE_INFO(gpu_clip_planes)
 
-#    define _world_clip_planes_calc_clip_distance(wpos, _clipplanes) \
-      { \
-        vec4 pos = vec4(wpos, 1.0); \
-        gl_ClipDistance[0] = dot(_clipplanes[0], pos); \
-        gl_ClipDistance[1] = dot(_clipplanes[1], pos); \
-        gl_ClipDistance[2] = dot(_clipplanes[2], pos); \
-        gl_ClipDistance[3] = dot(_clipplanes[3], pos); \
-        gl_ClipDistance[4] = dot(_clipplanes[4], pos); \
-        gl_ClipDistance[5] = dot(_clipplanes[5], pos); \
-      }
+void world_clip_planes_calc_clip_distance(vec3 wpos)
+{
+  vec4 pos = vec4(wpos, 1.0);
 
-/* HACK Dirty hack to be able to override the definition in common_view_lib.glsl.
- * Not doing this would require changing the include order in every shaders. */
-#    define world_clip_planes_calc_clip_distance(wpos) \
-      _world_clip_planes_calc_clip_distance(wpos, WorldClipPlanes)
-
-#  endif
-
-#  define world_clip_planes_set_clip_distance(c) \
-    { \
-      gl_ClipDistance[0] = (c)[0]; \
-      gl_ClipDistance[1] = (c)[1]; \
-      gl_ClipDistance[2] = (c)[2]; \
-      gl_ClipDistance[3] = (c)[3]; \
-      gl_ClipDistance[4] = (c)[4]; \
-      gl_ClipDistance[5] = (c)[5]; \
-    }
+  gl_ClipDistance[0] = dot(clipPlanes.world[0], pos);
+  gl_ClipDistance[1] = dot(clipPlanes.world[1], pos);
+  gl_ClipDistance[2] = dot(clipPlanes.world[2], pos);
+  gl_ClipDistance[3] = dot(clipPlanes.world[3], pos);
+  gl_ClipDistance[4] = dot(clipPlanes.world[4], pos);
+  gl_ClipDistance[5] = dot(clipPlanes.world[5], pos);
+}
 
 #endif

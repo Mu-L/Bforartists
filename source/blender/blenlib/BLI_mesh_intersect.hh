@@ -1,42 +1,29 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
 /** \file
  * \ingroup bli
  *
- *  Mesh intersection library functions.
- *  Uses exact arithmetic, so need GMP.
+ * Mesh intersection library functions.
+ * Uses exact arithmetic, so need GMP.
  */
 
 #ifdef WITH_GMP
 
-#  include <iostream>
+#  include <iosfwd>
 
 #  include "BLI_array.hh"
-#  include "BLI_double3.hh"
-#  include "BLI_float3.hh"
+#  include "BLI_function_ref.hh"
 #  include "BLI_index_range.hh"
 #  include "BLI_map.hh"
 #  include "BLI_math_mpq.hh"
-#  include "BLI_mpq3.hh"
+#  include "BLI_math_vector_mpq_types.hh"
+#  include "BLI_math_vector_types.hh"
 #  include "BLI_span.hh"
 #  include "BLI_utility_mixins.hh"
-#  include "BLI_vector.hh"
 
 namespace blender::meshintersect {
 
@@ -91,15 +78,18 @@ struct Plane {
 
   Plane() = default;
   Plane(const mpq3 &norm_exact, const mpq_class &d_exact);
-  Plane(const double3 &norm, const double d);
+  Plane(const double3 &norm, double d);
 
-  /* Test equality on the exact fields. */
+  /** Test equality on the exact fields. */
   bool operator==(const Plane &other) const;
 
-  /* Hash on the exact fields. */
+  /** Hash on the exact fields. */
   uint64_t hash() const;
 
   void make_canonical();
+  /**
+   * This is wrong for degenerate planes, but we don't expect to call it on those.
+   */
   bool exact_populated() const;
   void populate_exact();
 };
@@ -249,7 +239,6 @@ class IMeshArena : NonCopyable, NonMovable {
  * internal structures for indexing exactly the set of needed Verts,
  * and also going from a Vert pointer to the index in that system.
  */
-
 class IMesh {
   Array<Face *> face_;                   /* Not `const` so can lazily populate planes. */
   Array<const Vert *> vert_;             /* Only valid if vert_populated_. */
@@ -258,9 +247,7 @@ class IMesh {
 
  public:
   IMesh() = default;
-  IMesh(Span<Face *> faces) : face_(faces)
-  {
-  }
+  IMesh(Span<Face *> faces) : face_(faces) {}
 
   void set_faces(Span<Face *> faces);
   Face *face(int index) const
@@ -350,55 +337,41 @@ struct BoundingBox {
   float3 max{-FLT_MAX, -FLT_MAX, -FLT_MAX};
 
   BoundingBox() = default;
-  BoundingBox(const float3 &min, const float3 &max) : min(min), max(max)
-  {
-  }
+  BoundingBox(const float3 &min, const float3 &max) : min(min), max(max) {}
 
   void combine(const float3 &p)
   {
-    min.x = min_ff(min.x, p.x);
-    min.y = min_ff(min.y, p.y);
-    min.z = min_ff(min.z, p.z);
-    max.x = max_ff(max.x, p.x);
-    max.y = max_ff(max.y, p.y);
-    max.z = max_ff(max.z, p.z);
+    math::min_max(p, this->min, this->max);
   }
 
   void combine(const double3 &p)
   {
-    min.x = min_ff(min.x, static_cast<float>(p.x));
-    min.y = min_ff(min.y, static_cast<float>(p.y));
-    min.z = min_ff(min.z, static_cast<float>(p.z));
-    max.x = max_ff(max.x, static_cast<float>(p.x));
-    max.y = max_ff(max.y, static_cast<float>(p.y));
-    max.z = max_ff(max.z, static_cast<float>(p.z));
+    math::min_max(float3(p), this->min, this->max);
   }
 
   void combine(const BoundingBox &bb)
   {
-    min.x = min_ff(min.x, bb.min.x);
-    min.y = min_ff(min.y, bb.min.y);
-    min.z = min_ff(min.z, bb.min.z);
-    max.x = max_ff(max.x, bb.max.x);
-    max.y = max_ff(max.y, bb.max.y);
-    max.z = max_ff(max.z, bb.max.z);
+    min = math::min(this->min, bb.min);
+    max = math::max(this->max, bb.max);
   }
 
   void expand(float pad)
   {
-    min.x -= pad;
-    min.y -= pad;
-    min.z -= pad;
-    max.x += pad;
-    max.y += pad;
-    max.z += pad;
+    min -= pad;
+    max += pad;
   }
 };
 
-/** Assume bounding boxes have been expanded by a sufficient epsilon. */
+/**
+ * Assume bounding boxes have been expanded by a sufficient epsilon on all sides
+ * so that the comparisons against the bb bounds are sufficient to guarantee that
+ * if an overlap or even touching could happen, this will return true.
+ */
 bool bbs_might_intersect(const BoundingBox &bb_a, const BoundingBox &bb_b);
 
 /**
+ * This is the main routine for calculating the self_intersection of a triangle mesh.
+ *
  * The output will have duplicate vertices merged and degenerate triangles ignored.
  * If the input has overlapping co-planar triangles, then there will be
  * as many duplicates as there are overlaps in each overlapping triangular region.
@@ -406,20 +379,27 @@ bool bbs_might_intersect(const BoundingBox &bb_a, const BoundingBox &bb_b);
  * that the output triangle was a part of (input can have -1 for that field and then
  * the index in `tri[]` will be used as the original index).
  * The orig structure of the output #IMesh gives the originals for vertices and edges.
- * NOTE: if the input tm_in has a non-empty orig structure, then it is ignored.
+ * \note if the input tm_in has a non-empty orig structure, then it is ignored.
  */
 IMesh trimesh_self_intersect(const IMesh &tm_in, IMeshArena *arena);
 
 IMesh trimesh_nary_intersect(const IMesh &tm_in,
                              int nshapes,
-                             std::function<int(int)> shape_fn,
+                             FunctionRef<int(int)> shape_fn,
                              bool use_self,
                              IMeshArena *arena);
 
-/** Return an IMesh that is a triangulation of a mesh with general polygonal faces. */
+/**
+ * Return an #IMesh that is a triangulation of a mesh with general
+ * polygonal faces, #IMesh.
+ * Added diagonals will be distinguishable by having edge original
+ * indices of #NO_INDEX.
+ */
 IMesh triangulate_polymesh(IMesh &imesh, IMeshArena *arena);
 
-/** This has the side effect of populating verts in the #IMesh. */
+/**
+ * Writing the obj_mesh has the side effect of populating verts in the #IMesh.
+ */
 void write_obj_mesh(IMesh &m, const std::string &objname);
 
 } /* namespace blender::meshintersect */

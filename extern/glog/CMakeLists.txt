@@ -1,22 +1,6 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2016 Blender Foundation
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# The Original Code is Copyright (C) 2016, Blender Foundation
-# All rights reserved.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(INC
   src
@@ -45,6 +29,8 @@ set(SRC
   src/config_hurd.h
   src/config_linux.h
   src/config_mac.h
+  src/config_netbsd.h
+  src/config_openbsd.h
 
   src/base/commandlineflags.h
   src/base/googleinit.h
@@ -62,6 +48,11 @@ set(SRC
 set(LIB
 )
 
+# Suppress warnings as GLOG has it's own define.
+if(HAVE_EXECINFO_H)
+  remove_definitions(-DHAVE_EXECINFO_H)
+endif()
+
 if(NOT WITH_SYSTEM_GFLAGS)
   list(APPEND LIB
     extern_gflags
@@ -76,6 +67,7 @@ if(WIN32)
     src/windows/glog/vlog_is_on.h
     src/windows/glog/logging.h
     src/windows/glog/log_severity.h
+    src/windows/glog/stl_logging.h
     src/windows/port.h
     src/windows/config.h
   )
@@ -96,6 +88,7 @@ else()
     include/glog/logging.h
     include/glog/log_severity.h
     include/glog/raw_logging.h
+    include/glog/stl_logging.h
     include/glog/vlog_is_on.h
   )
 endif()

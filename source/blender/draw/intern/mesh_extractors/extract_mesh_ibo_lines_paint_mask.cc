@@ -1,127 +1,142 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2021 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2021 by Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup draw
  */
 
-#include "draw_cache_extract_mesh_private.h"
-
 #include "BLI_bitmap.h"
-#include "BLI_vector.hh"
 #include "atomic_ops.h"
 
 #include "MEM_guardedalloc.h"
 
+#include "GPU_index_buffer.hh"
+
+#include "draw_subdivision.hh"
+#include "extract_mesh.hh"
+
 namespace blender::draw {
-/* ---------------------------------------------------------------------- */
-/** \name Extract Paint Mask Line Indices
- * \{ */
 
-struct MeshExtract_LinePaintMask_Data {
-  GPUIndexBufBuilder elb;
-  /** One bit per edge set if face is selected. */
-  BLI_bitmap *select_map;
-};
-
-static void extract_lines_paint_mask_init(const MeshRenderData *mr,
-                                          struct MeshBatchCache *UNUSED(cache),
-                                          void *UNUSED(ibo),
-                                          void *tls_data)
+void extract_lines_paint_mask(const MeshRenderData &mr, gpu::IndexBuf &lines)
 {
-  MeshExtract_LinePaintMask_Data *data = static_cast<MeshExtract_LinePaintMask_Data *>(tls_data);
-  data->select_map = BLI_BITMAP_NEW(mr->edge_len, __func__);
-  GPU_indexbuf_init(&data->elb, GPU_PRIM_LINES, mr->edge_len, mr->loop_len);
-}
+  const OffsetIndices faces = mr.faces;
+  const Span<int> corner_edges = mr.corner_edges;
+  const Span<bool> hide_edge = mr.hide_edge;
+  const Span<bool> select_poly = mr.select_poly;
+  const Span<int> orig_index_edge = mr.orig_index_edge ?
+                                        Span<int>(mr.orig_index_edge, mr.edges_num) :
+                                        Span<int>();
 
-static void extract_lines_paint_mask_iter_poly_mesh(const MeshRenderData *mr,
-                                                    const MPoly *mp,
-                                                    const int UNUSED(mp_index),
-                                                    void *_data)
-{
-  MeshExtract_LinePaintMask_Data *data = static_cast<MeshExtract_LinePaintMask_Data *>(_data);
-  const MLoop *mloop = mr->mloop;
-  const int ml_index_end = mp->loopstart + mp->totloop;
-  for (int ml_index = mp->loopstart; ml_index < ml_index_end; ml_index += 1) {
-    const MLoop *ml = &mloop[ml_index];
+  GPUIndexBufBuilder builder;
+  const int max_index = mr.corners_num;
+  GPU_indexbuf_init(&builder, GPU_PRIM_LINES, mr.edges_num, max_index);
+  MutableSpan<uint2> data = GPU_indexbuf_get_data(&builder).cast<uint2>();
 
-    const int e_index = ml->e;
-    const MEdge *me = &mr->medge[e_index];
-    if (!((mr->use_hide && (me->flag & ME_HIDE)) ||
-          ((mr->extract_type == MR_EXTRACT_MAPPED) && (mr->e_origindex) &&
-           (mr->e_origindex[e_index] == ORIGINDEX_NONE)))) {
+  BLI_bitmap *select_map = BLI_BITMAP_NEW(mr.edges_num, __func__);
+  threading::parallel_for(faces.index_range(), 1024, [&](const IndexRange range) {
+    for (const int face_index : range) {
+      const IndexRange face = faces[face_index];
+      for (const int corner : face) {
+        const int edge = corner_edges[corner];
+        if ((!hide_edge.is_empty() && hide_edge[edge]) ||
+            (!orig_index_edge.is_empty() && (orig_index_edge[edge] == ORIGINDEX_NONE)))
+        {
+          data[edge] = uint2(gpu::RESTART_INDEX);
+          continue;
+        }
 
-      const int ml_index_last = mp->totloop + mp->loopstart - 1;
-      const int ml_index_other = (ml_index == ml_index_last) ? mp->loopstart : (ml_index + 1);
-      if (mp->flag & ME_FACE_SEL) {
-        if (BLI_BITMAP_TEST_AND_SET_ATOMIC(data->select_map, e_index)) {
-          /* Hide edge as it has more than 2 selected loop. */
-          GPU_indexbuf_set_line_restart(&data->elb, e_index);
+        const int corner_next = bke::mesh::face_corner_next(face, corner);
+        if (!select_poly.is_empty() && select_poly[face_index]) {
+          if (BLI_BITMAP_TEST_AND_SET_ATOMIC(select_map, edge)) {
+            /* Hide edge as it has more than 2 selected loop. */
+            data[edge] = uint2(gpu::RESTART_INDEX);
+          }
+          else {
+            /* First selected loop. Set edge visible, overwriting any unselected loop. */
+            data[edge] = uint2(corner, corner_next);
+          }
         }
         else {
-          /* First selected loop. Set edge visible, overwriting any unselected loop. */
-          GPU_indexbuf_set_line_verts(&data->elb, e_index, ml_index, ml_index_other);
-        }
-      }
-      else {
-        /* Set these unselected loop only if this edge has no other selected loop. */
-        if (!BLI_BITMAP_TEST(data->select_map, e_index)) {
-          GPU_indexbuf_set_line_verts(&data->elb, e_index, ml_index, ml_index_other);
+          /* Set these unselected loop only if this edge has no other selected loop. */
+          if (!BLI_BITMAP_TEST(select_map, edge)) {
+            data[edge] = uint2(corner, corner_next);
+          }
         }
       }
     }
-    else {
-      GPU_indexbuf_set_line_restart(&data->elb, e_index);
+  });
+
+  GPU_indexbuf_build_in_place_ex(&builder, 0, max_index, true, &lines);
+
+  MEM_freeN(select_map);
+}
+
+void extract_lines_paint_mask_subdiv(const MeshRenderData &mr,
+                                     const DRWSubdivCache &subdiv_cache,
+                                     gpu::IndexBuf &lines)
+{
+  const Span<bool> hide_edge = mr.hide_edge;
+  const Span<bool> select_poly = mr.select_poly;
+  const Span<int> orig_index_edge = mr.orig_index_edge ?
+                                        Span<int>(mr.orig_index_edge, mr.edges_num) :
+                                        Span<int>();
+  const Span<int> subdiv_loop_face_index(subdiv_cache.subdiv_loop_face_index,
+                                         subdiv_cache.num_subdiv_loops);
+  const Span<int> subdiv_loop_subdiv_edge_index(subdiv_cache.subdiv_loop_subdiv_edge_index,
+                                                subdiv_cache.num_subdiv_loops);
+  const Span<int> subdiv_loop_edge_index = subdiv_cache.edges_orig_index->data<int>();
+
+  GPUIndexBufBuilder builder;
+  const int max_index = subdiv_cache.num_subdiv_loops;
+  GPU_indexbuf_init(&builder, GPU_PRIM_LINES, subdiv_cache.num_subdiv_edges, max_index);
+  MutableSpan<uint2> data = GPU_indexbuf_get_data(&builder).cast<uint2>();
+
+  BLI_bitmap *select_map = BLI_BITMAP_NEW(mr.edges_num, __func__);
+  const int quads_num = subdiv_cache.num_subdiv_quads;
+  threading::parallel_for(IndexRange(quads_num), 4096, [&](const IndexRange range) {
+    for (const int subdiv_quad_index : range) {
+      const int coarse_quad_index = subdiv_loop_face_index[subdiv_quad_index * 4];
+      const IndexRange subdiv_face(subdiv_quad_index * 4, 4);
+      for (const int corner : subdiv_face) {
+        const uint coarse_edge_index = uint(subdiv_loop_edge_index[corner]);
+        const uint subdiv_edge_index = uint(subdiv_loop_subdiv_edge_index[corner]);
+        if (coarse_edge_index == -1u) {
+          data[subdiv_edge_index] = uint2(gpu::RESTART_INDEX);
+          continue;
+        }
+        if ((!hide_edge.is_empty() && hide_edge[coarse_edge_index]) ||
+            (!orig_index_edge.is_empty() &&
+             (orig_index_edge[coarse_edge_index] == ORIGINDEX_NONE)))
+        {
+          data[subdiv_edge_index] = uint2(gpu::RESTART_INDEX);
+          continue;
+        }
+
+        const int corner_next = bke::mesh::face_corner_next(subdiv_face, corner);
+        if (!select_poly.is_empty() && select_poly[coarse_quad_index]) {
+          if (BLI_BITMAP_TEST_AND_SET_ATOMIC(select_map, coarse_edge_index)) {
+            /* Hide edge as it has more than 2 selected loop. */
+            data[subdiv_edge_index] = uint2(gpu::RESTART_INDEX);
+          }
+          else {
+            /* First selected loop. Set edge visible, overwriting any unselected loop. */
+            data[subdiv_edge_index] = uint2(corner, corner_next);
+          }
+        }
+        else {
+          /* Set these unselected loop only if this edge has no other selected loop. */
+          if (!BLI_BITMAP_TEST(select_map, coarse_edge_index)) {
+            data[subdiv_edge_index] = uint2(corner, corner_next);
+          }
+        }
+      }
     }
-  }
-}
+  });
 
-static void extract_lines_paint_mask_finish(const MeshRenderData *UNUSED(mr),
-                                            struct MeshBatchCache *UNUSED(cache),
-                                            void *buf,
-                                            void *_data)
-{
-  MeshExtract_LinePaintMask_Data *data = static_cast<MeshExtract_LinePaintMask_Data *>(_data);
-  GPUIndexBuf *ibo = static_cast<GPUIndexBuf *>(buf);
-  GPU_indexbuf_build_in_place(&data->elb, ibo);
-  MEM_freeN(data->select_map);
-}
+  GPU_indexbuf_build_in_place_ex(&builder, 0, max_index, true, &lines);
 
-/** \} */
-
-constexpr MeshExtract create_extractor_lines_paint_mask()
-{
-  MeshExtract extractor = {nullptr};
-  extractor.init = extract_lines_paint_mask_init;
-  extractor.iter_poly_mesh = extract_lines_paint_mask_iter_poly_mesh;
-  extractor.finish = extract_lines_paint_mask_finish;
-  extractor.data_type = MR_DATA_NONE;
-  extractor.data_size = sizeof(MeshExtract_LinePaintMask_Data);
-  extractor.use_threading = false;
-  extractor.mesh_buffer_offset = offsetof(MeshBufferCache, ibo.lines_paint_mask);
-  return extractor;
+  MEM_freeN(select_map);
 }
 
 }  // namespace blender::draw
-
-extern "C" {
-const MeshExtract extract_lines_paint_mask = blender::draw::create_extractor_lines_paint_mask();
-}
-
-/** \} */

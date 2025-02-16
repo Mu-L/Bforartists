@@ -1,24 +1,9 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2001-2002 NaN Holding BV. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
- * \ingroup iksolver
+ * \ingroup intern_iksolver
  */
 
 #include "IK_QTask.h"
@@ -58,8 +43,9 @@ void IK_QPositionTask::ComputeJacobian(IK_QJacobian &jacobian)
   Vector3d d_pos = m_goal - pos;
   double length = d_pos.norm();
 
-  if (length > m_clamp_length)
+  if (length > m_clamp_length) {
     d_pos = (m_clamp_length / length) * d_pos;
+  }
 
   jacobian.SetBetas(m_id, m_size, m_weight * d_pos);
 
@@ -73,8 +59,9 @@ void IK_QPositionTask::ComputeJacobian(IK_QJacobian &jacobian)
     for (i = 0; i < seg->NumberOfDoF(); i++) {
       Vector3d axis = seg->Axis(i) * m_weight;
 
-      if (seg->Translational())
+      if (seg->Translational()) {
         jacobian.SetDerivatives(m_id, seg->DoFId() + i, axis, 1e2);
+      }
       else {
         Vector3d pa = p.cross(axis);
         jacobian.SetDerivatives(m_id, seg->DoFId() + i, pa, 1e0);
@@ -119,20 +106,22 @@ void IK_QOrientationTask::ComputeJacobian(IK_QJacobian &jacobian)
   int i;
   const IK_QSegment *seg;
 
-  for (seg = m_segment; seg; seg = seg->Parent())
+  for (seg = m_segment; seg; seg = seg->Parent()) {
     for (i = 0; i < seg->NumberOfDoF(); i++) {
 
-      if (seg->Translational())
+      if (seg->Translational()) {
         jacobian.SetDerivatives(m_id, seg->DoFId() + i, Vector3d(0, 0, 0), 1e2);
+      }
       else {
         Vector3d axis = seg->Axis(i) * m_weight;
         jacobian.SetDerivatives(m_id, seg->DoFId() + i, axis, 1e0);
       }
     }
+  }
 }
 
 // IK_QCenterOfMassTask
-// Note: implementation not finished!
+// NOTE: implementation not finished!
 
 IK_QCenterOfMassTask::IK_QCenterOfMassTask(bool primary,
                                            const IK_QSegment *segment,
@@ -140,8 +129,9 @@ IK_QCenterOfMassTask::IK_QCenterOfMassTask(bool primary,
     : IK_QTask(3, primary, true, segment), m_goal_center(goal_center)
 {
   m_total_mass_inv = ComputeTotalMass(m_segment);
-  if (!FuzzyZero(m_total_mass_inv))
+  if (!FuzzyZero(m_total_mass_inv)) {
     m_total_mass_inv = 1.0 / m_total_mass_inv;
+  }
 }
 
 double IK_QCenterOfMassTask::ComputeTotalMass(const IK_QSegment *segment)
@@ -149,8 +139,9 @@ double IK_QCenterOfMassTask::ComputeTotalMass(const IK_QSegment *segment)
   double mass = /*seg->Mass()*/ 1.0;
 
   const IK_QSegment *seg;
-  for (seg = segment->Child(); seg; seg = seg->Sibling())
+  for (seg = segment->Child(); seg; seg = seg->Sibling()) {
     mass += ComputeTotalMass(seg);
+  }
 
   return mass;
 }
@@ -160,8 +151,9 @@ Vector3d IK_QCenterOfMassTask::ComputeCenter(const IK_QSegment *segment)
   Vector3d center = /*seg->Mass()**/ segment->GlobalStart();
 
   const IK_QSegment *seg;
-  for (seg = segment->Child(); seg; seg = seg->Sibling())
+  for (seg = segment->Child(); seg; seg = seg->Sibling()) {
     center += ComputeCenter(seg);
+  }
 
   return center;
 }
@@ -177,8 +169,9 @@ void IK_QCenterOfMassTask::JacobianSegment(IK_QJacobian &jacobian,
     Vector3d axis = segment->Axis(i) * m_weight;
     axis *= /*segment->Mass()**/ m_total_mass_inv;
 
-    if (segment->Translational())
+    if (segment->Translational()) {
       jacobian.SetDerivatives(m_id, segment->DoFId() + i, axis, 1e2);
+    }
     else {
       Vector3d pa = axis.cross(p);
       jacobian.SetDerivatives(m_id, segment->DoFId() + i, pa, 1e0);
@@ -186,8 +179,9 @@ void IK_QCenterOfMassTask::JacobianSegment(IK_QJacobian &jacobian,
   }
 
   const IK_QSegment *seg;
-  for (seg = segment->Child(); seg; seg = seg->Sibling())
+  for (seg = segment->Child(); seg; seg = seg->Sibling()) {
     JacobianSegment(jacobian, center, seg);
+  }
 }
 
 void IK_QCenterOfMassTask::ComputeJacobian(IK_QJacobian &jacobian)

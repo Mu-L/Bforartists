@@ -1,35 +1,18 @@
-// Copyright 2020 Blender Foundation. All rights reserved.
-//
-// This program is free software; you can redistribute it and/or
-// modify it under the terms of the GNU General Public License
-// as published by the Free Software Foundation; either version 2
-// of the License, or (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// You should have received a copy of the GNU General Public License
-// along with this program; if not, write to the Free Software Foundation,
-// Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-//
-// Author: Sergey Sharybin
+/* SPDX-FileCopyrightText: 2020 Blender Foundation
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later
+ *
+ * Author: Sergey Sharybin. */
 
 #include "internal/topology/mesh_topology.h"
 
 #include <cassert>
 
-namespace blender {
-namespace opensubdiv {
+namespace blender::opensubdiv {
 
-MeshTopology::MeshTopology() : num_vertices_(0), num_edges_(0), num_faces_(0)
-{
-}
+MeshTopology::MeshTopology() : num_vertices_(0), num_edges_(0), num_faces_(0) {}
 
-MeshTopology::~MeshTopology()
-{
-}
+MeshTopology::~MeshTopology() = default;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Vertices.
@@ -183,7 +166,7 @@ void MeshTopology::setNumFaces(int num_faces)
   num_faces_ = num_faces;
 
   // NOTE: Extra element to store fake face past the last real one to make it
-  // possible to calculate number of verticies in the last face.
+  // possible to calculate number of vertices in the last face.
   faces_first_vertex_index_.resize(num_faces + 1, 0);
 }
 
@@ -238,8 +221,8 @@ bool MeshTopology::isFaceVertexIndicesEqual(int face_index,
                 sizeof(int) * num_expected_face_vertex_indices) == 0;
 }
 
-bool MeshTopology::isFaceVertexIndicesEqual(int face_index,
-                                            const vector<int> &expected_face_vertex_indices) const
+bool MeshTopology::isFaceVertexIndicesEqual(
+    int face_index, const std::vector<int> &expected_face_vertex_indices) const
 {
   return isFaceVertexIndicesEqual(
       face_index, expected_face_vertex_indices.size(), expected_face_vertex_indices.data());
@@ -269,5 +252,4 @@ void MeshTopology::finishResizeTopology()
   }
 }
 
-}  // namespace opensubdiv
-}  // namespace blender
+}  // namespace blender::opensubdiv

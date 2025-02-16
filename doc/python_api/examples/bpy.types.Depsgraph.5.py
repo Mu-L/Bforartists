@@ -11,7 +11,7 @@ animation or modifiers into account:
 
 - For meshes this is similar to duplicating the source mesh.
 - For curves this disables own modifiers, and modifiers of objects used as bevel and taper.
-- For metaballs this produces an empty mesh since polygonization is done as a modifier evaluation.
+- For meta-balls this produces an empty mesh since polygonization is done as a modifier evaluation.
 
 When is used on evaluated object all modifiers are taken into account.
 
@@ -36,7 +36,7 @@ class OBJECT_OT_mesh_from_object(bpy.types.Operator):
             return {'CANCELLED'}
         # Avoid annoying None checks later on.
         if obj.type not in {'MESH', 'CURVE', 'SURFACE', 'FONT', 'META'}:
-            self.report({'INFO'}, "Object can not be converted to mesh")
+            self.report({'INFO'}, "Object cannot be converted to mesh")
             return {'CANCELLED'}
         depsgraph = context.evaluated_depsgraph_get()
         object_eval = obj.evaluated_get(depsgraph)

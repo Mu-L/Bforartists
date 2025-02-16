@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2008-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -50,7 +38,6 @@ extern "C" {
 
 #include "../view_map/SteerableViewMap.h"
 #include "../view_map/ViewMap.h"
-#include "../view_map/ViewMapIO.h"
 #include "../view_map/ViewMapTesselator.h"
 
 #include "../winged_edge/Curvature.h"
@@ -62,8 +49,8 @@ extern "C" {
 #include "../blender_interface/BlenderStrokeRenderer.h"
 #include "../blender_interface/BlenderStyleModule.h"
 
-#include "BKE_global.h"
-#include "BLI_path_util.h"
+#include "BKE_global.hh"
+#include "BLI_path_utils.hh"
 #include "BLI_utildefines.h"
 
 #include "DNA_freestyle_types.h"
@@ -85,9 +72,9 @@ Controller::Controller()
   _RootNode->addRef();
 
 #if 0
-  _SilhouetteNode = NULL;
-  _ProjectedSilhouette = NULL;
-  _VisibleProjectedSilhouette = NULL;
+  _SilhouetteNode = nullptr;
+  _ProjectedSilhouette = nullptr;
+  _VisibleProjectedSilhouette = nullptr;
 
   _DebugNode = new NodeGroup;
   _DebugNode->addRef();
@@ -142,14 +129,14 @@ Controller::~Controller()
   }
 
 #if 0
-  if (NULL != _SilhouetteNode) {
+  if (nullptr != _SilhouetteNode) {
     int ref = _SilhouetteNode->destroy();
     if (0 == ref) {
       delete _SilhouetteNode;
     }
   }
 
-  if (NULL != _DebugNode) {
+  if (nullptr != _DebugNode) {
     int ref = _DebugNode->destroy();
     if (0 == ref) {
       delete _DebugNode;
@@ -346,7 +333,7 @@ int Controller::LoadMesh(Render *re, ViewLayer *view_layer, Depsgraph *depsgraph
   soc string basename((const char *)qfi.fileName().toAscii().data());
   char cleaned[FILE_MAX];
   BLI_strncpy(cleaned, iFileName, FILE_MAX);
-  BLI_path_normalize(NULL, cleaned);
+  BLI_path_normalize(cleaned);
   string basename = string(cleaned);
 #endif
 
@@ -422,31 +409,31 @@ void Controller::DeleteViewMap(bool freeCache)
 {
 #if 0
   _pView->DetachSilhouette();
-  if (NULL != _SilhouetteNode) {
+  if (nullptr != _SilhouetteNode) {
     int ref = _SilhouetteNode->destroy();
     if (0 == ref) {
       delete _SilhouetteNode;
-      _SilhouetteNode = NULL;
+      _SilhouetteNode = nullptr;
     }
   }
 
-  if (NULL != _ProjectedSilhouette) {
+  if (nullptr != _ProjectedSilhouette) {
     int ref = _ProjectedSilhouette->destroy();
     if (0 == ref) {
       delete _ProjectedSilhouette;
-      _ProjectedSilhouette = NULL;
+      _ProjectedSilhouette = nullptr;
     }
   }
-  if (NULL != _VisibleProjectedSilhouette) {
+  if (nullptr != _VisibleProjectedSilhouette) {
     int ref = _VisibleProjectedSilhouette->destroy();
     if (0 == ref) {
       delete _VisibleProjectedSilhouette;
-      _VisibleProjectedSilhouette = NULL;
+      _VisibleProjectedSilhouette = nullptr;
     }
   }
 
   _pView->DetachDebug();
-  if (NULL != _DebugNode) {
+  if (nullptr != _DebugNode) {
     int ref = _DebugNode->destroy();
     if (0 == ref) {
       _DebugNode->addRef();
@@ -644,7 +631,7 @@ void Controller::ComputeSteerableViewMap()
 
   // Build 4 nodes containing the edges in the 4 directions
   NodeGroup *ng[Canvas::NB_STEERABLE_VIEWMAP];
-  unsigned i;
+  uint i;
   real c =
       32.0f /
       255.0f;  // see SteerableViewMap::readSteerableViewMapPixel() for information about this 32.
@@ -660,8 +647,8 @@ void Controller::ComputeSteerableViewMap()
   ViewMap::fedges_container &fedges = _ViewMap->FEdges();
   LineRep *fRep;
   NodeShape *ns;
-  for (ViewMap::fedges_container::iterator f = fedges.begin(), fend = fedges.end(); f != fend;
-       ++f) {
+  for (ViewMap::fedges_container::iterator f = fedges.begin(), fend = fedges.end(); f != fend; ++f)
+  {
     if ((*f)->viewedge()->qi() != 0) {
       continue;
     }
@@ -689,7 +676,7 @@ void Controller::ComputeSteerableViewMap()
     offscreenBuffer.AddNode(ng[i]);
 #  if 0
     img[i] = new GrayImage(_pView->width(), _pView->height());
-    offscreenBuffer.readPixels(0,0,_pView->width(), _pView->height(), img[i]->getArray());
+    offscreenBuffer.readPixels(0, 0, _pView->width(), _pView->height(), img[i]->getArray());
 #  endif
     pm = offscreenBuffer.renderPixmap(_pView->width(), _pView->height());
 
@@ -698,17 +685,17 @@ void Controller::ComputeSteerableViewMap()
         cout << "BuildViewMap Warning: couldn't render the steerable ViewMap" << endl;
       }
     }
-    //pm.save(QString("steerable") + QString::number(i) + QString(".bmp"), "BMP");
+    // pm.save(QString("steerable") + QString::number(i) + QString(".bmp"), "BMP");
     // FIXME!! Lost of time !
     qimg = pm.toImage();
     // FIXME !! again!
     img[i] = new GrayImage(_pView->width(), _pView->height());
-    for (unsigned int y = 0; y < img[i]->height(); ++y) {
-      for (unsigned int x = 0; x < img[i]->width(); ++x) {
-        //img[i]->setPixel(x, y, (float)qGray(qimg.pixel(x, y)) / 255.0f);
-        img[i]->setPixel(x, y, (float)qGray(qimg.pixel(x, y)));
+    for (uint y = 0; y < img[i]->height(); ++y) {
+      for (uint x = 0; x < img[i]->width(); ++x) {
+        // img[i]->setPixel(x, y, float(qGray(qimg.pixel(x, y))) / 255.0f);
+        img[i]->setPixel(x, y, float(qGray(qimg.pixel(x, y))));
         // float c = qGray(qimg.pixel(x, y));
-        //img[i]->setPixel(x, y, qGray(qimg.pixel(x, y)));
+        // img[i]->setPixel(x, y, qGray(qimg.pixel(x, y)));
       }
     }
     offscreenBuffer.DetachNode(ng[i]);
@@ -717,8 +704,8 @@ void Controller::ComputeSteerableViewMap()
     // check
 #  if 0
     qimg = QImage(_pView->width(), _pView->height(), 32);
-    for (unsigned int y = 0; y < img[i]->height(); ++y) {
-      for (unsigned int x = 0; x < img[i]->width(); ++x) {
+    for (uint y = 0; y < img[i]->height(); ++y) {
+      for (uint x = 0; x < img[i]->width(); ++x) {
         float v = img[i]->pixel(x, y);
         qimg.setPixel(x, y, qRgb(v, v, v));
       }
@@ -934,7 +921,7 @@ Render *Controller::RenderStrokes(Render *re, bool render)
   return freestyle_render;
 }
 
-void Controller::InsertStyleModule(unsigned index, const char *iFileName)
+void Controller::InsertStyleModule(uint index, const char *iFileName)
 {
   if (!BLI_path_extension_check(iFileName, ".py")) {
     cerr << "Error: Cannot load \"" << string(iFileName) << "\", unknown extension" << endl;
@@ -945,13 +932,13 @@ void Controller::InsertStyleModule(unsigned index, const char *iFileName)
   _Canvas->InsertStyleModule(index, sm);
 }
 
-void Controller::InsertStyleModule(unsigned index, const char *iName, const char *iBuffer)
+void Controller::InsertStyleModule(uint index, const char *iName, const char *iBuffer)
 {
   StyleModule *sm = new BufferedStyleModule(iBuffer, iName, _inter);
   _Canvas->InsertStyleModule(index, sm);
 }
 
-void Controller::InsertStyleModule(unsigned index, const char *iName, struct Text *iText)
+void Controller::InsertStyleModule(uint index, const char *iName, Text *iText)
 {
   StyleModule *sm = new BlenderStyleModule(iText, iName, _inter);
   _Canvas->InsertStyleModule(index, sm);
@@ -962,7 +949,7 @@ void Controller::AddStyleModule(const char * /*iFileName*/)
   //_pStyleWindow->Add(iFileName);
 }
 
-void Controller::RemoveStyleModule(unsigned index)
+void Controller::RemoveStyleModule(uint index)
 {
   _Canvas->RemoveStyleModule(index);
 }
@@ -972,34 +959,34 @@ void Controller::Clear()
   _Canvas->Clear();
 }
 
-void Controller::ReloadStyleModule(unsigned index, const char *iFileName)
+void Controller::ReloadStyleModule(uint index, const char *iFileName)
 {
   StyleModule *sm = new StyleModule(iFileName, _inter);
   _Canvas->ReplaceStyleModule(index, sm);
 }
 
-void Controller::SwapStyleModules(unsigned i1, unsigned i2)
+void Controller::SwapStyleModules(uint i1, uint i2)
 {
   _Canvas->SwapStyleModules(i1, i2);
 }
 
-void Controller::toggleLayer(unsigned index, bool iDisplay)
+void Controller::toggleLayer(uint index, bool iDisplay)
 {
   _Canvas->setVisible(index, iDisplay);
 }
 
-void Controller::setModified(unsigned index, bool iMod)
+void Controller::setModified(uint index, bool iMod)
 {
   //_pStyleWindow->setModified(index, iMod);
   _Canvas->setModified(index, iMod);
   updateCausalStyleModules(index + 1);
 }
 
-void Controller::updateCausalStyleModules(unsigned index)
+void Controller::updateCausalStyleModules(uint index)
 {
-  vector<unsigned> vec;
+  vector<uint> vec;
   _Canvas->causalStyleModules(vec, index);
-  for (vector<unsigned>::const_iterator it = vec.begin(); it != vec.end(); it++) {
+  for (vector<uint>::const_iterator it = vec.begin(); it != vec.end(); it++) {
     //_pStyleWindow->setModified(*it, true);
     _Canvas->setModified(*it, true);
   }
@@ -1019,7 +1006,7 @@ NodeGroup *Controller::BuildRep(vector<ViewEdge *>::iterator vedges_begin,
   mat.setDiffuse(1, 1, 0.3, 1);
   tesselator2D.setFrsMaterial(mat);
 
-  return (tesselator2D.Tesselate(vedges_begin, vedges_end));
+  return tesselator2D.Tesselate(vedges_begin, vedges_end);
 }
 
 void Controller::toggleEdgeTesselationNature(Nature::EdgeNature iNature)
@@ -1066,14 +1053,14 @@ void Controller::displayDensityCurves(int x, int y)
     return;
   }
 
-  unsigned int i, j;
+  uint i, j;
   using densityCurve = vector<Vec3r>;
   vector<densityCurve> curves(svm->getNumberOfOrientations() + 1);
   vector<densityCurve> curvesDirection(svm->getNumberOfPyramidLevels());
 
   // collect the curves values
-  unsigned nbCurves = svm->getNumberOfOrientations() + 1;
-  unsigned nbPoints = svm->getNumberOfPyramidLevels();
+  uint nbCurves = svm->getNumberOfOrientations() + 1;
+  uint nbPoints = svm->getNumberOfPyramidLevels();
   if (!nbPoints) {
     return;
   }
@@ -1113,13 +1100,10 @@ void Controller::init_options()
   Config::Path *cpath = Config::Path::getInstance();
 
   // Directories
-  ViewMapIO::Options::setModelsPath(cpath->getModelsPath());
   TextureManager::Options::setPatternsPath(cpath->getPatternsPath());
   TextureManager::Options::setBrushesPath(cpath->getModelsPath());
 
   // ViewMap Format
-  ViewMapIO::Options::rmFlags(ViewMapIO::Options::FLOAT_VECTORS);
-  ViewMapIO::Options::rmFlags(ViewMapIO::Options::NO_OCCLUDERS);
   setComputeSteerableViewMapFlag(false);
 
   // Visibility

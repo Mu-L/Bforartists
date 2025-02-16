@@ -1,9 +1,10 @@
+/* SPDX-FileCopyrightText: 2016-2022 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-uniform mat4 ModelViewProjectionMatrix;
-uniform mat4 ModelMatrix;
-uniform vec4 ClipPlane;
+#include "infos/gpu_shader_3D_uniform_color_info.hh"
 
-in vec3 pos;
+VERTEX_SHADER_CREATE_INFO(gpu_shader_3D_clipped_uniform_color)
 
 void main()
 {

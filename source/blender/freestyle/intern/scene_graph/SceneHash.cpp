@@ -1,24 +1,14 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2012-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
  */
 
 #include "SceneHash.h"
+
+#include "BLI_sys_types.h"
 
 #include <sstream>
 
@@ -33,39 +23,39 @@ string SceneHash::toString()
 
 void SceneHash::visitNodeViewLayer(NodeViewLayer &node)
 {
-  struct RenderData *r = &node.scene().r;
-  adler32((unsigned char *)&r->xsch, sizeof(r->xsch));  // resolution_x
-  adler32((unsigned char *)&r->ysch, sizeof(r->ysch));  // resolution_y
-  adler32((unsigned char *)&r->size, sizeof(r->size));  // resolution_percentage
+  RenderData *r = &node.scene().r;
+  adler32((uchar *)&r->xsch, sizeof(r->xsch));  // resolution_x
+  adler32((uchar *)&r->ysch, sizeof(r->ysch));  // resolution_y
+  adler32((uchar *)&r->size, sizeof(r->size));  // resolution_percentage
 
-  struct FreestyleConfig *config = &node.sceneLayer().freestyle_config;
-  adler32((unsigned char *)&config->flags, sizeof(config->flags));
-  adler32((unsigned char *)&config->crease_angle, sizeof(config->crease_angle));
-  adler32((unsigned char *)&config->sphere_radius, sizeof(config->sphere_radius));
-  adler32((unsigned char *)&config->dkr_epsilon, sizeof(config->dkr_epsilon));
+  FreestyleConfig *config = &node.sceneLayer().freestyle_config;
+  adler32((uchar *)&config->flags, sizeof(config->flags));
+  adler32((uchar *)&config->crease_angle, sizeof(config->crease_angle));
+  adler32((uchar *)&config->sphere_radius, sizeof(config->sphere_radius));
+  adler32((uchar *)&config->dkr_epsilon, sizeof(config->dkr_epsilon));
 }
 
 void SceneHash::visitNodeCamera(NodeCamera &cam)
 {
   double *proj = cam.projectionMatrix();
   for (int i = 0; i < 16; i++) {
-    adler32((unsigned char *)&proj[i], sizeof(double));
+    adler32((uchar *)&proj[i], sizeof(double));
   }
 }
 
 void SceneHash::visitIndexedFaceSet(IndexedFaceSet &ifs)
 {
   const float *v = ifs.vertices();
-  const unsigned n = ifs.vsize();
+  const uint n = ifs.vsize();
 
-  for (unsigned i = 0; i < n; i++) {
-    adler32((unsigned char *)&v[i], sizeof(v[i]));
+  for (uint i = 0; i < n; i++) {
+    adler32((uchar *)&v[i], sizeof(v[i]));
   }
 }
 
 static const int MOD_ADLER = 65521;
 
-void SceneHash::adler32(const unsigned char *data, int size)
+void SceneHash::adler32(const uchar *data, int size)
 {
   uint32_t sum1 = _sum & 0xffff;
   uint32_t sum2 = (_sum >> 16) & 0xffff;

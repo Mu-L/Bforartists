@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2008-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -39,7 +27,8 @@ static bool inBox(const Vec3r &inter, const Vec3r &box_min, const Vec3r &box_max
 {
   if (((inter.x() >= box_min.x()) && (inter.x() < box_max.x())) &&
       ((inter.y() >= box_min.y()) && (inter.y() < box_max.y())) &&
-      ((inter.z() >= box_min.z()) && (inter.z() < box_max.z()))) {
+      ((inter.z() >= box_min.z()) && (inter.z() < box_max.z())))
+  {
     return true;
   }
   return false;
@@ -50,7 +39,7 @@ void firstIntersectionGridVisitor::examineOccluder(Polygon3r *occ)
   // check whether the edge and the polygon plane are coincident:
   //-------------------------------------------------------------
   // first let us compute the plane equation.
-  Vec3r v1(((occ)->getVertices())[0]);
+  Vec3r v1((occ)->getVertices()[0]);
   Vec3d normal((occ)->getNormal());
   // soc unused - double d = -(v1 * normal);
 
@@ -60,25 +49,27 @@ void firstIntersectionGridVisitor::examineOccluder(Polygon3r *occ)
       // Check whether the intersection is in the cell:
       if (inBox(ray_org_ + tmp_t * ray_dir_ / ray_dir_.norm(),
                 current_cell_->getOrigin(),
-                current_cell_->getOrigin() + cell_size_)) {
+                current_cell_->getOrigin() + cell_size_))
+      {
 #if 0
         Vec3d bboxdiag(_scene3d->bbox().getMax() - _scene3d->bbox().getMin());
         if ((t > 1.0e-06 * (min(min(bboxdiag.x(), bboxdiag.y()), bboxdiag.z()))) &&
-            (t < raylength)) {
+            (t < raylength))
 #else
-        if (tmp_t < t_) {
+        if (tmp_t < t_)
 #endif
-        occluder_ = occ;
-        u_ = tmp_u;
-        v_ = tmp_v;
-        t_ = tmp_t;
+        {
+          occluder_ = occ;
+          u_ = tmp_u;
+          v_ = tmp_v;
+          t_ = tmp_t;
+        }
+      }
+      else {
+        occ->userdata2 = nullptr;
       }
     }
-    else {
-      occ->userdata2 = nullptr;
-    }
   }
-}
 }  // namespace Freestyle
 
 bool firstIntersectionGridVisitor::stop()
@@ -107,7 +98,7 @@ void Grid::clear()
   //_ray_occluders.clear();
 }
 
-void Grid::configure(const Vec3r &orig, const Vec3r &size, unsigned nb)
+void Grid::configure(const Vec3r &orig, const Vec3r &size, uint nb)
 {
   _orig = orig;
   Vec3r tmpSize = size;
@@ -139,9 +130,9 @@ void Grid::configure(const Vec3r &orig, const Vec3r &size, unsigned nb)
   real edge = pow(cell_vol, 1.0 / 3.0);
 
   // We compute the number of cells par edge such as we cover at least the whole box.
-  unsigned i;
+  uint i;
   for (i = 0; i < 3; i++) {
-    _cells_nb[i] = (unsigned)floor(tmpSize[i] / edge) + 1;
+    _cells_nb[i] = uint(floor(tmpSize[i] / edge)) + 1;
   }
 
   _size = tmpSize;
@@ -175,7 +166,7 @@ void Grid::insertOccluder(Polygon3r *occluder)
   // overlapping with the triangle in order to only fill in the ones really overlapping the
   // triangle.
 
-  unsigned i, x, y, z;
+  uint i, x, y, z;
   vector<Vec3r>::const_iterator it;
   Vec3u coord;
 
@@ -239,10 +230,10 @@ bool Grid::nextRayCell(Vec3u &current_cell, Vec3u &next_cell)
 {
   next_cell = current_cell;
   real t_min, t;
-  unsigned i;
+  uint i;
 
-  t_min = FLT_MAX;     // init tmin with handle of the case where one or 2 _u[i] = 0.
-  unsigned coord = 0;  // predominant coord(0=x, 1=y, 2=z)
+  t_min = FLT_MAX;  // init tmin with handle of the case where one or 2 _u[i] = 0.
+  uint coord = 0;   // predominant coord(0=x, 1=y, 2=z)
 
   // using a parametric equation of a line : B = A + t u, we find the tx, ty and tz respectively
   // corresponding to the intersections with the plans:
@@ -294,10 +285,7 @@ bool Grid::nextRayCell(Vec3u &current_cell, Vec3u &next_cell)
   return true;
 }
 
-void Grid::castRay(const Vec3r &orig,
-                   const Vec3r &end,
-                   OccludersSet &occluders,
-                   unsigned timestamp)
+void Grid::castRay(const Vec3r &orig, const Vec3r &end, OccludersSet &occluders, uint timestamp)
 {
   initRay(orig, end, timestamp);
   allOccludersGridVisitor visitor(occluders);
@@ -307,7 +295,7 @@ void Grid::castRay(const Vec3r &orig,
 void Grid::castInfiniteRay(const Vec3r &orig,
                            const Vec3r &dir,
                            OccludersSet &occluders,
-                           unsigned timestamp)
+                           uint timestamp)
 {
   Vec3r end = Vec3r(orig + FLT_MAX * dir / dir.norm());
   bool inter = initInfiniteRay(orig, dir, timestamp);
@@ -319,7 +307,7 @@ void Grid::castInfiniteRay(const Vec3r &orig,
 }
 
 Polygon3r *Grid::castRayToFindFirstIntersection(
-    const Vec3r &orig, const Vec3r &dir, double &t, double &u, double &v, unsigned timestamp)
+    const Vec3r &orig, const Vec3r &dir, double &t, double &u, double &v, uint timestamp)
 {
   Polygon3r *occluder = nullptr;
   Vec3r end = Vec3r(orig + FLT_MAX * dir / dir.norm());
@@ -339,7 +327,7 @@ Polygon3r *Grid::castRayToFindFirstIntersection(
   return occluder;
 }
 
-void Grid::initRay(const Vec3r &orig, const Vec3r &end, unsigned timestamp)
+void Grid::initRay(const Vec3r &orig, const Vec3r &end, uint timestamp)
 {
   _ray_dir = end - orig;
   _t_end = _ray_dir.norm();
@@ -347,15 +335,15 @@ void Grid::initRay(const Vec3r &orig, const Vec3r &end, unsigned timestamp)
   _ray_dir.normalize();
   _timestamp = timestamp;
 
-  for (unsigned i = 0; i < 3; i++) {
-    _current_cell[i] = (unsigned)floor((orig[i] - _orig[i]) / _cell_size[i]);
-    // soc unused - unsigned u = _current_cell[i];
+  for (uint i = 0; i < 3; i++) {
+    _current_cell[i] = uint(floor((orig[i] - _orig[i]) / _cell_size[i]));
+    // soc unused - uint u = _current_cell[i];
     _pt[i] = orig[i] - _orig[i] - _current_cell[i] * _cell_size[i];
   }
   //_ray_occluders.clear();
 }
 
-bool Grid::initInfiniteRay(const Vec3r &orig, const Vec3r &dir, unsigned timestamp)
+bool Grid::initInfiniteRay(const Vec3r &orig, const Vec3r &dir, uint timestamp)
 {
   _ray_dir = dir;
   _t_end = FLT_MAX;
@@ -368,9 +356,9 @@ bool Grid::initInfiniteRay(const Vec3r &orig, const Vec3r &dir, unsigned timesta
   Vec3r boxMax(_orig + _size);
   BBox<Vec3r> box(boxMin, boxMax);
   if (box.inside(orig)) {
-    for (unsigned int i = 0; i < 3; i++) {
-      _current_cell[i] = (unsigned int)floor((orig[i] - _orig[i]) / _cell_size[i]);
-      // soc unused - unsigned u = _current_cell[i];
+    for (uint i = 0; i < 3; i++) {
+      _current_cell[i] = uint(floor((orig[i] - _orig[i]) / _cell_size[i]));
+      // soc unused - uint u = _current_cell[i];
       _pt[i] = orig[i] - _orig[i] - _current_cell[i] * _cell_size[i];
     }
   }
@@ -380,12 +368,12 @@ bool Grid::initInfiniteRay(const Vec3r &orig, const Vec3r &dir, unsigned timesta
     if (GeomUtils::intersectRayBBox(orig, _ray_dir, boxMin, boxMax, 0, _t_end, tmin, tmax)) {
       BLI_assert(tmin != -1.0);
       Vec3r newOrig = orig + tmin * _ray_dir;
-      for (unsigned int i = 0; i < 3; i++) {
-        _current_cell[i] = (unsigned)floor((newOrig[i] - _orig[i]) / _cell_size[i]);
+      for (uint i = 0; i < 3; i++) {
+        _current_cell[i] = uint(floor((newOrig[i] - _orig[i]) / _cell_size[i]));
         if (_current_cell[i] == _cells_nb[i]) {
           _current_cell[i] = _cells_nb[i] - 1;
         }
-        // soc unused - unsigned u = _current_cell[i];
+        // soc unused - uint u = _current_cell[i];
         _pt[i] = newOrig[i] - _orig[i] - _current_cell[i] * _cell_size[i];
       }
     }

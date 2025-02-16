@@ -1,8 +1,8 @@
-/* Apache License, Version 2.0 */
+/* SPDX-FileCopyrightText: 2023 Blender Authors
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "testing/testing.h"
-
-#include "MEM_guardedalloc.h"
 
 #include "BLI_task.h"
 

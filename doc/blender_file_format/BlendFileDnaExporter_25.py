@@ -1,22 +1,7 @@
 #!/usr/bin/env python3
-
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2010-2022 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ***** END GPL LICENCE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 ######################################################
 #
@@ -55,7 +40,6 @@
 #
 ######################################################
 
-import struct
 import sys
 from string import Template     # strings completion
 
@@ -245,7 +229,7 @@ class DNACatalogHTML:
 
         return structure_field
 
-    def indent(self, input, dent, startswith=''):
+    def indent(self, input, dent):
         output = ''
         if dent < 0:
             for line in input.split('\n'):
@@ -378,15 +362,15 @@ class DNACatalogHTML:
 
 
 def usage():
-    print("\nUsage: \n\tblender2.5 --background -noaudio --python BlendFileDnaExporter_25.py [-- [options]]")
+    print("\nUsage: \n\tblender2.5 --background --python BlendFileDnaExporter_25.py [-- [options]]")
     print("Options:")
     print("\t--dna-keep-blend:      doesn't delete the produced blend file DNA export to html")
     print("\t--dna-debug:           sets the logging level to DEBUG (lots of additional info)")
     print("\t--dna-versioned        saves version information in the html and blend filenames")
     print("\t--dna-overwrite-css    overwrite dna.css, useful when modifying css in the script")
     print("Examples:")
-    print("\tdefault:       % blender2.5 --background -noaudio --python BlendFileDnaExporter_25.py")
-    print("\twith options:  % blender2.5 --background -noaudio --python BlendFileDnaExporter_25.py -- --dna-keep-blend --dna-debug\n")
+    print("\tdefault:       % blender2.5 --background --python BlendFileDnaExporter_25.py")
+    print("\twith options:  % blender2.5 --background --python BlendFileDnaExporter_25.py -- --dna-keep-blend --dna-debug\n")
 
 
 ######################################################
@@ -395,7 +379,8 @@ def usage():
 
 def main():
 
-    import os, os.path
+    import os
+    import os.path
 
     try:
         bpy = __import__('bpy')
@@ -417,7 +402,7 @@ def main():
             log.info("   saving to: " + Path_Blend)
             try:
                 bpy.ops.wm.save_as_mainfile(filepath=Path_Blend, copy=True, compress=False)
-            except:
+            except Exception:
                 log.error("Filename {0} does not exist and can't be created... quitting".format(Path_Blend))
                 return
         else:
@@ -427,7 +412,7 @@ def main():
         # read blend header from blend file
         log.info("2: read file:")
 
-        if not dir in sys.path:
+        if dir not in sys.path:
             sys.path.append(dir)
         import BlendFileReader
 

@@ -1,9 +1,13 @@
-/* Apache License, Version 2.0 */
+/* SPDX-FileCopyrightText: 2023 Blender Authors
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "BLI_exception_safety_test_utils.hh"
-#include "BLI_strict_flags.h"
 #include "BLI_vector_set.hh"
+
 #include "testing/testing.h"
+
+#include "BLI_strict_flags.h" /* IWYU pragma: keep. Keep last. */
 
 namespace blender::tests {
 
@@ -126,6 +130,19 @@ TEST(vector_set, RemoveContained)
   EXPECT_EQ(set[0], 7);
   set.remove_contained(7);
   EXPECT_EQ(set.size(), 0);
+}
+
+TEST(vector_set, RemoveIf)
+{
+  VectorSet<int64_t> set;
+  for (const int64_t i : IndexRange(100)) {
+    set.add(i * i);
+  }
+  const int64_t removed = set.remove_if([](const int64_t key) { return key % 2 == 0; });
+  EXPECT_EQ(set.size() + removed, 100);
+  for (const int64_t i : IndexRange(100)) {
+    EXPECT_EQ(set.contains(i * i), i % 2 == 1);
+  }
 }
 
 TEST(vector_set, AddMultipleTimes)
@@ -269,6 +286,57 @@ TEST(vector_set, LookupKey)
   EXPECT_EQ(set.lookup_key_ptr_as("d"), nullptr);
   EXPECT_EQ(set.lookup_key_ptr_as("b")->size(), 1);
   EXPECT_EQ(set.lookup_key_ptr("a"), set.lookup_key_ptr_as("a"));
+}
+
+TEST(vector_set, GrowWhenEmpty)
+{
+  /* Tests that the internal keys array is freed correctly when growing an empty set. */
+  VectorSet<int> set;
+  set.add(4);
+  set.remove(4);
+  EXPECT_TRUE(set.is_empty());
+  set.reserve(100);
+}
+
+TEST(vector_set, ExtractVector)
+{
+  VectorSet<int> set;
+  set.add_multiple({5, 2, 7, 4, 8, 5, 4, 5});
+  EXPECT_EQ(set.size(), 5);
+  const int *data_ptr = set.data();
+
+  Vector<int> vec = set.extract_vector();
+  EXPECT_EQ(vec.size(), 5);
+  EXPECT_EQ(vec.data(), data_ptr);
+}
+
+TEST(vector_set, ExtractVectorEmpty)
+{
+  VectorSet<int> set;
+  Vector<int> vec = set.extract_vector();
+  EXPECT_TRUE(vec.is_empty());
+}
+
+TEST(vector_set, CustomIDVectorSet)
+{
+  struct ThingWithID {
+    int a;
+    std::string b;
+    int c;
+  };
+  struct ThingGetter {
+    StringRef operator()(const ThingWithID &value) const
+    {
+      return value.b;
+    }
+  };
+  CustomIDVectorSet<ThingWithID, ThingGetter> set;
+  set.add_new(ThingWithID{0, "test", 54});
+  EXPECT_TRUE(set.contains_as("test"));
+  set.add_new(ThingWithID{4333, "other", 2});
+  EXPECT_EQ(set.size(), 2);
+  set.add(ThingWithID{3333, "test", 27});
+  EXPECT_EQ(set.size(), 2);
 }
 
 }  // namespace blender::tests

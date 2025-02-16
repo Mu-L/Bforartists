@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup modifiers
@@ -21,107 +9,45 @@
 #include <vector>
 
 #include "BKE_geometry_set.hh"
-#include "BKE_lib_query.h"
-#include "BKE_mesh_runtime.h"
-#include "BKE_mesh_wrapper.h"
-#include "BKE_modifier.h"
-#include "BKE_object.h"
-#include "BKE_volume.h"
+#include "BKE_lib_id.hh"
+#include "BKE_lib_query.hh"
+#include "BKE_mesh.hh"
+#include "BKE_mesh_wrapper.hh"
+#include "BKE_modifier.hh"
+#include "BKE_volume.hh"
+
+#include "BLT_translation.hh"
 
 #include "DNA_mesh_types.h"
-#include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
 #include "DNA_screen_types.h"
-#include "DNA_volume_types.h"
 
-#include "DEG_depsgraph.h"
+#include "GEO_mesh_to_volume.hh"
 
-#include "UI_interface.h"
-#include "UI_resources.h"
+#include "UI_interface.hh"
+#include "UI_resources.hh"
 
-#include "BLO_read_write.h"
+#include "MOD_ui_common.hh"
 
-#include "MEM_guardedalloc.h"
+#include "BLI_math_matrix_types.hh"
 
-#include "MOD_modifiertypes.h"
-#include "MOD_ui_common.h"
+#include "RNA_prototypes.hh"
 
-#include "BLI_float4x4.hh"
-#include "BLI_index_range.hh"
-#include "BLI_span.hh"
-
-#include "RNA_access.h"
-
-#ifdef WITH_OPENVDB
-#  include <openvdb/openvdb.h>
-#  include <openvdb/tools/MeshToVolume.h>
-#endif
-
-#ifdef WITH_OPENVDB
-namespace blender {
-/* This class follows the MeshDataAdapter interface from openvdb. */
-class OpenVDBMeshAdapter {
- private:
-  Span<MVert> vertices_;
-  Span<MLoop> loops_;
-  Span<MLoopTri> looptris_;
-  float4x4 transform_;
-
- public:
-  OpenVDBMeshAdapter(Mesh &mesh, float4x4 transform)
-      : vertices_(mesh.mvert, mesh.totvert),
-        loops_(mesh.mloop, mesh.totloop),
-        transform_(transform)
-  {
-    const MLoopTri *looptries = BKE_mesh_runtime_looptri_ensure(&mesh);
-    const int looptries_len = BKE_mesh_runtime_looptri_len(&mesh);
-    looptris_ = Span(looptries, looptries_len);
-  }
-
-  size_t polygonCount() const
-  {
-    return static_cast<size_t>(looptris_.size());
-  }
-
-  size_t pointCount() const
-  {
-    return static_cast<size_t>(vertices_.size());
-  }
-
-  size_t vertexCount(size_t UNUSED(polygon_index)) const
-  {
-    /* All polygons are triangles. */
-    return 3;
-  }
-
-  void getIndexSpacePoint(size_t polygon_index, size_t vertex_index, openvdb::Vec3d &pos) const
-  {
-    const MLoopTri &looptri = looptris_[polygon_index];
-    const MVert &vertex = vertices_[loops_[looptri.tri[vertex_index]].v];
-    const float3 transformed_co = transform_ * float3(vertex.co);
-    pos = &transformed_co.x;
-  }
-};
-}  // namespace blender
-#endif
-
-static void initData(ModifierData *md)
+static void init_data(ModifierData *md)
 {
   MeshToVolumeModifierData *mvmd = reinterpret_cast<MeshToVolumeModifierData *>(md);
   mvmd->object = nullptr;
   mvmd->resolution_mode = MESH_TO_VOLUME_RESOLUTION_MODE_VOXEL_AMOUNT;
   mvmd->voxel_size = 0.1f;
   mvmd->voxel_amount = 32;
-  mvmd->fill_volume = true;
-  mvmd->interior_band_width = 0.1f;
-  mvmd->exterior_band_width = 0.1f;
+  mvmd->interior_band_width = 0.2f;
   mvmd->density = 1.0f;
 }
 
-static void updateDepsgraph(ModifierData *md, const ModifierUpdateDepsgraphContext *ctx)
+static void update_depsgraph(ModifierData *md, const ModifierUpdateDepsgraphContext *ctx)
 {
   MeshToVolumeModifierData *mvmd = reinterpret_cast<MeshToVolumeModifierData *>(md);
-  DEG_add_modifier_to_transform_relation(ctx->node, "Mesh to Volume Modifier");
+  DEG_add_depends_on_transform_relation(ctx->node, "Mesh to Volume Modifier");
   if (mvmd->object) {
     DEG_add_object_relation(
         ctx->node, mvmd->object, DEG_OB_COMP_GEOMETRY, "Mesh to Volume Modifier");
@@ -130,13 +56,13 @@ static void updateDepsgraph(ModifierData *md, const ModifierUpdateDepsgraphConte
   }
 }
 
-static void foreachIDLink(ModifierData *md, Object *ob, IDWalkFunc walk, void *userData)
+static void foreach_ID_link(ModifierData *md, Object *ob, IDWalkFunc walk, void *user_data)
 {
   MeshToVolumeModifierData *mvmd = reinterpret_cast<MeshToVolumeModifierData *>(md);
-  walk(userData, ob, (ID **)&mvmd->object, IDWALK_CB_NOP);
+  walk(user_data, ob, (ID **)&mvmd->object, IDWALK_CB_NOP);
 }
 
-static void panel_draw(const bContext *UNUSED(C), Panel *panel)
+static void panel_draw(const bContext * /*C*/, Panel *panel)
 {
   uiLayout *layout = panel->layout;
 
@@ -145,65 +71,31 @@ static void panel_draw(const bContext *UNUSED(C), Panel *panel)
 
   uiLayoutSetPropSep(layout, true);
 
-  uiItemR(layout, ptr, "object", 0, nullptr, ICON_NONE);
-  uiItemR(layout, ptr, "density", 0, nullptr, ICON_NONE);
+  uiItemR(layout, ptr, "object", UI_ITEM_NONE, std::nullopt, ICON_NONE);
+  uiItemR(layout, ptr, "density", UI_ITEM_NONE, std::nullopt, ICON_NONE);
 
   {
     uiLayout *col = uiLayoutColumn(layout, false);
-    uiItemR(col, ptr, "use_fill_volume", 0, nullptr, ICON_NONE);
-    uiItemR(col, ptr, "exterior_band_width", 0, nullptr, ICON_NONE);
-
-    uiLayout *subcol = uiLayoutColumn(col, false);
-    uiLayoutSetActive(subcol, !mvmd->fill_volume);
-    uiItemR(subcol, ptr, "interior_band_width", 0, nullptr, ICON_NONE);
+    uiItemR(col, ptr, "interior_band_width", UI_ITEM_NONE, std::nullopt, ICON_NONE);
   }
   {
     uiLayout *col = uiLayoutColumn(layout, false);
-    uiItemR(col, ptr, "resolution_mode", 0, nullptr, ICON_NONE);
+    uiItemR(col, ptr, "resolution_mode", UI_ITEM_NONE, std::nullopt, ICON_NONE);
     if (mvmd->resolution_mode == MESH_TO_VOLUME_RESOLUTION_MODE_VOXEL_AMOUNT) {
-      uiItemR(col, ptr, "voxel_amount", 0, nullptr, ICON_NONE);
+      uiItemR(col, ptr, "voxel_amount", UI_ITEM_NONE, std::nullopt, ICON_NONE);
     }
     else {
-      uiItemR(col, ptr, "voxel_size", 0, nullptr, ICON_NONE);
+      uiItemR(col, ptr, "voxel_size", UI_ITEM_NONE, std::nullopt, ICON_NONE);
     }
   }
 
   modifier_panel_end(layout, ptr);
 }
 
-static void panelRegister(ARegionType *region_type)
+static void panel_register(ARegionType *region_type)
 {
   modifier_panel_register(region_type, eModifierType_MeshToVolume, panel_draw);
 }
-
-#ifdef WITH_OPENVDB
-static float compute_voxel_size(const ModifierEvalContext *ctx,
-                                const MeshToVolumeModifierData *mvmd,
-                                const blender::float4x4 &transform)
-{
-  using namespace blender;
-
-  float volume_simplify = BKE_volume_simplify_factor(ctx->depsgraph);
-  if (volume_simplify == 0.0f) {
-    return 0.0f;
-  }
-
-  if (mvmd->resolution_mode == MESH_TO_VOLUME_RESOLUTION_MODE_VOXEL_SIZE) {
-    return mvmd->voxel_size / volume_simplify;
-  }
-  if (mvmd->voxel_amount <= 0) {
-    return 0;
-  }
-  /* Compute the voxel size based on the desired number of voxels and the approximated bounding box
-   * of the volume. */
-  const BoundBox *bb = BKE_object_boundbox_get(mvmd->object);
-  const float diagonal = float3::distance(transform * float3(bb->vec[6]),
-                                          transform * float3(bb->vec[0]));
-  const float approximate_volume_side_length = diagonal + mvmd->exterior_band_width * 2.0f;
-  const float voxel_size = approximate_volume_side_length / mvmd->voxel_amount / volume_simplify;
-  return voxel_size;
-}
-#endif
 
 static Volume *mesh_to_volume(ModifierData *md,
                               const ModifierEvalContext *ctx,
@@ -218,59 +110,58 @@ static Volume *mesh_to_volume(ModifierData *md,
   if (object_to_convert == nullptr) {
     return input_volume;
   }
-  Mesh *mesh = BKE_modifier_get_evaluated_mesh_from_evaluated_object(object_to_convert, false);
+  Mesh *mesh = BKE_modifier_get_evaluated_mesh_from_evaluated_object(object_to_convert);
   if (mesh == nullptr) {
     return input_volume;
   }
   BKE_mesh_wrapper_ensure_mdata(mesh);
-
-  const float4x4 mesh_to_own_object_space_transform = float4x4(ctx->object->imat) *
-                                                      float4x4(object_to_convert->obmat);
-  const float voxel_size = compute_voxel_size(ctx, mvmd, mesh_to_own_object_space_transform);
-  if (voxel_size == 0.0f) {
+  if (mesh->verts_num == 0) {
     return input_volume;
   }
 
-  float4x4 mesh_to_index_space_transform;
-  scale_m4_fl(mesh_to_index_space_transform.values, 1.0f / voxel_size);
-  mul_m4_m4_post(mesh_to_index_space_transform.values, mesh_to_own_object_space_transform.values);
-  /* Better align generated grid with the source mesh. */
-  add_v3_fl(mesh_to_index_space_transform.values[3], -0.5f);
+  const float4x4 mesh_to_own_object_space_transform = ctx->object->world_to_object() *
+                                                      object_to_convert->object_to_world();
+  geometry::MeshToVolumeResolution resolution;
+  resolution.mode = (MeshToVolumeModifierResolutionMode)mvmd->resolution_mode;
+  if (resolution.mode == MESH_TO_VOLUME_RESOLUTION_MODE_VOXEL_AMOUNT) {
+    resolution.settings.voxel_amount = mvmd->voxel_amount;
+    if (resolution.settings.voxel_amount < 1.0f) {
+      return input_volume;
+    }
+  }
+  else if (resolution.mode == MESH_TO_VOLUME_RESOLUTION_MODE_VOXEL_SIZE) {
+    resolution.settings.voxel_size = mvmd->voxel_size;
+    if (resolution.settings.voxel_size < 1e-5f) {
+      return input_volume;
+    }
+  }
 
-  OpenVDBMeshAdapter mesh_adapter{*mesh, mesh_to_index_space_transform};
+  const float voxel_size = geometry::volume_compute_voxel_size(
+      ctx->depsgraph,
+      [&]() { return *mesh->bounds_min_max(); },
+      resolution,
+      0.0f,
+      mesh_to_own_object_space_transform);
 
-  /* Convert the bandwidths from object in index space. */
-  const float exterior_band_width = MAX2(0.001f, mvmd->exterior_band_width / voxel_size);
-  const float interior_band_width = MAX2(0.001f, mvmd->interior_band_width / voxel_size);
-
-  openvdb::FloatGrid::Ptr new_grid;
-  if (mvmd->fill_volume) {
-    /* Setting the interior bandwidth to FLT_MAX, will make it fill the entire volume. */
-    new_grid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(
-        mesh_adapter, {}, exterior_band_width, FLT_MAX);
+  /* Create a new volume. */
+  Volume *volume;
+  if (input_volume == nullptr) {
+    volume = static_cast<Volume *>(BKE_id_new_nomain(ID_VO, "Volume"));
   }
   else {
-    new_grid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(
-        mesh_adapter, {}, exterior_band_width, interior_band_width);
+    volume = BKE_volume_new_for_eval(input_volume);
   }
 
-  /* Create a new volume object and add the density grid. */
-  Volume *volume = BKE_volume_new_for_eval(input_volume);
-  VolumeGrid *c_density_grid = BKE_volume_grid_add(volume, "density", VOLUME_GRID_FLOAT);
-  openvdb::FloatGrid::Ptr density_grid = openvdb::gridPtrCast<openvdb::FloatGrid>(
-      BKE_volume_grid_openvdb_for_write(volume, c_density_grid, false));
-
-  /* Merge the generated grid into the density grid. Should be cheap because density_grid has just
-   * been created as well. */
-  density_grid->merge(*new_grid);
-
-  /* Change transform so that the index space is correctly transformed to object space. */
-  density_grid->transform().postScale(voxel_size);
-
-  /* Give each grid cell a fixed density for now. */
-  openvdb::tools::foreach (
-      density_grid->beginValueOn(),
-      [&](const openvdb::FloatGrid::ValueOnIter &iter) { iter.setValue(mvmd->density); });
+  /* Convert mesh to grid and add to volume. */
+  geometry::fog_volume_grid_add_from_mesh(volume,
+                                          "density",
+                                          mesh->vert_positions(),
+                                          mesh->corner_verts(),
+                                          mesh->corner_tris(),
+                                          mesh_to_own_object_space_transform,
+                                          voxel_size,
+                                          mvmd->interior_band_width,
+                                          mvmd->density);
 
   return volume;
 
@@ -281,9 +172,9 @@ static Volume *mesh_to_volume(ModifierData *md,
 #endif
 }
 
-static void modifyGeometrySet(ModifierData *md,
-                              const ModifierEvalContext *ctx,
-                              GeometrySet *geometry_set)
+static void modify_geometry_set(ModifierData *md,
+                                const ModifierEvalContext *ctx,
+                                blender::bke::GeometrySet *geometry_set)
 {
   Volume *input_volume = geometry_set->get_volume_for_write();
   Volume *result_volume = mesh_to_volume(md, ctx, input_volume);
@@ -293,35 +184,36 @@ static void modifyGeometrySet(ModifierData *md,
 }
 
 ModifierTypeInfo modifierType_MeshToVolume = {
-    /* name */ "Mesh to Volume",
-    /* structName */ "MeshToVolumeModifierData",
-    /* structSize */ sizeof(MeshToVolumeModifierData),
-    /* srna */ &RNA_MeshToVolumeModifier,
-    /* type */ eModifierTypeType_Constructive,
-    /* flags */ static_cast<ModifierTypeFlag>(0),
-    /* icon */ ICON_VOLUME_DATA, /* TODO: Use correct icon. */
+    /*idname*/ "Mesh to Volume",
+    /*name*/ N_("Mesh to Volume"),
+    /*struct_name*/ "MeshToVolumeModifierData",
+    /*struct_size*/ sizeof(MeshToVolumeModifierData),
+    /*srna*/ &RNA_MeshToVolumeModifier,
+    /*type*/ ModifierTypeType::Constructive,
+    /*flags*/ static_cast<ModifierTypeFlag>(0),
+    /*icon*/ ICON_VOLUME_DATA, /* TODO: Use correct icon. */
 
-    /* copyData */ BKE_modifier_copydata_generic,
+    /*copy_data*/ BKE_modifier_copydata_generic,
 
-    /* deformVerts */ nullptr,
-    /* deformMatrices */ nullptr,
-    /* deformVertsEM */ nullptr,
-    /* deformMatricesEM */ nullptr,
-    /* modifyMesh */ nullptr,
-    /* modifyHair */ nullptr,
-    /* modifyGeometrySet */ modifyGeometrySet,
+    /*deform_verts*/ nullptr,
+    /*deform_matrices*/ nullptr,
+    /*deform_verts_EM*/ nullptr,
+    /*deform_matrices_EM*/ nullptr,
+    /*modify_mesh*/ nullptr,
+    /*modify_geometry_set*/ modify_geometry_set,
 
-    /* initData */ initData,
-    /* requiredDataMask */ nullptr,
-    /* freeData */ nullptr,
-    /* isDisabled */ nullptr,
-    /* updateDepsgraph */ updateDepsgraph,
-    /* dependsOnTime */ nullptr,
-    /* dependsOnNormals */ nullptr,
-    /* foreachIDLink */ foreachIDLink,
-    /* foreachTexLink */ nullptr,
-    /* freeRuntimeData */ nullptr,
-    /* panelRegister */ panelRegister,
-    /* blendWrite */ nullptr,
-    /* blendRead */ nullptr,
+    /*init_data*/ init_data,
+    /*required_data_mask*/ nullptr,
+    /*free_data*/ nullptr,
+    /*is_disabled*/ nullptr,
+    /*update_depsgraph*/ update_depsgraph,
+    /*depends_on_time*/ nullptr,
+    /*depends_on_normals*/ nullptr,
+    /*foreach_ID_link*/ foreach_ID_link,
+    /*foreach_tex_link*/ nullptr,
+    /*free_runtime_data*/ nullptr,
+    /*panel_register*/ panel_register,
+    /*blend_write*/ nullptr,
+    /*blend_read*/ nullptr,
+    /*foreach_cache*/ nullptr,
 };

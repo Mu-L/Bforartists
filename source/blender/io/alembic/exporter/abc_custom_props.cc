@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2020 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2020 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup Alembic
@@ -25,15 +10,13 @@
 
 #include "abc_writer_abstract.h"
 
-#include <functional>
-#include <iostream>
-#include <memory>
 #include <string>
 
 #include <Alembic/Abc/OTypedArrayProperty.h>
-#include <Alembic/Abc/OTypedScalarProperty.h>
 
-#include "BKE_idprop.h"
+#include "BLI_listbase.h"
+
+#include "BKE_idprop.hh"
 #include "DNA_ID.h"
 
 using Alembic::Abc::ArraySample;
@@ -47,9 +30,7 @@ using Alembic::Abc::OStringArrayProperty;
 
 namespace blender::io::alembic {
 
-CustomPropertiesExporter::CustomPropertiesExporter(ABCAbstractWriter *owner) : owner_(owner)
-{
-}
+CustomPropertiesExporter::CustomPropertiesExporter(ABCAbstractWriter *owner) : owner_(owner) {}
 
 void CustomPropertiesExporter::write_all(const IDProperty *group)
 {
@@ -60,9 +41,6 @@ void CustomPropertiesExporter::write_all(const IDProperty *group)
 
   /* Loop over the properties, just like IDP_foreach_property() does, but without the recursion. */
   LISTBASE_FOREACH (IDProperty *, id_property, &group->data.group) {
-    if (STREQ(id_property->name, "_RNA_UI")) {
-      continue;
-    }
     write(id_property);
   }
 }
@@ -73,7 +51,7 @@ void CustomPropertiesExporter::write(const IDProperty *id_property)
 
   switch (id_property->type) {
     case IDP_STRING: {
-      /* The Alembic library doesn't accept NULL-terminated character arrays. */
+      /* The Alembic library doesn't accept null-terminated character arrays. */
       const std::string prop_value(IDP_String(id_property), id_property->len - 1);
       set_scalar_property<OStringArrayProperty, std::string>(id_property->name, prop_value);
       break;
@@ -88,6 +66,9 @@ void CustomPropertiesExporter::write(const IDProperty *id_property)
     case IDP_DOUBLE:
       set_scalar_property<ODoubleArrayProperty, double>(id_property->name,
                                                         IDP_Double(id_property));
+      break;
+    case IDP_BOOLEAN:
+      set_scalar_property<OBoolArrayProperty, bool>(id_property->name, IDP_Bool(id_property));
       break;
     case IDP_ARRAY:
       write_array(id_property);
@@ -117,6 +98,11 @@ void CustomPropertiesExporter::write_array(const IDProperty *id_property)
     case IDP_DOUBLE: {
       const double *array = (double *)IDP_Array(id_property);
       set_array_property<ODoubleArrayProperty, double>(id_property->name, array, id_property->len);
+      break;
+    }
+    case IDP_BOOLEAN: {
+      const int8_t *array = static_cast<const int8_t *>(IDP_Array(id_property));
+      set_array_property<OBoolArrayProperty, int8_t>(id_property->name, array, id_property->len);
       break;
     }
   }
@@ -169,7 +155,7 @@ void CustomPropertiesExporter::write_idparray_of_strings(const IDProperty *idp_a
   }
 
   /* Alembic needs a pointer to the first value of the array. */
-  const std::string *array_of_strings = &strings[0];
+  const std::string *array_of_strings = strings.data();
   set_array_property<OStringArrayProperty, std::string>(
       idp_array->name, array_of_strings, strings.size());
 }
@@ -184,7 +170,7 @@ void CustomPropertiesExporter::write_idparray_of_numbers(const IDProperty *idp_a
   BLI_assert(idp_rows[0].type == IDP_ARRAY);
 
   const int subtype = idp_rows[0].subtype;
-  if (!ELEM(subtype, IDP_INT, IDP_FLOAT, IDP_DOUBLE)) {
+  if (!ELEM(subtype, IDP_INT, IDP_FLOAT, IDP_DOUBLE, IDP_BOOLEAN)) {
     /* Non-numerical types are not supported. */
     return;
   }
@@ -200,6 +186,9 @@ void CustomPropertiesExporter::write_idparray_of_numbers(const IDProperty *idp_a
     case IDP_DOUBLE:
       write_idparray_flattened_typed<ODoubleArrayProperty, double>(idp_array);
       break;
+    case IDP_BOOLEAN:
+      write_idparray_flattened_typed<OBoolArrayProperty, int8_t>(idp_array);
+      break;
   }
 }
 
@@ -211,7 +200,7 @@ void CustomPropertiesExporter::write_idparray_flattened_typed(const IDProperty *
 
   const IDProperty *idp_rows = (IDProperty *)IDP_Array(idp_array);
   BLI_assert(idp_rows[0].type == IDP_ARRAY);
-  BLI_assert(ELEM(idp_rows[0].subtype, IDP_INT, IDP_FLOAT, IDP_DOUBLE));
+  BLI_assert(ELEM(idp_rows[0].subtype, IDP_INT, IDP_FLOAT, IDP_DOUBLE, IDP_BOOLEAN));
 
   const uint64_t num_rows = idp_array->len;
   std::vector<BlenderValueType> matrix_values;
@@ -223,7 +212,7 @@ void CustomPropertiesExporter::write_idparray_flattened_typed(const IDProperty *
   }
 
   set_array_property<ABCPropertyType, BlenderValueType>(
-      idp_array->name, &matrix_values[0], matrix_values.size());
+      idp_array->name, matrix_values.data(), matrix_values.size());
 }
 
 template<typename ABCPropertyType, typename BlenderValueType>

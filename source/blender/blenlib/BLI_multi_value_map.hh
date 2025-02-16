@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -33,6 +21,7 @@
  */
 
 #include "BLI_map.hh"
+#include "BLI_struct_equality_utils.hh"
 #include "BLI_vector.hh"
 
 namespace blender {
@@ -129,6 +118,23 @@ template<typename Key, typename Value> class MultiValueMap {
   }
 
   /**
+   * Get the number of keys.
+   */
+  int64_t size() const
+  {
+    return map_.size();
+  }
+
+  /**
+   * Returns true if there are no keys in the map.
+   * NOTE: There may be keys without values. In this case the map is not empty.
+   */
+  bool is_empty() const
+  {
+    return map_.is_empty();
+  }
+
+  /**
    * NOTE: This signature will change when the implementation changes.
    */
   typename MapType::ItemIterator items() const
@@ -151,6 +157,18 @@ template<typename Key, typename Value> class MultiValueMap {
   {
     return map_.values();
   }
+
+  void clear()
+  {
+    map_.clear();
+  }
+
+  void clear_and_shrink()
+  {
+    map_.clear_and_shrink();
+  }
+
+  BLI_STRUCT_EQUALITY_OPERATORS_1(MultiValueMap, map_)
 };
 
 }  // namespace blender

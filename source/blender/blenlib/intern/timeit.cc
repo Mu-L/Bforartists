@@ -1,34 +1,80 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
+#include "BLI_string_ref.hh"
 #include "BLI_timeit.hh"
+
+#include <algorithm>
+#include <iostream>
+
+#include <fmt/format.h>
 
 namespace blender::timeit {
 
-void print_duration(Nanoseconds duration)
+static void format_duration(Nanoseconds duration, fmt::memory_buffer &buf)
 {
-  if (duration < std::chrono::microseconds(100)) {
-    std::cout << duration.count() << " ns";
+  using namespace std::chrono;
+  if (duration < microseconds(100)) {
+    fmt::format_to(fmt::appender(buf), FMT_STRING("{} ns"), duration.count());
   }
-  else if (duration < std::chrono::seconds(5)) {
-    std::cout << duration.count() / 1.0e6 << " ms";
+  else if (duration < seconds(5)) {
+    fmt::format_to(fmt::appender(buf), FMT_STRING("{:.2f} ms"), duration.count() / 1.0e6);
+  }
+  else if (duration > seconds(90)) {
+    /* Long durations: print seconds, and also H:m:s */
+    const auto dur_hours = duration_cast<hours>(duration);
+    const auto dur_mins = duration_cast<minutes>(duration - dur_hours);
+    const auto dur_sec = duration_cast<seconds>(duration - dur_hours - dur_mins);
+    fmt::format_to(fmt::appender(buf),
+                   FMT_STRING("{:.1f} s ({}H:{}m:{}s)"),
+                   duration.count() / 1.0e9,
+                   dur_hours.count(),
+                   dur_mins.count(),
+                   dur_sec.count());
   }
   else {
-    std::cout << duration.count() / 1.0e9 << " s";
+    fmt::format_to(fmt::appender(buf), FMT_STRING("{:.1f} s"), duration.count() / 1.0e9);
   }
+}
+
+void print_duration(Nanoseconds duration)
+{
+  fmt::memory_buffer buf;
+  format_duration(duration, buf);
+  std::cout << StringRef(buf.data(), buf.size());
+}
+
+ScopedTimer::~ScopedTimer()
+{
+  const TimePoint end = Clock::now();
+  const Nanoseconds duration = end - start_;
+
+  fmt::memory_buffer buf;
+  fmt::format_to(fmt::appender(buf), FMT_STRING("Timer '{}' took "), name_);
+  format_duration(duration, buf);
+  buf.append(StringRef("\n"));
+  std::cout << StringRef(buf.data(), buf.size());
+}
+
+ScopedTimerAveraged::~ScopedTimerAveraged()
+{
+  const TimePoint end = Clock::now();
+  const Nanoseconds duration = end - start_;
+
+  total_count_++;
+  total_time_ += duration;
+  min_time_ = std::min(duration, min_time_);
+
+  fmt::memory_buffer buf;
+  fmt::format_to(fmt::appender(buf), FMT_STRING("Timer '{}': (Average: "), name_);
+  format_duration(total_time_ / total_count_, buf);
+  buf.append(StringRef(", Min: "));
+  format_duration(min_time_, buf);
+  buf.append(StringRef(", Last: "));
+  format_duration(duration, buf);
+  fmt::format_to(fmt::appender(buf), ", Samples: {})\n", total_count_);
+  std::cout << StringRef(buf.data(), buf.size());
 }
 
 }  // namespace blender::timeit

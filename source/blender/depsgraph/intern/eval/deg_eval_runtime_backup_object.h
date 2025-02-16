@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2019 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2019 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup depsgraph
@@ -23,18 +8,20 @@
 
 #pragma once
 
-#include "DNA_object_types.h"
-#include "DNA_session_uuid_types.h"
+#include <optional>
 
-#include "BLI_session_uuid.h"
+#include "DNA_object_types.h"
+#include "DNA_session_uid_types.h"
+
+#include "BKE_object_types.hh"
+
+#include "BLI_map.hh"
 
 #include "intern/eval/deg_eval_runtime_backup_modifier.h"
-#include "intern/eval/deg_eval_runtime_backup_pose.h"
 
 struct Object;
 
-namespace blender {
-namespace deg {
+namespace blender::deg {
 
 struct Depsgraph;
 
@@ -55,12 +42,12 @@ class ObjectRuntimeBackup {
   void restore_modifier_runtime_data(Object *object);
   void restore_pose_channel_runtime_data(Object *object);
 
-  Object_Runtime runtime;
+  bke::ObjectRuntime runtime;
+  std::optional<LightLinkingRuntime> light_linking_runtime;
   short base_flag;
   unsigned short base_local_view_bits;
-  Map<SessionUUID, ModifierDataBackup> modifier_runtime_data;
-  Map<SessionUUID, bPoseChannel_Runtime> pose_channel_runtime_data;
+  Map<int, ModifierDataBackup> modifier_runtime_data;
+  Map<SessionUID, bPoseChannel_Runtime> pose_channel_runtime_data;
 };
 
-}  // namespace deg
-}  // namespace blender
+}  // namespace blender::deg

@@ -1,4 +1,6 @@
-/* Apache License, Version 2.0 */
+/* SPDX-FileCopyrightText: 2023 Blender Authors
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "testing/testing.h"
 
@@ -6,13 +8,12 @@
 #include <fstream>
 #include <iostream>
 
-#include "PIL_time.h"
-
 #include "BLI_array.hh"
 #include "BLI_math_mpq.hh"
+#include "BLI_math_vector_mpq_types.hh"
 #include "BLI_mesh_intersect.hh"
-#include "BLI_mpq3.hh"
 #include "BLI_task.h"
+#include "BLI_time.h"
 #include "BLI_vector.hh"
 
 #define DO_REGULAR_TESTS 1
@@ -42,11 +43,13 @@ class IMeshBuilder {
     return std::pair<int, int>(e_index / MAX_FACE_LEN, e_index % MAX_FACE_LEN);
   }
 
-  /*
+  /**
    * Spec should have form:
-   *  #verts #faces
-   *  mpq_class mpq_class mpq_clas [#verts lines]
-   *  int int int ... [#faces lines; indices into verts for given face]
+   * <pre>
+   * #verts #faces
+   * mpq_class mpq_class mpq_clas [#verts lines]
+   * int int int ... [#faces lines; indices into verts for given face]
+   * </pre>
    */
   IMeshBuilder(const char *spec)
   {
@@ -151,7 +154,7 @@ static int find_edge_pos_in_tri(const Vert *v0, const Vert *v1, const Face *f)
   for (int pos : f->index_range()) {
     int nextpos = f->next_pos(pos);
     if (((*f)[pos] == v0 && (*f)[nextpos] == v1) || ((*f)[pos] == v1 && (*f)[nextpos] == v0)) {
-      return static_cast<int>(pos);
+      return pos;
     }
   }
   return -1;
@@ -296,7 +299,8 @@ TEST(mesh_intersect, TriTri)
     EXPECT_TRUE(v0 != nullptr && v1 != nullptr && v2 != nullptr);
     EXPECT_TRUE(v3 != nullptr && v4 != nullptr && v5 != nullptr);
     if (v0 != nullptr && v1 != nullptr && v2 != nullptr && v3 != nullptr && v4 != nullptr &&
-        v5 != nullptr) {
+        v5 != nullptr)
+    {
       EXPECT_EQ(v0->orig, 0);
       EXPECT_EQ(v1->orig, 1);
       const Face *f0 = find_tri_with_verts(out, v4, v1, v5);
@@ -367,7 +371,8 @@ TEST(mesh_intersect, TriTriReversed)
     EXPECT_TRUE(v0 != nullptr && v1 != nullptr && v2 != nullptr);
     EXPECT_TRUE(v3 != nullptr && v4 != nullptr && v5 != nullptr);
     if (v0 != nullptr && v1 != nullptr && v2 != nullptr && v3 != nullptr && v4 != nullptr &&
-        v5 != nullptr) {
+        v5 != nullptr)
+    {
       EXPECT_EQ(v0->orig, 0);
       EXPECT_EQ(v1->orig, 1);
       const Face *f0 = find_tri_with_verts(out, v4, v5, v1);
@@ -457,8 +462,8 @@ TEST(mesh_intersect, TwoTris)
       {4, 11, 6, 4}, /* 9: T11 edge (-1,1,1)(0,1/2,1/2) inside T4 edge. */
       {4, 12, 6, 2}, /* 10: parallel planes, not intersecting. */
       {4, 13, 6, 2}, /* 11: non-parallel planes, not intersecting, all one side. */
-      {0, 14, 6, 2}, /* 12: non-paralel planes, not intersecting, alternate sides. */
-      /* Following are all coplanar cases. */
+      {0, 14, 6, 2}, /* 12: non-parallel planes, not intersecting, alternate sides. */
+      /* Following are all co-planar cases. */
       {15, 16, 6, 8},   /* 13: T16 inside T15. NOTE: dup'd tri is expected. */
       {15, 17, 8, 8},   /* 14: T17 intersects one edge of T15 at (1,1,0)(3,3,0). */
       {15, 18, 10, 12}, /* 15: T18 intersects T15 at (1,1,0)(3,3,0)(3,15/4,1/2)(0,3,2). */
@@ -809,14 +814,14 @@ TEST(mesh_intersect, RectCross)
 #  if DO_PERF_TESTS
 
 static void get_sphere_params(
-    int nrings, int nsegs, bool triangulate, int *r_num_verts, int *r_num_faces)
+    int nrings, int nsegs, bool triangulate, int *r_verts_num, int *r_faces_num)
 {
-  *r_num_verts = nsegs * (nrings - 1) + 2;
+  *r_verts_num = nsegs * (nrings - 1) + 2;
   if (triangulate) {
-    *r_num_faces = 2 * nsegs + 2 * nsegs * (nrings - 2);
+    *r_faces_num = 2 * nsegs + 2 * nsegs * (nrings - 2);
   }
   else {
-    *r_num_faces = nsegs * nrings;
+    *r_faces_num = nsegs * nrings;
   }
 }
 
@@ -830,11 +835,11 @@ static void fill_sphere_data(int nrings,
                              int fid_start,
                              IMeshArena *arena)
 {
-  int num_verts;
-  int num_faces;
-  get_sphere_params(nrings, nsegs, triangulate, &num_verts, &num_faces);
-  BLI_assert(num_faces == face.size());
-  Array<const Vert *> vert(num_verts);
+  int verts_num;
+  int faces_num;
+  get_sphere_params(nrings, nsegs, triangulate, &verts_num, &faces_num);
+  BLI_assert(faces_num == face.size());
+  Array<const Vert *> vert(verts_num);
   const bool nrings_even = (nrings % 2 == 0);
   int half_nrings = nrings / 2;
   const bool nsegs_even = (nsegs % 2) == 0;
@@ -845,12 +850,12 @@ static void fill_sphere_data(int nrings,
   double delta_theta = M_PI / nrings;
   int fid = fid_start;
   int vid = vid_start;
-  auto vert_index_fn = [nrings, num_verts](int seg, int ring) {
+  auto vert_index_fn = [nrings, verts_num](int seg, int ring) {
     if (ring == 0) { /* Top vert. */
-      return num_verts - 2;
+      return verts_num - 2;
     }
     if (ring == nrings) { /* Bottom vert. */
-      return num_verts - 1;
+      return verts_num - 1;
     }
     return seg * (nrings - 1) + (ring - 1);
   };
@@ -970,26 +975,26 @@ static void fill_sphere_data(int nrings,
 
 static void spheresphere_test(int nrings, double y_offset, bool use_self)
 {
-  /* Make two uvspheres with nrings rings ad 2*nrings segments. */
+  /* Make two UV-spheres with nrings rings ad 2*nrings segments. */
   if (nrings < 2) {
     return;
   }
   BLI_task_scheduler_init(); /* Without this, no parallelism. */
-  double time_start = PIL_check_seconds_timer();
+  double time_start = BLI_time_now_seconds();
   IMeshArena arena;
   int nsegs = 2 * nrings;
-  int num_sphere_verts;
-  int num_sphere_tris;
-  get_sphere_params(nrings, nsegs, true, &num_sphere_verts, &num_sphere_tris);
-  Array<Face *> tris(2 * num_sphere_tris);
-  arena.reserve(6 * num_sphere_verts / 2, 8 * num_sphere_tris);
+  int sphere_verts_num;
+  int sphere_tris_num;
+  get_sphere_params(nrings, nsegs, true, &sphere_verts_num, &sphere_tris_num);
+  Array<Face *> tris(2 * sphere_tris_num);
+  arena.reserve(6 * sphere_verts_num / 2, 8 * sphere_tris_num);
   double3 center1(0.0, 0.0, 0.0);
   fill_sphere_data(nrings,
                    nsegs,
                    center1,
                    1.0,
                    true,
-                   MutableSpan<Face *>(tris.begin(), num_sphere_tris),
+                   MutableSpan<Face *>(tris.begin(), sphere_tris_num),
                    0,
                    0,
                    &arena);
@@ -999,23 +1004,23 @@ static void spheresphere_test(int nrings, double y_offset, bool use_self)
                    center2,
                    1.0,
                    true,
-                   MutableSpan<Face *>(tris.begin() + num_sphere_tris, num_sphere_tris),
-                   num_sphere_verts,
-                   num_sphere_verts,
+                   MutableSpan<Face *>(tris.begin() + sphere_tris_num, sphere_tris_num),
+                   sphere_verts_num,
+                   sphere_verts_num,
                    &arena);
   IMesh mesh(tris);
-  double time_create = PIL_check_seconds_timer();
+  double time_create = BLI_time_now_seconds();
   // write_obj_mesh(mesh, "spheresphere_in");
   IMesh out;
   if (use_self) {
     out = trimesh_self_intersect(mesh, &arena);
   }
   else {
-    int nf = num_sphere_tris;
+    int nf = sphere_tris_num;
     out = trimesh_nary_intersect(
         mesh, 2, [nf](int t) { return t < nf ? 0 : 1; }, false, &arena);
   }
-  double time_intersect = PIL_check_seconds_timer();
+  double time_intersect = BLI_time_now_seconds();
   std::cout << "Create time: " << time_create - time_start << "\n";
   std::cout << "Intersect time: " << time_intersect - time_create << "\n";
   std::cout << "Total time: " << time_intersect - time_start << "\n";
@@ -1026,14 +1031,14 @@ static void spheresphere_test(int nrings, double y_offset, bool use_self)
 }
 
 static void get_grid_params(
-    int x_subdiv, int y_subdiv, bool triangulate, int *r_num_verts, int *r_num_faces)
+    int x_subdiv, int y_subdiv, bool triangulate, int *r_verts_num, int *r_faces_num)
 {
-  *r_num_verts = x_subdiv * y_subdiv;
+  *r_verts_num = x_subdiv * y_subdiv;
   if (triangulate) {
-    *r_num_faces = 2 * (x_subdiv - 1) * (y_subdiv - 1);
+    *r_faces_num = 2 * (x_subdiv - 1) * (y_subdiv - 1);
   }
   else {
-    *r_num_faces = (x_subdiv - 1) * (y_subdiv - 1);
+    *r_faces_num = (x_subdiv - 1) * (y_subdiv - 1);
   }
 }
 
@@ -1051,11 +1056,11 @@ static void fill_grid_data(int x_subdiv,
   if (x_subdiv <= 1 || y_subdiv <= 1) {
     return;
   }
-  int num_verts;
-  int num_faces;
-  get_grid_params(x_subdiv, y_subdiv, triangulate, &num_verts, &num_faces);
-  BLI_assert(face.size() == num_faces);
-  Array<const Vert *> vert(num_verts);
+  int verts_num;
+  int faces_num;
+  get_grid_params(x_subdiv, y_subdiv, triangulate, &verts_num, &faces_num);
+  BLI_assert(face.size() == faces_num);
+  Array<const Vert *> vert(verts_num);
   auto vert_index_fn = [x_subdiv](int ix, int iy) { return iy * x_subdiv + ix; };
   auto face_index_fn = [x_subdiv](int ix, int iy) { return iy * (x_subdiv - 1) + ix; };
   auto tri_index_fn = [x_subdiv](int ix, int iy, int tri) {
@@ -1115,26 +1120,26 @@ static void spheregrid_test(int nrings, int grid_level, double z_offset, bool us
     return;
   }
   BLI_task_scheduler_init(); /* Without this, no parallelism. */
-  double time_start = PIL_check_seconds_timer();
+  double time_start = BLI_time_now_seconds();
   IMeshArena arena;
-  int num_sphere_verts;
-  int num_sphere_tris;
+  int sphere_verts_num;
+  int sphere_tris_num;
   int nsegs = 2 * nrings;
-  int num_grid_verts;
-  int num_grid_tris;
+  int grid_verts_num;
+  int grid_tris_num;
   int subdivs = 1 << grid_level;
-  get_sphere_params(nrings, nsegs, true, &num_sphere_verts, &num_sphere_tris);
-  get_grid_params(subdivs, subdivs, true, &num_grid_verts, &num_grid_tris);
-  Array<Face *> tris(num_sphere_tris + num_grid_tris);
-  arena.reserve(3 * (num_sphere_verts + num_grid_verts) / 2,
-                4 * (num_sphere_tris + num_grid_tris));
+  get_sphere_params(nrings, nsegs, true, &sphere_verts_num, &sphere_tris_num);
+  get_grid_params(subdivs, subdivs, true, &grid_verts_num, &grid_tris_num);
+  Array<Face *> tris(sphere_tris_num + grid_tris_num);
+  arena.reserve(3 * (sphere_verts_num + grid_verts_num) / 2,
+                4 * (sphere_tris_num + grid_tris_num));
   double3 center(0.0, 0.0, z_offset);
   fill_sphere_data(nrings,
                    nsegs,
                    center,
                    1.0,
                    true,
-                   MutableSpan<Face *>(tris.begin(), num_sphere_tris),
+                   MutableSpan<Face *>(tris.begin(), sphere_tris_num),
                    0,
                    0,
                    &arena);
@@ -1144,23 +1149,23 @@ static void spheregrid_test(int nrings, int grid_level, double z_offset, bool us
                  4.0,
                  double3(0, 0, 0),
                  0.0,
-                 MutableSpan<Face *>(tris.begin() + num_sphere_tris, num_grid_tris),
-                 num_sphere_verts,
-                 num_sphere_tris,
+                 MutableSpan<Face *>(tris.begin() + sphere_tris_num, grid_tris_num),
+                 sphere_verts_num,
+                 sphere_tris_num,
                  &arena);
   IMesh mesh(tris);
-  double time_create = PIL_check_seconds_timer();
+  double time_create = BLI_time_now_seconds();
   // write_obj_mesh(mesh, "spheregrid_in");
   IMesh out;
   if (use_self) {
     out = trimesh_self_intersect(mesh, &arena);
   }
   else {
-    int nf = num_sphere_tris;
+    int nf = sphere_tris_num;
     out = trimesh_nary_intersect(
         mesh, 2, [nf](int t) { return t < nf ? 0 : 1; }, false, &arena);
   }
-  double time_intersect = PIL_check_seconds_timer();
+  double time_intersect = BLI_time_now_seconds();
   std::cout << "Create time: " << time_create - time_start << "\n";
   std::cout << "Intersect time: " << time_intersect - time_create << "\n";
   std::cout << "Total time: " << time_intersect - time_start << "\n";
@@ -1182,28 +1187,28 @@ static void gridgrid_test(int x_level_1,
   /* Make two grids, each 4x4, with given subdivision levels in x and y,
    * and the second offset from the first by x_off, y_off, and rotated by rot_deg degrees. */
   BLI_task_scheduler_init(); /* Without this, no parallelism. */
-  double time_start = PIL_check_seconds_timer();
+  double time_start = BLI_time_now_seconds();
   IMeshArena arena;
   int x_subdivs_1 = 1 << x_level_1;
   int y_subdivs_1 = 1 << y_level_1;
   int x_subdivs_2 = 1 << x_level_2;
   int y_subdivs_2 = 1 << y_level_2;
-  int num_grid_verts_1;
-  int num_grid_verts_2;
-  int num_grid_tris_1;
-  int num_grid_tris_2;
-  get_grid_params(x_subdivs_1, y_subdivs_1, true, &num_grid_verts_1, &num_grid_tris_1);
-  get_grid_params(x_subdivs_2, y_subdivs_2, true, &num_grid_verts_2, &num_grid_tris_2);
-  Array<Face *> tris(num_grid_tris_1 + num_grid_tris_2);
-  arena.reserve(3 * (num_grid_verts_1 + num_grid_verts_2) / 2,
-                4 * (num_grid_tris_1 + num_grid_tris_2));
+  int grid_verts_1_num;
+  int grid_verts_2_num;
+  int grid_tris_1_num;
+  int grid_tris_2_num;
+  get_grid_params(x_subdivs_1, y_subdivs_1, true, &grid_verts_1_num, &grid_tris_1_num);
+  get_grid_params(x_subdivs_2, y_subdivs_2, true, &grid_verts_2_num, &grid_tris_2_num);
+  Array<Face *> tris(grid_tris_1_num + grid_tris_2_num);
+  arena.reserve(3 * (grid_verts_1_num + grid_verts_2_num) / 2,
+                4 * (grid_tris_1_num + grid_tris_2_num));
   fill_grid_data(x_subdivs_1,
                  y_subdivs_1,
                  true,
                  4.0,
                  double3(0, 0, 0),
                  0.0,
-                 MutableSpan<Face *>(tris.begin(), num_grid_tris_1),
+                 MutableSpan<Face *>(tris.begin(), grid_tris_1_num),
                  0,
                  0,
                  &arena);
@@ -1213,23 +1218,23 @@ static void gridgrid_test(int x_level_1,
                  4.0,
                  double3(x_off, y_off, 0),
                  rot_deg,
-                 MutableSpan<Face *>(tris.begin() + num_grid_tris_1, num_grid_tris_2),
-                 num_grid_verts_1,
-                 num_grid_tris_1,
+                 MutableSpan<Face *>(tris.begin() + grid_tris_1_num, grid_tris_2_num),
+                 grid_verts_1_num,
+                 grid_tris_1_num,
                  &arena);
   IMesh mesh(tris);
-  double time_create = PIL_check_seconds_timer();
+  double time_create = BLI_time_now_seconds();
   // write_obj_mesh(mesh, "gridgrid_in");
   IMesh out;
   if (use_self) {
     out = trimesh_self_intersect(mesh, &arena);
   }
   else {
-    int nf = num_grid_tris_1;
+    int nf = grid_tris_1_num;
     out = trimesh_nary_intersect(
         mesh, 2, [nf](int t) { return t < nf ? 0 : 1; }, false, &arena);
   }
-  double time_intersect = PIL_check_seconds_timer();
+  double time_intersect = BLI_time_now_seconds();
   std::cout << "Create time: " << time_create - time_start << "\n";
   std::cout << "Intersect time: " << time_intersect - time_create << "\n";
   std::cout << "Total time: " << time_intersect - time_start << "\n";

@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -35,9 +23,7 @@
 #include "../system/Exception.h"
 #include "../system/Precision.h"
 
-#ifdef WITH_CXX_GUARDEDALLOC
-#  include "MEM_guardedalloc.h"
-#endif
+#include "MEM_guardedalloc.h"
 
 namespace Freestyle {
 
@@ -80,13 +66,11 @@ template<class T> class UnaryFunction0D {
   /** Default constructor. */
   UnaryFunction0D()
   {
-    py_uf0D = NULL;
+    py_uf0D = nullptr;
   }
 
-  /** Destructor; */
-  virtual ~UnaryFunction0D()
-  {
-  }
+  /** Destructor. */
+  virtual ~UnaryFunction0D() {}
 
   /** Returns the string "UnaryFunction0D" */
   virtual string getName() const
@@ -105,14 +89,12 @@ template<class T> class UnaryFunction0D {
     return Director_BPy_UnaryFunction0D___call__(this, py_uf0D, iter);
   }
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:UnaryFunction0D")
-#endif
 };
 
 #ifdef SWIG
 %feature("director")  UnaryFunction0D<void>;
-%feature("director")  UnaryFunction0D<unsigned>;
+%feature("director")  UnaryFunction0D<uint>;
 %feature("director")  UnaryFunction0D<float>;
 %feature("director")  UnaryFunction0D<double>;
 %feature("director")  UnaryFunction0D<Vec2f>;
@@ -120,7 +102,7 @@ template<class T> class UnaryFunction0D {
 %feature("director")  UnaryFunction0D<Id>;
 
 %template(UnaryFunction0DVoid)             UnaryFunction0D<void>;
-%template(UnaryFunction0DUnsigned)         UnaryFunction0D<unsigned>;
+%template(UnaryFunction0DUnsigned)         UnaryFunction0D<uint>;
 %template(UnaryFunction0DFloat)            UnaryFunction0D<float>;
 %template(UnaryFunction0DDouble)           UnaryFunction0D<double>;
 %template(UnaryFunction0DVec2f)            UnaryFunction0D<Vec2f>;
@@ -417,7 +399,7 @@ class ShapeIdF0D : public UnaryFunction0D<Id> {
  * the user willing to deal with this cases in a specific way should implement its own getQIF0D
  * functor.
  */
-class QuantitativeInvisibilityF0D : public UnaryFunction0D<unsigned int> {
+class QuantitativeInvisibilityF0D : public UnaryFunction0D<uint> {
  public:
   /** Returns the string "QuantitativeInvisibilityF0D" */
   string getName() const

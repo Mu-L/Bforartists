@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2014 Blender Authors
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
 # - Find PugiXML library
 # Find the native PugiXML includes and library
 # This module defines
@@ -11,24 +15,21 @@
 # also defined, but not for general use are
 #  PUGIXML_LIBRARY, where to find the PugiXML library.
 
-#=============================================================================
-# Copyright 2014 Blender Foundation.
-#
-# Distributed under the OSI-approved BSD 3-Clause License,
-# see accompanying file BSD-3-Clause-license.txt for details.
-#=============================================================================
+# If `PUGIXML_ROOT_DIR` was defined in the environment, use it.
+if(DEFINED PUGIXML_ROOT_DIR)
+  # Pass.
+elseif(DEFINED ENV{PUGIXML_ROOT_DIR})
+  set(PUGIXML_ROOT_DIR $ENV{PUGIXML_ROOT_DIR})
+else()
+  set(PUGIXML_ROOT_DIR "")
+endif()
 
-# If PUGIXML_ROOT_DIR was defined in the environment, use it.
-IF(NOT PUGIXML_ROOT_DIR AND NOT $ENV{PUGIXML_ROOT_DIR} STREQUAL "")
-  SET(PUGIXML_ROOT_DIR $ENV{PUGIXML_ROOT_DIR})
-ENDIF()
-
-SET(_pugixml_SEARCH_DIRS
+set(_pugixml_SEARCH_DIRS
   ${PUGIXML_ROOT_DIR}
   /opt/lib/oiio
 )
 
-FIND_PATH(PUGIXML_INCLUDE_DIR
+find_path(PUGIXML_INCLUDE_DIR
   NAMES
     pugixml.hpp
   HINTS
@@ -37,29 +38,31 @@ FIND_PATH(PUGIXML_INCLUDE_DIR
     include
 )
 
-FIND_LIBRARY(PUGIXML_LIBRARY
+find_library(PUGIXML_LIBRARY
   NAMES
     pugixml
   HINTS
     ${_pugixml_SEARCH_DIRS}
   PATH_SUFFIXES
     lib64 lib
-  )
+)
 
 # handle the QUIETLY and REQUIRED arguments and set PUGIXML_FOUND to TRUE if
 # all listed variables are TRUE
-INCLUDE(FindPackageHandleStandardArgs)
-FIND_PACKAGE_HANDLE_STANDARD_ARGS(PugiXML DEFAULT_MSG
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(PugiXML DEFAULT_MSG
     PUGIXML_LIBRARY PUGIXML_INCLUDE_DIR)
 
-IF(PUGIXML_FOUND)
-  SET(PUGIXML_LIBRARIES ${PUGIXML_LIBRARY})
-  SET(PUGIXML_INCLUDE_DIRS ${PUGIXML_INCLUDE_DIR})
-ELSE()
-  SET(PUGIXML_PUGIXML_FOUND FALSE)
-ENDIF()
+if(PUGIXML_FOUND)
+  set(PUGIXML_LIBRARIES ${PUGIXML_LIBRARY})
+  set(PUGIXML_INCLUDE_DIRS ${PUGIXML_INCLUDE_DIR})
+else()
+  set(PUGIXML_PUGIXML_FOUND FALSE)
+endif()
 
-MARK_AS_ADVANCED(
+mark_as_advanced(
   PUGIXML_INCLUDE_DIR
   PUGIXML_LIBRARY
 )
+
+unset(_pugixml_SEARCH_DIRS)

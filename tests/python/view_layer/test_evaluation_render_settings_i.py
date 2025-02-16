@@ -1,12 +1,18 @@
+# SPDX-FileCopyrightText: 2017-2023 Blender Authors
+#
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 # ############################################################
 # Importing - Same For All Render Layer Tests
 # ############################################################
 
 import unittest
-import os
-import sys
 
-from view_layer_common import *
+from view_layer_common import (
+    Clay,
+    ViewLayerTesting,
+    setup_extra_arguments,
+)
 
 
 # ############################################################
@@ -14,7 +20,7 @@ from view_layer_common import *
 # ############################################################
 
 class UnitTesting(ViewLayerTesting):
-    @unittest.skip("Uses the clay engine, that is removed T55454")
+    @unittest.skip("Uses the clay engine, that is removed #55454")
     def test_render_settings(self):
         """
         See if the depsgraph evaluation is correct

@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -24,9 +12,7 @@
 #include <list>
 #include <vector>
 
-#ifdef WITH_CXX_GUARDEDALLOC
-#  include "MEM_guardedalloc.h"
-#endif
+#include "MEM_guardedalloc.h"
 
 namespace Freestyle {
 
@@ -71,9 +57,7 @@ template<class Edge> class Intersection {
   real tA;      // parameter defining the intersection point with respect to the segment EdgeA.
   real tB;      // parameter defining the intersection point with respect to the segment EdgeB.
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:Intersection")
-#endif
 };
 
 #ifdef _MSC_VER
@@ -83,9 +67,7 @@ template<class Edge> class Intersection {
 
 template<class T, class Point> class Segment {
  public:
-  Segment()
-  {
-  }
+  Segment() {}
 
   Segment(T &s, const Point &iA, const Point &iB)
   {
@@ -125,7 +107,7 @@ template<class T, class Point> class Segment {
     _Intersections.clear();
   }
 
-  inline Point operator[](const unsigned short int &i) const
+  inline Point operator[](const ushort &i) const
   {
     return (i % 2 == 0) ? A : B;
   }
@@ -181,9 +163,7 @@ template<class T, class Point> class Segment {
       _Intersections;  // list of intersections parameters
   bool _order;  // true if A and B are in the same order than _edge.A and _edge.B. false otherwise.
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:Segment")
-#endif
 };
 
 #ifdef _MSC_VER
@@ -194,15 +174,9 @@ template<class T, class Point> class Segment {
  * intersection between 2 edges must be computed
  */
 template<class T1, class T2> struct binary_rule {
-  binary_rule()
-  {
-  }
-  template<class T3, class T4> binary_rule(const binary_rule<T3, T4> &brother)
-  {
-  }
-  virtual ~binary_rule()
-  {
-  }
+  binary_rule() {}
+  template<class T3, class T4> binary_rule(const binary_rule<T3, T4> & /*brother*/) {}
+  virtual ~binary_rule() {}
 
   virtual bool operator()(T1 &, T2 &)
   {
@@ -212,15 +186,14 @@ template<class T1, class T2> struct binary_rule {
 
 template<class T, class Point> class SweepLine {
  public:
-  SweepLine()
-  {
-  }
+  SweepLine() {}
   ~SweepLine()
   {
     for (typename vector<Intersection<Segment<T, Point>> *>::iterator i = _Intersections.begin(),
                                                                       iend = _Intersections.end();
          i != iend;
-         i++) {
+         i++)
+    {
       delete (*i);
     }
   }
@@ -277,7 +250,8 @@ template<class T, class Point> class SweepLine {
     }
     for (typename std::list<Segment<T, Point> *>::iterator s = _set.begin(), send = _set.end();
          s != send;
-         s++) {
+         s++)
+    {
       Segment<T, Point> *currentS = (*s);
       if (true != binrule(*S, *currentS)) {
         continue;
@@ -300,7 +274,8 @@ template<class T, class Point> class SweepLine {
       }
 
       if (GeomUtils::intersect2dSeg2dSegParametric(v0, v1, v2, v3, t, u, epsilon) ==
-          GeomUtils::DO_INTERSECT) {
+          GeomUtils::DO_INTERSECT)
+      {
         // create the intersection
         Intersection<Segment<T, Point>> *inter = new Intersection<Segment<T, Point>>(
             S, t, currentS, u);
@@ -340,9 +315,7 @@ template<class T, class Point> class SweepLine {
   std::vector<Segment<T, Point> *> _IntersectedEdges;             // the list of intersected edges
   std::vector<Intersection<Segment<T, Point>> *> _Intersections;  // the list of all intersections.
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:SweepLine")
-#endif
 };
 
 } /* namespace Freestyle */

@@ -1,52 +1,36 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2008 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2008 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
+#include <map>
+#include <set>
+#include <vector>
+
 #include "BCSampleData.h"
-#include "collada_utils.h"
 
-#include "MEM_guardedalloc.h"
+#include "BKE_fcurve.hh"
 
-#include "BKE_armature.h"
-#include "BKE_fcurve.h"
-#include "BKE_material.h"
+#include "RNA_types.hh"
 
-#include "ED_anim_api.h"
-#include "ED_keyframes_edit.h"
-#include "ED_keyframing.h"
+#include "ED_anim_api.hh"
 
-typedef float(TangentPoint)[2];
+using TangentPoint = float[2];
 
-typedef std::set<float> BCFrameSet;
-typedef std::vector<float> BCFrames;
-typedef std::vector<float> BCValues;
-typedef std::vector<float> BCTimes;
-typedef std::map<int, float> BCValueMap;
+using BCFrameSet = std::set<float>;
+using BCFrames = std::vector<float>;
+using BCValues = std::vector<float>;
+using BCTimes = std::vector<float>;
+using BCValueMap = std::map<int, float>;
 
-typedef enum BC_animation_type {
+enum BC_animation_type {
   BC_ANIMATION_TYPE_OBJECT,
   BC_ANIMATION_TYPE_BONE,
   BC_ANIMATION_TYPE_CAMERA,
   BC_ANIMATION_TYPE_MATERIAL,
   BC_ANIMATION_TYPE_LIGHT,
-} BC_animation_type;
+};
 
 class BCCurveKey {
  private:
@@ -59,8 +43,8 @@ class BCCurveKey {
   BCCurveKey();
   BCCurveKey(const BC_animation_type type,
              const std::string path,
-             const int array_index,
-             const int subindex = -1);
+             int array_index,
+             int subindex = -1);
   void operator=(const BCCurveKey &other);
   std::string get_full_path() const;
   std::string get_path() const;
@@ -127,7 +111,7 @@ class BCAnimationCurve {
   FCurve *get_fcurve() const;
   int sample_count() const;
 
-  float get_value(const float frame);
+  float get_value(float frame);
   void get_values(BCValues &values) const;
   void get_value_map(BCValueMap &value_map);
 
@@ -135,14 +119,14 @@ class BCAnimationCurve {
 
   /* Curve edit functions create a copy of the underlying #FCurve. */
   FCurve *get_edit_fcurve();
-  bool add_value_from_rna(const int frame);
-  bool add_value_from_matrix(const BCSample &sample, const int frame);
-  void add_value(const float val, const int frame);
+  bool add_value_from_rna(int frame);
+  bool add_value_from_matrix(const BCSample &sample, int frame);
+  void add_value(float val, int frame);
   void clean_handles();
 
   /* experimental stuff */
-  int closest_index_above(const float sample_frame, const int start_at) const;
-  int closest_index_below(const float sample_frame) const;
+  int closest_index_above(float sample_frame, int start_at) const;
+  int closest_index_below(float sample_frame) const;
 };
 
-typedef std::map<BCCurveKey, BCAnimationCurve *> BCAnimationCurveMap;
+using BCAnimationCurveMap = std::map<BCCurveKey, BCAnimationCurve *>;

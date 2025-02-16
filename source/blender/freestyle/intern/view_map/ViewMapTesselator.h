@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -32,9 +20,7 @@
 
 #include "../winged_edge/WEdge.h"
 
-#ifdef WITH_CXX_GUARDEDALLOC
-#  include "MEM_guardedalloc.h"
-#endif
+#include "MEM_guardedalloc.h"
 
 namespace Freestyle {
 
@@ -52,15 +38,13 @@ class ViewMapTesselator {
     _overloadFrsMaterial = false;
   }
 
-  virtual ~ViewMapTesselator()
-  {
-  }
+  virtual ~ViewMapTesselator() {}
 
-  /** Builds a set of lines rep contained under a a NodeShape, itself contained under a NodeGroup
+  /** Builds a set of lines rep contained under a NodeShape, itself contained under a NodeGroup
    * from a ViewMap */
   NodeGroup *Tesselate(ViewMap *iViewMap);
 
-  /** Builds a set of lines rep contained under a a NodeShape, itself contained under a NodeGroup
+  /** Builds a set of lines rep contained under a NodeShape, itself contained under a NodeGroup
    * from a set of view edges
    */
   template<class ViewEdgesIterator>
@@ -98,20 +82,14 @@ class ViewMapTesselator {
   FrsMaterial _FrsMaterial;
   bool _overloadFrsMaterial;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:ViewMapTesselator")
-#endif
 };
 
-/** Class to tesselate the 2D projected silhouette */
+/** Class to tessellate the 2D projected silhouette */
 class ViewMapTesselator2D : public ViewMapTesselator {
  public:
-  inline ViewMapTesselator2D() : ViewMapTesselator()
-  {
-  }
-  virtual ~ViewMapTesselator2D()
-  {
-  }
+  inline ViewMapTesselator2D() : ViewMapTesselator() {}
+  virtual ~ViewMapTesselator2D() {}
 
  protected:
   virtual void AddVertexToLine(LineRep *iLine, SVertex *v)
@@ -119,20 +97,14 @@ class ViewMapTesselator2D : public ViewMapTesselator {
     iLine->AddVertex(v->point2D());
   }
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:ViewMapTesselator2D")
-#endif
 };
 
-/** Class to tesselate the 3D silhouette */
+/** Class to tessellate the 3D silhouette */
 class ViewMapTesselator3D : public ViewMapTesselator {
  public:
-  inline ViewMapTesselator3D() : ViewMapTesselator()
-  {
-  }
-  virtual ~ViewMapTesselator3D()
-  {
-  }
+  inline ViewMapTesselator3D() : ViewMapTesselator() {}
+  virtual ~ViewMapTesselator3D() {}
 
  protected:
   virtual void AddVertexToLine(LineRep *iLine, SVertex *v)
@@ -140,9 +112,7 @@ class ViewMapTesselator3D : public ViewMapTesselator {
     iLine->AddVertex(v->point3D());
   }
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:ViewMapTesselator3D")
-#endif
 };
 
 //
@@ -164,7 +134,6 @@ NodeGroup *ViewMapTesselator::Tesselate(ViewEdgesIterator begin, ViewEdgesIterat
   FEdge *firstEdge;
   FEdge *nextFEdge, *currentEdge;
 
-  int id = 0;
   // for (vector<ViewEdge*>::const_iterator c = viewedges.begin(), cend = viewedges.end(); c !=
   // cend; c++)
   for (ViewEdgesIterator c = begin, cend = end; c != cend; c++) {
@@ -208,7 +177,7 @@ NodeGroup *ViewMapTesselator::Tesselate(ViewEdgesIterator begin, ViewEdgesIterat
         AddVertexToLine(line, nextFEdge->vertexA());
         currentEdge = nextFEdge;
         nextFEdge = nextFEdge->nextEdge();
-      } while ((nextFEdge != NULL) && (nextFEdge != firstEdge));
+      } while ((nextFEdge != nullptr) && (nextFEdge != firstEdge));
       // Add the last vertex
       // line->AddVertex(currentEdge->vertexB()->point3D());
       AddVertexToLine(line, currentEdge->vertexB());
@@ -217,7 +186,6 @@ NodeGroup *ViewMapTesselator::Tesselate(ViewEdgesIterator begin, ViewEdgesIterat
     line->setId((*c)->getId().getFirst());
     line->ComputeBBox();
     tshape->AddRep(line);
-    id++;
   }
 
   return group;

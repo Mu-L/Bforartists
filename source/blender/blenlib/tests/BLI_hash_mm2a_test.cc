@@ -1,8 +1,10 @@
-/* Apache License, Version 2.0 */
+/* SPDX-FileCopyrightText: 2023 Blender Authors
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "testing/testing.h"
 
-#include "BLI_hash_mm2a.h"
+#include "BLI_hash_mm2a.hh"
 
 /* NOTE: Reference results are taken from reference implementation
  * (cpp code, CMurmurHash2A variant):
@@ -16,7 +18,7 @@ TEST(hash_mm2a, MM2ABasic)
   const char *data = "Blender";
 
   BLI_hash_mm2a_init(&mm2, 0);
-  BLI_hash_mm2a_add(&mm2, (const unsigned char *)data, strlen(data));
+  BLI_hash_mm2a_add(&mm2, (const uchar *)data, strlen(data));
 #ifdef __LITTLE_ENDIAN__
   EXPECT_EQ(BLI_hash_mm2a_end(&mm2), 1633988145);
 #else
@@ -35,12 +37,12 @@ TEST(hash_mm2a, MM2AConcatenateStrings)
   const char *data123 = "Blender is FaNtAsTiC";
 
   BLI_hash_mm2a_init(&mm2, 0);
-  BLI_hash_mm2a_add(&mm2, (const unsigned char *)data1, strlen(data1));
-  BLI_hash_mm2a_add(&mm2, (const unsigned char *)data2, strlen(data2));
-  BLI_hash_mm2a_add(&mm2, (const unsigned char *)data3, strlen(data3));
+  BLI_hash_mm2a_add(&mm2, (const uchar *)data1, strlen(data1));
+  BLI_hash_mm2a_add(&mm2, (const uchar *)data2, strlen(data2));
+  BLI_hash_mm2a_add(&mm2, (const uchar *)data3, strlen(data3));
   hash = BLI_hash_mm2a_end(&mm2);
   BLI_hash_mm2a_init(&mm2, 0);
-  BLI_hash_mm2a_add(&mm2, (const unsigned char *)data123, strlen(data123));
+  BLI_hash_mm2a_add(&mm2, (const uchar *)data123, strlen(data123));
 #ifdef __LITTLE_ENDIAN__
   EXPECT_EQ(hash, 1545105348);
 #else
@@ -63,7 +65,7 @@ TEST(hash_mm2a, MM2AIntegers)
   BLI_hash_mm2a_add_int(&mm2, ints[3]);
   hash = BLI_hash_mm2a_end(&mm2);
   BLI_hash_mm2a_init(&mm2, 0);
-  BLI_hash_mm2a_add(&mm2, (const unsigned char *)ints, sizeof(ints));
+  BLI_hash_mm2a_add(&mm2, (const uchar *)ints, sizeof(ints));
   /* Yes, same hash here on little and big endian. */
 #ifdef __LITTLE_ENDIAN__
   EXPECT_EQ(hash, 405493096);

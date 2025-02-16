@@ -1,40 +1,29 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
-#include <string.h>
+#include <cstring>
+#include <optional>
 
-#include "BLI_float3.hh"
-#include "BLI_utildefines.h"
-
-#include "MEM_guardedalloc.h"
+#include "BLI_math_vector.hh"  // IWYU pragma: export
 
 #include "DNA_node_types.h"
 
-#include "BKE_node.h"
+#include "BKE_node.hh"
+#include "BKE_node_legacy_types.hh"  // IWYU pragma: export
 
-#include "BLT_translation.h"
+#include "NOD_multi_function.hh"       // IWYU pragma: export
+#include "NOD_register.hh"             // IWYU pragma: export
+#include "NOD_socket_declarations.hh"  // IWYU pragma: export
 
-#include "NOD_function.h"
-#include "NOD_node_tree_multi_function.hh"
+#include "node_util.hh"  // IWYU pragma: export
 
-#include "node_util.h"
+#include "FN_multi_function_builder.hh"  // IWYU pragma: export
 
-#include "FN_multi_function_builder.hh"
+#include "RNA_access.hh"  // IWYU pragma: export
 
-void fn_node_type_base(
-    struct bNodeType *ntype, int type, const char *name, short nclass, short flag);
+void fn_node_type_base(blender::bke::bNodeType *ntype,
+                       std::string idname,
+                       std::optional<int16_t> legacy_type = std::nullopt);

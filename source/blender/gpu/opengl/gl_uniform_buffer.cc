@@ -1,35 +1,17 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2020 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2020 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup gpu
  */
 
-#include "BKE_global.h"
-
 #include "BLI_string.h"
 
-#include "gpu_backend.hh"
 #include "gpu_context_private.hh"
 
-#include "gl_backend.hh"
 #include "gl_debug.hh"
+#include "gl_texture.hh"
 #include "gl_uniform_buffer.hh"
 
 namespace blender::gpu {
@@ -76,6 +58,35 @@ void GLUniformBuf::update(const void *data)
   glBindBuffer(GL_UNIFORM_BUFFER, 0);
 }
 
+void GLUniformBuf::clear_to_zero()
+{
+  if (ubo_id_ == 0) {
+    this->init();
+  }
+
+  uint32_t data = 0;
+  eGPUTextureFormat internal_format = GPU_R32UI;
+  eGPUDataFormat data_format = GPU_DATA_UINT;
+
+  if (GLContext::direct_state_access_support) {
+    glClearNamedBufferData(ubo_id_,
+                           to_gl_internal_format(internal_format),
+                           to_gl_data_format(internal_format),
+                           to_gl(data_format),
+                           &data);
+  }
+  else {
+    /* WATCH(@fclem): This should be ok since we only use clear outside of drawing functions. */
+    glBindBuffer(GL_UNIFORM_BUFFER, ubo_id_);
+    glClearBufferData(GL_UNIFORM_BUFFER,
+                      to_gl_internal_format(internal_format),
+                      to_gl_data_format(internal_format),
+                      to_gl(data_format),
+                      &data);
+    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+  }
+}
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -85,11 +96,12 @@ void GLUniformBuf::update(const void *data)
 void GLUniformBuf::bind(int slot)
 {
   if (slot >= GLContext::max_ubo_binds) {
-    fprintf(stderr,
-            "Error: Trying to bind \"%s\" ubo to slot %d which is above the reported limit of %d.",
-            name_,
-            slot,
-            GLContext::max_ubo_binds);
+    fprintf(
+        stderr,
+        "Error: Trying to bind \"%s\" ubo to slot %d which is above the reported limit of %d.\n",
+        name_,
+        slot,
+        GLContext::max_ubo_binds);
     return;
   }
 
@@ -105,15 +117,32 @@ void GLUniformBuf::bind(int slot)
   slot_ = slot;
   glBindBufferBase(GL_UNIFORM_BUFFER, slot_, ubo_id_);
 
-#ifdef DEBUG
+#ifndef NDEBUG
   BLI_assert(slot < 16);
   GLContext::get()->bound_ubo_slots |= 1 << slot;
 #endif
 }
 
+void GLUniformBuf::bind_as_ssbo(int slot)
+{
+  if (ubo_id_ == 0) {
+    this->init();
+  }
+  if (data_ != nullptr) {
+    this->update(data_);
+    MEM_SAFE_FREE(data_);
+  }
+
+  glBindBufferBase(GL_SHADER_STORAGE_BUFFER, slot, ubo_id_);
+#ifndef NDEBUG
+  BLI_assert(slot < 16);
+  GLContext::get()->bound_ssbo_slots |= 1 << slot;
+#endif
+}
+
 void GLUniformBuf::unbind()
 {
-#ifdef DEBUG
+#ifndef NDEBUG
   /* NOTE: This only unbinds the last bound slot. */
   glBindBufferBase(GL_UNIFORM_BUFFER, slot_, 0);
   /* Hope that the context did not change. */

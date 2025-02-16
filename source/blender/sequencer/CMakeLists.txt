@@ -1,42 +1,15 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2011-2024 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# The Original Code is Copyright (C) 2011, Blender Foundation
-# All rights reserved.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(INC
-  .
+  PUBLIC .
   intern
-  ../blenfont
-  ../blenkernel
-  ../blenlib
-  ../blenloader
-  ../blentranslation
-  ../depsgraph
-  ../imbuf
-  ../makesdna
+  ../animrig
   ../makesrna
-  ../render
-  ../windowmanager
-  ../../../intern/atomic
-  ../../../intern/guardedalloc
 
-  # dna_type_offsets.h
-  ${CMAKE_CURRENT_BINARY_DIR}/../makesdna/intern
+  # RNA_prototypes.hh
+  ${CMAKE_BINARY_DIR}/source/blender/makesrna
 )
 
 set(INC_SYS
@@ -44,72 +17,113 @@ set(INC_SYS
 )
 
 set(SRC
-  SEQ_add.h
-  SEQ_clipboard.h
-  SEQ_edit.h
-  SEQ_effects.h
-  SEQ_iterator.h
-  SEQ_modifier.h
-  SEQ_prefetch.h
-  SEQ_proxy.h
-  SEQ_relations.h
-  SEQ_render.h
-  SEQ_select.h
-  SEQ_sequencer.h
-  SEQ_sound.h
-  SEQ_time.h
-  SEQ_transform.h
-  SEQ_utils.h
+  SEQ_add.hh
+  SEQ_animation.hh
+  SEQ_channels.hh
+  SEQ_connect.hh
+  SEQ_edit.hh
+  SEQ_effects.hh
+  SEQ_iterator.hh
+  SEQ_modifier.hh
+  SEQ_prefetch.hh
+  SEQ_proxy.hh
+  SEQ_relations.hh
+  SEQ_render.hh
+  SEQ_retiming.hh
+  SEQ_select.hh
+  SEQ_sequencer.hh
+  SEQ_sound.hh
+  SEQ_thumbnail_cache.hh
+  SEQ_time.hh
+  SEQ_transform.hh
+  SEQ_utils.hh
 
-  intern/clipboard.c
-  intern/effects.c
-  intern/effects.h
-  intern/image_cache.c
-  intern/image_cache.h
-  intern/iterator.c
-  intern/modifier.c
-  intern/multiview.c
-  intern/multiview.h
-  intern/prefetch.c
-  intern/prefetch.h
-  intern/proxy.c
-  intern/proxy.h
-  intern/proxy_job.c
-  intern/render.c
-  intern/render.h
-  intern/sequence_lookup.c
-  intern/sequencer.c
-  intern/sequencer.h
-  intern/sound.c
-  intern/strip_add.c
-  intern/strip_edit.c
-  intern/strip_relations.c
-  intern/strip_select.c
-  intern/strip_time.c
-  intern/strip_time.h
-  intern/strip_transform.c
-  intern/utils.c
-  intern/utils.h
+  intern/animation.cc
+  intern/channels.cc
+  intern/disk_cache.cc
+  intern/disk_cache.hh
+  intern/effects/effects.cc
+  intern/effects/effects.hh
+  intern/effects/vse_effect_add_sub_mul.cc
+  intern/effects/vse_effect_adjustment.cc
+  intern/effects/vse_effect_blend.cc
+  intern/effects/vse_effect_cross.cc
+  intern/effects/vse_effect_gaussian_blur.cc
+  intern/effects/vse_effect_glow.cc
+  intern/effects/vse_effect_multi_camera.cc
+  intern/effects/vse_effect_solid_color.cc
+  intern/effects/vse_effect_speed.cc
+  intern/effects/vse_effect_text.cc
+  intern/effects/vse_effect_transform.cc
+  intern/effects/vse_effect_wipe.cc
+  intern/image_cache.cc
+  intern/image_cache.hh
+  intern/iterator.cc
+  intern/media_presence.cc
+  intern/modifier.cc
+  intern/multiview.cc
+  intern/multiview.hh
+  intern/prefetch.cc
+  intern/prefetch.hh
+  intern/proxy.cc
+  intern/proxy.hh
+  intern/proxy_job.cc
+  intern/render.cc
+  intern/render.hh
+  intern/sequencer.cc
+  intern/sequencer.hh
+  intern/sound.cc
+  intern/strip_add.cc
+  intern/strip_connect.cc
+  intern/strip_edit.cc
+  intern/strip_lookup.cc
+  intern/strip_relations.cc
+  intern/strip_retiming.cc
+  intern/strip_select.cc
+  intern/strip_time.cc
+  intern/strip_time.hh
+  intern/strip_transform.cc
+  intern/thumbnail_cache.cc
+  intern/utils.cc
+  intern/utils.hh
 )
 
 set(LIB
-  bf_blenkernel
-  bf_blenlib
+  PRIVATE bf::blenfont
+  PRIVATE bf::blenkernel
+  PRIVATE bf::blenlib
+  PRIVATE bf::blenloader
+  PRIVATE bf::blentranslation
+  PRIVATE bf::depsgraph
+  PRIVATE bf::dna
+  PRIVATE bf::imbuf
+  PRIVATE bf::imbuf::movie
+  PRIVATE bf::intern::atomic
+  PRIVATE bf::intern::clog
+  PRIVATE bf::intern::guardedalloc
+  PRIVATE bf::render
+  PRIVATE bf::windowmanager
 )
 
 if(WITH_AUDASPACE)
-  add_definitions(-DWITH_AUDASPACE)
-
   list(APPEND INC_SYS
     ${AUDASPACE_C_INCLUDE_DIRS}
   )
-  list(APPEND LIB
-    ${AUDASPACE_C_LIBRARIES}
-    ${AUDASPACE_PY_LIBRARIES}
-  )
+  if(WITH_SYSTEM_AUDASPACE)
+    list(APPEND LIB
+      ${AUDASPACE_C_LIBRARIES}
+      ${AUDASPACE_PY_LIBRARIES}
+    )
+  endif()
+  add_definitions(-DWITH_AUDASPACE)
+
+  if(WITH_FFTW3)
+    add_definitions(-DWITH_CONVOLUTION)
+  endif()
 endif()
 
 blender_add_lib(bf_sequencer "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+add_library(bf::sequencer ALIAS bf_sequencer)
 
-# Needed so we can use dna_type_offsets.h.
-add_dependencies(bf_sequencer bf_dna)
+# RNA_prototypes.hh
+add_dependencies(bf_sequencer bf_rna)

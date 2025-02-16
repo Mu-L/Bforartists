@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
@@ -20,7 +8,6 @@
 
 #pragma once
 
-/* Struct members on own line. */
 /* clang-format off */
 
 #define _DNA_DEFAULT_ArmatureModifierData \
@@ -65,6 +52,8 @@
     .miter_outer = MOD_BEVEL_MITER_SHARP, \
     .affect_type = MOD_BEVEL_AFFECT_EDGES, \
     .profile = 0.5f, \
+    .edge_weight_name = "bevel_weight_edge", \
+    .vertex_weight_name = "bevel_weight_vert", \
     .bevel_angle = DEG2RADF(30.0f), \
     .spread = 0.1f, \
     .defgrp_name = "", \
@@ -76,7 +65,7 @@
     .collection = NULL, \
     .double_threshold = 1e-6f, \
     .operation = eBooleanModifierOp_Difference, \
-    .solver = eBooleanModifierSolver_Exact, \
+    .solver = eBooleanModifierSolver_Mesh_Arr, \
     .flag = eBooleanModifierFlag_Object, \
     .bm_flag = 0, \
   }
@@ -159,7 +148,7 @@
     .compression_damp = 5.0f, \
     .shear_damp = 5.0f, \
     .internal_spring_max_length = 0.0f, \
-    .internal_spring_max_diversion = M_PI / 4.0f, \
+    .internal_spring_max_diversion = M_PI_4, \
     .vgroup_intern = 0, \
     .internal_tension = 15.0f, \
     .internal_compression = 15.0f, \
@@ -207,7 +196,7 @@
     .current_xnew = NULL, \
     .current_x = NULL, \
     .current_v = NULL, \
-    .tri = NULL, \
+    .vert_tris = NULL, \
     .mvert_num = 0, \
     .tri_num = 0, \
     .time_x = -1000.0f, \
@@ -323,7 +312,7 @@
     .falloff = 0.0f, \
     .curfalloff = NULL, \
     .indexar = NULL, \
-    .totindex = 0, \
+    .indexar_num = 0, \
     .force = 1.0f, \
     .name = "", \
   }
@@ -331,7 +320,7 @@
 #define _DNA_DEFAULT_LaplacianDeformModifierData \
   { \
     .anchor_grp_name = "", \
-    .total_verts = 0, \
+    .verts_num = 0, \
     .repeat = 1, \
     .vertexco = NULL, \
     .cache_system = NULL, \
@@ -395,13 +384,13 @@
     .bindinfluences = NULL, \
     .bindoffsets = NULL, \
     .bindcagecos = NULL, \
-    .totvert = 0, \
-    .totcagevert = 0, \
+    .verts_num = 0, \
+    .cage_verts_num = 0, \
     .dyngrid = NULL, \
     .dyninfluences = NULL, \
     .dynverts = NULL, \
     .dyngridsize = 0, \
-    .totinfluence = 0, \
+    .influences_num = 0, \
     .dyncellmin = {0.0f, 0.0f, 0.0f}, \
     .dyncellwidth = 0.0f, \
     .bindmat = _DNA_DEFAULT_UNIT_M4, \
@@ -419,10 +408,6 @@
     .velocity_scale = 1.0f, \
     .reader = NULL, \
     .reader_object_path = "", \
-    .vertex_velocities = NULL, \
-    .num_vertices = 0, \
-    .velocity_delta = 0.0f, \
-    .last_lookup_time = 0.0f, \
   }
 
 #define _DNA_DEFAULT_MirrorModifierData \
@@ -433,6 +418,7 @@
     .uv_offset = {0.0f, 0.0f}, \
     .uv_offset_copy = {0.0f, 0.0f}, \
     .mirror_ob = NULL, \
+    .use_correct_order_on_merge = true, \
   }
 
 #define _DNA_DEFAULT_MultiresModifierData \
@@ -459,7 +445,7 @@
     .offset = {0.0f, 0.0f, 0.0f}, \
   }
 
-/* Some fields are initialized in #initData. */
+/* Some fields are initialized in #init_data. */
 #define _DNA_DEFAULT_OceanModifierData \
   { \
     .ocean = NULL, \
@@ -577,7 +563,9 @@
   }
 
 #define _DNA_DEFAULT_NodesModifierData \
-  { 0 }
+  { \
+    .bake_target = NODES_MODIFIER_BAKE_TARGET_PACKED, \
+  }
 
 #define _DNA_DEFAULT_SkinModifierData \
   { \
@@ -633,12 +621,7 @@
 
 #define _DNA_DEFAULT_SurfaceModifierData \
   { \
-    .x = NULL, \
-    .v = NULL, \
-    .mesh = NULL, \
-    .bvhtree = NULL, \
-    .cfra = 0, \
-    .numverts = 0, \
+   .runtime = {NULL}, /* Include to avoid empty an struct (for MSVC). */ \
   }
 
 #define _DNA_DEFAULT_SurfaceDeformModifierData \
@@ -647,9 +630,10 @@
     .target = NULL, \
     .verts = NULL, \
     .falloff = 4.0f, \
-    .num_mesh_verts = 0, \
-    .num_bind_verts = 0, \
-    .numpoly = 0, \
+    .mesh_verts_num = 0, \
+    .bind_verts_num = 0, \
+    .target_verts_num = 0, \
+    .target_polys_num = 0, \
     .flags = 0, \
     .mat = _DNA_DEFAULT_UNIT_M4, \
     .strength = 1.0f, \
@@ -667,7 +651,7 @@
 #define _DNA_DEFAULT_UVProjectModifierData \
   { \
     .projectors = {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL}, \
-    .num_projectors = 1, \
+    .projectors_num = 1, \
     .aspectx = 1.0f, \
     .aspecty = 1.0f, \
     .scalex = 1.0f, \
@@ -818,6 +802,288 @@
     .crease_weight = 1.0f, \
     .flag = MOD_WIREFRAME_REPLACE | MOD_WIREFRAME_OFS_EVEN, \
     .mat_ofs = 0, \
+  }
+
+#define _DNA_DEFAULT_GreasePencilOpacityModifierData \
+  { \
+    .color_mode = MOD_GREASE_PENCIL_COLOR_BOTH, \
+    .color_factor = 1.0f, \
+    .hardness_factor = 1.0f, \
+  }
+
+#define _DNA_DEFAULT_GreasePencilSubdivModifierData \
+  { \
+    .level = 1, \
+  }
+
+#define _DNA_DEFAULT_GreasePencilColorModifierData \
+  { \
+    .color_mode = MOD_GREASE_PENCIL_COLOR_BOTH, \
+    .hsv = {0.5f, 1.0f, 1.0f}, \
+  }
+
+
+#define _DNA_DEFAULT_GreasePencilTintModifierData \
+  { \
+    .color_mode = MOD_GREASE_PENCIL_COLOR_BOTH, \
+    .tint_mode = MOD_GREASE_PENCIL_TINT_UNIFORM, \
+    .factor = 0.5f, \
+    .radius = 1.0f, \
+    .color = {1.0f, 1.0f, 1.0f}, \
+  }
+
+#define _DNA_DEFAULT_GreasePencilSmoothModifierData \
+  { \
+    .flag = MOD_GREASE_PENCIL_SMOOTH_MOD_LOCATION, \
+    .factor = 1.0f, \
+    .step = 1, \
+  }
+
+#define _DNA_DEFAULT_GreasePencilOffsetModifierData \
+  { \
+    .flag = 0, \
+    .offset_mode = MOD_GREASE_PENCIL_OFFSET_RANDOM, \
+    .loc = {0.0f, 0.0f, 0.0f}, \
+    .rot = {0.0f, 0.0f, 0.0f}, \
+    .scale = {0.0f, 0.0f, 0.0f}, \
+    .stroke_step = 1, \
+    .stroke_start_offset = 0, \
+  }
+
+#define _DNA_DEFAULT_GreasePencilNoiseModifierData \
+  { \
+    .flag = GP_NOISE_FULL_STROKE | GP_NOISE_USE_RANDOM, \
+    .factor = 0.5f, \
+    .factor_strength = 0.0f, \
+    .factor_thickness = 0.0f, \
+    .factor_uvs = 0.0f, \
+    .noise_scale = 0.0f, \
+    .noise_offset = 0.0f, \
+    .step = 4, \
+    .seed = 1, \
+  }
+
+#define _DNA_DEFAULT_GreasePencilMirrorModifierData \
+  { \
+    .flag = MOD_GREASE_PENCIL_MIRROR_AXIS_X, \
+  }
+
+#define _DNA_DEFAULT_GreasePencilThickModifierData \
+  { \
+    .flag = 0, \
+    .thickness_fac = 1.0f, \
+    .thickness = 0.02, \
+  }
+
+#define _DNA_DEFAULT_GreasePencilLatticeModifierData \
+  { \
+    .object = NULL, \
+    .strength = 1.0f, \
+  }
+
+#define _DNA_DEFAULT_GreasePencilDashModifierData \
+  { \
+    .dash_offset = 0, \
+    .segments_array = NULL, \
+    .segments_num = 0, \
+    .segment_active_index = 0, \
+  }
+
+#define _DNA_DEFAULT_GreasePencilDashModifierSegment \
+  { \
+    .name = "Segment", \
+    .dash = 2, \
+    .gap = 1, \
+    .radius = 1.0f, \
+    .opacity = 1.0f, \
+    .mat_nr = -1, \
+  }
+
+#define _DNA_DEFAULT_GreasePencilMultiModifierData \
+  { \
+    .flag = 0, \
+    .duplications = 3, \
+    .distance = 0.1f, \
+    .offset = 0.0f, \
+    .fading_center = 0.5f, \
+    .fading_thickness = 0.5f, \
+    .fading_opacity = 0.5f, \
+  }
+
+#define _DNA_DEFAULT_GreasePencilLengthModifierData \
+  { \
+    .start_fac = 0.1f,\
+    .end_fac = 0.1f,\
+    .overshoot_fac = 0.1f,\
+    .flag = GP_LENGTH_USE_CURVATURE,\
+    .point_density = 30.0f,\
+    .segment_influence = 0.0f,\
+    .max_angle = DEG2RAD(170.0f),\
+    .rand_start_fac = 0.0f,\
+    .rand_end_fac = 0.0f,\
+    .rand_offset = 0.0f,\
+    .seed = 0,\
+    .step = 4,\
+  }
+
+#define _DNA_DEFAULT_GreasePencilWeightAngleModifierData \
+  { \
+    .flag = 0, \
+    .axis = 1, \
+  }
+
+#define _DNA_DEFAULT_GreasePencilArrayModifierData \
+  { \
+    .object = NULL, \
+    .count = 2, \
+    .flag = GP_ARRAY_USE_RELATIVE, \
+    .offset = {0.0f, 0.0f, 0.0f}, \
+    .shift = {1.0f, 0.0f, 0.0f}, \
+    .rnd_offset = {0.0f, 0.0f, 0.0f}, \
+    .rnd_rot = {0.0f, 0.0f, 0.0f}, \
+    .rnd_scale = {0.0f, 0.0f, 0.0f}, \
+    .seed = 1, \
+    .mat_rpl = 0, \
+  }
+
+#define _DNA_DEFAULT_GreasePencilWeightProximityModifierData \
+  { \
+    .target_vgname = "", \
+    .flag = 0, \
+    .dist_start = 0.0f, \
+    .dist_end = 20.0f, \
+  }
+
+#define _DNA_DEFAULT_GreasePencilHookModifierData \
+  { \
+    .object = NULL, \
+    .subtarget = "", \
+    .flag = 0, \
+    .falloff_type = MOD_GREASE_PENCIL_HOOK_Falloff_Smooth, \
+    .parentinv = _DNA_DEFAULT_UNIT_M4, \
+    .cent = {0.0f, 0.0f, 0.0f}, \
+    .falloff = 0.0f, \
+    .force = 0.5f, \
+  }
+
+#define _DNA_DEFAULT_GreasePencilLineartModifierData \
+  { \
+    .edge_types = MOD_LINEART_EDGE_FLAG_INIT_TYPE, \
+    .thickness = 25, \
+    .opacity = 1.0f, \
+    .crease_threshold = DEG2RAD(140.0f), \
+    .calculation_flags = MOD_LINEART_ALLOW_DUPLI_OBJECTS | MOD_LINEART_ALLOW_CLIPPING_BOUNDARIES | \
+                         MOD_LINEART_USE_CREASE_ON_SHARP_EDGES | MOD_LINEART_FILTER_FACE_MARK_KEEP_CONTOUR | \
+                         MOD_LINEART_MATCH_OUTPUT_VGROUP, \
+    /* Do not split by default, this is for better chaining quality. */ \
+    .angle_splitting_threshold = 0.0f, \
+    .chaining_image_threshold = 0.001f, \
+    .stroke_depth_offset = 0.05,\
+    .chain_smooth_tolerance = 0.0f,\
+    .overscan = 0.1f,\
+    .shadow_camera_near = 0.1f, \
+    .shadow_camera_far = 200.0f, \
+    .shadow_camera_size = 200.0f, \
+  }
+
+#define _DNA_DEFAULT_GreasePencilArmatureModifierData \
+  { \
+    .deformflag = ARM_DEF_VGROUP, \
+    .object = NULL, \
+  }
+
+#define _DNA_DEFAULT_GreasePencilTimeModifierData \
+  { \
+    .flag = MOD_GREASE_PENCIL_TIME_KEEP_LOOP, \
+    .offset = 1, \
+    .frame_scale = 1.0f, \
+    .mode = 0, \
+    .sfra = 1, \
+    .efra = 250, \
+    .segments_array = NULL, \
+    .segments_num = 1, \
+    .segment_active_index = 0, \
+  }
+
+#define _DNA_DEFAULT_GreasePencilTimeModifierSegment \
+  { \
+    .name = "Segment", \
+    .segment_start = 1, \
+    .segment_end = 2, \
+    .segment_mode = 0, \
+    .segment_repeat = 1, \
+  }
+
+#define _DNA_DEFAULT_GreasePencilEnvelopeModifierData \
+  { \
+    .spread = 10, \
+    .mode = MOD_GREASE_PENCIL_ENVELOPE_SEGMENTS, \
+    .mat_nr = -1, \
+    .thickness = 1.0f, \
+    .strength = 1.0f, \
+    .skip = 0, \
+  }
+
+#define _DNA_DEFAULT_GreasePencilOutlineModifierData \
+  { \
+    .flag = MOD_GREASE_PENCIL_OUTLINE_KEEP_SHAPE, \
+    .thickness = 1, \
+    .sample_length = 0.0f, \
+    .subdiv = 3, \
+    .outline_material = NULL, \
+  }
+
+#define _DNA_DEFAULT_GreasePencilShrinkwrapModifierData \
+  { \
+    .target = NULL, \
+    .aux_target = NULL, \
+    .keep_dist = 0.05f, \
+    .shrink_type = MOD_SHRINKWRAP_NEAREST_SURFACE, \
+    .shrink_opts = MOD_SHRINKWRAP_PROJECT_ALLOW_POS_DIR, \
+    .shrink_mode = MOD_SHRINKWRAP_ON_SURFACE, \
+    .proj_limit = 0.0f, \
+    .proj_axis = MOD_SHRINKWRAP_PROJECT_OVER_NORMAL, \
+    .subsurf_levels = 0, \
+    .smooth_factor = 0.05f, \
+    .smooth_step = 1, \
+  }
+
+/* Here we deliberately set effective range to the half the default
+ * frame-range to have an immediate effect to suggest use-cases. */
+#define _DNA_DEFAULT_GreasePencilBuildModifierData \
+  { \
+    .start_frame = 1, \
+    .end_frame = 125, \
+    .start_delay = 0.0f, \
+    .length = 100.0f, \
+    .flag = 0, \
+    .mode = 0, \
+    .transition = 0, \
+    .time_alignment = 0, \
+    .time_mode = 0, \
+    .speed_fac = 1.2f, \
+    .speed_maxgap = 0.5f, \
+    .percentage_fac = 0.0f, \
+  }
+
+#define _DNA_DEFAULT_GreasePencilSimplifyModifierData \
+  { \
+    .factor = 0.0f, \
+    .mode = MOD_GREASE_PENCIL_SIMPLIFY_FIXED, \
+    .step = 1, \
+    .length = 0.1f, \
+    .distance = 0.1f, \
+  }
+
+#define _DNA_DEFAULT_GreasePencilTextureModifierData \
+  { \
+    .uv_offset = 0.0f, \
+    .uv_scale = 1.0f, \
+    .fill_rotation = 0.0f, \
+    .fill_offset = {0.0f, 0.0f}, \
+    .fill_scale = 1.0f, \
+    .fit_method = GP_TEX_CONSTANT_LENGTH, \
+    .mode = 0, \
   }
 
 /* clang-format off */

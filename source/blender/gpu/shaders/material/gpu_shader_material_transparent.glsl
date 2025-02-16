@@ -1,11 +1,15 @@
-#ifndef VOLUMETRICS
-void node_bsdf_transparent(vec4 color, out Closure result)
+/* SPDX-FileCopyrightText: 2019-2022 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
+
+void node_bsdf_transparent(vec4 color, float weight, out Closure result)
 {
-  result = CLOSURE_DEFAULT;
-  result.radiance = vec3(0.0);
-  result.transmittance = abs(color.rgb);
+  color = max(color, vec4(0.0));
+
+  ClosureTransparency transparency_data;
+  transparency_data.weight = weight;
+  transparency_data.transmittance = color.rgb;
+  transparency_data.holdout = 0.0;
+
+  result = closure_eval(transparency_data);
 }
-#else
-/* Stub transparent because it is not compatible with volumetrics. */
-#  define node_bsdf_transparent(a, b) (b = CLOSURE_DEFAULT)
-#endif

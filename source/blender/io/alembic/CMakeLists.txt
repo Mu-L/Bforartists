@@ -1,43 +1,17 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2006 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# The Original Code is Copyright (C) 2006, Blender Foundation
-# All rights reserved.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(INC
   .
   ../common
-  ../../blenkernel
-  ../../blenlib
-  ../../blenloader
-  ../../bmesh
-  ../../depsgraph
   ../../editors/include
-  ../../makesdna
   ../../makesrna
-  ../../windowmanager
-  ../../../../intern/clog
-  ../../../../intern/guardedalloc
   ../../../../intern/utfconv
 )
 
 set(INC_SYS
   ${ALEMBIC_INCLUDE_DIRS}
-  ${BOOST_INCLUDE_DIR}
   ${OPENEXR_INCLUDE_DIRS}
 )
 
@@ -59,7 +33,6 @@ set(SRC
   exporter/abc_custom_props.cc
   exporter/abc_export_capi.cc
   exporter/abc_hierarchy_iterator.cc
-  exporter/abc_subdiv_disabler.cc
   exporter/abc_writer_abstract.cc
   exporter/abc_writer_camera.cc
   exporter/abc_writer_curves.cc
@@ -87,7 +60,6 @@ set(SRC
   exporter/abc_archive.h
   exporter/abc_custom_props.h
   exporter/abc_hierarchy_iterator.h
-  exporter/abc_subdiv_disabler.h
   exporter/abc_writer_abstract.h
   exporter/abc_writer_camera.h
   exporter/abc_writer_curves.h
@@ -101,19 +73,23 @@ set(SRC
 )
 
 set(LIB
-  bf_blenkernel
-  bf_blenlib
+  PRIVATE bf::blenkernel
+  PRIVATE bf::blenlib
+  PRIVATE bf::blenloader
+  PRIVATE bf::blentranslation
+  PRIVATE bf::bmesh
+  PRIVATE bf::depsgraph
+  PRIVATE bf::dna
+  PRIVATE bf::intern::clog
+  PRIVATE bf::intern::guardedalloc
   bf_io_common
 
   ${ALEMBIC_LIBRARIES}
   ${OPENEXR_LIBRARIES}
+  PRIVATE bf::windowmanager
 )
 
-list(APPEND LIB
-  ${BOOST_LIBRARIES}
-)
-
-blender_add_lib(bf_alembic "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+blender_add_lib(bf_io_alembic "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
 
 if(WITH_GTESTS)
   set(TEST_SRC
@@ -123,8 +99,7 @@ if(WITH_GTESTS)
   set(TEST_INC
   )
   set(TEST_LIB
-    bf_alembic
+    bf_io_alembic
   )
-  include(GTestTesting)
-  blender_add_test_lib(bf_io_alembic_tests "${TEST_SRC}" "${INC};${TEST_INC}" "${INC_SYS}" "${LIB};${TEST_LIB}")
+  blender_add_test_suite_lib(io_alembic "${TEST_SRC}" "${INC};${TEST_INC}" "${INC_SYS}" "${LIB};${TEST_LIB}")
 endif()

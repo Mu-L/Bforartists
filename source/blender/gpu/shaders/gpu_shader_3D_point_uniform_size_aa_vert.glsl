@@ -1,12 +1,10 @@
+/* SPDX-FileCopyrightText: 2016-2022 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-uniform mat4 ModelViewProjectionMatrix;
-#ifdef USE_WORLD_CLIP_PLANES
-uniform mat4 ModelMatrix;
-#endif
-uniform float size;
+#include "infos/gpu_shader_3D_point_info.hh"
 
-in vec3 pos;
-out vec2 radii;
+VERTEX_SHADER_CREATE_INFO(gpu_shader_3D_point_uniform_size_uniform_color_aa)
 
 void main()
 {
@@ -14,17 +12,13 @@ void main()
   gl_Position = ModelViewProjectionMatrix * pos_4d;
   gl_PointSize = size;
 
-  // calculate concentric radii in pixels
+  /* Calculate concentric radii in pixels. */
   float radius = 0.5 * size;
 
-  // start at the outside and progress toward the center
+  /* Start at the outside and progress toward the center. */
   radii[0] = radius;
   radii[1] = radius - 1.0;
 
-  // convert to PointCoord units
+  /* Convert to PointCoord units. */
   radii /= size;
-
-#ifdef USE_WORLD_CLIP_PLANES
-  world_clip_planes_calc_clip_distance((ModelMatrix * pos_4d).xyz);
-#endif
 }

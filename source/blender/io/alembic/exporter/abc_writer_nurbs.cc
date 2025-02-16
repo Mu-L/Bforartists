@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup balembic
@@ -26,7 +14,8 @@
 
 #include "BLI_listbase.h"
 
-#include "BKE_curve.h"
+#include "BKE_curve.hh"
+#include "BKE_object_types.hh"
 
 #include "CLG_log.h"
 static CLG_LogRef LOG = {"io.alembic"};
@@ -40,9 +29,7 @@ using Alembic::AbcGeom::OCompoundProperty;
 using Alembic::AbcGeom::ONuPatch;
 using Alembic::AbcGeom::ONuPatchSchema;
 
-ABCNurbsWriter::ABCNurbsWriter(const ABCWriterConstructorArgs &args) : ABCAbstractWriter(args)
-{
-}
+ABCNurbsWriter::ABCNurbsWriter(const ABCWriterConstructorArgs &args) : ABCAbstractWriter(args) {}
 
 void ABCNurbsWriter::create_alembic_objects(const HierarchyContext *context)
 {
@@ -98,7 +85,7 @@ bool ABCNurbsWriter::check_is_animated(const HierarchyContext &context) const
 
 bool ABCNurbsWriter::is_supported(const HierarchyContext *context) const
 {
-  return ELEM(context->object->type, OB_SURF, OB_CURVE);
+  return ELEM(context->object->type, OB_SURF, OB_CURVES_LEGACY);
 }
 
 static void get_knots(std::vector<float> &knots, const int num_knots, float *nu_knots)
@@ -126,8 +113,8 @@ void ABCNurbsWriter::do_write(HierarchyContext &context)
   Curve *curve = static_cast<Curve *>(context.object->data);
   ListBase *nulb;
 
-  if (context.object->runtime.curve_cache->deformed_nurbs.first != nullptr) {
-    nulb = &context.object->runtime.curve_cache->deformed_nurbs;
+  if (context.object->runtime->curve_cache->deformed_nurbs.first != nullptr) {
+    nulb = &context.object->runtime->curve_cache->deformed_nurbs;
   }
   else {
     nulb = BKE_curve_nurbs_get(curve);

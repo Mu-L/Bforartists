@@ -1,37 +1,14 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2014 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# The Original Code is Copyright (C) 2014, Blender Foundation
-# All rights reserved.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(INC
-  .
-  ../blenkernel
-  ../blenlib
-  ../bmesh
-  ../draw
-  ../functions
-  ../makesdna
+  PUBLIC .
+  ../animrig
   ../makesrna
   ../modifiers
-  ../sequencer
-  ../windowmanager
-  ../../../intern/atomic
-  ../../../intern/guardedalloc
+  # RNA_prototypes.hh
+  ${CMAKE_BINARY_DIR}/source/blender/makesrna
 )
 
 set(INC_SYS
@@ -41,6 +18,8 @@ set(SRC
   intern/builder/deg_builder.cc
   intern/builder/deg_builder_cache.cc
   intern/builder/deg_builder_cycle.cc
+  intern/builder/deg_builder_key.cc
+  intern/builder/deg_builder_key.h
   intern/builder/deg_builder_map.cc
   intern/builder/deg_builder_nodes.cc
   intern/builder/deg_builder_nodes_rig.cc
@@ -49,16 +28,17 @@ set(SRC
   intern/builder/deg_builder_pchanmap.cc
   intern/builder/deg_builder_relations.cc
   intern/builder/deg_builder_relations_drivers.cc
-  intern/builder/deg_builder_relations_keys.cc
   intern/builder/deg_builder_relations_rig.cc
   intern/builder/deg_builder_relations_scene.cc
   intern/builder/deg_builder_relations_view_layer.cc
   intern/builder/deg_builder_remove_noop.cc
   intern/builder/deg_builder_rna.cc
+  intern/builder/deg_builder_stack.cc
   intern/builder/deg_builder_transitive.cc
   intern/builder/pipeline.cc
   intern/builder/pipeline_all_objects.cc
   intern/builder/pipeline_compositor.cc
+  intern/builder/pipeline_from_collection.cc
   intern/builder/pipeline_from_ids.cc
   intern/builder/pipeline_render.cc
   intern/builder/pipeline_view_layer.cc
@@ -80,6 +60,8 @@ set(SRC
   intern/eval/deg_eval_runtime_backup_sound.cc
   intern/eval/deg_eval_runtime_backup_volume.cc
   intern/eval/deg_eval_stats.cc
+  intern/eval/deg_eval_visibility.cc
+  intern/eval/deg_eval_visibility.h
   intern/node/deg_node.cc
   intern/node/deg_node_component.cc
   intern/node/deg_node_factory.cc
@@ -90,6 +72,8 @@ set(SRC
   intern/depsgraph_build.cc
   intern/depsgraph_debug.cc
   intern/depsgraph_eval.cc
+  intern/depsgraph_light_linking.cc
+  intern/depsgraph_light_linking.hh
   intern/depsgraph_physics.cc
   intern/depsgraph_query.cc
   intern/depsgraph_query_foreach.cc
@@ -99,12 +83,15 @@ set(SRC
   intern/depsgraph_tag.cc
   intern/depsgraph_type.cc
   intern/depsgraph_update.cc
+  intern/depsgraph_writeback_sync.cc
 
-  DEG_depsgraph.h
-  DEG_depsgraph_build.h
-  DEG_depsgraph_debug.h
-  DEG_depsgraph_physics.h
-  DEG_depsgraph_query.h
+  DEG_depsgraph.hh
+  DEG_depsgraph_build.hh
+  DEG_depsgraph_debug.hh
+  DEG_depsgraph_light_linking.hh
+  DEG_depsgraph_physics.hh
+  DEG_depsgraph_query.hh
+  DEG_depsgraph_writeback_sync.hh
 
   intern/builder/deg_builder.h
   intern/builder/deg_builder_cache.h
@@ -117,15 +104,16 @@ set(SRC
   intern/builder/deg_builder_relations_impl.h
   intern/builder/deg_builder_remove_noop.h
   intern/builder/deg_builder_rna.h
+  intern/builder/deg_builder_stack.h
   intern/builder/deg_builder_transitive.h
   intern/builder/pipeline.h
   intern/builder/pipeline_all_objects.h
   intern/builder/pipeline_compositor.h
+  intern/builder/pipeline_from_collection.h
   intern/builder/pipeline_from_ids.h
   intern/builder/pipeline_render.h
   intern/builder/pipeline_view_layer.h
   intern/debug/deg_debug.h
-  intern/debug/deg_time_average.h
   intern/eval/deg_eval.h
   intern/eval/deg_eval_copy_on_write.h
   intern/eval/deg_eval_flush.h
@@ -141,35 +129,56 @@ set(SRC
   intern/eval/deg_eval_runtime_backup_sound.h
   intern/eval/deg_eval_runtime_backup_volume.h
   intern/eval/deg_eval_stats.h
-  intern/node/deg_node.h
-  intern/node/deg_node_component.h
-  intern/node/deg_node_factory.h
-  intern/node/deg_node_factory_impl.h
-  intern/node/deg_node_id.h
-  intern/node/deg_node_operation.h
-  intern/node/deg_node_time.h
-  intern/depsgraph.h
-  intern/depsgraph_physics.h
-  intern/depsgraph_registry.h
-  intern/depsgraph_relation.h
-  intern/depsgraph_tag.h
-  intern/depsgraph_type.h
-  intern/depsgraph_update.h
+  intern/node/deg_node.hh
+  intern/node/deg_node_component.hh
+  intern/node/deg_node_factory.hh
+  intern/node/deg_node_factory_impl.hh
+  intern/node/deg_node_id.hh
+  intern/node/deg_node_operation.hh
+  intern/node/deg_node_time.hh
+  intern/depsgraph.hh
+  intern/depsgraph_physics.hh
+  intern/depsgraph_registry.hh
+  intern/depsgraph_relation.hh
+  intern/depsgraph_tag.hh
+  intern/depsgraph_type.hh
+  intern/depsgraph_update.hh
 )
 
 set(LIB
-  bf_blenkernel
+  PRIVATE bf::blenkernel
+  PRIVATE bf::blenlib
+  PRIVATE bf::bmesh
+  PRIVATE bf::dna
+  PRIVATE bf::draw
+  PRIVATE bf::functions
+  PRIVATE bf::intern::atomic
+  PRIVATE bf::intern::guardedalloc
+  PRIVATE bf::sequencer
+  PRIVATE bf::windowmanager
 )
 
+if(WITH_PYTHON)
+  add_definitions(-DWITH_PYTHON)
+  list(APPEND INC
+    ../python
+  )
+endif()
+
 blender_add_lib(bf_depsgraph "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+add_library(bf::depsgraph ALIAS bf_depsgraph)
+
+# RNA_prototypes.hh
+add_dependencies(bf_depsgraph bf_rna)
 
 if(WITH_GTESTS)
+  set(TEST_INC
+  )
   set(TEST_SRC
     intern/builder/deg_builder_rna_test.cc
   )
   set(TEST_LIB
     bf_depsgraph
   )
-  include(GTestTesting)
-  blender_add_test_lib(bf_depsgraph_tests "${TEST_SRC}" "${INC};${TEST_INC}" "${INC_SYS}" "${LIB}")
+  blender_add_test_suite_lib(depsgraph "${TEST_SRC}" "${INC};${TEST_INC}" "${INC_SYS}" "${LIB}")
 endif()

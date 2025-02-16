@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2013 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2013 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup depsgraph
@@ -25,36 +10,32 @@
 
 #include "intern/eval/deg_eval_flush.h"
 
-#include <cmath>
+#include <deque>
 
 #include "BLI_listbase.h"
-#include "BLI_math_vector.h"
 #include "BLI_task.h"
 #include "BLI_utildefines.h"
 
-#include "BKE_key.h"
-#include "BKE_object.h"
-#include "BKE_scene.h"
+#include "BKE_global.hh"
+#include "BKE_key.hh"
+#include "BKE_object.hh"
+#include "BKE_scene.hh"
 
-#include "DNA_key_types.h"
-#include "DNA_object_types.h"
-#include "DNA_scene_types.h"
+#include "DRW_engine.hh"
 
-#include "DRW_engine.h"
-
-#include "DEG_depsgraph.h"
+#include "DEG_depsgraph.hh"
+#include "DEG_depsgraph_debug.hh"
 
 #include "intern/debug/deg_debug.h"
-#include "intern/depsgraph.h"
-#include "intern/depsgraph_relation.h"
-#include "intern/depsgraph_type.h"
-#include "intern/depsgraph_update.h"
-#include "intern/node/deg_node.h"
-#include "intern/node/deg_node_component.h"
-#include "intern/node/deg_node_factory.h"
-#include "intern/node/deg_node_id.h"
-#include "intern/node/deg_node_operation.h"
-#include "intern/node/deg_node_time.h"
+#include "intern/depsgraph.hh"
+#include "intern/depsgraph_relation.hh"
+#include "intern/depsgraph_update.hh"
+#include "intern/node/deg_node.hh"
+#include "intern/node/deg_node_component.hh"
+#include "intern/node/deg_node_factory.hh"
+#include "intern/node/deg_node_id.hh"
+#include "intern/node/deg_node_operation.hh"
+#include "intern/node/deg_node_time.hh"
 
 #include "intern/eval/deg_eval_copy_on_write.h"
 
@@ -82,7 +63,7 @@ enum {
   COMPONENT_STATE_DONE = 2,
 };
 
-using FlushQueue = deque<OperationNode *>;
+using FlushQueue = std::deque<OperationNode *>;
 
 namespace {
 
@@ -145,7 +126,18 @@ inline void flush_handle_component_node(IDNode *id_node,
    *
    * TODO(sergey): Make this a more generic solution. */
   if (!ELEM(comp_node->type, NodeType::PARTICLE_SETTINGS, NodeType::PARTICLE_SYSTEM)) {
+    const bool is_geometry_component = comp_node->type == NodeType::GEOMETRY;
     for (OperationNode *op : comp_node->operations) {
+      /* Special case for the visibility operation in the geometry component.
+       *
+       * This operation is a part of the geometry component so that manual tag for geometry recalc
+       * ensures that the visibility is re-evaluated. This operation is not to be re-evaluated when
+       * an update is flushed to the geometry component via a time dependency or a driver targeting
+       * a modifier. Skipping update in this case avoids CPU time unnecessarily spent looping over
+       * modifiers and looking up operations by name in the visibility evaluation function. */
+      if (is_geometry_component && op->opcode == OperationCode::VISIBILITY) {
+        continue;
+      }
       op->flag |= DEPSOP_FLAG_NEEDS_UPDATE;
     }
   }
@@ -183,7 +175,8 @@ inline OperationNode *flush_schedule_children(OperationNode *op_node, FlushQueue
     /* Relation only allows flushes on user changes, but the node was not
      * affected by user. */
     if ((rel->flag & RELATION_FLAG_FLUSH_USER_EDIT_ONLY) &&
-        (op_node->flag & DEPSOP_FLAG_USER_MODIFIED) == 0) {
+        (op_node->flag & DEPSOP_FLAG_USER_MODIFIED) == 0)
+    {
       continue;
     }
     OperationNode *to_node = (OperationNode *)rel->to;
@@ -240,41 +233,17 @@ void flush_editors_id_update(Depsgraph *graph, const DEGEditorUpdateContext *upd
                      EVAL,
                      "Accumulated recalc bits for %s: %u\n",
                      id_orig->name,
-                     (unsigned int)id_cow->recalc);
+                     uint(id_cow->recalc));
 
     /* Inform editors. Only if the data-block is being evaluated a second
      * time, to distinguish between user edits and initial evaluation when
      * the data-block becomes visible.
      *
-     * TODO: image data-blocks do not use COW, so might not be detected
+     * TODO: image data-blocks do not use copy-on-eval, so might not be detected
      * correctly. */
-    if (deg_copy_on_write_is_expanded(id_cow)) {
+    if (deg_eval_copy_is_expanded(id_cow)) {
       if (graph->is_active && id_node->is_user_modified) {
         deg_editors_id_update(update_ctx, id_orig);
-
-        /* We only want to tag an ID for lib-override auto-refresh if it was actually tagged as
-         * changed. CoW IDs indirectly modified because of changes in other IDs should never
-         * require a lib-override diffing. */
-        if (ID_IS_OVERRIDE_LIBRARY_REAL(id_orig)) {
-          id_orig->tag |= LIB_TAG_OVERRIDE_LIBRARY_AUTOREFRESH;
-        }
-        else if (ID_IS_OVERRIDE_LIBRARY_VIRTUAL(id_orig)) {
-          switch (GS(id_orig->name)) {
-            case ID_KE:
-              ((Key *)id_orig)->from->tag |= LIB_TAG_OVERRIDE_LIBRARY_AUTOREFRESH;
-              break;
-            case ID_GR:
-              BLI_assert(id_orig->flag & LIB_EMBEDDED_DATA);
-              /* TODO. */
-              break;
-            case ID_NT:
-              BLI_assert(id_orig->flag & LIB_EMBEDDED_DATA);
-              /* TODO. */
-              break;
-            default:
-              BLI_assert(0);
-          }
-        }
       }
       /* Inform draw engines that something was changed. */
       flush_engine_data_update(id_cow);
@@ -289,7 +258,7 @@ void invalidate_tagged_evaluated_transform(ID *id)
   switch (id_type) {
     case ID_OB: {
       Object *object = (Object *)id;
-      copy_vn_fl((float *)object->obmat, 16, NAN);
+      copy_vn_fl((float *)object->object_to_world().ptr(), 16, NAN);
       break;
     }
     default:
@@ -320,7 +289,7 @@ void invalidate_tagged_evaluated_data(Depsgraph *graph)
       continue;
     }
     ID *id_cow = id_node->id_cow;
-    if (!deg_copy_on_write_is_expanded(id_cow)) {
+    if (!deg_eval_copy_is_expanded(id_cow)) {
       continue;
     }
     for (ComponentNode *comp_node : id_node->components.values()) {
@@ -346,9 +315,6 @@ void invalidate_tagged_evaluated_data(Depsgraph *graph)
 
 }  // namespace
 
-/* Flush updates from tagged nodes outwards until all affected nodes
- * are tagged.
- */
 void deg_graph_flush_updates(Depsgraph *graph)
 {
   /* Sanity checks. */
@@ -395,14 +361,8 @@ void deg_graph_flush_updates(Depsgraph *graph)
   invalidate_tagged_evaluated_data(graph);
 }
 
-/* Clear tags from all operation nodes. */
 void deg_graph_clear_tags(Depsgraph *graph)
 {
-  /* Go over all operation nodes, clearing tags. */
-  for (OperationNode *node : graph->operations) {
-    node->flag &= ~(DEPSOP_FLAG_DIRECTLY_MODIFIED | DEPSOP_FLAG_NEEDS_UPDATE |
-                    DEPSOP_FLAG_USER_MODIFIED);
-  }
   /* Clear any entry tags which haven't been flushed. */
   graph->entry_tags.clear();
 

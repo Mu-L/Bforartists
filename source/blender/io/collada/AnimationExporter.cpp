@@ -1,29 +1,19 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2009-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup collada
  */
 
 #include "AnimationExporter.h"
-#include "AnimationClipExporter.h"
 #include "BCAnimationSampler.h"
-#include "GeometryExporter.h"
-#include "MaterialExporter.h"
 #include "collada_utils.h"
+
+#include "BKE_material.hh"
+
+#include "BLI_listbase.h"
+#include "BLI_string.h"
 
 std::string EMPTY_STRING;
 
@@ -57,7 +47,7 @@ bool AnimationExporter::open_animation_container(bool has_container, Object *ob)
 {
   if (!has_container) {
     char anim_id[200];
-    sprintf(anim_id, "action_container-%s", translate_id(id_name(ob)).c_str());
+    SNPRINTF(anim_id, "action_container-%s", translate_id(id_name(ob)).c_str());
     openAnimation(anim_id, encode_xml(id_name(ob)));
   }
   return true;
@@ -126,7 +116,6 @@ bool AnimationExporter::exportAnimations()
   return animation_count;
 }
 
-/* called for each exported object */
 void AnimationExporter::exportAnimation(Object *ob, BCAnimationSampler &sampler)
 {
   bool container_is_open = false;
@@ -157,7 +146,7 @@ void AnimationExporter::exportAnimation(Object *ob, BCAnimationSampler &sampler)
 
     /* Export skeletal animation (if any) */
     bArmature *arm = (bArmature *)ob->data;
-    for (Bone *root_bone = (Bone *)arm->bonebase.first; root_bone; root_bone = root_bone->next) {
+    LISTBASE_FOREACH (Bone *, root_bone, &arm->bonebase) {
       export_bone_animations_recursive(ob, root_bone, sampler);
     }
   }
@@ -165,16 +154,6 @@ void AnimationExporter::exportAnimation(Object *ob, BCAnimationSampler &sampler)
   close_animation_container(container_is_open);
 }
 
-/*
- * Export all animation FCurves of an Object.
- *
- * NOTE: This uses the keyframes as sample points,
- * and exports "baked keyframes" while keeping the tangent information
- * of the FCurves intact. This works for simple cases, but breaks
- * especially when negative scales are involved in the animation.
- * And when parent inverse matrices are involved (when exporting
- * object hierarchies)
- */
 void AnimationExporter::export_curve_animation_set(Object *ob,
                                                    BCAnimationSampler &sampler,
                                                    bool export_as_matrix)
@@ -254,7 +233,6 @@ BC_global_rotation_type AnimationExporter::get_global_rotation_type(Object *ob)
   return (apply_global_rotation) ? BC_DATA_ROTATION : BC_OBJECT_ROTATION;
 }
 
-/* Write bone animations in transform matrix sources. */
 void AnimationExporter::export_bone_animations_recursive(Object *ob,
                                                          Bone *bone,
                                                          BCAnimationSampler &sampler)
@@ -272,19 +250,11 @@ void AnimationExporter::export_bone_animations_recursive(Object *ob,
     }
   }
 
-  for (Bone *child = (Bone *)bone->childbase.first; child; child = child->next) {
+  LISTBASE_FOREACH (Bone *, child, &bone->childbase) {
     export_bone_animations_recursive(ob, child, sampler);
   }
 }
 
-/**
- * In some special cases the exported Curve needs to be replaced
- * by a modified curve (for collada purposes)
- * This method checks if a conversion is necessary and if applicable
- * returns a pointer to the modified BCAnimationCurve.
- * IMPORTANT: the modified curve must be deleted by the caller when no longer needed
- * if no conversion is needed this method returns a NULL;
- */
 BCAnimationCurve *AnimationExporter::get_modified_export_curve(Object *ob,
                                                                BCAnimationCurve &curve,
                                                                BCAnimationCurveMap &curves)
@@ -337,7 +307,7 @@ void AnimationExporter::export_curve_animation(Object *ob, BCAnimationCurve &cur
   /*
    * Some curves can not be exported as is and need some conversion
    * For more information see implementation of get_modified_export_curve()
-   * NOTE: if mcurve is not NULL then it must be deleted at end of this method;
+   * NOTE: if mcurve is not null then it must be deleted at end of this method;
    */
 
   int channel_index = curve.get_channel_index();
@@ -396,7 +366,7 @@ bool AnimationExporter::is_bone_deform_group(Bone *bone)
   }
   /* Check child bones */
 
-  for (Bone *child = (Bone *)bone->childbase.first; child; child = child->next) {
+  LISTBASE_FOREACH (Bone *, child, &bone->childbase) {
     /* loop through all the children until deform bone is found, and then return */
     is_def = is_bone_deform_group(child);
     if (is_def) {
@@ -420,13 +390,12 @@ void AnimationExporter::export_collada_curve_animation(
   BCValues values;
   curve.get_frames(frames);
   curve.get_values(values);
-  std::string channel_target = curve.get_channel_target();
 
   fprintf(
       stdout, "Export animation curve %s (%d control points)\n", id.c_str(), int(frames.size()));
   openAnimation(id, name);
-  BC_animation_source_type source_type = (curve.is_rotation_curve()) ? BC_SOURCE_TYPE_ANGLE :
-                                                                       BC_SOURCE_TYPE_VALUE;
+  BC_animation_source_type source_type = curve.is_rotation_curve() ? BC_SOURCE_TYPE_ANGLE :
+                                                                     BC_SOURCE_TYPE_VALUE;
 
   std::string input_id = collada_source_from_values(
       BC_SOURCE_TYPE_TIMEFRAME, COLLADASW::InputSemantic::INPUT, frames, id, axis);
@@ -535,31 +504,31 @@ void AnimationExporter::add_source_parameters(COLLADASW::SourceBase::ParameterNa
 {
   switch (semantic) {
     case COLLADASW::InputSemantic::INPUT:
-      param.push_back("TIME");
+      param.emplace_back("TIME");
       break;
     case COLLADASW::InputSemantic::OUTPUT:
       if (is_rot) {
-        param.push_back("ANGLE");
+        param.emplace_back("ANGLE");
       }
       else {
         if (!axis.empty()) {
           param.push_back(axis);
         }
         else if (transform) {
-          param.push_back("TRANSFORM");
+          param.emplace_back("TRANSFORM");
         }
         else {
-          /* assumes if axis isn't specified all axises are added */
-          param.push_back("X");
-          param.push_back("Y");
-          param.push_back("Z");
+          /* assumes if axis isn't specified all axes are added */
+          param.emplace_back("X");
+          param.emplace_back("Y");
+          param.emplace_back("Z");
         }
       }
       break;
     case COLLADASW::InputSemantic::IN_TANGENT:
     case COLLADASW::InputSemantic::OUT_TANGENT:
-      param.push_back("X");
-      param.push_back("Y");
+      param.emplace_back("X");
+      param.emplace_back("Y");
       break;
     default:
       break;
@@ -657,9 +626,6 @@ std::string AnimationExporter::collada_source_from_values(
   return source_id;
 }
 
-/*
- * Create a collada matrix source for a set of samples
- */
 std::string AnimationExporter::collada_source_from_values(
     BCMatrixSampleMap &samples,
     const std::string &anim_id,
@@ -682,7 +648,7 @@ std::string AnimationExporter::collada_source_from_values(
 
   BCMatrixSampleMap::iterator it;
   /* could be made configurable */
-  int precision = (this->export_settings.get_limit_precision()) ? 6 : -1;
+  int precision = this->export_settings.get_limit_precision() ? 6 : -1;
   for (it = samples.begin(); it != samples.end(); it++) {
     BCMatrix sample = BCMatrix(*it->second);
     BCMatrix global_transform = this->export_settings.get_global_transform();
@@ -715,7 +681,7 @@ std::string AnimationExporter::collada_interpolation_source(const BCAnimationCur
   source.setAccessorStride(1);
 
   COLLADASW::SourceBase::ParameterNameList &param = source.getParameterNameList();
-  param.push_back("INTERPOLATION");
+  param.emplace_back("INTERPOLATION");
 
   source.prepareToAppendValues();
 
@@ -724,7 +690,7 @@ std::string AnimationExporter::collada_interpolation_source(const BCAnimationCur
   std::vector<float> frames;
   curve.get_frames(frames);
 
-  for (unsigned int i = 0; i < curve.sample_count(); i++) {
+  for (uint i = 0; i < curve.sample_count(); i++) {
     float frame = frames[i];
     int ipo = curve.get_interpolation_type(frame);
     if (ipo == BEZT_IPO_BEZ) {
@@ -758,7 +724,7 @@ std::string AnimationExporter::collada_linear_interpolation_source(int tot,
   source.setAccessorStride(1);
 
   COLLADASW::SourceBase::ParameterNameList &param = source.getParameterNameList();
-  param.push_back("INTERPOLATION");
+  param.emplace_back("INTERPOLATION");
 
   source.prepareToAppendValues();
 
@@ -823,14 +789,9 @@ std::string AnimationExporter::get_collada_name(std::string channel_type) const
   return tm_name;
 }
 
-/*
- * Assign sid of the animated parameter or transform for rotation,
- * axis name is always appended and the value of append_axis is ignored
- */
 std::string AnimationExporter::get_collada_sid(const BCAnimationCurve &curve,
                                                const std::string axis_name)
 {
-  std::string channel_target = curve.get_channel_target();
   std::string channel_type = curve.get_channel_type();
   std::string tm_name = get_collada_name(channel_type);
 
@@ -855,22 +816,15 @@ std::string AnimationExporter::get_collada_sid(const BCAnimationCurve &curve,
  * So we have to update BCSample for this to work. */
 void AnimationExporter::export_morph_animation(Object *ob, BCAnimationSampler &sampler)
 {
-  FCurve *fcu;
   Key *key = BKE_key_from_object(ob);
   if (!key) {
     return;
   }
 
-  if (key->adt && key->adt->action) {
-    fcu = (FCurve *)key->adt->action->curves.first;
+  for (FCurve *fcu : blender::animrig::legacy::fcurves_for_assigned_action(key->adt)) {
+    BC_animation_transform_type tm_type = get_transform_type(fcu->rna_path);
 
-    while (fcu) {
-      BC_animation_transform_type tm_type = get_transform_type(fcu->rna_path);
-
-      create_keyframed_animation(ob, fcu, tm_type, true, sampler);
-
-      fcu = fcu->next;
-    }
+    create_keyframed_animation(ob, fcu, tm_type, true, sampler);
   }
 }
 #endif

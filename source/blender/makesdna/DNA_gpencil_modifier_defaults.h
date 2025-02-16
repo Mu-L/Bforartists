@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
@@ -22,7 +10,6 @@
 
 /* Note that some struct members for color-mapping and color-bands are not initialized here. */
 
-/* Struct members on own line. */
 /* clang-format off */
 
 #define _DNA_DEFAULT_ArmatureGpencilModifierData \
@@ -68,6 +55,9 @@
     .mode = 0, \
     .transition = 0, \
     .time_alignment = 0, \
+    .time_mode = 0, \
+    .speed_fac = 1.2f, \
+    .speed_maxgap = 0.5f, \
     .percentage_fac = 0.0f, \
   }
 
@@ -166,6 +156,9 @@
     .vgname = "", \
     .pass_index = 0, \
     .flag = 0, \
+    .stroke_step = 1, \
+    .mode = GP_OFFSET_RANDOM, \
+    .stroke_start_offset = 0, \
     .loc = {0.0f, 0.0f, 0.0f}, \
     .rot = {0.0f, 0.0f, 0.0f}, \
     .scale = {0.0f, 0.0f, 0.0f}, \
@@ -182,8 +175,21 @@
     .factor = 1.0f, \
     .modify_color = GP_MODIFY_COLOR_BOTH, \
     .layer_pass = 0, \
-    .hardeness = 1.0f, \
+    .hardness = 1.0f, \
     .curve_intensity = NULL, \
+  }
+
+#define _DNA_DEFAULT_OutlineGpencilModifierData \
+  { \
+    .material = NULL, \
+    .layername = "", \
+    .pass_index = 0, \
+    .flag = GP_OUTLINE_KEEP_SHAPE, \
+    .thickness = 1, \
+    .sample_length = 0.0f, \
+    .subdiv = 3, \
+    .layer_pass = 0, \
+    .outline_material = NULL, \
   }
 
 #define _DNA_DEFAULT_SimplifyGpencilModifierData \
@@ -207,7 +213,7 @@
     .vgname = "", \
     .pass_index = 0, \
     .flag = GP_SMOOTH_MOD_LOCATION, \
-    .factor = 0.5f, \
+    .factor = 1.0f, \
     .step = 1, \
     .layer_pass = 0, \
     .curve_intensity = NULL, \
@@ -263,6 +269,18 @@
     .mode = 0, \
     .sfra = 1, \
     .efra = 250, \
+    .segments = NULL, \
+    .segments_len = 1, \
+    .segment_active_index = 0, \
+  }
+
+  #define _DNA_DEFAULT_TimeGpencilModifierSegment \
+  { \
+    .name = "", \
+    .seg_start = 1, \
+    .seg_end = 2, \
+    .seg_mode = 0, \
+    .seg_repeat = 1, \
   }
 
 #define _DNA_DEFAULT_TintGpencilModifierData \
@@ -283,7 +301,20 @@
     .colorband = NULL, \
   }
 
-#define _DNA_DEFAULT_WeightGpencilModifierData \
+#define _DNA_DEFAULT_WeightProxGpencilModifierData \
+  { \
+    .target_vgname = "", \
+    .material = NULL, \
+    .layername = "", \
+    .vgname = "", \
+    .pass_index = 0, \
+    .flag = 0, \
+    .layer_pass = 0, \
+    .dist_start = 0.0f, \
+    .dist_end = 20.0f, \
+  }
+
+#define _DNA_DEFAULT_WeightAngleGpencilModifierData \
   { \
     .target_vgname = "", \
     .material = NULL, \
@@ -293,29 +324,93 @@
     .flag = 0, \
     .axis = 1, \
     .layer_pass = 0, \
-    .dist_start = 0.0f, \
-    .dist_end = 20.0f, \
   }
 
 #define _DNA_DEFAULT_LineartGpencilModifierData \
   { \
-    .edge_types = LRT_EDGE_FLAG_ALL_TYPE, \
+    .edge_types = MOD_LINEART_EDGE_FLAG_INIT_TYPE, \
     .thickness = 25, \
     .opacity = 1.0f, \
-    .flags = LRT_GPENCIL_MATCH_OUTPUT_VGROUP, \
     .crease_threshold = DEG2RAD(140.0f), \
-    .calculation_flags = LRT_ALLOW_DUPLI_OBJECTS | LRT_ALLOW_CLIPPING_BOUNDARIES, \
-    .angle_splitting_threshold = DEG2RAD(60.0f), \
+    .calculation_flags = MOD_LINEART_ALLOW_DUPLI_OBJECTS | MOD_LINEART_ALLOW_CLIPPING_BOUNDARIES | \
+                         MOD_LINEART_USE_CREASE_ON_SHARP_EDGES | MOD_LINEART_FILTER_FACE_MARK_KEEP_CONTOUR | \
+                         MOD_LINEART_MATCH_OUTPUT_VGROUP, \
+    /* Do not split by default, this is for better chaining quality. */ \
+    .angle_splitting_threshold = 0.0f, \
     .chaining_image_threshold = 0.001f, \
+    .stroke_depth_offset = 0.05,\
+    .chain_smooth_tolerance = 0.0f,\
+    .overscan = 0.1f,\
+    .shadow_camera_near = 0.1f, \
+    .shadow_camera_far = 200.0f, \
+    .shadow_camera_size = 200.0f, \
   }
 
 #define _DNA_DEFAULT_LengthGpencilModifierData \
   { \
     .start_fac = 0.1f,\
     .end_fac = 0.1f,\
-    .overshoot_fac = 0.01f,\
+    .overshoot_fac = 0.1f,\
     .pass_index = 0,\
     .material = NULL,\
+    .flag = GP_LENGTH_USE_CURVATURE,\
+    .point_density = 30.0f,\
+    .segment_influence = 0.0f,\
+    .max_angle = DEG2RAD(170.0f),\
+    .rand_start_fac = 0.0f,\
+    .rand_end_fac = 0.0f,\
+    .rand_offset = 0.0f,\
+    .seed = 0,\
+    .step = 4,\
+  }
+
+#define _DNA_DEFAULT_DashGpencilModifierData \
+  { \
+    .dash_offset = 0, \
+    .segments = NULL, \
+    .segments_len = 1, \
+    .segment_active_index = 0, \
+  }
+
+#define _DNA_DEFAULT_DashGpencilModifierSegment \
+  { \
+    .name = "", \
+    .dash = 2, \
+    .gap = 1, \
+    .radius = 1.0f, \
+    .opacity = 1.0f, \
+    .mat_nr = -1, \
+  }
+
+#define _DNA_DEFAULT_ShrinkwrapGpencilModifierData \
+  { \
+    .target = NULL, \
+    .aux_target = NULL, \
+    .keep_dist = 0.05f, \
+    .shrink_type = MOD_SHRINKWRAP_NEAREST_SURFACE, \
+    .shrink_opts = MOD_SHRINKWRAP_PROJECT_ALLOW_POS_DIR, \
+    .shrink_mode = 0, \
+    .proj_limit = 0.0f, \
+    .proj_axis = 0, \
+    .subsurf_levels = 0, \
+    .material = NULL, \
+    .layername = "", \
+    .vgname = "", \
+    .pass_index = 0, \
+    .flag = 0, \
+    .layer_pass = 0, \
+    .smooth_factor = 0.05f, \
+    .smooth_step = 1, \
+  }
+
+#define _DNA_DEFAULT_EnvelopeGpencilModifierData \
+  { \
+    .spread = 10, \
+    .mode = GP_ENVELOPE_SEGMENTS, \
+    .mat_nr = -1, \
+    .thickness = 1.0f, \
+    .strength = 1.0f, \
+    .skip = 0, \
   }
 
 

@@ -1,25 +1,12 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2019 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2019 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup depsgraph
  */
+
+#include "BLI_session_uid.h"
 
 #include "intern/eval/deg_eval_runtime_backup_object.h"
 
@@ -29,8 +16,11 @@
 
 #include "BLI_listbase.h"
 
-#include "BKE_action.h"
-#include "BKE_object.h"
+#include "BKE_action.hh"
+#include "BKE_mesh_types.hh"
+#include "BKE_modifier.hh"
+#include "BKE_object.hh"
+#include "BKE_object_types.hh"
 
 namespace blender::deg {
 
@@ -38,16 +28,19 @@ ObjectRuntimeBackup::ObjectRuntimeBackup(const Depsgraph * /*depsgraph*/)
     : base_flag(0), base_local_view_bits(0)
 {
   /* TODO(sergey): Use something like BKE_object_runtime_reset(). */
-  memset(&runtime, 0, sizeof(runtime));
+  runtime = {};
 }
 
 void ObjectRuntimeBackup::init_from_object(Object *object)
 {
   /* Store evaluated mesh and curve_cache, and make sure we don't free it. */
-  runtime = object->runtime;
+  runtime = *object->runtime;
+  if (object->light_linking) {
+    light_linking_runtime = object->light_linking->runtime;
+  }
   BKE_object_runtime_reset(object);
-  /* Keep bbox (for now at least). */
-  object->runtime.bb = runtime.bb;
+  /* Keep bounding-box (for now at least). */
+  object->runtime->bounds_eval = runtime.bounds_eval;
   /* Object update will override actual object->data to an evaluated version.
    * Need to make sure we don't have data set to evaluated one before free
    * anything. */
@@ -68,11 +61,7 @@ void ObjectRuntimeBackup::backup_modifier_runtime_data(Object *object)
       continue;
     }
 
-    const SessionUUID &session_uuid = modifier_data->session_uuid;
-    BLI_assert(BLI_session_uuid_is_generated(&session_uuid));
-
-    BLI_assert(modifier_data->orig_modifier_data != nullptr);
-    modifier_runtime_data.add(session_uuid, ModifierDataBackup(modifier_data));
+    modifier_runtime_data.add(modifier_data->persistent_uid, ModifierDataBackup(modifier_data));
     modifier_data->runtime = nullptr;
   }
 }
@@ -81,10 +70,10 @@ void ObjectRuntimeBackup::backup_pose_channel_runtime_data(Object *object)
 {
   if (object->pose != nullptr) {
     LISTBASE_FOREACH (bPoseChannel *, pchan, &object->pose->chanbase) {
-      const SessionUUID &session_uuid = pchan->runtime.session_uuid;
-      BLI_assert(BLI_session_uuid_is_generated(&session_uuid));
+      const SessionUID &session_uid = pchan->runtime.session_uid;
+      BLI_assert(BLI_session_uid_is_generated(&session_uid));
 
-      pose_channel_runtime_data.add(session_uuid, pchan->runtime);
+      pose_channel_runtime_data.add(session_uid, pchan->runtime);
       BKE_pose_channel_runtime_reset(&pchan->runtime);
     }
   }
@@ -92,13 +81,13 @@ void ObjectRuntimeBackup::backup_pose_channel_runtime_data(Object *object)
 
 void ObjectRuntimeBackup::restore_to_object(Object *object)
 {
-  ID *data_orig = object->runtime.data_orig;
+  ID *data_orig = object->runtime->data_orig;
   ID *data_eval = runtime.data_eval;
-  BoundBox *bb = object->runtime.bb;
-  object->runtime = runtime;
-  object->runtime.data_orig = data_orig;
-  object->runtime.bb = bb;
-  if (ELEM(object->type, OB_MESH, OB_LATTICE) && data_eval != nullptr) {
+  std::optional<Bounds<float3>> bounds = object->runtime->bounds_eval;
+  *object->runtime = runtime;
+  object->runtime->data_orig = data_orig;
+  object->runtime->bounds_eval = bounds;
+  if (ELEM(object->type, OB_MESH, OB_LATTICE, OB_CURVES_LEGACY, OB_FONT) && data_eval != nullptr) {
     if (object->id.recalc & ID_RECALC_GEOMETRY) {
       /* If geometry is tagged for update it means, that part of
        * evaluated mesh are not valid anymore. In this case we can not
@@ -112,9 +101,11 @@ void ObjectRuntimeBackup::restore_to_object(Object *object)
       BKE_object_free_derived_caches(object);
     }
     else {
-      /* Do same thing as object update: override actual object data
-       * pointer with evaluated datablock. */
-      object->data = data_eval;
+      /* Do same thing as object update: override actual object data pointer with evaluated
+       * datablock, but only if the evaluated data has the same type as the original data. */
+      if (GS(((ID *)object->data)->name) == GS(data_eval->name)) {
+        object->data = data_eval;
+      }
 
       /* Evaluated mesh simply copied edit_mesh pointer from
        * original mesh during update, need to make sure no dead
@@ -122,23 +113,33 @@ void ObjectRuntimeBackup::restore_to_object(Object *object)
       if (object->type == OB_MESH) {
         Mesh *mesh_eval = (Mesh *)data_eval;
         Mesh *mesh_orig = (Mesh *)data_orig;
-        mesh_eval->edit_mesh = mesh_orig->edit_mesh;
+        mesh_eval->runtime->edit_mesh = mesh_orig->runtime->edit_mesh;
       }
     }
   }
-  else if (ELEM(object->type, OB_HAIR, OB_POINTCLOUD, OB_VOLUME)) {
+  else if (ELEM(object->type, OB_CURVES, OB_POINTCLOUD, OB_VOLUME, OB_GREASE_PENCIL)) {
     if (object->id.recalc & ID_RECALC_GEOMETRY) {
       /* Free evaluated caches. */
       object->data = data_orig;
       BKE_object_free_derived_caches(object);
     }
     else {
-      object->data = object->runtime.data_eval;
+      object->data = object->runtime->data_eval;
     }
+  }
+
+  if (light_linking_runtime) {
+    /* Lazily allocate light linking on the evaluated object for the cases when the object is only
+     * a receiver or a blocker and does not need its own LightLinking on the original object. */
+    if (!object->light_linking) {
+      object->light_linking = MEM_cnew<LightLinking>(__func__);
+    }
+    object->light_linking->runtime = *light_linking_runtime;
   }
 
   object->base_flag = base_flag;
   object->base_local_view_bits = base_local_view_bits;
+
   /* Restore modifier's runtime data.
    * NOTE: Data of unused modifiers will be freed there. */
   restore_modifier_runtime_data(object);
@@ -148,9 +149,8 @@ void ObjectRuntimeBackup::restore_to_object(Object *object)
 void ObjectRuntimeBackup::restore_modifier_runtime_data(Object *object)
 {
   LISTBASE_FOREACH (ModifierData *, modifier_data, &object->modifiers) {
-    BLI_assert(modifier_data->orig_modifier_data != nullptr);
-    const SessionUUID &session_uuid = modifier_data->session_uuid;
-    optional<ModifierDataBackup> backup = modifier_runtime_data.pop_try(session_uuid);
+    std::optional<ModifierDataBackup> backup = modifier_runtime_data.pop_try(
+        modifier_data->persistent_uid);
     if (backup.has_value()) {
       modifier_data->runtime = backup->runtime;
     }
@@ -159,7 +159,16 @@ void ObjectRuntimeBackup::restore_modifier_runtime_data(Object *object)
   for (ModifierDataBackup &backup : modifier_runtime_data.values()) {
     const ModifierTypeInfo *modifier_type_info = BKE_modifier_get_info(backup.type);
     BLI_assert(modifier_type_info != nullptr);
-    modifier_type_info->freeRuntimeData(backup.runtime);
+    modifier_type_info->free_runtime_data(backup.runtime);
+
+    if (backup.type == eModifierType_Subsurf) {
+      if (object->type == OB_MESH) {
+        Mesh *mesh = (Mesh *)object->data;
+        if (mesh->runtime->subsurf_runtime_data == backup.runtime) {
+          mesh->runtime->subsurf_runtime_data = nullptr;
+        }
+      }
+    }
   }
 }
 
@@ -167,8 +176,8 @@ void ObjectRuntimeBackup::restore_pose_channel_runtime_data(Object *object)
 {
   if (object->pose != nullptr) {
     LISTBASE_FOREACH (bPoseChannel *, pchan, &object->pose->chanbase) {
-      const SessionUUID &session_uuid = pchan->runtime.session_uuid;
-      optional<bPoseChannel_Runtime> runtime = pose_channel_runtime_data.pop_try(session_uuid);
+      const SessionUID &session_uid = pchan->runtime.session_uid;
+      std::optional<bPoseChannel_Runtime> runtime = pose_channel_runtime_data.pop_try(session_uid);
       if (runtime.has_value()) {
         pchan->runtime = *runtime;
       }

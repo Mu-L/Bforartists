@@ -1,20 +1,9 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2020 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2020 Blender Foundation,
- * All rights reserved.
+ * SPDX-License-Identifier: GPL-2.0-or-later */
+
+/** \file
+ * \ingroup intern_rigidbody
  */
 
 #include "LinearMath/btConvexHullComputer.h"
@@ -82,7 +71,8 @@ int plConvexHullGetFaceSize(plConvexHull hull, int n)
 
   for (e_orig = &computer->edges[computer->faces[n]], e = e_orig, count = 0;
        count == 0 || e != e_orig;
-       e = e->getNextEdgeOfFace(), count++) {
+       e = e->getNextEdgeOfFace(), count++)
+  {
     ;
   }
   return count;
@@ -96,7 +86,8 @@ void plConvexHullGetFaceLoops(plConvexHull hull, int n, int *loops)
 
   for (e_orig = &computer->edges[computer->faces[n]], e = e_orig, count = 0;
        count == 0 || e != e_orig;
-       e = e->getNextEdgeOfFace(), count++) {
+       e = e->getNextEdgeOfFace(), count++)
+  {
     loops[count] = e - &computer->edges[0];
   }
 }
@@ -109,7 +100,8 @@ void plConvexHullGetFaceVertices(plConvexHull hull, int n, int *vertices)
 
   for (e_orig = &computer->edges[computer->faces[n]], e = e_orig, count = 0;
        count == 0 || e != e_orig;
-       e = e->getNextEdgeOfFace(), count++) {
+       e = e->getNextEdgeOfFace(), count++)
+  {
     vertices[count] = e->getTargetVertex();
   }
 }

@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2008-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -26,7 +14,9 @@
 #include "../geometry/GeomUtils.h"
 #include "../geometry/normal_cycle.h"
 
-#include "BKE_global.h"
+#include "BLI_sys_types.h"
+
+#include "BKE_global.hh"
 
 namespace Freestyle {
 
@@ -58,8 +48,8 @@ void FEdgeXDetector::processShapes(WingedEdge &we)
 #endif
     if (_changes) {
       vector<WFace *> &wfaces = wxs->GetFaceList();
-      for (vector<WFace *>::iterator wf = wfaces.begin(), wfend = wfaces.end(); wf != wfend;
-           ++wf) {
+      for (vector<WFace *>::iterator wf = wfaces.begin(), wfend = wfaces.end(); wf != wfend; ++wf)
+      {
         WXFace *wxf = dynamic_cast<WXFace *>(*wf);
         wxf->Clear();
       }
@@ -140,7 +130,8 @@ void FEdgeXDetector::preProcessShape(WXShape *iWShape)
   if (_computeRidgesAndValleys || _computeSuggestiveContours) {
     vector<WVertex *> &wvertices = iWShape->getVertexList();
     for (vector<WVertex *>::iterator wv = wvertices.begin(), wvend = wvertices.end(); wv != wvend;
-         ++wv) {
+         ++wv)
+    {
       // Compute curvatures
       WXVertex *wxv = dynamic_cast<WXVertex *>(*wv);
       computeCurvatures(wxv);
@@ -179,9 +170,9 @@ void FEdgeXDetector::preProcessFace(WXFace *iFace)
 
 void FEdgeXDetector::computeCurvatures(WXVertex *vertex)
 {
-  // TODO: for some reason, the 'vertex' may have no associated edges
-  // (i.e., WVertex::_EdgeList is empty), which causes a crash due to
-  // a subsequent call of WVertex::_EdgeList.front().
+  /* TODO: for some reason, the 'vertex' may have no associated edges.
+   * (i.e., WVertex::_EdgeList is empty), which causes a crash due to
+   * a subsequent call of `WVertex::_EdgeList.front()`. */
   if (vertex->GetEdges().empty()) {
     if (G.debug & G_DEBUG_FREESTYLE) {
       printf("Warning: WVertex %d has no associated edges.\n", vertex->GetId());
@@ -190,7 +181,7 @@ void FEdgeXDetector::computeCurvatures(WXVertex *vertex)
   }
 
   // CURVATURE LAYER
-  // store all the curvature datas for each vertex
+  // store all the curvature data for each vertex
 
   // soc unused - real K1, K2
   real cos2theta, sin2theta;
@@ -332,8 +323,8 @@ void FEdgeXDetector::ProcessSilhouetteEdge(WXEdge *iEdge)
   WXFace *fA = (WXFace *)iEdge->GetaOEdge()->GetaFace();
   WXFace *fB = (WXFace *)iEdge->GetaOEdge()->GetbFace();
 
-  if ((fA->front()) ^
-      (fB->front())) {  // fA->visible XOR fB->visible (true if one is 0 and the other is 1)
+  /* fA->visible XOR fB->visible (true if one is 0 and the other is 1). */
+  if (fA->front() ^ fB->front()) {
     // The only edges we want to set as silhouette edges in this way are the ones with 2 different
     // normals for 1 vertex for these two faces
     //--------------------
@@ -434,8 +425,8 @@ void FEdgeXDetector::ProcessRidgeFace(WXFace *iFace)
   WXFaceLayer *flayer = new WXFaceLayer(iFace, Nature::RIDGE | Nature::VALLEY, false);
   iFace->AddSmoothLayer(flayer);
 
-  unsigned int numVertices = iFace->numberOfVertices();
-  for (unsigned int i = 0; i < numVertices; ++i) {
+  uint numVertices = iFace->numberOfVertices();
+  for (uint i = 0; i < numVertices; ++i) {
     WVertex *wv = iFace->GetVertex(i);
     WXVertex *wxv = dynamic_cast<WXVertex *>(wv);
     flayer->PushDotP(wxv->curvatures()->K1);
@@ -443,11 +434,12 @@ void FEdgeXDetector::ProcessRidgeFace(WXFace *iFace)
 
 #if 0  // XXX fabs(flayer->dotP(i)) < threshold cannot be true
   real threshold = 0;
-  //real threshold = _maxK1 - (_maxK1 - _meanK1) / 20.0;
+  // real threshold = _maxK1 - (_maxK1 - _meanK1) / 20.0;
 
   if (flayer->nPosDotP() != numVertices) {
     if ((fabs(flayer->dotP(0)) < threshold) && (fabs(flayer->dotP(1)) < threshold) &&
-        (fabs(flayer->dotP(2)) < threshold)) {
+        (fabs(flayer->dotP(2)) < threshold))
+    {
       flayer->ReplaceDotP(0, 0);
       flayer->ReplaceDotP(1, 0);
       flayer->ReplaceDotP(2, 0);
@@ -460,7 +452,8 @@ void FEdgeXDetector::ProcessRidgeFace(WXFace *iFace)
 void FEdgeXDetector::ProcessRidgeFace(WXFace *iFace)
 {
   // RIDGE LAYER
-  // Compute the RidgeFunction, that is the derivative of the ppal curvature along e1 at each vertex of the face
+  // Compute the RidgeFunction, that is the derivative of the ppal curvature along e1 at each
+  // vertex of the face
   WVertex *v;
   Vec3r v1v2;
   real t;
@@ -508,8 +501,8 @@ void FEdgeXDetector::ProcessRidgeFace(WXFace *iFace)
         Face_Curvature_Info *second_layer_info =
             (Face_Curvature_Info *)second_ridge_layer[0]->userdata;
 
-        unsigned index1 = wxf->GetIndex(oppositeEdge->GetaVertex());
-        unsigned index2 = wxf->GetIndex(oppositeEdge->GetbVertex());
+        uint index1 = wxf->GetIndex(oppositeEdge->GetaVertex());
+        uint index2 = wxf->GetIndex(oppositeEdge->GetbVertex());
         real K1_1 = second_layer_info->vec_curvature_info[index1]->K1;
         real K1_2 = second_layer_info->vec_curvature_info[index2]->K1;
         real K1 = (1.0 - t) * K1_1 + t * K1_2;
@@ -528,17 +521,18 @@ void FEdgeXDetector::ProcessRidgeFace(WXFace *iFace)
       }
     }
     // Once we have K1 along the ppal direction compute the derivative : K1b - K1a put it in DotP
-    //real d = fabs(K1_b) - fabs(K1_a);
+    // real d = fabs(K1_b) - fabs(K1_a);
     real d = 0;
     real threshold = _meanK1 + (_maxK1 - _meanK1) / 7.0;
-    //real threshold = _meanK1;
-    //if ((fabs(K1_b) > threshold) || ((fabs(K1_a) > threshold)))
+    // real threshold = _meanK1;
+    // if ((fabs(K1_b) > threshold) || ((fabs(K1_a) > threshold)))
     d = (K1_b) - (K1_a) / (Inter_b - Inter_a).norm();
     faceLayer->PushDotP(d);
-    //faceLayer->PushDotP(layer_info->vec_curvature_info[i]->K1);
+    // faceLayer->PushDotP(layer_info->vec_curvature_info[i]->K1);
   }
 
-  // Make the values relevant by checking whether all principal directions have the "same" direction:
+  // Make the values relevant by checking whether all principal directions have the "same"
+  // direction:
   Vec3r e0((layer_info->vec_curvature_info[0]->K1 * layer_info->vec_curvature_info[0]->e1));
   e0.normalize();
   Vec3r e1((layer_info->vec_curvature_info[1]->K1 * layer_info->vec_curvature_info[1]->e1));
@@ -557,7 +551,9 @@ void FEdgeXDetector::ProcessRidgeFace(WXFace *iFace)
 #  if 0  // remove the weakest values;
   real minDiff = (_maxK1 - _minK1) / 10.0;
   real minDiff = _meanK1;
-  if ((faceLayer->dotP(0) < minDiff) && (faceLayer->dotP(1) < minDiff) && (faceLayer->dotP(2) < minDiff)) {
+  if ((faceLayer->dotP(0) < minDiff) && (faceLayer->dotP(1) < minDiff) &&
+      (faceLayer->dotP(2) < minDiff))
+  {
     faceLayer->ReplaceDotP(0, 0);
     faceLayer->ReplaceDotP(1, 0);
     faceLayer->ReplaceDotP(2, 0);
@@ -584,8 +580,8 @@ void FEdgeXDetector::ProcessSuggestiveContourFace(WXFace *iFace)
   WXFaceLayer *faceLayer = new WXFaceLayer(iFace, Nature::SUGGESTIVE_CONTOUR, true);
   iFace->AddSmoothLayer(faceLayer);
 
-  unsigned int numVertices = iFace->numberOfVertices();
-  for (unsigned int i = 0; i < numVertices; ++i) {
+  uint numVertices = iFace->numberOfVertices();
+  for (uint i = 0; i < numVertices; ++i) {
     WVertex *wv = iFace->GetVertex(i);
     WXVertex *wxv = dynamic_cast<WXVertex *>(wv);
     faceLayer->PushDotP(wxv->curvatures()->Kr);
@@ -595,7 +591,8 @@ void FEdgeXDetector::ProcessSuggestiveContourFace(WXFace *iFace)
   real threshold = _meanKr;
   if (faceLayer->nPosDotP() != numVertices) {
     if ((fabs(faceLayer->dotP(0)) < threshold) && (fabs(faceLayer->dotP(1)) < threshold) &&
-        (fabs(faceLayer->dotP(2)) < threshold)) {
+        (fabs(faceLayer->dotP(2)) < threshold))
+    {
       faceLayer->ReplaceDotP(0, 0);
       faceLayer->ReplaceDotP(1, 0);
       faceLayer->ReplaceDotP(2, 0);
@@ -632,7 +629,7 @@ void FEdgeXDetector::postProcessSuggestiveContourFace(WXFace *iFace)
   // Compute the derivative value at each vertex of the face, and add it in a vector.
   vector<real> kr_derivatives;
 
-  unsigned vertices_nb = iFace->numberOfVertices();
+  uint vertices_nb = iFace->numberOfVertices();
   WXVertex *v, *opposite_vertex_a, *opposite_vertex_b;
   WXFace *wxf;
   WOEdge *opposite_edge;
@@ -640,8 +637,8 @@ void FEdgeXDetector::postProcessSuggestiveContourFace(WXFace *iFace)
   GeomUtils::intersection_test res;
   real kr(0), kr1(0), kr2(0), t;
 
-  for (unsigned int i = 0; i < vertices_nb; ++i) {
-    v = (WXVertex *)(iFace->GetVertex(i));
+  for (uint i = 0; i < vertices_nb; ++i) {
+    v = (WXVertex *)iFace->GetVertex(i);
 
     // v is a singular vertex, skip it.
     if (v->isBoundary()) {
@@ -654,7 +651,8 @@ void FEdgeXDetector::postProcessSuggestiveContourFace(WXFace *iFace)
 
     // For each vertex, iterate on its adjacent faces.
     for (WVertex::face_iterator fit = v->faces_begin(), fitend = v->faces_end(); fit != fitend;
-         ++fit) {
+         ++fit)
+    {
       wxf = dynamic_cast<WXFace *>(*fit);
       if (!wxf->getOppositeEdge(v, opposite_edge)) {
         continue;
@@ -707,7 +705,8 @@ void FEdgeXDetector::postProcessSuggestiveContourFace(WXFace *iFace)
   t = sc_edge->ta();
   if (t * kr_derivatives[iFace->GetIndex(sc_oedge->GetaVertex())] +
           (1 - t) * kr_derivatives[iFace->GetIndex(sc_oedge->GetbVertex())] <
-      _kr_derivative_epsilon) {
+      _kr_derivative_epsilon)
+  {
     sc_layer->removeSmoothEdge();
     return;
   }
@@ -715,7 +714,8 @@ void FEdgeXDetector::postProcessSuggestiveContourFace(WXFace *iFace)
   t = sc_edge->tb();
   if (t * kr_derivatives[iFace->GetIndex(sc_oedge->GetaVertex())] +
           (1 - t) * kr_derivatives[iFace->GetIndex(sc_oedge->GetbVertex())] <
-      _kr_derivative_epsilon) {
+      _kr_derivative_epsilon)
+  {
     sc_layer->removeSmoothEdge();
   }
 }
@@ -777,7 +777,8 @@ void FEdgeXDetector::buildSmoothEdges(WXShape *iShape)
     vector<WXFaceLayer *> &faceLayers = ((WXFace *)(*f))->getSmoothLayers();
     for (vector<WXFaceLayer *>::iterator wxfl = faceLayers.begin(), wxflend = faceLayers.end();
          wxfl != wxflend;
-         ++wxfl) {
+         ++wxfl)
+    {
       if ((*wxfl)->BuildSmoothEdge()) {
         hasSmoothEdges = true;
       }
@@ -787,7 +788,8 @@ void FEdgeXDetector::buildSmoothEdges(WXShape *iShape)
   if (hasSmoothEdges && !_computeRidgesAndValleys && !_computeSuggestiveContours) {
     vector<WVertex *> &wvertices = iShape->getVertexList();
     for (vector<WVertex *>::iterator wv = wvertices.begin(), wvend = wvertices.end(); wv != wvend;
-         ++wv) {
+         ++wv)
+    {
       // Compute curvatures
       WXVertex *wxv = dynamic_cast<WXVertex *>(*wv);
       computeCurvatures(wxv);

@@ -1,5 +1,14 @@
+/* SPDX-FileCopyrightText: 2020-2023 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#pragma BLENDER_REQUIRE(workbench_data_lib.glsl)
+#pragma once
+
+#include "infos/workbench_prepass_info.hh"
+
+#ifdef GPU_LIBRARY_SHADER
+SHADER_LIBRARY_CREATE_INFO(workbench_prepass)
+#endif
 
 vec2 matcap_uv_compute(vec3 I, vec3 N, bool flipped)
 {
@@ -15,16 +24,25 @@ vec2 matcap_uv_compute(vec3 I, vec3 N, bool flipped)
   return matcap_uv * 0.496 + 0.5;
 }
 
-uniform sampler2D matcapDiffuseImage;
-uniform sampler2D matcapSpecularImage;
-
-vec3 get_matcap_lighting(vec3 base_color, vec3 N, vec3 I)
+vec3 get_matcap_lighting(
+    sampler2D diffuse_matcap, sampler2D specular_matcap, vec3 base_color, vec3 N, vec3 I)
 {
   bool flipped = world_data.matcap_orientation != 0;
   vec2 uv = matcap_uv_compute(I, N, flipped);
 
-  vec3 diffuse = textureLod(matcapDiffuseImage, uv, 0.0).rgb;
-  vec3 specular = textureLod(matcapSpecularImage, uv, 0.0).rgb;
+  vec3 diffuse = textureLod(diffuse_matcap, uv, 0.0).rgb;
+  vec3 specular = textureLod(specular_matcap, uv, 0.0).rgb;
+
+  return diffuse * base_color + specular * float(world_data.use_specular);
+}
+
+vec3 get_matcap_lighting(sampler2DArray matcap, vec3 base_color, vec3 N, vec3 I)
+{
+  bool flipped = world_data.matcap_orientation != 0;
+  vec2 uv = matcap_uv_compute(I, N, flipped);
+
+  vec3 diffuse = textureLod(matcap, vec3(uv, 0.0), 0.0).rgb;
+  vec3 specular = textureLod(matcap, vec3(uv, 1.0), 0.0).rgb;
 
   return diffuse * base_color + specular * float(world_data.use_specular);
 }

@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2011-2023 Blender Authors
+#
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 # see "cmake --help-policy CMP0003"
 # So library linking is more sane
@@ -9,7 +12,7 @@ cmake_policy(SET CMP0005 NEW)
 # So syntax problems are errors
 cmake_policy(SET CMP0010 NEW)
 
-# Input directories must have CMakeLists.txt
+# Input directories must have `CMakeLists.txt`.
 cmake_policy(SET CMP0014 NEW)
 
 cmake_minimum_required(VERSION 3.5)
@@ -23,7 +26,7 @@ set(WITH_GUARDEDALLOC ON)
 add_executable(datatoc
   "${CMAKE_SOURCE_DIR}/../../../source/blender/datatoc/datatoc.c")
 
-# Fake the current source dir for includes.
+# Fake the current source directory for includes.
 set(_CMAKE_CURRENT_SOURCE_DIR_INIT "${CMAKE_CURRENT_SOURCE_DIR}")
 
 # -----------------------------------------------------------------------------
@@ -68,7 +71,7 @@ endmacro()
 
 # set the endian define
 if(MSVC)
-  # for some reason this fails on msvc
+  # For some reason this fails on MSVC.
   add_definitions(-D__LITTLE_ENDIAN__)
 else()
   include(TestBigEndian)
@@ -88,8 +91,6 @@ if(UNIX AND NOT APPLE)
   set(WITH_GHOST_X11 ON)
 endif()
 
-# for now... default to this
-add_definitions(-DWITH_GL_PROFILE_COMPAT)
 # BLF needs this to ignore GPU library
 add_definitions(-DBLF_STANDALONE)
 
@@ -107,7 +108,7 @@ suffix_relpaths(SRC_NEW "${SRC}" "../../string/")
 include_directories(${INC_NEW})
 add_library(string_lib ${SRC_NEW})
 
-# numaapi (for 'bli_lib')
+# `numaapi` (for 'bli_lib').
 include(${CMAKE_SOURCE_DIR}/../../numaapi/CMakeLists.txt)
 suffix_relpaths(INC_NEW "${INC}" "../../numaapi/")
 suffix_relpaths(SRC_NEW "${SRC}" "../../numaapi/")
@@ -121,7 +122,7 @@ suffix_relpaths(SRC_NEW "${SRC}" "../../guardedalloc/")
 include_directories(${INC_NEW})
 add_library(guardedalloc_lib ${SRC_NEW})
 
-# gpu (used by blenfont)
+# `gpu` (used by `blenfont`).
 add_definitions(-DGPU_STANDALONE)
 set(CMAKE_CURRENT_SOURCE_DIR "${CMAKE_SOURCE_DIR}/../../../source/blender/gpu")
 include(${CMAKE_SOURCE_DIR}/../../../source/blender/gpu/CMakeLists.txt)
@@ -131,7 +132,7 @@ include_directories(${INC_NEW})
 add_library(gpu_lib ${SRC_NEW})
 set(CMAKE_CURRENT_SOURCE_DIR "${_CMAKE_CURRENT_SOURCE_DIR_INIT}")
 
-# imbuf (used by )
+# `imbuf` (used by ???).
 # set(CMAKE_CURRENT_SOURCE_DIR "${CMAKE_SOURCE_DIR}/../../../source/blender/imbuf")
 # include(${CMAKE_SOURCE_DIR}/../../../source/blender/imbuf/CMakeLists.txt)
 # suffix_relpaths(INC_NEW "${INC}" "../../../source/blender/imbuf/")
@@ -140,33 +141,26 @@ set(CMAKE_CURRENT_SOURCE_DIR "${_CMAKE_CURRENT_SOURCE_DIR_INIT}")
 # add_library(imbuf_lib ${SRC_NEW})
 # set(CMAKE_CURRENT_SOURCE_DIR "${_CMAKE_CURRENT_SOURCE_DIR_INIT}")
 
-# blenfont
+# `blenfont`.
 include(${CMAKE_SOURCE_DIR}/../../../source/blender/blenfont/CMakeLists.txt)
 suffix_relpaths(INC_NEW "${INC}" "../../../source/blender/blenfont/")
 suffix_relpaths(SRC_NEW "${SRC}" "../../../source/blender/blenfont/")
 include_directories(${INC_NEW})
 add_library(blenfont_lib ${SRC_NEW})
 
-# wcwidth
+# `wcwidth`.
 include(${CMAKE_SOURCE_DIR}/../../../extern/wcwidth/CMakeLists.txt)
 suffix_relpaths(INC_NEW "${INC}" "../../../extern/wcwidth/")
 suffix_relpaths(SRC_NEW "${SRC}" "../../../extern/wcwidth/")
 include_directories(${INC_NEW})
 add_library(wcwidth_lib ${SRC_NEW})
 
-# glew-mx
-include(${CMAKE_SOURCE_DIR}/../../../intern/glew-mx/CMakeLists.txt)
-suffix_relpaths(INC_NEW "${INC}" "../../../intern/glew-mx/")
-suffix_relpaths(SRC_NEW "${SRC}" "../../../intern/glew-mx/")
-include_directories(${INC_NEW})
-add_library(glewmx_lib ${SRC_NEW})
-
-# grr, blenfont needs BLI
+# Unfortunately `blenfont` needs `blenlib`.
 include_directories(
   "../../../source/blender/blenlib"
 )
 
-# Needed for math_matrix.c to avoid eigen_capi.h dep.
+# Needed for math_matrix_c.cc to avoid eigen_capi.h dependency.
 add_definitions(-DMATH_STANDALONE)
 
 add_library(bli_lib
@@ -175,24 +169,24 @@ add_library(bli_lib
   "../../../source/blender/blenlib/intern/rct.c"
   "../../../source/blender/blenlib/intern/string.c"
   "../../../source/blender/blenlib/intern/string_utf8.c"
-  "../../../source/blender/blenlib/intern/listbase.c"
-  "../../../source/blender/blenlib/intern/math_color.c"
+  "../../../source/blender/blenlib/intern/listbase.cc"
+  "../../../source/blender/blenlib/intern/math_color.cc"
   "../../../source/blender/blenlib/intern/math_geom.c"
-  "../../../source/blender/blenlib/intern/math_matrix.c"
+  "../../../source/blender/blenlib/intern/math_matrix_c.cc"
   "../../../source/blender/blenlib/intern/math_rotation.c"
   "../../../source/blender/blenlib/intern/math_vector.c"
   "../../../source/blender/blenlib/intern/storage.c"
   "../../../source/blender/blenlib/intern/task.c"
   "../../../source/blender/blenlib/intern/threads.c"
   "../../../source/blender/blenlib/intern/time.c"
-  "../../../source/blender/blenlib/intern/path_util.c"
+  "../../../source/blender/blenlib/intern/path_utils.cc"
   "../../../source/blender/blenlib/intern/BLI_dynstr.c"
   "../../../source/blender/blenlib/intern/BLI_ghash.c"
-  "../../../source/blender/blenlib/intern/BLI_ghash_utils.c"
+  "../../../source/blender/blenlib/intern/BLI_ghash_utils.cc"
   "../../../source/blender/blenlib/intern/BLI_linklist.c"
   "../../../source/blender/blenlib/intern/BLI_memarena.c"
   "../../../source/blender/blenlib/intern/BLI_mempool.c"
-  "../../../source/blender/blenlib/intern/hash_mm2a.c"
+  "../../../source/blender/blenlib/intern/hash_mm2a.cc"
   "../../../source/blender/blenlib/intern/string_utils.c"
   "../../../source/blender/blenlib/intern/system.c"
 )
@@ -216,21 +210,12 @@ endif()
 
 if(UNIX AND NOT APPLE)
   find_package(X11 REQUIRED)
-  find_package(GLEW)
-
-  if(NOT GLEW_FOUND)
-    message(FATAL_ERROR "GLEW is required to build blender, install it or disable WITH_SYSTEM_GLEW")
-  endif()
 
   set(PLATFORM_LINKLIBS
     ${X11_X11_LIB}
     ${X11_Xinput_LIB}
-    ${GLEW_LIBRARY}
     -lpthread
   )
-else()
-  # set(GLEW_LIBRARY "")  # unused
-  set(GLEW_INCLUDE_PATH "${CMAKE_SOURCE_DIR}/extern/glew/include")
 endif()
 
 string(APPEND CMAKE_C_FLAGS " ${PLATFORM_CFLAGS}")
@@ -241,30 +226,30 @@ string(APPEND CMAKE_CXX_FLAGS " ${PLATFORM_CFLAGS}")
 
 # Gears (C)
 add_executable(gears_c
-    ${CMAKE_SOURCE_DIR}/gears/GHOST_C-Test.c)
+  ${CMAKE_SOURCE_DIR}/gears/GHOST_C-Test.c
+)
 
 target_link_libraries(gears_c
-    ghost_lib
-    glewmx_lib
-    string_lib
-    ${OPENGL_gl_LIBRARY}
-    ${CMAKE_DL_LIBS}
-    ${PLATFORM_LINKLIBS}
-    )
+  ghost_lib
+  string_lib
+  ${OPENGL_gl_LIBRARY}
+  ${CMAKE_DL_LIBS}
+  ${PLATFORM_LINKLIBS}
+)
 
 
 # Gears (C++)
 add_executable(gears_cpp
-    ${CMAKE_SOURCE_DIR}/gears/GHOST_Test.cpp)
+  ${CMAKE_SOURCE_DIR}/gears/GHOST_Test.cpp
+)
 
 target_link_libraries(gears_cpp
-    ghost_lib
-    glewmx_lib
-    string_lib
-    ${OPENGL_gl_LIBRARY}
-    ${CMAKE_DL_LIBS}
-    ${PLATFORM_LINKLIBS}
-    )
+  ghost_lib
+  string_lib
+  ${OPENGL_gl_LIBRARY}
+  ${CMAKE_DL_LIBS}
+  ${PLATFORM_LINKLIBS}
+)
 
 
 # MultiTest (C)
@@ -286,13 +271,12 @@ target_link_libraries(multitest_c
   # imbuf_lib
   ghost_lib
   bli_lib  # again...
-  glewmx_lib
   string_lib
   numaapi_lib
   guardedalloc_lib
   wcwidth_lib
   ${OPENGL_gl_LIBRARY}
-  ${FREETYPE_LIBRARY}
+  ${FREETYPE_LIBRARIES} ${BROTLI_LIBRARIES}
   ${ZLIB_LIBRARIES}
   ${CMAKE_DL_LIBS}
   ${PLATFORM_LINKLIBS}

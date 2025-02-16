@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup collada
@@ -24,15 +12,14 @@
 #include "COLLADAFWNode.h"
 #include "COLLADAFWUniqueId.h"
 
-#include "BKE_context.h"
-#include "BKE_key.h"
+#include "BKE_context.hh"
+#include "BKE_key.hh"
 
 #include "DNA_armature_types.h"
-#include "DNA_key_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 
-#include "ED_armature.h"
+#include "ED_armature.hh"
 
 #include "AnimationImporter.h"
 #include "ExtraTags.h"
@@ -111,10 +98,16 @@ class ArmatureImporter : private TransformReader {
                                   std::vector<std::string> &layer_labels,
                                   BoneExtensionMap &extended_bones);
 
+  /**
+   * Collada only knows Joints, hence bones at the end of a bone chain
+   * don't have a defined length. This function guesses reasonable
+   * tail locations for the affected bones (nodes which don't have any connected child)
+   * Hint: The extended_bones set gets populated in ArmatureImporter::create_bone
+   */
   void fix_leaf_bone_hierarchy(bArmature *armature, Bone *bone, bool fix_orientation);
   void fix_leaf_bone(bArmature *armature, EditBone *ebone, BoneExtended *be, bool fix_orientation);
   void fix_parent_connect(bArmature *armature, Bone *bone);
-  void connect_bone_chains(bArmature *armature, Bone *bone, const int max_chain_length);
+  void connect_bone_chains(bArmature *armature, Bone *bone, int max_chain_length);
 
   void set_pose(Object *ob_arm,
                 COLLADAFW::Node *root_node,
@@ -140,7 +133,7 @@ class ArmatureImporter : private TransformReader {
   void create_armature_bones(Main *bmain, std::vector<Object *> &arm_objs);
 
   /** TagsMap typedef for uid_tags_map. */
-  typedef std::map<std::string, ExtraTags *> TagsMap;
+  using TagsMap = std::map<std::string, ExtraTags *>;
   TagsMap uid_tags_map;
 
  public:
@@ -152,15 +145,20 @@ class ArmatureImporter : private TransformReader {
                    const ImportSettings *import_settings);
   ~ArmatureImporter();
 
+  /**
+   * root - if this joint is the top joint in hierarchy, if a joint
+   * is a child of a node (not joint), root should be true since
+   * this is where we build armature bones from
+   */
   void add_root_joint(COLLADAFW::Node *node, Object *parent);
 
-  /* here we add bones to armatures, having armatures previously created in write_controller */
+  /** Here we add bones to armatures, having armatures previously created in write_controller. */
   void make_armatures(bContext *C, std::vector<Object *> &objects_to_scale);
 
   void make_shape_keys(bContext *C);
 
 #if 0
-  /* link with meshes, create vertex groups, assign weights */
+  /** Link with meshes, create vertex groups, assign weights. */
   void link_armature(Object *ob_arm,
                      const COLLADAFW::UniqueId &geom_id,
                      const COLLADAFW::UniqueId &controller_data_id);
@@ -174,9 +172,9 @@ class ArmatureImporter : private TransformReader {
 
   Object *get_armature_for_joint(COLLADAFW::Node *node);
 
-  void get_rna_path_for_joint(COLLADAFW::Node *node, char *joint_path, size_t count);
+  void get_rna_path_for_joint(COLLADAFW::Node *node, char *joint_path, size_t joint_path_maxncpy);
 
-  /* gives a world-space mat */
+  /** Gives a world-space mat. */
   bool get_joint_bind_mat(float m[4][4], COLLADAFW::Node *joint);
 
   void set_tags_map(TagsMap &tags_map);

@@ -1,177 +1,84 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#include "BKE_spline.hh"
-#include "BKE_volume.h"
+#include "GEO_mesh_primitive_cuboid.hh"
+#include "GEO_transform.hh"
 
 #include "node_geometry_util.hh"
 
-static bNodeSocketTemplate geo_node_bounding_box_in[] = {
-    {SOCK_GEOMETRY, N_("Geometry")},
-    {-1, ""},
-};
+namespace blender::nodes::node_geo_bounding_box_cc {
 
-static bNodeSocketTemplate geo_node_bounding_box_out[] = {
-    {SOCK_GEOMETRY, N_("Bounding Box")},
-    {SOCK_VECTOR, N_("Min")},
-    {SOCK_VECTOR, N_("Max")},
-    {-1, ""},
-};
-
-namespace blender::nodes {
-
-using bke::GeometryInstanceGroup;
-
-static void compute_min_max_from_position_and_transform(const GeometryComponent &component,
-                                                        Span<float4x4> transforms,
-                                                        float3 &r_min,
-                                                        float3 &r_max)
+static void node_declare(NodeDeclarationBuilder &b)
 {
-  GVArray_Typed<float3> positions = component.attribute_get_for_read<float3>(
-      "position", ATTR_DOMAIN_POINT, {0, 0, 0});
-
-  for (const float4x4 &transform : transforms) {
-    for (const int i : positions.index_range()) {
-      const float3 position = positions[i];
-      const float3 transformed_position = transform * position;
-      minmax_v3v3_v3(r_min, r_max, transformed_position);
-    }
-  }
+  b.add_input<decl::Geometry>("Geometry");
+  b.add_output<decl::Geometry>("Bounding Box");
+  b.add_output<decl::Vector>("Min");
+  b.add_output<decl::Vector>("Max");
 }
 
-static void compute_min_max_from_volume_and_transforms(const VolumeComponent &volume_component,
-                                                       Span<float4x4> transforms,
-                                                       float3 &r_min,
-                                                       float3 &r_max)
-{
-#ifdef WITH_OPENVDB
-  const Volume *volume = volume_component.get_for_read();
-  if (volume == nullptr) {
-    return;
-  }
-  for (const int i : IndexRange(BKE_volume_num_grids(volume))) {
-    const VolumeGrid *volume_grid = BKE_volume_grid_get_for_read(volume, i);
-    openvdb::GridBase::ConstPtr grid = BKE_volume_grid_openvdb_for_read(volume, volume_grid);
-
-    for (const float4x4 &transform : transforms) {
-      openvdb::GridBase::ConstPtr instance_grid = BKE_volume_grid_shallow_transform(grid,
-                                                                                    transform);
-      float3 grid_min = float3(FLT_MAX);
-      float3 grid_max = float3(-FLT_MAX);
-      if (BKE_volume_grid_bounds(instance_grid, grid_min, grid_max)) {
-        DO_MIN(grid_min, r_min);
-        DO_MAX(grid_max, r_max);
-      }
-    }
-  }
-#else
-  UNUSED_VARS(volume_component, transforms, r_min, r_max);
-#endif
-}
-
-static void compute_min_max_from_curve_and_transforms(const CurveComponent &curve_component,
-                                                      Span<float4x4> transforms,
-                                                      float3 &r_min,
-                                                      float3 &r_max)
-{
-  const CurveEval *curve = curve_component.get_for_read();
-  if (curve == nullptr) {
-    return;
-  }
-  for (const SplinePtr &spline : curve->splines()) {
-    Span<float3> positions = spline->evaluated_positions();
-
-    for (const float4x4 &transform : transforms) {
-      for (const int i : positions.index_range()) {
-        const float3 position = positions[i];
-        const float3 transformed_position = transform * position;
-        minmax_v3v3_v3(r_min, r_max, transformed_position);
-      }
-    }
-  }
-}
-
-static void compute_geometry_set_instances_boundbox(const GeometrySet &geometry_set,
-                                                    float3 &r_min,
-                                                    float3 &r_max)
-{
-  Vector<GeometryInstanceGroup> set_groups;
-  bke::geometry_set_gather_instances(geometry_set, set_groups);
-
-  for (const GeometryInstanceGroup &set_group : set_groups) {
-    const GeometrySet &set = set_group.geometry_set;
-    Span<float4x4> transforms = set_group.transforms;
-
-    if (set.has<PointCloudComponent>()) {
-      compute_min_max_from_position_and_transform(
-          *set.get_component_for_read<PointCloudComponent>(), transforms, r_min, r_max);
-    }
-    if (set.has<MeshComponent>()) {
-      compute_min_max_from_position_and_transform(
-          *set.get_component_for_read<MeshComponent>(), transforms, r_min, r_max);
-    }
-    if (set.has<VolumeComponent>()) {
-      compute_min_max_from_volume_and_transforms(
-          *set.get_component_for_read<VolumeComponent>(), transforms, r_min, r_max);
-    }
-    if (set.has<CurveComponent>()) {
-      compute_min_max_from_curve_and_transforms(
-          *set.get_component_for_read<CurveComponent>(), transforms, r_min, r_max);
-    }
-  }
-}
-
-static void geo_node_bounding_box_exec(GeoNodeExecParams params)
+static void node_geo_exec(GeoNodeExecParams params)
 {
   GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
 
-  float3 min = float3(FLT_MAX);
-  float3 max = float3(-FLT_MAX);
-
-  if (geometry_set.has_instances()) {
-    compute_geometry_set_instances_boundbox(geometry_set, min, max);
-  }
-  else {
-    geometry_set.compute_boundbox_without_instances(&min, &max);
-  }
-
-  if (min == float3(FLT_MAX)) {
-    params.set_output("Bounding Box", GeometrySet());
+  /* Compute the min and max of all realized geometry for the two
+   * vector outputs, which are only meant to consider real geometry. */
+  const std::optional<Bounds<float3>> bounds = geometry_set.compute_boundbox_without_instances();
+  if (!bounds) {
     params.set_output("Min", float3(0));
     params.set_output("Max", float3(0));
   }
   else {
-    const float3 scale = max - min;
-    const float3 center = min + scale / 2.0f;
-    Mesh *mesh = create_cube_mesh(1.0f);
-    transform_mesh(mesh, center, float3(0), scale);
-    params.set_output("Bounding Box", GeometrySet::create_with_mesh(mesh));
-    params.set_output("Min", min);
-    params.set_output("Max", max);
+    params.set_output("Min", bounds->min);
+    params.set_output("Max", bounds->max);
+  }
+
+  /* Generate the bounding box meshes inside each unique geometry set (including individually for
+   * every instance). Because geometry components are reference counted anyway, we can just
+   * repurpose the original geometry sets for the output. */
+  if (params.output_is_required("Bounding Box")) {
+    geometry_set.modify_geometry_sets([&](GeometrySet &sub_geometry) {
+      std::optional<Bounds<float3>> sub_bounds;
+
+      /* Reuse the min and max calculation if this is the main "real" geometry set. */
+      if (&sub_geometry == &geometry_set) {
+        sub_bounds = bounds;
+      }
+      else {
+        sub_bounds = sub_geometry.compute_boundbox_without_instances();
+      }
+
+      if (!sub_bounds) {
+        sub_geometry.remove_geometry_during_modify();
+      }
+      else {
+        const float3 scale = sub_bounds->max - sub_bounds->min;
+        const float3 center = sub_bounds->min + scale / 2.0f;
+        Mesh *mesh = geometry::create_cuboid_mesh(scale, 2, 2, 2, "uv_map");
+        geometry::transform_mesh(*mesh, center, math::Quaternion::identity(), float3(1));
+        sub_geometry.replace_mesh(mesh);
+        sub_geometry.keep_only_during_modify({GeometryComponent::Type::Mesh});
+      }
+    });
+
+    params.set_output("Bounding Box", std::move(geometry_set));
   }
 }
 
-}  // namespace blender::nodes
-
-void register_node_type_geo_bounding_box()
+static void node_register()
 {
-  static bNodeType ntype;
-
-  geo_node_type_base(&ntype, GEO_NODE_BOUNDING_BOX, "Bounding Box", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(&ntype, geo_node_bounding_box_in, geo_node_bounding_box_out);
-  ntype.geometry_node_execute = blender::nodes::geo_node_bounding_box_exec;
-  nodeRegisterType(&ntype);
+  static blender::bke::bNodeType ntype;
+  geo_node_type_base(&ntype, "GeometryNodeBoundBox", GEO_NODE_BOUNDING_BOX);
+  ntype.ui_name = "Bounding Box";
+  ntype.ui_description =
+      "Calculate the limits of a geometry's positions and generate a box mesh with those "
+      "dimensions";
+  ntype.enum_name_legacy = "BOUNDING_BOX";
+  ntype.nclass = NODE_CLASS_GEOMETRY;
+  ntype.declare = node_declare;
+  ntype.geometry_node_execute = node_geo_exec;
+  blender::bke::node_register_type(&ntype);
 }
+NOD_REGISTER_NODE(node_register)
+
+}  // namespace blender::nodes::node_geo_bounding_box_cc

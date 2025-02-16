@@ -1,31 +1,11 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2006 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# The Original Code is Copyright (C) 2006, Blender Foundation
-# All rights reserved.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(INC
   .
   ..
   ../..
-  ../../../blenkernel
-  ../../../blenlib
-  ../../../makesdna
-  ../../../../../intern/guardedalloc
 )
 
 set(INC_SYS
@@ -38,14 +18,18 @@ set(SRC
   logImageCore.h
   logmemfile.h
 
-  cineon_dpx.c
-  cineonlib.c
-  dpxlib.c
-  logImageCore.c
-  logmemfile.c
+  cineon_dpx.cc
+  cineonlib.cc
+  dpxlib.cc
+  logImageCore.cc
+  logmemfile.cc
 )
 
 set(LIB
+  PRIVATE bf::blenkernel
+  PRIVATE bf::blenlib
+  PRIVATE bf::dna
+  PRIVATE bf::intern::guardedalloc
 )
 
 if(WITH_IMAGE_CINEON)

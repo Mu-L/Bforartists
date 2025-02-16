@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 Blender Authors
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
 # - Find OptiX library
 # Find the native OptiX includes and library
 # This module defines
@@ -7,24 +11,30 @@
 #                     This can also be an environment variable.
 #  OPTIX_FOUND, If false, do not try to use OptiX.
 
-#=============================================================================
-# Copyright 2019 Blender Foundation.
-#
-# Distributed under the OSI-approved BSD 3-Clause License,
-# see accompanying file BSD-3-Clause-license.txt for details.
-#=============================================================================
+if(NOT (DEFINED OPTIX_ROOT_DIR))
+  set(OPTIX_ROOT_DIR "")
+endif()
 
-# If OPTIX_ROOT_DIR was defined in the environment, use it.
-IF(NOT OPTIX_ROOT_DIR AND NOT $ENV{OPTIX_ROOT_DIR} STREQUAL "")
-  SET(OPTIX_ROOT_DIR $ENV{OPTIX_ROOT_DIR})
-ENDIF()
+# If `OPTIX_ROOT_DIR` was defined in the environment, use it.
+if(OPTIX_ROOT_DIR)
+  # Pass.
+elseif(DEFINED ENV{OPTIX_ROOT_DIR})
+  set(OPTIX_ROOT_DIR $ENV{OPTIX_ROOT_DIR})
+endif()
 
-SET(_optix_SEARCH_DIRS
+set(_optix_SEARCH_DIRS
   ${OPTIX_ROOT_DIR}
-  "$ENV{PROGRAMDATA}/NVIDIA Corporation/OptiX SDK 7.0.0"
 )
 
-FIND_PATH(OPTIX_INCLUDE_DIR
+# TODO: Which environment uses this?
+if(DEFINED ENV{PROGRAMDATA})
+  list(APPEND _optix_SEARCH_DIRS
+    "$ENV{PROGRAMDATA}/NVIDIA Corporation/OptiX SDK 7.4.0"
+    "$ENV{PROGRAMDATA}/NVIDIA Corporation/OptiX SDK 7.3.0"
+  )
+endif()
+
+find_path(OPTIX_INCLUDE_DIR
   NAMES
     optix.h
   HINTS
@@ -33,18 +43,31 @@ FIND_PATH(OPTIX_INCLUDE_DIR
     include
 )
 
+if(EXISTS "${OPTIX_INCLUDE_DIR}/optix.h")
+  file(STRINGS "${OPTIX_INCLUDE_DIR}/optix.h" _optix_version REGEX "^#define OPTIX_VERSION[ \t].*$")
+  string(REGEX MATCHALL "[0-9]+" _optix_version ${_optix_version})
+
+  math(EXPR _optix_version_major "${_optix_version} / 10000")
+  math(EXPR _optix_version_minor "(${_optix_version} % 10000) / 100")
+  math(EXPR _optix_version_patch "${_optix_version} % 100")
+
+  set(OPTIX_VERSION "${_optix_version_major}.${_optix_version_minor}.${_optix_version_patch}")
+endif()
+
 # handle the QUIETLY and REQUIRED arguments and set OPTIX_FOUND to TRUE if
 # all listed variables are TRUE
-INCLUDE(FindPackageHandleStandardArgs)
-FIND_PACKAGE_HANDLE_STANDARD_ARGS(OptiX DEFAULT_MSG
-    OPTIX_INCLUDE_DIR)
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(OptiX
+    REQUIRED_VARS OPTIX_INCLUDE_DIR
+    VERSION_VAR OPTIX_VERSION)
 
-IF(OPTIX_FOUND)
-  SET(OPTIX_INCLUDE_DIRS ${OPTIX_INCLUDE_DIR})
-ENDIF()
+if(OPTIX_FOUND)
+  set(OPTIX_INCLUDE_DIRS ${OPTIX_INCLUDE_DIR})
+endif()
 
-MARK_AS_ADVANCED(
+mark_as_advanced(
   OPTIX_INCLUDE_DIR
+  OPTIX_VERSION
 )
 
-UNSET(_optix_SEARCH_DIRS)
+unset(_optix_SEARCH_DIRS)

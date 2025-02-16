@@ -1,40 +1,34 @@
+/* SPDX-FileCopyrightText: 2016-2023 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#pragma BLENDER_REQUIRE(common_view_lib.glsl)
-#pragma BLENDER_REQUIRE(workbench_shader_interface_lib.glsl)
-#pragma BLENDER_REQUIRE(workbench_common_lib.glsl)
-#pragma BLENDER_REQUIRE(workbench_material_lib.glsl)
-#pragma BLENDER_REQUIRE(workbench_image_lib.glsl)
+#include "infos/workbench_prepass_info.hh"
 
-in vec3 pos;
-in vec3 nor;
-in vec4 ac; /* active color */
-in vec2 au; /* active texture layer */
+VERTEX_SHADER_CREATE_INFO(workbench_prepass)
+VERTEX_SHADER_CREATE_INFO(workbench_lighting_flat)
+VERTEX_SHADER_CREATE_INFO(workbench_transparent_accum)
+VERTEX_SHADER_CREATE_INFO(workbench_mesh)
+
+#include "draw_model_lib.glsl"
+#include "draw_view_clipping_lib.glsl"
+#include "draw_view_lib.glsl"
+#include "workbench_common_lib.glsl"
+#include "workbench_image_lib.glsl"
+#include "workbench_material_lib.glsl"
 
 void main()
 {
-  vec3 world_pos = point_object_to_world(pos);
-  gl_Position = point_world_to_ndc(world_pos);
+  vec3 world_pos = drw_point_object_to_world(pos);
+  gl_Position = drw_point_world_to_homogenous(world_pos);
 
-#ifdef USE_WORLD_CLIP_PLANES
-  world_clip_planes_calc_clip_distance(world_pos);
-#endif
+  view_clipping_distances(world_pos);
 
   uv_interp = au;
 
-  normal_interp = normalize(normal_object_to_view(nor));
+  normal_interp = normalize(drw_normal_object_to_view(nor));
 
-#ifdef OPAQUE_MATERIAL
-  float metallic, roughness;
-#endif
-  workbench_material_data_get(resource_handle, color_interp, alpha_interp, roughness, metallic);
+  object_id = int(uint(resource_id) & 0xFFFFu) + 1;
 
-  if (materialIndex == 0) {
-    color_interp = ac.rgb;
-  }
-
-#ifdef OPAQUE_MATERIAL
-  packed_rough_metal = workbench_float_pair_encode(roughness, metallic);
-#endif
-
-  object_id = int(uint(resource_handle) & 0xFFFFu) + 1;
+  workbench_material_data_get(
+      int(drw_CustomID), ac.rgb, color_interp, alpha_interp, _roughness, metallic);
 }

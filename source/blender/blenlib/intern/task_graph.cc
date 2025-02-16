@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup bli
@@ -38,9 +26,7 @@ struct TaskGraph {
 #endif
   std::vector<std::unique_ptr<TaskNode>> nodes;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("task_graph:TaskGraph")
-#endif
 };
 
 /* TaskNode - a node in the task graph. */
@@ -89,7 +75,7 @@ struct TaskNode {
   }
 
 #ifdef WITH_TBB
-  tbb::flow::continue_msg run(const tbb::flow::continue_msg UNUSED(input))
+  tbb::flow::continue_msg run(const tbb::flow::continue_msg /*input*/)
   {
     run_func(task_data);
     return tbb::flow::continue_msg();
@@ -104,12 +90,10 @@ struct TaskNode {
     }
   }
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("task_graph:TaskNode")
-#endif
 };
 
-TaskGraph *BLI_task_graph_create(void)
+TaskGraph *BLI_task_graph_create()
 {
   return new TaskGraph();
 }
@@ -128,17 +112,17 @@ void BLI_task_graph_work_and_wait(TaskGraph *task_graph)
 #endif
 }
 
-struct TaskNode *BLI_task_graph_node_create(struct TaskGraph *task_graph,
-                                            TaskGraphNodeRunFunction run,
-                                            void *user_data,
-                                            TaskGraphNodeFreeFunction free_func)
+TaskNode *BLI_task_graph_node_create(TaskGraph *task_graph,
+                                     TaskGraphNodeRunFunction run,
+                                     void *user_data,
+                                     TaskGraphNodeFreeFunction free_func)
 {
   TaskNode *task_node = new TaskNode(task_graph, run, user_data, free_func);
   task_graph->nodes.push_back(std::unique_ptr<TaskNode>(task_node));
   return task_node;
 }
 
-bool BLI_task_graph_node_push_work(struct TaskNode *task_node)
+bool BLI_task_graph_node_push_work(TaskNode *task_node)
 {
 #ifdef WITH_TBB
   if (BLI_task_scheduler_num_threads() > 1) {
@@ -150,7 +134,7 @@ bool BLI_task_graph_node_push_work(struct TaskNode *task_node)
   return true;
 }
 
-void BLI_task_graph_edge_create(struct TaskNode *from_node, struct TaskNode *to_node)
+void BLI_task_graph_edge_create(TaskNode *from_node, TaskNode *to_node)
 {
 #ifdef WITH_TBB
   if (BLI_task_scheduler_num_threads() > 1) {

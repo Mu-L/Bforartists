@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2016 by Mike Erwin. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2016 by Mike Erwin.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup gpu
@@ -23,9 +8,13 @@
  * GPU vertex format
  */
 
-#include "GPU_vertex_format.h"
+#include "GPU_vertex_format.hh"
+#include "BLI_assert.h"
+#include "GPU_capabilities.hh"
+
+#include "gpu_shader_create_info.hh"
 #include "gpu_shader_private.hh"
-#include "gpu_vertex_format_private.h"
+#include "gpu_vertex_format_private.hh"
 
 #include <cstddef>
 #include <cstring>
@@ -41,10 +30,11 @@
 #endif
 
 using namespace blender::gpu;
+using namespace blender::gpu::shader;
 
 void GPU_vertformat_clear(GPUVertFormat *format)
 {
-#if TRUST_NO_ONE
+#ifndef NDEBUG
   memset(format, 0, sizeof(GPUVertFormat));
 #else
   format->attr_len = 0;
@@ -59,47 +49,46 @@ void GPU_vertformat_clear(GPUVertFormat *format)
 #endif
 }
 
-void GPU_vertformat_copy(GPUVertFormat *dest, const GPUVertFormat *src)
+void GPU_vertformat_copy(GPUVertFormat *dest, const GPUVertFormat &src)
 {
   /* copy regular struct fields */
-  memcpy(dest, src, sizeof(GPUVertFormat));
+  memcpy(dest, &src, sizeof(GPUVertFormat));
 }
 
-static uint comp_sz(GPUVertCompType type)
+static uint comp_size(GPUVertCompType type)
 {
-#if TRUST_NO_ONE
-  assert(type <= GPU_COMP_F32); /* other types have irregular sizes (not bytes) */
-#endif
+  BLI_assert(type <= GPU_COMP_F32); /* other types have irregular sizes (not bytes) */
   const uint sizes[] = {1, 1, 2, 2, 4, 4, 4};
   return sizes[type];
 }
 
-static uint attr_sz(const GPUVertAttr *a)
+static uint attr_size(const GPUVertAttr *a)
 {
   if (a->comp_type == GPU_COMP_I10) {
     return 4; /* always packed as 10_10_10_2 */
   }
-  return a->comp_len * comp_sz(static_cast<GPUVertCompType>(a->comp_type));
+  return a->comp_len * comp_size(static_cast<GPUVertCompType>(a->comp_type));
 }
 
-static uint attr_align(const GPUVertAttr *a)
+static uint attr_align(const GPUVertAttr *a, uint minimum_stride)
 {
   if (a->comp_type == GPU_COMP_I10) {
     return 4; /* always packed as 10_10_10_2 */
   }
-  uint c = comp_sz(static_cast<GPUVertCompType>(a->comp_type));
+  uint c = comp_size(static_cast<GPUVertCompType>(a->comp_type));
   if (a->comp_len == 3 && c <= 2) {
     return 4 * c; /* AMD HW can't fetch these well, so pad it out (other vendors too?) */
   }
 
-  return c; /* most fetches are ok if components are naturally aligned */
+  /* Most fetches are ok if components are naturally aligned.
+   * However, in Metal,the minimum supported per-vertex stride is 4,
+   * so we must query the GPU and pad out the size accordingly. */
+  return max_ii(minimum_stride, c);
 }
 
 uint vertex_buffer_size(const GPUVertFormat *format, uint vertex_len)
 {
-#if TRUST_NO_ONE
-  assert(format->packed && format->stride > 0);
-#endif
+  BLI_assert(format->packed && format->stride > 0);
   return format->stride * vertex_len;
 }
 
@@ -120,12 +109,9 @@ static uchar copy_attr_name(GPUVertFormat *format, const char *name)
       break;
     }
   }
-#if TRUST_NO_ONE
-  assert(terminated);
-  assert(format->name_offset <= GPU_VERT_ATTR_NAMES_BUF_LEN);
-#else
-  (void)terminated;
-#endif
+  BLI_assert(terminated);
+  BLI_assert(format->name_offset <= GPU_VERT_ATTR_NAMES_BUF_LEN);
+  UNUSED_VARS_NDEBUG(terminated);
   return name_offset;
 }
 
@@ -135,33 +121,33 @@ uint GPU_vertformat_attr_add(GPUVertFormat *format,
                              uint comp_len,
                              GPUVertFetchMode fetch_mode)
 {
-#if TRUST_NO_ONE
-  assert(format->name_len < GPU_VERT_FORMAT_MAX_NAMES); /* there's room for more */
-  assert(format->attr_len < GPU_VERT_ATTR_MAX_LEN);     /* there's room for more */
-  assert(!format->packed);                              /* packed means frozen/locked */
-  assert((comp_len >= 1 && comp_len <= 4) || comp_len == 8 || comp_len == 12 || comp_len == 16);
+  BLI_assert(format->name_len < GPU_VERT_FORMAT_MAX_NAMES); /* there's room for more */
+  BLI_assert(format->attr_len < GPU_VERT_ATTR_MAX_LEN);     /* there's room for more */
+  BLI_assert(!format->packed);                              /* packed means frozen/locked */
+  BLI_assert((comp_len >= 1 && comp_len <= 4) || comp_len == 8 || comp_len == 12 ||
+             comp_len == 16);
 
   switch (comp_type) {
     case GPU_COMP_F32:
       /* float type can only kept as float */
-      assert(fetch_mode == GPU_FETCH_FLOAT);
+      BLI_assert(fetch_mode == GPU_FETCH_FLOAT);
       break;
     case GPU_COMP_I10:
-      /* 10_10_10 format intended for normals (xyz) or colors (rgb)
+      /* 10_10_10 format intended for normals (XYZ) or colors (RGB)
        * extra component packed.w can be manually set to { -2, -1, 0, 1 } */
-      assert(comp_len == 3 || comp_len == 4);
+      BLI_assert(ELEM(comp_len, 3, 4));
 
       /* Not strictly required, may relax later. */
-      assert(fetch_mode == GPU_FETCH_INT_TO_FLOAT_UNIT);
+      BLI_assert(fetch_mode == GPU_FETCH_INT_TO_FLOAT_UNIT);
 
       break;
     default:
       /* integer types can be kept as int or converted/normalized to float */
-      assert(fetch_mode != GPU_FETCH_FLOAT);
+      BLI_assert(fetch_mode != GPU_FETCH_FLOAT);
       /* only support float matrices (see Batch_update_program_bindings) */
-      assert(comp_len != 8 && comp_len != 12 && comp_len != 16);
+      BLI_assert(!ELEM(comp_len, 8, 12, 16));
   }
-#endif
+
   format->name_len++; /* Multi-name support. */
 
   const uint attr_id = format->attr_len++;
@@ -172,7 +158,7 @@ uint GPU_vertformat_attr_add(GPUVertFormat *format,
   attr->comp_len = (comp_type == GPU_COMP_I10) ?
                        4 :
                        comp_len; /* system needs 10_10_10_2 to be 4 or BGRA */
-  attr->sz = attr_sz(attr);
+  attr->size = attr_size(attr);
   attr->offset = 0; /* offsets & stride are calculated later (during pack) */
   attr->fetch_mode = fetch_mode;
 
@@ -182,25 +168,12 @@ uint GPU_vertformat_attr_add(GPUVertFormat *format,
 void GPU_vertformat_alias_add(GPUVertFormat *format, const char *alias)
 {
   GPUVertAttr *attr = &format->attrs[format->attr_len - 1];
-#if TRUST_NO_ONE
-  assert(format->name_len < GPU_VERT_FORMAT_MAX_NAMES); /* there's room for more */
-  assert(attr->name_len < GPU_VERT_ATTR_MAX_NAMES);
-#endif
+  BLI_assert(format->name_len < GPU_VERT_FORMAT_MAX_NAMES); /* there's room for more */
+  BLI_assert(attr->name_len < GPU_VERT_ATTR_MAX_NAMES);
   format->name_len++; /* Multi-name support. */
   attr->names[attr->name_len++] = copy_attr_name(format, alias);
 }
 
-/**
- * Makes vertex attribute from the next vertices to be accessible in the vertex shader.
- * For an attribute named "attr" you can access the next nth vertex using "attr{number}".
- * Use this function after specifying all the attributes in the format.
- *
- * NOTE: This does NOT work when using indexed rendering.
- * NOTE: Only works for first attribute name. (this limitation can be changed if needed)
- *
- * WARNING: this function creates a lot of aliases/attributes, make sure to keep the attribute
- * name short to avoid overflowing the name-buffer.
- */
 void GPU_vertformat_multiload_enable(GPUVertFormat *format, int load_count)
 {
   /* Sanity check. Maximum can be upgraded if needed. */
@@ -219,8 +192,8 @@ void GPU_vertformat_multiload_enable(GPUVertFormat *format, int load_count)
   for (int i = 0; i < attr_len; i++, attr++) {
     const char *attr_name = GPU_vertformat_attr_name_get(format, attr, 0);
     for (int j = 1; j < load_count; j++) {
-      char load_name[64];
-      BLI_snprintf(load_name, sizeof(load_name), "%s%d", attr_name, j);
+      char load_name[68 /* MAX_CUSTOMDATA_LAYER_NAME */];
+      SNPRINTF(load_name, "%s%d", attr_name, j);
       GPUVertAttr *dst_attr = &format->attrs[format->attr_len++];
       *dst_attr = *attr;
 
@@ -262,7 +235,7 @@ void GPU_vertformat_attr_rename(GPUVertFormat *format, int attr_id, const char *
 /* Encode 8 original bytes into 11 safe bytes. */
 static void safe_bytes(char out[11], const char data[8])
 {
-  char safe_chars[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  const char safe_chars[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
   uint64_t in = *(uint64_t *)data;
   for (int i = 0; i < 11; i++) {
@@ -271,15 +244,13 @@ static void safe_bytes(char out[11], const char data[8])
   }
 }
 
-/* Warning: Always add a prefix to the result of this function as
- * the generated string can start with a number and not be a valid attribute name. */
-void GPU_vertformat_safe_attr_name(const char *attr_name, char *r_safe_name, uint UNUSED(max_len))
+void GPU_vertformat_safe_attr_name(const char *attr_name, char *r_safe_name, uint /*max_len*/)
 {
   char data[8] = {0};
   uint len = strlen(attr_name);
 
   if (len > 8) {
-    /* Start with the first 4 chars of the name; */
+    /* Start with the first 4 chars of the name. */
     for (int i = 0; i < 4; i++) {
       data[i] = attr_name[i];
     }
@@ -306,20 +277,6 @@ void GPU_vertformat_safe_attr_name(const char *attr_name, char *r_safe_name, uin
 #endif
 }
 
-/**
- * Make attribute layout non-interleaved.
- * Warning! This does not change data layout!
- * Use direct buffer access to fill the data.
- * This is for advanced usage.
- *
- * De-interleaved data means all attribute data for each attribute
- * is stored continuously like this:
- * 000011112222
- * instead of:
- * 012012012012
- *
- * \note This is per attribute de-interleaving, NOT per component.
- */
 void GPU_vertformat_deinterleave(GPUVertFormat *format)
 {
   /* Ideally we should change the stride and offset here. This would allow
@@ -337,41 +294,41 @@ uint padding(uint offset, uint alignment)
 }
 
 #if PACK_DEBUG
-static void show_pack(uint a_idx, uint sz, uint pad)
+static void show_pack(uint a_idx, uint size, uint pad)
 {
   const char c = 'A' + a_idx;
   for (uint i = 0; i < pad; i++) {
     putchar('-');
   }
-  for (uint i = 0; i < sz; i++) {
+  for (uint i = 0; i < size; i++) {
     putchar(c);
   }
 }
 #endif
 
-void VertexFormat_pack(GPUVertFormat *format)
+static void VertexFormat_pack_impl(GPUVertFormat *format, uint minimum_stride)
 {
   GPUVertAttr *a0 = &format->attrs[0];
   a0->offset = 0;
-  uint offset = a0->sz;
+  uint offset = a0->size;
 
 #if PACK_DEBUG
-  show_pack(0, a0->sz, 0);
+  show_pack(0, a0->size, 0);
 #endif
 
   for (uint a_idx = 1; a_idx < format->attr_len; a_idx++) {
     GPUVertAttr *a = &format->attrs[a_idx];
-    uint mid_padding = padding(offset, attr_align(a));
+    uint mid_padding = padding(offset, attr_align(a, minimum_stride));
     offset += mid_padding;
     a->offset = offset;
-    offset += a->sz;
+    offset += a->size;
 
 #if PACK_DEBUG
-    show_pack(a_idx, a->sz, mid_padding);
+    show_pack(a_idx, a->size, mid_padding);
 #endif
   }
 
-  uint end_padding = padding(offset, attr_align(a0));
+  uint end_padding = padding(offset, attr_align(a0, minimum_stride));
 
 #if PACK_DEBUG
   show_pack(0, 0, end_padding);
@@ -381,8 +338,110 @@ void VertexFormat_pack(GPUVertFormat *format)
   format->packed = true;
 }
 
-void GPU_vertformat_from_shader(GPUVertFormat *format, const struct GPUShader *gpushader)
+void VertexFormat_pack(GPUVertFormat *format)
 {
-  const Shader *shader = reinterpret_cast<const Shader *>(gpushader);
-  shader->vertformat_from_shader(format);
+  /* Perform standard vertex packing, ensuring vertex format satisfies
+   * minimum stride requirements for vertex assembly. */
+  VertexFormat_pack_impl(format, GPU_minimum_per_vertex_stride());
+}
+
+void VertexFormat_texture_buffer_pack(GPUVertFormat *format)
+{
+  /* Validates packing for vertex formats used with texture buffers.
+   * In these cases, there must only be a single vertex attribute.
+   * This attribute should be tightly packed without padding, to ensure
+   * it aligns with the backing texture data format, skipping
+   * minimum per-vertex stride, which mandates 4-byte alignment in Metal.
+   * This additional alignment padding caused smaller data types, e.g. U16,
+   * to mis-align. */
+  for (int i = 0; i < format->attr_len; i++) {
+    /* The buffer texture setup uses the first attribute for type and size.
+     * Make sure all attributes use the same size. */
+    BLI_assert_msg(format->attrs[i].size == format->attrs[0].size,
+                   "Texture buffer mode should only use a attributes with the same size.");
+  }
+
+  /* Pack vertex format without minimum stride, as this is not required by texture buffers. */
+  VertexFormat_pack_impl(format, 1);
+}
+
+static uint component_size_get(const Type gpu_type)
+{
+  switch (gpu_type) {
+    case Type::VEC2:
+    case Type::IVEC2:
+    case Type::UVEC2:
+      return 2;
+    case Type::VEC3:
+    case Type::IVEC3:
+    case Type::UVEC3:
+      return 3;
+    case Type::VEC4:
+    case Type::IVEC4:
+    case Type::UVEC4:
+      return 4;
+    case Type::MAT3:
+      return 12;
+    case Type::MAT4:
+      return 16;
+    default:
+      return 1;
+  }
+}
+
+static void recommended_fetch_mode_and_comp_type(Type gpu_type,
+                                                 GPUVertCompType *r_comp_type,
+                                                 GPUVertFetchMode *r_fetch_mode)
+{
+  switch (gpu_type) {
+    case Type::FLOAT:
+    case Type::VEC2:
+    case Type::VEC3:
+    case Type::VEC4:
+    case Type::MAT3:
+    case Type::MAT4:
+      *r_comp_type = GPU_COMP_F32;
+      *r_fetch_mode = GPU_FETCH_FLOAT;
+      break;
+    case Type::INT:
+    case Type::IVEC2:
+    case Type::IVEC3:
+    case Type::IVEC4:
+      *r_comp_type = GPU_COMP_I32;
+      *r_fetch_mode = GPU_FETCH_INT;
+      break;
+    case Type::UINT:
+    case Type::UVEC2:
+    case Type::UVEC3:
+    case Type::UVEC4:
+      *r_comp_type = GPU_COMP_U32;
+      *r_fetch_mode = GPU_FETCH_INT;
+      break;
+    default:
+      BLI_assert(0);
+  }
+}
+
+void GPU_vertformat_from_shader(GPUVertFormat *format, const GPUShader *shader)
+{
+  GPU_vertformat_clear(format);
+
+  uint attr_len = GPU_shader_get_attribute_len(shader);
+  int location_test = 0, attrs_added = 0;
+  while (attrs_added < attr_len) {
+    char name[256];
+    Type gpu_type;
+    if (!GPU_shader_get_attribute_info(shader, location_test++, name, (int *)&gpu_type)) {
+      continue;
+    }
+
+    GPUVertCompType comp_type;
+    GPUVertFetchMode fetch_mode;
+    recommended_fetch_mode_and_comp_type(gpu_type, &comp_type, &fetch_mode);
+
+    int comp_len = component_size_get(gpu_type);
+
+    GPU_vertformat_attr_add(format, name, comp_type, comp_len, fetch_mode);
+    attrs_added++;
+  }
 }

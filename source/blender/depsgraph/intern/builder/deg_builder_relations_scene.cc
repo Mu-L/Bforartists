@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2013 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2013 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup depsgraph
@@ -24,6 +9,8 @@
 #include "intern/builder/deg_builder_relations.h"
 
 #include "DNA_scene_types.h"
+
+#include "BLI_listbase.h"
 
 namespace blender::deg {
 
@@ -47,16 +34,31 @@ void DepsgraphRelationBuilder::build_scene_render(Scene *scene, ViewLayer *view_
   }
 }
 
+void DepsgraphRelationBuilder::build_scene_camera(Scene *scene)
+{
+  if (scene->camera != nullptr) {
+    build_object(scene->camera);
+  }
+  LISTBASE_FOREACH (TimeMarker *, marker, &scene->markers) {
+    if (!ELEM(marker->camera, nullptr, scene->camera)) {
+      build_object(marker->camera);
+    }
+  }
+}
+
 void DepsgraphRelationBuilder::build_scene_parameters(Scene *scene)
 {
   if (built_map_.checkIsBuiltAndTag(scene, BuilderMap::TAG_PARAMETERS)) {
     return;
   }
+
+  /* TODO(sergey): Trace as a scene parameters. */
+
   build_idproperties(scene->id.properties);
   build_parameters(&scene->id);
   OperationKey parameters_eval_key(
       &scene->id, NodeType::PARAMETERS, OperationCode::PARAMETERS_EXIT);
-  OperationKey scene_eval_key(&scene->id, NodeType::PARAMETERS, OperationCode::SCENE_EVAL);
+  ComponentKey scene_eval_key(&scene->id, NodeType::SCENE);
   add_relation(parameters_eval_key, scene_eval_key, "Parameters -> Scene Eval");
 
   LISTBASE_FOREACH (TimeMarker *, marker, &scene->markers) {
@@ -72,6 +74,9 @@ void DepsgraphRelationBuilder::build_scene_compositor(Scene *scene)
   if (scene->nodetree == nullptr) {
     return;
   }
+
+  /* TODO(sergey): Trace as a scene compositor. */
+
   build_nodetree(scene->nodetree);
 }
 

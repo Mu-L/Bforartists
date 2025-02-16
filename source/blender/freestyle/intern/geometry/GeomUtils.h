@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -103,11 +91,10 @@ bool intersect2dSeg2dArea(const Vec2r &min, const Vec2r &max, const Vec2r &A, co
 /** check whether a 2D segment is included in a 2D region or not */
 bool include2dSeg2dArea(const Vec2r &min, const Vec2r &max, const Vec2r &A, const Vec2r &B);
 
-/** Box-triangle overlap test, adapted from Tomas Akenine-Möller code */
-bool overlapTriangleBox(Vec3r &boxcenter, Vec3r &boxhalfsize, Vec3r triverts[3]);
+/** Box-triangle overlap test. */
+bool overlapTriangleBox(const Vec3r &boxcenter, const Vec3r &boxhalfsize, const Vec3r triverts[3]);
 
-/** Fast, Minimum Storage Ray-Triangle Intersection, adapted from Tomas Möller and Ben Trumbore
- * code. */
+/** Fast, Minimum Storage Ray-Triangle Intersection. */
 bool intersectRayTriangle(const Vec3r &orig,
                           const Vec3r &dir,
                           const Vec3r &v0,
@@ -118,7 +105,7 @@ bool intersectRayTriangle(const Vec3r &orig,
                           real &v,  // I = (1 - u - v) * v0 + u * v1 + v * v2
                           const real epsilon = M_EPSILON);  // the epsilon to use
 
-/** Intersection between plane and ray adapted from Graphics Gems, Didier Badouel */
+/** Intersection between plane and ray. */
 intersection_test intersectRayPlane(const Vec3r &orig,
                                     const Vec3r &dir,  // ray origin and direction
                                     // plane's normal and offset (plane = { P / P.N + d = 0 })

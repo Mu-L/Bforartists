@@ -1,23 +1,11 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2010-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #define DEBUG_NDOF_DRIVER false
 
-#include "GHOST_NDOFManagerCocoa.h"
-#include "GHOST_SystemCocoa.h"
+#include "GHOST_NDOFManagerCocoa.hh"
+#include "GHOST_SystemCocoa.hh"
 
 #include <dlfcn.h>
 #include <stdint.h>
@@ -26,19 +14,19 @@
 #  include <cstdio>
 #endif
 
-// static callback functions need to talk to these objects:
-static GHOST_SystemCocoa *ghost_system = NULL;
-static GHOST_NDOFManager *ndof_manager = NULL;
+/* Static callback functions need to talk to these objects: */
+static GHOST_SystemCocoa *ghost_system = nullptr;
+static GHOST_NDOFManager *ndof_manager = nullptr;
 
 static uint16_t clientID = 0;
 
 static bool driver_loaded = false;
 static bool has_old_driver =
-    false;  // 3Dconnexion drivers before 10 beta 4 are "old", not all buttons will work
+    false; /* 3Dconnexion drivers before 10 beta 4 are "old", not all buttons will work. */
 static bool has_new_driver =
-    false;  // drivers >= 10.2.2 are "new", and can process events on a separate thread
+    false; /* drivers >= 10.2.2 are "new", and can process events on a separate thread. */
 
-// replicate just enough of the 3Dx API for our uses, not everything the driver provides
+/* Replicate just enough of the 3Dx API for our uses, not everything the driver provides. */
 
 #define kConnexionClientModeTakeOver 1
 #define kConnexionMaskAll 0x3fff
@@ -49,7 +37,7 @@ static bool has_new_driver =
 #define kConnexionMsgDeviceState '3dSR'
 #define kConnexionCtlGetDeviceID '3did'
 
-#pragma pack(push, 2)  // just this struct
+#pragma pack(push, 2) /* Just this struct. */
 struct ConnexionDeviceState {
   uint16_t version;
   uint16_t client;
@@ -58,19 +46,19 @@ struct ConnexionDeviceState {
   int32_t value;
   uint64_t time;
   uint8_t report[8];
-  uint16_t buttons8;  // obsolete! (pre-10.x drivers)
-  int16_t axis[6];    // tx, ty, tz, rx, ry, rz
+  uint16_t buttons8; /* Obsolete! (pre-10.x drivers). */
+  int16_t axis[6];   /* TX, TY, TZ, RX, RY, RZ. */
   uint16_t address;
   uint32_t buttons;
 };
 #pragma pack(pop)
 
-// callback functions:
+/* Callback functions: */
 typedef void (*AddedHandler)(uint32_t);
 typedef void (*RemovedHandler)(uint32_t);
 typedef void (*MessageHandler)(uint32_t, uint32_t msg_type, void *msg_arg);
 
-// driver functions:
+/* Driver functions: */
 typedef int16_t (*SetConnexionHandlers_ptr)(MessageHandler, AddedHandler, RemovedHandler, bool);
 typedef int16_t (*InstallConnexionHandlers_ptr)(MessageHandler, AddedHandler, RemovedHandler);
 typedef void (*CleanupConnexionHandlers_ptr)();
@@ -85,7 +73,7 @@ typedef int16_t (*ConnexionClientControl_ptr)(uint16_t clientID,
                                               int32_t param,
                                               int32_t *result);
 
-#define DECLARE_FUNC(name) name##_ptr name = NULL
+#define DECLARE_FUNC(name) name##_ptr name = nullptr
 
 DECLARE_FUNC(SetConnexionHandlers);
 DECLARE_FUNC(InstallConnexionHandlers);
@@ -113,7 +101,7 @@ static void *load_func(void *module, const char *func_name)
 
 #define LOAD_FUNC(name) name = (name##_ptr)load_func(module, #name)
 
-static void *module;  // handle to the whole driver
+static void *module; /* Handle to the whole driver. */
 
 static bool load_driver_functions()
 {
@@ -127,14 +115,14 @@ static bool load_driver_functions()
   if (module) {
     LOAD_FUNC(SetConnexionHandlers);
 
-    if (SetConnexionHandlers != NULL) {
+    if (SetConnexionHandlers != nullptr) {
       driver_loaded = true;
       has_new_driver = true;
     }
     else {
       LOAD_FUNC(InstallConnexionHandlers);
 
-      driver_loaded = (InstallConnexionHandlers != NULL);
+      driver_loaded = (InstallConnexionHandlers != nullptr);
     }
 
     if (driver_loaded) {
@@ -144,7 +132,7 @@ static bool load_driver_functions()
       LOAD_FUNC(UnregisterConnexionClient);
       LOAD_FUNC(ConnexionClientControl);
 
-      has_old_driver = (SetConnexionClientButtonMask == NULL);
+      has_old_driver = (SetConnexionClientButtonMask == nullptr);
     }
   }
 #if DEBUG_NDOF_DRIVER
@@ -165,13 +153,13 @@ static void unload_driver()
   dlclose(module);
 }
 
-static void DeviceAdded(uint32_t unused)
+static void DeviceAdded(uint32_t /*unused*/)
 {
 #if DEBUG_NDOF_DRIVER
   printf("ndof: device added\n");
 #endif
 
-  // determine exactly which device is plugged in
+  /* Determine exactly which device is plugged in. */
   int32_t result;
   ConnexionClientControl(clientID, kConnexionCtlGetDeviceID, 0, &result);
   int16_t vendorID = result >> 16;
@@ -180,26 +168,26 @@ static void DeviceAdded(uint32_t unused)
   ndof_manager->setDevice(vendorID, productID);
 }
 
-static void DeviceRemoved(uint32_t unused)
+static void DeviceRemoved(uint32_t /*unused*/)
 {
 #if DEBUG_NDOF_DRIVER
   printf("ndof: device removed\n");
 #endif
 }
 
-static void DeviceEvent(uint32_t unused, uint32_t msg_type, void *msg_arg)
+static void DeviceEvent(uint32_t /*unused*/, uint32_t msg_type, void *msg_arg)
 {
   if (msg_type == kConnexionMsgDeviceState) {
     ConnexionDeviceState *s = (ConnexionDeviceState *)msg_arg;
 
-    // device state is broadcast to all clients; only react if sent to us
+    /* Device state is broadcast to all clients; only react if sent to us. */
     if (s->client == clientID) {
-      // TODO: is s->time compatible with GHOST timestamps? if so use that instead.
+      /* TODO: is s->time compatible with GHOST timestamps? if so use that instead. */
       uint64_t now = ghost_system->getMilliSeconds();
 
       switch (s->command) {
         case kConnexionCmdHandleAxis: {
-          // convert to blender view coordinates
+          /* convert to blender view coordinates. */
           const int t[3] = {s->axis[0], -(s->axis[2]), s->axis[1]};
           const int r[3] = {-(s->axis[3]), s->axis[5], -(s->axis[4])};
 
@@ -214,7 +202,7 @@ static void DeviceEvent(uint32_t unused, uint32_t msg_type, void *msg_arg)
 #ifdef DEBUG_NDOF_BUTTONS
           printf("button bits: 0x%08x\n", button_bits);
 #endif
-          ndof_manager->updateButtons(button_bits, now);
+          ndof_manager->updateButtonsBitmask(button_bits, now);
           ghost_system->notifyExternalEventProcessed();
           break;
         }
@@ -234,13 +222,13 @@ static void DeviceEvent(uint32_t unused, uint32_t msg_type, void *msg_arg)
 GHOST_NDOFManagerCocoa::GHOST_NDOFManagerCocoa(GHOST_System &sys) : GHOST_NDOFManager(sys)
 {
   if (load_driver_functions()) {
-    // give static functions something to talk to:
+    /* Give static functions something to talk to: */
     ghost_system = dynamic_cast<GHOST_SystemCocoa *>(&sys);
     ndof_manager = this;
 
     uint16_t error;
     if (has_new_driver) {
-      const bool separate_thread = false;  // TODO: rework Mac event handler to allow this
+      const bool separate_thread = false; /* TODO: rework Mac event handler to allow this. */
       error = SetConnexionHandlers(DeviceEvent, DeviceAdded, DeviceRemoved, separate_thread);
     }
     else {
@@ -254,7 +242,7 @@ GHOST_NDOFManagerCocoa::GHOST_NDOFManagerCocoa(GHOST_System &sys) : GHOST_NDOFMa
       return;
     }
 
-    // Pascal string *and* a four-letter constant. How old-skool.
+    /* Pascal string *and* a four-letter constant. How old-school. */
     clientID = RegisterConnexionClient(
         'blnd', "\007blender", kConnexionClientModeTakeOver, kConnexionMaskAll);
 
@@ -271,8 +259,8 @@ GHOST_NDOFManagerCocoa::~GHOST_NDOFManagerCocoa()
     CleanupConnexionHandlers();
     unload_driver();
 
-    ghost_system = NULL;
-    ndof_manager = NULL;
+    ghost_system = nullptr;
+    ndof_manager = nullptr;
   }
 }
 

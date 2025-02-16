@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2017-2023 Blender Authors
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
 # Module to find IlmBase
 #
 # This module will first look into the directories defined by the variables:
@@ -6,7 +10,7 @@
 # It also supports non-standard names for the library components.
 #
 # To use a custom IlmBase:
-#   - Set the variable ILMBASE_CUSTOM to True
+#   - Set the variable ILMBASE_CUSTOM to TRUE
 #   - Set the variable ILMBASE_CUSTOM_LIBRARIES to a list of the libraries to
 #     use, e.g. "SpiImath SpiHalf SpiIlmThread SpiIex"
 #   - Optionally set the variable ILMBASE_CUSTOM_INCLUDE_DIR to any
@@ -18,7 +22,7 @@
 #
 # ILMBASE_INCLUDE_DIR - where to find half.h, IlmBaseConfig.h, etc.
 # ILMBASE_LIBRARIES   - list of libraries to link against when using IlmBase.
-# ILMBASE_FOUND       - True if IlmBase was found.
+# ILMBASE_FOUND       - TRUE if IlmBase was found.
 
 # Other standard issue macros
 include(FindPackageHandleStandardArgs)
@@ -175,7 +179,8 @@ if(ILMBASE_INCLUDE_DIR)
              "\\1" XYZ ${ILMBASE_BUILD_SPECIFICATION})
       set("ILMBASE_VERSION" ${XYZ} CACHE STRING "Version of ILMBase lib")
     else()
-      # Old versions (before 2.0?) do not have any version string, just assuming 2.0 should be fine though.
+      # Old versions (before 2.0?) do not have any version string,
+      # just assuming 2.0 should be fine though.
       message(WARNING "Could not determine ILMBase library version, assuming 2.0.")
       set("ILMBASE_VERSION" "2.0" CACHE STRING "Version of ILMBase lib")
     endif()
@@ -190,11 +195,16 @@ if(ILMBASE_CUSTOM)
   set(IlmBase_Libraries ${ILMBASE_CUSTOM_LIBRARIES})
   separate_arguments(IlmBase_Libraries)
 else()
-# elseif(${ILMBASE_VERSION} VERSION_LESS "2.1")
+  # elseif(${ILMBASE_VERSION} VERSION_LESS "2.1")
   set(IlmBase_Libraries Half Iex Imath IlmThread)
-# else()
-#   string(REGEX REPLACE "([0-9]+)[.]([0-9]+).*" "\\1_\\2" _ilmbase_libs_ver ${ILMBASE_VERSION})
-#   set(IlmBase_Libraries Half Iex-${_ilmbase_libs_ver} Imath-${_ilmbase_libs_ver} IlmThread-${_ilmbase_libs_ver})
+  # else()
+  #   string(REGEX REPLACE "([0-9]+)[.]([0-9]+).*" "\\1_\\2" _ilmbase_libs_ver ${ILMBASE_VERSION})
+  #   set(IlmBase_Libraries
+  #     Half
+  #     Iex-${_ilmbase_libs_ver}
+  #     Imath-${_ilmbase_libs_ver}
+  #     IlmThread-${_ilmbase_libs_ver}
+  #   )
 endif()
 
 
@@ -242,7 +252,7 @@ if(ILMBASE_FOUND)
     FIND_PACKAGE_MESSAGE(ILMBASE
       "Found IlmBase: ${ILMBASE_LIBRARIES}"
       "[${ILMBASE_INCLUDE_DIR}][${ILMBASE_LIBRARIES}][${ILMBASE_CURRENT_STATE}]"
-      )
+    )
   endif()
 endif()
 

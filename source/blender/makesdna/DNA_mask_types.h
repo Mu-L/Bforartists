@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2012 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2012 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
@@ -31,13 +16,14 @@
 #include "DNA_defs.h"
 #include "DNA_listBase.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 typedef struct Mask {
   ID id;
   struct AnimData *adt;
+  /**
+   * Engines draw data, must be immediately after AnimData. See IdDdtTemplate and
+   * DRW_drawdatalist_from_id to understand this requirement.
+   */
+  DrawDataList drawdata;
   /** Mask layers. */
   ListBase masklayers;
   /** Index of active mask layer (-1 == None). */
@@ -161,7 +147,12 @@ typedef struct MaskLayer {
 
   /** Active spline. */
   struct MaskSpline *act_spline;
-  /** Active point. */
+  /**
+   * Active point.
+   *
+   * \note By convention the active-point will be a point in `act_spline` however this isn't
+   * guaranteed and cannot be assumed by logic that validates memory.
+   */
   struct MaskSplinePoint *act_point;
 
   /* blending options */
@@ -174,11 +165,13 @@ typedef struct MaskLayer {
   /** For animation. */
   char flag;
   /** Matching 'Object' flag of the same name - eventually use in the outliner. */
-  char restrictflag;
+  char visibility_flag;
 } MaskLayer;
 
-/* MaskParent->flag */
-/* #define MASK_PARENT_ACTIVE  (1 << 0) */ /* UNUSED */
+// /** #MaskParent::flag */
+// enum {
+//   MASK_PARENT_ACTIVE = 1 << 0, /* UNUSED. */
+// };
 
 /* MaskParent->type */
 enum {
@@ -206,14 +199,19 @@ enum {
   MASK_SPLINE_OFFSET_SMOOTH = 1,
 };
 
-/* ob->restrictflag */
-#define MASK_RESTRICT_VIEW (1 << 0)
-#define MASK_RESTRICT_SELECT (1 << 1)
-#define MASK_RESTRICT_RENDER (1 << 2)
+/* MaskLayer->visibility_flag */
+enum {
+  MASK_HIDE_VIEW = 1 << 0,
+  MASK_HIDE_SELECT = 1 << 1,
+  MASK_HIDE_RENDER = 1 << 2,
+};
 
 /* SpaceClip->mask_draw_flag */
-#define MASK_DRAWFLAG_SMOOTH (1 << 0)
-#define MASK_DRAWFLAG_OVERLAY (1 << 1)
+enum {
+  MASK_DRAWFLAG_SMOOTH_DEPRECATED = 1 << 0, /* Deprecated. */
+  MASK_DRAWFLAG_OVERLAY = 1 << 1,
+  MASK_DRAWFLAG_SPLINE = 1 << 2,
+};
 
 /* copy of eSpaceImage_UVDT */
 /* SpaceClip->mask_draw_type */
@@ -267,7 +265,3 @@ enum {
 enum {
   MASK_ANIMF_EXPAND = (1 << 4),
 };
-
-#ifdef __cplusplus
-}
-#endif

@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2001-2002 NaN Holding BV. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup render
@@ -27,142 +12,258 @@
 /* exposed internal in render module only! */
 /* ------------------------------------------------------------------------- */
 
-#include "DNA_object_types.h"
+#include <mutex>
+
 #include "DNA_scene_types.h"
 
 #include "BLI_threads.h"
 
-#include "BKE_main.h"
-
+#include "RE_compositor.hh"
 #include "RE_pipeline.h"
 
-struct GHash;
+#include "tile_highlight.h"
+
+namespace blender::compositor {
+class RenderContext;
+class Profiler;
+enum class OutputTypes : uint8_t;
+}  // namespace blender::compositor
+
+struct bNodeTree;
+struct Depsgraph;
 struct Main;
 struct Object;
 struct RenderEngine;
 struct ReportList;
+struct Scene;
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+struct BaseRender {
+  BaseRender() = default;
+  virtual ~BaseRender();
 
-/* this is handed over to threaded hiding/passes/shading engine */
-typedef struct RenderPart {
-  struct RenderPart *next, *prev;
+  /* Get class which manages highlight of tiles.
+   * Note that it might not exist: for example, viewport render does not support the tile
+   * highlight. */
+  virtual blender::render::TilesHighlight *get_tile_highlight() = 0;
 
-  RenderResult *result; /* result of part rendering */
-  ListBase fullresult;  /* optional full sample buffers */
+  virtual void compositor_execute(const Scene &scene,
+                                  const RenderData &render_data,
+                                  const bNodeTree &node_tree,
+                                  const char *view_name,
+                                  blender::compositor::RenderContext *render_context,
+                                  blender::compositor::Profiler *profiler,
+                                  blender::compositor::OutputTypes needed_outputs) = 0;
+  virtual void compositor_free() = 0;
 
-  rcti disprect;    /* part coordinates within total picture */
-  int rectx, recty; /* the size */
-  int nr;           /* nr is partnr */
-  short status;
-} RenderPart;
+  virtual void display_init(RenderResult *render_result) = 0;
+  virtual void display_clear(RenderResult *render_result) = 0;
+  virtual void display_update(RenderResult *render_result, rcti *rect) = 0;
+  virtual void current_scene_update(struct Scene *scene) = 0;
 
-enum {
-  /* PART_STATUS_NONE = 0, */ /* UNUSED */
-  PART_STATUS_IN_PROGRESS = 1,
-  PART_STATUS_RENDERED = 2,
-  PART_STATUS_MERGED = 3,
+  virtual void stats_draw(RenderStats *render_stats) = 0;
+  virtual void progress(float progress) = 0;
+
+  virtual void draw_lock() = 0;
+  virtual void draw_unlock() = 0;
+
+  /* Test whether render is to be stopped: if the function returns true rendering will be stopped
+   * as soon as the render pipeline allows it. */
+  virtual bool test_break() = 0;
+
+  /**
+   * Executed right before the initialization of the depsgraph, in order to modify some stuff in
+   * the viewlayer. The modified ids must be tagged in the depsgraph.
+   *
+   * If false is returned then rendering is aborted,
+   */
+  virtual bool prepare_viewlayer(struct ViewLayer *view_layer, struct Depsgraph *depsgraph) = 0;
+
+  /* Result of rendering */
+  RenderResult *result = nullptr;
+
+  /* Read/write mutex, all internal code that writes to the `result` must use a
+   * write lock, all external code must use a read lock. Internal code is assumed
+   * to not conflict with writes, so no lock used for that. */
+  ThreadRWMutex resultmutex = BLI_RWLOCK_INITIALIZER;
+
+  /* Render engine. */
+  struct RenderEngine *engine = nullptr;
+
+  /* Guard for drawing render result using engine's `draw()` callback. */
+  ThreadMutex engine_draw_mutex = BLI_MUTEX_INITIALIZER;
 };
 
-/* controls state of render, everything that's read-only during render stage */
-struct Render {
-  struct Render *next, *prev;
-  char name[RE_MAXNAME];
-  int slot;
+struct ViewRender : public BaseRender {
+  blender::render::TilesHighlight *get_tile_highlight() override
+  {
+    return nullptr;
+  }
+
+  void compositor_execute(const Scene & /*scene*/,
+                          const RenderData & /*render_data*/,
+                          const bNodeTree & /*node_tree*/,
+                          const char * /*view_name*/,
+                          blender::compositor::RenderContext * /*render_context*/,
+                          blender::compositor::Profiler * /*profiler*/,
+                          blender::compositor::OutputTypes /*needed_outputs*/) override
+  {
+  }
+  void compositor_free() override {}
+
+  void display_init(RenderResult * /*render_result*/) override {}
+  void display_clear(RenderResult * /*render_result*/) override {}
+  void display_update(RenderResult * /*render_result*/, rcti * /*rect*/) override {}
+  void current_scene_update(struct Scene * /*scene*/) override {}
+
+  void stats_draw(RenderStats * /*render_stats*/) override {}
+  void progress(const float /*progress*/) override {}
+
+  void draw_lock() override {}
+  void draw_unlock() override {}
+
+  bool test_break() override
+  {
+    return false;
+  }
+
+  bool prepare_viewlayer(struct ViewLayer * /*view_layer*/,
+                         struct Depsgraph * /*depsgraph*/) override
+  {
+    return true;
+  }
+};
+
+/** Controls state of render, everything that's read-only during render stage. */
+struct Render : public BaseRender {
+  /* NOTE: Currently unused, provision for the future.
+   * Add these now to allow the guarded memory allocator to catch C-specific function calls. */
+  Render() = default;
+  ~Render() override;
+
+  blender::render::TilesHighlight *get_tile_highlight() override
+  {
+    return &tile_highlight;
+  }
+
+  void compositor_execute(const Scene &scene,
+                          const RenderData &render_data,
+                          const bNodeTree &node_tree,
+                          const char *view_name,
+                          blender::compositor::RenderContext *render_context,
+                          blender::compositor::Profiler *profiler,
+                          blender::compositor::OutputTypes needed_outputs) override;
+  void compositor_free() override;
+
+  void display_init(RenderResult *render_result) override;
+  void display_clear(RenderResult *render_result) override;
+  void display_update(RenderResult *render_result, rcti *rect) override;
+  void current_scene_update(struct Scene *scene) override;
+
+  void stats_draw(RenderStats *render_stats) override;
+  void progress(float progress) override;
+
+  void draw_lock() override;
+  void draw_unlock() override;
+
+  bool test_break() override;
+
+  bool prepare_viewlayer(struct ViewLayer *view_layer, struct Depsgraph *depsgraph) override;
+
+  char name[RE_MAXNAME] = "";
 
   /* state settings */
-  short flag, ok, result_ok;
+  short flag = 0;
+  bool ok = false;
 
-  /* result of rendering */
-  RenderResult *result;
   /* if render with single-layer option, other rendered layers are stored here */
-  RenderResult *pushedresult;
+  RenderResult *pushedresult = nullptr;
   /** A list of #RenderResults, for full-samples. */
-  ListBase fullresult;
-  /* read/write mutex, all internal code that writes to re->result must use a
-   * write lock, all external code must use a read lock. internal code is assumed
-   * to not conflict with writes, so no lock used for that */
-  ThreadRWMutex resultmutex;
+  ListBase fullresult = {nullptr, nullptr};
+  /* True if result has GPU textures, to quickly skip cache clear. */
+  bool result_has_gpu_texture_caches = false;
 
   /** Window size, display rect, viewplane.
    * \note Buffer width and height with percentage applied
    * without border & crop. convert to long before multiplying together to avoid overflow. */
-  int winx, winy;
-  rcti disprect;  /* part within winx winy */
-  rctf viewplane; /* mapped on winx winy */
+  int winx = 0, winy = 0;
+  rcti disprect = {0, 0, 0, 0};  /* part within winx winy */
+  rctf viewplane = {0, 0, 0, 0}; /* mapped on winx winy */
 
   /* final picture width and height (within disprect) */
-  int rectx, recty;
+  int rectx = 0, recty = 0;
 
-  /* real maximum size of parts after correction for minimum
-   * partx*xparts can be larger than rectx, in that case last part is smaller */
-  int partx, party;
-
-  /* Camera transform, only used by Freestyle. */
-  float winmat[4][4];
+  /* Camera transform. Used by Freestyle, Eevee, and other draw manager engines.. */
+  float winmat[4][4] = {{0}};
 
   /* Clipping. */
-  float clip_start;
-  float clip_end;
+  float clip_start = 0.0f;
+  float clip_end = 0.0f;
 
   /* main, scene, and its full copy of renderdata and world */
-  struct Main *main;
-  Scene *scene;
-  RenderData r;
-  ListBase view_layers;
-  int active_view_layer;
-  struct Object *camera_override;
+  struct Main *main = nullptr;
+  Scene *scene = nullptr;
+  RenderData r = {};
+  char single_view_layer[MAX_NAME] = "";
+  struct Object *camera_override = nullptr;
 
-  ThreadRWMutex partsmutex;
-  struct GHash *parts;
-
-  /* render engine */
-  struct RenderEngine *engine;
+  blender::render::TilesHighlight tile_highlight;
 
   /* NOTE: This is a minimal dependency graph and evaluated scene which is enough to access view
-   * layer visibility and use for post-precessing (compositor and sequencer). */
-  Depsgraph *pipeline_depsgraph;
-  Scene *pipeline_scene_eval;
+   * layer visibility and use for postprocessing (compositor and sequencer). */
+  struct Depsgraph *pipeline_depsgraph = nullptr;
+  Scene *pipeline_scene_eval = nullptr;
 
-  /* callbacks */
-  void (*display_init)(void *handle, RenderResult *rr);
-  void *dih;
-  void (*display_clear)(void *handle, RenderResult *rr);
-  void *dch;
-  void (*display_update)(void *handle, RenderResult *rr, volatile rcti *rect);
-  void *duh;
-  void (*current_scene_update)(void *handle, struct Scene *scene);
-  void *suh;
+  /* Compositor.
+   * NOTE: Use bare pointer instead of smart pointer because the it is a fully opaque type. */
+  blender::render::Compositor *compositor = nullptr;
+  std::mutex compositor_mutex;
 
-  void (*stats_draw)(void *handle, RenderStats *ri);
-  void *sdh;
-  void (*progress)(void *handle, float i);
-  void *prh;
+  /* Callbacks for the corresponding base class method implementation. */
+  void (*display_init_cb)(void *handle, RenderResult *rr) = nullptr;
+  void *dih = nullptr;
+  void (*display_clear_cb)(void *handle, RenderResult *rr) = nullptr;
+  void *dch = nullptr;
+  void (*display_update_cb)(void *handle, RenderResult *rr, rcti *rect) = nullptr;
+  void *duh = nullptr;
+  void (*current_scene_update_cb)(void *handle, struct Scene *scene) = nullptr;
+  void *suh = nullptr;
 
-  void (*draw_lock)(void *handle, bool lock);
-  void *dlh;
-  int (*test_break)(void *handle);
-  void *tbh;
+  void (*stats_draw_cb)(void *handle, RenderStats *ri) = nullptr;
+  void *sdh = nullptr;
+  void (*progress_cb)(void *handle, float i) = nullptr;
+  void *prh = nullptr;
 
-  RenderStats i;
+  void (*draw_lock_cb)(void *handle, bool lock) = nullptr;
+  void *dlh = nullptr;
+  bool (*test_break_cb)(void *handle) = nullptr;
+  void *tbh = nullptr;
 
-  struct ReportList *reports;
+  bool (*prepare_viewlayer_cb)(void *handle, struct ViewLayer *vl, struct Depsgraph *depsgraph);
+  void *prepare_vl_handle;
 
-  void **movie_ctx_arr;
-  char viewname[MAX_NAME];
+  RenderStats i = {};
+
+  /**
+   * Optional report list which may be null (borrowed memory).
+   * Callers to rendering functions are responsible for setting can clearing, see: #RE_SetReports.
+   */
+  struct ReportList *reports = nullptr;
+
+  blender::Vector<MovieWriter *> movie_writers;
+  char viewname[MAX_NAME] = "";
 
   /* TODO: replace by a whole draw manager. */
-  void *gl_context;
-  void *gpu_context;
+  void *system_gpu_context = nullptr;
+  void *blender_gpu_context = nullptr;
 };
 
 /* **************** defines ********************* */
 
-/* R.flag */
-#define R_ANIMATION 1
-
-#ifdef __cplusplus
-}
-#endif
+/** #R.flag */
+#define R_ANIMATION 1 << 0
+/* Indicates that the render pipeline should not write its render result. This happens for instance
+ * when the render pipeline uses the compositor, but the compositor node tree does not have an
+ * output composite node or a render layer input, and consequently no render result. In that case,
+ * the output will be written from the File Output nodes, since the render pipeline will early fail
+ * if neither a File Output nor a Composite node exist in the scene. */
+#define R_SKIP_WRITE 1 << 1

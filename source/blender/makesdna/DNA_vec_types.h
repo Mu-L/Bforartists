@@ -1,31 +1,12 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2001-2002 NaN Holding BV. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
  */
 
 #pragma once
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 /* types */
 
@@ -39,20 +20,20 @@ typedef struct vec2f {
   float x, y;
 } vec2f;
 
-/* not used at the moment */
-/*
 typedef struct vec2i {
   int x, y;
 } vec2i;
 
+/* not used at the moment */
+/*
 typedef struct vec2d {
   double x, y;
 } vec2d;
-
+*/
 typedef struct vec3i {
   int x, y, z;
 } vec3i;
-*/
+
 typedef struct vec3f {
   float x, y, z;
 } vec3f;
@@ -64,11 +45,20 @@ typedef struct vec3d {
 typedef struct vec4i {
   int x, y, z, w;
 } vec4i;
-
+*/
 typedef struct vec4f {
   float x, y, z, w;
 } vec4f;
 
+/**
+ * This type generally shouldn't be used. It only exists for cases where a DNA type that
+ * corresponds to `blender:float4x4` is required. Note that `float4x4` is 16 byte aligned, but we
+ * can't enforce that this struct yet.
+ */
+typedef struct mat4x4f {
+  float value[4][4];
+} mat4x4f;
+/*
 typedef struct vec4d {
   double x, y, z, w;
 } vec4d;
@@ -78,6 +68,17 @@ typedef struct vec4d {
 typedef struct rcti {
   int xmin, xmax;
   int ymin, ymax;
+
+#ifdef __cplusplus
+  inline bool operator==(const rcti &other) const
+  {
+    return xmin == other.xmin && xmax == other.xmax && ymin == other.ymin && ymax == other.ymax;
+  }
+  inline bool operator!=(const rcti &other) const
+  {
+    return !(*this == other);
+  }
+#endif
 } rcti;
 
 /** float rectangle. */
@@ -94,7 +95,3 @@ typedef struct DualQuat {
   float scale[4][4];
   float scale_weight;
 } DualQuat;
-
-#ifdef __cplusplus
-}
-#endif

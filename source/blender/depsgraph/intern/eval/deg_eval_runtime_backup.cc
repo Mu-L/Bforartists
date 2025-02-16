@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2017 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2017 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup depsgraph
@@ -25,9 +10,7 @@
 
 #include "intern/eval/deg_eval_copy_on_write.h"
 
-#include "BLI_utildefines.h"
-
-#include "DRW_engine.h"
+#include "DRW_engine.hh"
 
 namespace blender::deg {
 
@@ -47,12 +30,14 @@ RuntimeBackup::RuntimeBackup(const Depsgraph *depsgraph)
 
 void RuntimeBackup::init_from_id(ID *id)
 {
-  if (!deg_copy_on_write_is_expanded(id)) {
+  if (!deg_eval_copy_is_expanded(id)) {
     return;
   }
   have_backup = true;
 
+  /* Clear, so freeing the expanded data doesn't touch this Python reference. */
   id_data.py_instance = id->py_instance;
+  id->py_instance = nullptr;
 
   animation_backup.init_from_id(id);
 

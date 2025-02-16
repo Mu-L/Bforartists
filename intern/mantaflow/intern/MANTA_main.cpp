@@ -1,48 +1,32 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2016 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2016 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
- * \ingroup mantaflow
+ * \ingroup intern_mantaflow
  */
 
+#include <algorithm>
 #include <fstream>
-#include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <zlib.h>
 
+#include <Python.h>
+
+#include <manta.h>
+
 #include "MANTA_main.h"
-#include "Python.h"
 #include "fluid_script.h"
 #include "liquid_script.h"
-#include "manta.h"
 #include "smoke_script.h"
 
 #include "BLI_fileops.h"
-#include "BLI_path_util.h"
+#include "BLI_path_utils.hh"
 #include "BLI_utildefines.h"
 
 #include "DNA_fluid_types.h"
 #include "DNA_modifier_types.h"
-#include "DNA_scene_types.h"
-
-#include "MEM_guardedalloc.h"
 
 using std::cerr;
 using std::cout;
@@ -59,9 +43,10 @@ int MANTA::with_debug(0);
 MANTA::MANTA(int *res, FluidModifierData *fmd)
     : mCurrentID(++solverID), mMaxRes(fmd->domain->maxres)
 {
-  if (with_debug)
+  if (with_debug) {
     cout << "FLUID: " << mCurrentID << " with res(" << res[0] << ", " << res[1] << ", " << res[2]
          << ")" << endl;
+  }
 
   FluidDomainSettings *fds = fmd->domain;
   fds->fluid = this;
@@ -192,12 +177,15 @@ MANTA::MANTA(int *res, FluidModifierData *fmd)
   if (mUsingLiquid) {
     initSuccess &= initDomain();
     initSuccess &= initLiquid();
-    if (mUsingObstacle)
+    if (mUsingObstacle) {
       initSuccess &= initObstacle();
-    if (mUsingInvel)
+    }
+    if (mUsingInvel) {
       initSuccess &= initInVelocity();
-    if (mUsingOutflow)
+    }
+    if (mUsingOutflow) {
       initSuccess &= initOutflow();
+    }
 
     if (mUsingDrops || mUsingBubbles || mUsingFloats || mUsingTracers) {
       mUpresParticle = fds->particle_scale;
@@ -243,18 +231,24 @@ MANTA::MANTA(int *res, FluidModifierData *fmd)
   if (mUsingSmoke) {
     initSuccess &= initDomain();
     initSuccess &= initSmoke();
-    if (mUsingHeat)
+    if (mUsingHeat) {
       initSuccess &= initHeat();
-    if (mUsingFire)
+    }
+    if (mUsingFire) {
       initSuccess &= initFire();
-    if (mUsingColors)
+    }
+    if (mUsingColors) {
       initSuccess &= initColors();
-    if (mUsingObstacle)
+    }
+    if (mUsingObstacle) {
       initSuccess &= initObstacle();
-    if (mUsingInvel)
+    }
+    if (mUsingInvel) {
       initSuccess &= initInVelocity();
-    if (mUsingOutflow)
+    }
+    if (mUsingOutflow) {
       initSuccess &= initOutflow();
+    }
 
     if (mUsingGuiding) {
       mResGuiding = (fds->guide_parent) ? fds->guide_res : fds->res;
@@ -271,14 +265,18 @@ MANTA::MANTA(int *res, FluidModifierData *fmd)
       /* Initialize Mantaflow variables in Python. */
       initSuccess &= initNoise();
       initSuccess &= initSmokeNoise();
-      if (mUsingFire)
+      if (mUsingFire) {
         initSuccess &= initFireHigh();
-      if (mUsingColors)
+      }
+      if (mUsingColors) {
         initSuccess &= initColorsHigh();
+      }
     }
   }
   /* All requested initializations must not fail in constructor. */
   BLI_assert(initSuccess);
+  (void)initSuccess; /* Ignored in release. */
+
   updatePointers(fmd);
 }
 
@@ -556,12 +554,13 @@ bool MANTA::initLiquidSndParts(FluidModifierData *fmd)
 
 MANTA::~MANTA()
 {
-  if (with_debug)
+  if (with_debug) {
     cout << "~FLUID: " << mCurrentID << " with res(" << mResX << ", " << mResY << ", " << mResZ
          << ")" << endl;
+  }
 
   /* Destruction string for Python. */
-  string tmpString = "";
+  string tmpString;
   vector<string> pythonCommands;
   bool result = false;
 
@@ -576,31 +575,102 @@ MANTA::~MANTA()
   pythonCommands.push_back(finalString);
   result = runPythonString(pythonCommands);
 
+  /* WARNING: this causes crash on exit in the `cycles_volume_cpu/smoke_color` test,
+   * freeing a single modifier ends up clearing the shared module.
+   * For this to be handled properly there would need to be a initialize/free
+   * function for global data. */
+#if 0
+  MANTA::terminateMantaflow();
+#endif
+
   BLI_assert(result);
   UNUSED_VARS(result);
 }
 
 /**
- * Store a pointer to the __main__ module used by mantaflow. This is necessary, because sometimes
- * Blender will overwrite that module. That happens when e.g. scripts are executed in the text
- * editor.
- *
+ * Copied from `PyC_DefaultNameSpace` in Blender.
+ * with some differences:
+ * - Doesn't touch `sys.modules`, use #manta_python_main_module_activate instead.
+ * - Returns the module instead of the modules `dict`.
+ */
+static PyObject *manta_python_main_module_create(const char *filename)
+{
+  PyObject *builtins = PyEval_GetBuiltins();
+  PyObject *mod_main = PyModule_New("__main__");
+  PyModule_AddStringConstant(mod_main, "__name__", "__main__");
+  if (filename) {
+    /* __file__ mainly for nice UI'ness
+     * NOTE: this won't map to a real file when executing text-blocks and buttons. */
+    PyModule_AddObject(mod_main, "__file__", PyUnicode_InternFromString(filename));
+  }
+  PyModule_AddObjectRef(mod_main, "__builtins__", builtins);
+  return mod_main;
+}
+
+static void manta_python_main_module_activate(PyObject *mod_main)
+{
+  PyObject *modules = PyImport_GetModuleDict();
+  PyObject *main_mod_cmp = PyDict_GetItemString(modules, "__main__");
+  if (mod_main == main_mod_cmp) {
+    return;
+  }
+  /* NOTE: we could remove the reference to `mod_main` here, but as it's know to be removed
+   * accept that there is temporarily an extra reference. */
+  PyDict_SetItemString(modules, "__main__", mod_main);
+}
+
+static void manta_python_main_module_backup(PyObject **r_main_mod)
+{
+  PyObject *modules = PyImport_GetModuleDict();
+  *r_main_mod = PyDict_GetItemString(modules, "__main__");
+  Py_XINCREF(*r_main_mod); /* don't free */
+}
+
+static void manta_python_main_module_restore(PyObject *main_mod)
+{
+  PyObject *modules = PyImport_GetModuleDict();
+  PyDict_SetItemString(modules, "__main__", main_mod);
+  Py_XDECREF(main_mod);
+}
+
+/**
  * Mantaflow stores many variables in the globals() dict of the __main__ module. To be able to
  * access these variables, the same __main__ module has to be used every time.
  *
  * Unfortunately, we also depend on the fact that mantaflow dumps variables into this module using
- * PyRun_SimpleString. So we can't easily create a separate module without changing mantaflow.
+ * #PyRun_String. So we can't easily create a separate module without changing mantaflow.
  */
 static PyObject *manta_main_module = nullptr;
+
+static void manta_python_main_module_clear()
+{
+  if (manta_main_module) {
+    Py_DECREF(manta_main_module);
+    manta_main_module = nullptr;
+  }
+}
+
+static PyObject *manta_python_main_module_ensure()
+{
+  if (!manta_main_module) {
+    manta_main_module = manta_python_main_module_create("<manta_namespace>");
+  }
+  return manta_main_module;
+}
 
 bool MANTA::runPythonString(vector<string> commands)
 {
   bool success = true;
   PyGILState_STATE gilstate = PyGILState_Ensure();
 
-  if (manta_main_module == nullptr) {
-    manta_main_module = PyImport_ImportModule("__main__");
-  }
+  /* Temporarily set `sys.modules["__main__"]` as some Python modules expect this. */
+  PyObject *main_mod_backup;
+  manta_python_main_module_backup(&main_mod_backup);
+
+  /* If we never want to run this when the module isn't initialize,
+   * assign with `manta_python_main_module_ensure()`. */
+  BLI_assert(manta_main_module != nullptr);
+  manta_python_main_module_activate(manta_main_module);
 
   for (vector<string>::iterator it = commands.begin(); it != commands.end(); ++it) {
     string command = *it;
@@ -619,6 +689,9 @@ bool MANTA::runPythonString(vector<string> commands)
       Py_DECREF(return_value);
     }
   }
+
+  manta_python_main_module_restore(main_mod_backup);
+
   PyGILState_Release(gilstate);
 
   BLI_assert(success);
@@ -627,8 +700,9 @@ bool MANTA::runPythonString(vector<string> commands)
 
 void MANTA::initializeMantaflow()
 {
-  if (with_debug)
+  if (with_debug) {
     cout << "Fluid: Initializing Mantaflow framework" << endl;
+  }
 
   string filename = "manta_scene_" + to_string(mCurrentID) + ".py";
   vector<string> fill = vector<string>();
@@ -636,24 +710,30 @@ void MANTA::initializeMantaflow()
   /* Initialize extension classes and wrappers. */
   srand(0);
   PyGILState_STATE gilstate = PyGILState_Ensure();
-  Pb::setup(filename, fill); /* Namespace from Mantaflow (registry). */
+
+  PyObject *manta_main_module = manta_python_main_module_ensure();
+  PyObject *globals_dict = PyModule_GetDict(manta_main_module);
+  Pb::setup(false, filename, fill, globals_dict); /* Namespace from Mantaflow (registry). */
   PyGILState_Release(gilstate);
 }
 
 void MANTA::terminateMantaflow()
 {
-  if (with_debug)
+  if (with_debug) {
     cout << "Fluid: Releasing Mantaflow framework" << endl;
+  }
 
   PyGILState_STATE gilstate = PyGILState_Ensure();
-  Pb::finalize(); /* Namespace from Mantaflow (registry). */
+  Pb::finalize(false); /* Namespace from Mantaflow (registry). */
+  manta_python_main_module_clear();
   PyGILState_Release(gilstate);
 }
 
 static string getCacheFileEnding(char cache_format)
 {
-  if (MANTA::with_debug)
+  if (MANTA::with_debug) {
     cout << "MANTA::getCacheFileEnding()" << endl;
+  }
 
   switch (cache_format) {
     case FLUID_DOMAIN_FILE_UNI:
@@ -680,54 +760,67 @@ static string getBooleanString(int value)
 
 void MANTA::initializeRNAMap(FluidModifierData *fmd)
 {
-  if (with_debug)
+  if (with_debug) {
     cout << "MANTA::initializeRNAMap()" << endl;
+  }
 
   mRNAMap["ID"] = to_string(mCurrentID);
 
   if (!fmd) {
-    if (with_debug)
+    if (with_debug) {
       cout << "Fluid: No modifier data given in RNA map setup - returning early" << endl;
+    }
     return;
   }
 
   FluidDomainSettings *fds = fmd->domain;
   bool is2D = (fds->solver_res == 2);
 
-  string borderCollisions = "";
-  if ((fds->border_collisions & FLUID_DOMAIN_BORDER_LEFT) == 0)
+  string borderCollisions;
+  if ((fds->border_collisions & FLUID_DOMAIN_BORDER_LEFT) == 0) {
     borderCollisions += "x";
-  if ((fds->border_collisions & FLUID_DOMAIN_BORDER_RIGHT) == 0)
+  }
+  if ((fds->border_collisions & FLUID_DOMAIN_BORDER_RIGHT) == 0) {
     borderCollisions += "X";
-  if ((fds->border_collisions & FLUID_DOMAIN_BORDER_FRONT) == 0)
+  }
+  if ((fds->border_collisions & FLUID_DOMAIN_BORDER_FRONT) == 0) {
     borderCollisions += "y";
-  if ((fds->border_collisions & FLUID_DOMAIN_BORDER_BACK) == 0)
+  }
+  if ((fds->border_collisions & FLUID_DOMAIN_BORDER_BACK) == 0) {
     borderCollisions += "Y";
-  if ((fds->border_collisions & FLUID_DOMAIN_BORDER_BOTTOM) == 0)
+  }
+  if ((fds->border_collisions & FLUID_DOMAIN_BORDER_BOTTOM) == 0) {
     borderCollisions += "z";
-  if ((fds->border_collisions & FLUID_DOMAIN_BORDER_TOP) == 0)
+  }
+  if ((fds->border_collisions & FLUID_DOMAIN_BORDER_TOP) == 0) {
     borderCollisions += "Z";
+  }
 
-  string particleTypesStr = "";
-  if (fds->particle_type & FLUID_DOMAIN_PARTICLE_SPRAY)
+  string particleTypesStr;
+  if (fds->particle_type & FLUID_DOMAIN_PARTICLE_SPRAY) {
     particleTypesStr += "PtypeSpray";
+  }
   if (fds->particle_type & FLUID_DOMAIN_PARTICLE_BUBBLE) {
-    if (!particleTypesStr.empty())
+    if (!particleTypesStr.empty()) {
       particleTypesStr += "|";
+    }
     particleTypesStr += "PtypeBubble";
   }
   if (fds->particle_type & FLUID_DOMAIN_PARTICLE_FOAM) {
-    if (!particleTypesStr.empty())
+    if (!particleTypesStr.empty()) {
       particleTypesStr += "|";
+    }
     particleTypesStr += "PtypeFoam";
   }
   if (fds->particle_type & FLUID_DOMAIN_PARTICLE_TRACER) {
-    if (!particleTypesStr.empty())
+    if (!particleTypesStr.empty()) {
       particleTypesStr += "|";
+    }
     particleTypesStr += "PtypeTracer";
   }
-  if (particleTypesStr.empty())
+  if (particleTypesStr.empty()) {
     particleTypesStr = "0";
+  }
 
   int particleTypes = (FLUID_DOMAIN_PARTICLE_SPRAY | FLUID_DOMAIN_PARTICLE_BUBBLE |
                        FLUID_DOMAIN_PARTICLE_FOAM | FLUID_DOMAIN_PARTICLE_TRACER);
@@ -735,23 +828,29 @@ void MANTA::initializeRNAMap(FluidModifierData *fmd)
   string cacheDirectory(fds->cache_directory);
 
   float viscosity = fds->viscosity_base * pow(10.0f, -fds->viscosity_exponent);
-  float domainSize = MAX3(fds->global_size[0], fds->global_size[1], fds->global_size[2]);
+  float domainSize = std::max({fds->global_size[0], fds->global_size[1], fds->global_size[2]});
 
   string vdbCompressionMethod = "Compression_None";
-  if (fds->openvdb_compression == VDB_COMPRESSION_NONE)
+  if (fds->openvdb_compression == VDB_COMPRESSION_NONE) {
     vdbCompressionMethod = "Compression_None";
-  else if (fds->openvdb_compression == VDB_COMPRESSION_ZIP)
+  }
+  else if (fds->openvdb_compression == VDB_COMPRESSION_ZIP) {
     vdbCompressionMethod = "Compression_Zip";
-  else if (fds->openvdb_compression == VDB_COMPRESSION_BLOSC)
+  }
+  else if (fds->openvdb_compression == VDB_COMPRESSION_BLOSC) {
     vdbCompressionMethod = "Compression_Blosc";
+  }
 
   string vdbPrecisionHalf = "Precision_Half";
-  if (fds->openvdb_data_depth == VDB_PRECISION_FULL_FLOAT)
+  if (fds->openvdb_data_depth == VDB_PRECISION_FULL_FLOAT) {
     vdbPrecisionHalf = "Precision_Full";
-  else if (fds->openvdb_data_depth == VDB_PRECISION_HALF_FLOAT)
+  }
+  else if (fds->openvdb_data_depth == VDB_PRECISION_HALF_FLOAT) {
     vdbPrecisionHalf = "Precision_Half";
-  else if (fds->openvdb_data_depth == VDB_PRECISION_MINI_FLOAT)
+  }
+  else if (fds->openvdb_data_depth == VDB_PRECISION_MINI_FLOAT) {
     vdbPrecisionHalf = "Precision_Mini";
+  }
 
   mRNAMap["USING_SMOKE"] = getBooleanString(fds->type == FLUID_DOMAIN_TYPE_GAS);
   mRNAMap["USING_LIQUID"] = getBooleanString(fds->type == FLUID_DOMAIN_TYPE_LIQUID);
@@ -1054,9 +1153,10 @@ string MANTA::getRealValue(const string &varName)
 
 string MANTA::parseLine(const string &line)
 {
-  if (line.size() == 0)
+  if (line.size() == 0) {
     return "";
-  string res = "";
+  }
+  string res;
   int currPos = 0, start_del = 0, end_del = -1;
   bool readingVar = false;
   const char delimiter = '$';
@@ -1079,12 +1179,13 @@ string MANTA::parseLine(const string &line)
 
 string MANTA::parseScript(const string &setup_string, FluidModifierData *fmd)
 {
-  if (MANTA::with_debug)
+  if (MANTA::with_debug) {
     cout << "MANTA::parseScript()" << endl;
+  }
 
   istringstream f(setup_string);
   ostringstream res;
-  string line = "";
+  string line;
 
   /* Update RNA map if modifier data is handed over. */
   if (fmd) {
@@ -1096,10 +1197,10 @@ string MANTA::parseScript(const string &setup_string, FluidModifierData *fmd)
   return res.str();
 }
 
-/* Dirty hack: Needed to format paths from python code that is run via PyRun_SimpleString */
+/** Dirty hack: Needed to format paths from python code that is run via #PyRun_String. */
 static string escapePath(string const &s)
 {
-  string result = "";
+  string result;
   for (char c : s) {
     if (c == '\\') {
       result += "\\\\";
@@ -1116,8 +1217,9 @@ static string escapePath(string const &s)
 
 bool MANTA::writeConfiguration(FluidModifierData *fmd, int framenr)
 {
-  if (with_debug)
+  if (with_debug) {
     cout << "MANTA::writeConfiguration()" << endl;
+  }
 
   FluidDomainSettings *fds = fmd->domain;
 
@@ -1157,8 +1259,9 @@ bool MANTA::writeConfiguration(FluidModifierData *fmd, int framenr)
 
 bool MANTA::writeData(FluidModifierData *fmd, int framenr)
 {
-  if (with_debug)
+  if (with_debug) {
     cout << "MANTA::writeData()" << endl;
+  }
 
   ostringstream ss;
   vector<string> pythonCommands;
@@ -1185,8 +1288,9 @@ bool MANTA::writeData(FluidModifierData *fmd, int framenr)
 
 bool MANTA::writeNoise(FluidModifierData *fmd, int framenr)
 {
-  if (with_debug)
+  if (with_debug) {
     cout << "MANTA::writeNoise()" << endl;
+  }
 
   ostringstream ss;
   vector<string> pythonCommands;
@@ -1207,8 +1311,9 @@ bool MANTA::writeNoise(FluidModifierData *fmd, int framenr)
 
 bool MANTA::readConfiguration(FluidModifierData *fmd, int framenr)
 {
-  if (with_debug)
+  if (with_debug) {
     cout << "MANTA::readConfiguration()" << endl;
+  }
 
   FluidDomainSettings *fds = fmd->domain;
   float dummy;
@@ -1217,8 +1322,9 @@ bool MANTA::readConfiguration(FluidModifierData *fmd, int framenr)
   string format = FLUID_DOMAIN_EXTENSION_UNI;
   string file = getFile(fmd, FLUID_DOMAIN_DIR_CONFIG, FLUID_NAME_CONFIG, format, framenr);
 
-  if (!hasConfig(fmd, framenr))
+  if (!hasConfig(fmd, framenr)) {
     return false;
+  }
 
   gzFile gzf = (gzFile)BLI_gzopen(file.c_str(), "rb"); /* Do some compression. */
   if (!gzf) {
@@ -1250,11 +1356,13 @@ bool MANTA::readConfiguration(FluidModifierData *fmd, int framenr)
 
 bool MANTA::readData(FluidModifierData *fmd, int framenr, bool resumable)
 {
-  if (with_debug)
+  if (with_debug) {
     cout << "MANTA::readData()" << endl;
+  }
 
-  if (!mUsingSmoke && !mUsingLiquid)
+  if (!mUsingSmoke && !mUsingLiquid) {
     return false;
+  }
 
   ostringstream ss;
   vector<string> pythonCommands;
@@ -1266,8 +1374,9 @@ bool MANTA::readData(FluidModifierData *fmd, int framenr, bool resumable)
   string resumable_cache = (!resumable) ? "False" : "True";
 
   /* Sanity check: Are cache files present? */
-  if (!hasData(fmd, framenr))
+  if (!hasData(fmd, framenr)) {
     return false;
+  }
 
   if (mUsingSmoke) {
     ss.str("");
@@ -1290,11 +1399,13 @@ bool MANTA::readData(FluidModifierData *fmd, int framenr, bool resumable)
 
 bool MANTA::readNoise(FluidModifierData *fmd, int framenr, bool resumable)
 {
-  if (with_debug)
+  if (with_debug) {
     cout << "MANTA::readNoise()" << endl;
+  }
 
-  if (!mUsingSmoke || !mUsingNoise)
+  if (!mUsingSmoke || !mUsingNoise) {
     return false;
+  }
 
   ostringstream ss;
   vector<string> pythonCommands;
@@ -1309,8 +1420,9 @@ bool MANTA::readNoise(FluidModifierData *fmd, int framenr, bool resumable)
   string volume_format = getCacheFileEnding(format);
 
   /* Sanity check: Are cache files present? */
-  if (!hasNoise(fmd, framenr))
+  if (!hasNoise(fmd, framenr)) {
     return false;
+  }
 
   ss.str("");
   ss << "smoke_load_noise_" << mCurrentID << "('" << escapePath(directory) << "', " << framenr
@@ -1322,11 +1434,13 @@ bool MANTA::readNoise(FluidModifierData *fmd, int framenr, bool resumable)
 
 bool MANTA::readMesh(FluidModifierData *fmd, int framenr)
 {
-  if (with_debug)
+  if (with_debug) {
     cout << "MANTA::readMesh()" << endl;
+  }
 
-  if (!mUsingLiquid || !mUsingMesh)
+  if (!mUsingLiquid || !mUsingMesh) {
     return false;
+  }
 
   ostringstream ss;
   vector<string> pythonCommands;
@@ -1337,8 +1451,9 @@ bool MANTA::readMesh(FluidModifierData *fmd, int framenr)
   string volume_format = getCacheFileEnding(fds->cache_data_format);
 
   /* Sanity check: Are cache files present? */
-  if (!hasMesh(fmd, framenr))
+  if (!hasMesh(fmd, framenr)) {
     return false;
+  }
 
   ss.str("");
   ss << "liquid_load_mesh_" << mCurrentID << "('" << escapePath(directory) << "', " << framenr
@@ -1357,13 +1472,16 @@ bool MANTA::readMesh(FluidModifierData *fmd, int framenr)
 
 bool MANTA::readParticles(FluidModifierData *fmd, int framenr, bool resumable)
 {
-  if (with_debug)
+  if (with_debug) {
     cout << "MANTA::readParticles()" << endl;
+  }
 
-  if (!mUsingLiquid)
+  if (!mUsingLiquid) {
     return false;
-  if (!mUsingDrops && !mUsingBubbles && !mUsingFloats && !mUsingTracers)
+  }
+  if (!mUsingDrops && !mUsingBubbles && !mUsingFloats && !mUsingTracers) {
     return false;
+  }
 
   ostringstream ss;
   vector<string> pythonCommands;
@@ -1378,8 +1496,9 @@ bool MANTA::readParticles(FluidModifierData *fmd, int framenr, bool resumable)
   string volume_format = getCacheFileEnding(format);
 
   /* Sanity check: Are cache files present? */
-  if (!hasParticles(fmd, framenr))
+  if (!hasParticles(fmd, framenr)) {
     return false;
+  }
 
   ss.str("");
   ss << "liquid_load_particles_" << mCurrentID << "('" << escapePath(directory) << "', " << framenr
@@ -1391,13 +1510,16 @@ bool MANTA::readParticles(FluidModifierData *fmd, int framenr, bool resumable)
 
 bool MANTA::readGuiding(FluidModifierData *fmd, int framenr, bool sourceDomain)
 {
-  if (with_debug)
+  if (with_debug) {
     cout << "MANTA::readGuiding()" << endl;
+  }
 
-  if (!mUsingGuiding)
+  if (!mUsingGuiding) {
     return false;
-  if (!fmd)
+  }
+  if (!fmd) {
     return false;
+  }
 
   ostringstream ss;
   vector<string> pythonCommands;
@@ -1408,8 +1530,9 @@ bool MANTA::readGuiding(FluidModifierData *fmd, int framenr, bool sourceDomain)
   string volume_format = getCacheFileEnding(fds->cache_data_format);
 
   /* Sanity check: Are cache files present? */
-  if (!hasGuiding(fmd, framenr, sourceDomain))
+  if (!hasGuiding(fmd, framenr, sourceDomain)) {
     return false;
+  }
 
   if (sourceDomain) {
     ss.str("");
@@ -1428,8 +1551,9 @@ bool MANTA::readGuiding(FluidModifierData *fmd, int framenr, bool sourceDomain)
 
 bool MANTA::bakeData(FluidModifierData *fmd, int framenr)
 {
-  if (with_debug)
+  if (with_debug) {
     cout << "MANTA::bakeData()" << endl;
+  }
 
   string tmpString, finalString;
   ostringstream ss;
@@ -1442,13 +1566,9 @@ bool MANTA::bakeData(FluidModifierData *fmd, int framenr)
 
   string volume_format = getCacheFileEnding(fds->cache_data_format);
 
+  BLI_path_join(cacheDirData, sizeof(cacheDirData), fds->cache_directory, FLUID_DOMAIN_DIR_DATA);
   BLI_path_join(
-      cacheDirData, sizeof(cacheDirData), fds->cache_directory, FLUID_DOMAIN_DIR_DATA, nullptr);
-  BLI_path_join(cacheDirGuiding,
-                sizeof(cacheDirGuiding),
-                fds->cache_directory,
-                FLUID_DOMAIN_DIR_GUIDE,
-                nullptr);
+      cacheDirGuiding, sizeof(cacheDirGuiding), fds->cache_directory, FLUID_DOMAIN_DIR_GUIDE);
   BLI_path_make_safe(cacheDirData);
   BLI_path_make_safe(cacheDirGuiding);
 
@@ -1462,8 +1582,9 @@ bool MANTA::bakeData(FluidModifierData *fmd, int framenr)
 
 bool MANTA::bakeNoise(FluidModifierData *fmd, int framenr)
 {
-  if (with_debug)
+  if (with_debug) {
     cout << "MANTA::bakeNoise()" << endl;
+  }
 
   ostringstream ss;
   vector<string> pythonCommands;
@@ -1475,7 +1596,7 @@ bool MANTA::bakeNoise(FluidModifierData *fmd, int framenr)
   string volume_format = getCacheFileEnding(fds->cache_data_format);
 
   BLI_path_join(
-      cacheDirNoise, sizeof(cacheDirNoise), fds->cache_directory, FLUID_DOMAIN_DIR_NOISE, nullptr);
+      cacheDirNoise, sizeof(cacheDirNoise), fds->cache_directory, FLUID_DOMAIN_DIR_NOISE);
   BLI_path_make_safe(cacheDirNoise);
 
   ss.str("");
@@ -1488,8 +1609,9 @@ bool MANTA::bakeNoise(FluidModifierData *fmd, int framenr)
 
 bool MANTA::bakeMesh(FluidModifierData *fmd, int framenr)
 {
-  if (with_debug)
+  if (with_debug) {
     cout << "MANTA::bakeMesh()" << endl;
+  }
 
   ostringstream ss;
   vector<string> pythonCommands;
@@ -1501,8 +1623,7 @@ bool MANTA::bakeMesh(FluidModifierData *fmd, int framenr)
   string volume_format = getCacheFileEnding(fds->cache_data_format);
   string mesh_format = getCacheFileEnding(fds->cache_mesh_format);
 
-  BLI_path_join(
-      cacheDirMesh, sizeof(cacheDirMesh), fds->cache_directory, FLUID_DOMAIN_DIR_MESH, nullptr);
+  BLI_path_join(cacheDirMesh, sizeof(cacheDirMesh), fds->cache_directory, FLUID_DOMAIN_DIR_MESH);
   BLI_path_make_safe(cacheDirMesh);
 
   ss.str("");
@@ -1515,8 +1636,9 @@ bool MANTA::bakeMesh(FluidModifierData *fmd, int framenr)
 
 bool MANTA::bakeParticles(FluidModifierData *fmd, int framenr)
 {
-  if (with_debug)
+  if (with_debug) {
     cout << "MANTA::bakeParticles()" << endl;
+  }
 
   ostringstream ss;
   vector<string> pythonCommands;
@@ -1531,8 +1653,7 @@ bool MANTA::bakeParticles(FluidModifierData *fmd, int framenr)
   BLI_path_join(cacheDirParticles,
                 sizeof(cacheDirParticles),
                 fds->cache_directory,
-                FLUID_DOMAIN_DIR_PARTICLES,
-                nullptr);
+                FLUID_DOMAIN_DIR_PARTICLES);
   BLI_path_make_safe(cacheDirParticles);
 
   ss.str("");
@@ -1545,8 +1666,9 @@ bool MANTA::bakeParticles(FluidModifierData *fmd, int framenr)
 
 bool MANTA::bakeGuiding(FluidModifierData *fmd, int framenr)
 {
-  if (with_debug)
+  if (with_debug) {
     cout << "MANTA::bakeGuiding()" << endl;
+  }
 
   ostringstream ss;
   vector<string> pythonCommands;
@@ -1558,11 +1680,8 @@ bool MANTA::bakeGuiding(FluidModifierData *fmd, int framenr)
   string volume_format = getCacheFileEnding(fds->cache_data_format);
   string resumable_cache = !(fds->flags & FLUID_DOMAIN_USE_RESUMABLE_CACHE) ? "False" : "True";
 
-  BLI_path_join(cacheDirGuiding,
-                sizeof(cacheDirGuiding),
-                fds->cache_directory,
-                FLUID_DOMAIN_DIR_GUIDE,
-                nullptr);
+  BLI_path_join(
+      cacheDirGuiding, sizeof(cacheDirGuiding), fds->cache_directory, FLUID_DOMAIN_DIR_GUIDE);
   BLI_path_make_safe(cacheDirGuiding);
 
   ss.str("");
@@ -1579,12 +1698,15 @@ bool MANTA::updateVariables(FluidModifierData *fmd)
   vector<string> pythonCommands;
 
   tmpString += fluid_variables;
-  if (mUsingSmoke)
+  if (mUsingSmoke) {
     tmpString += smoke_variables;
-  if (mUsingLiquid)
+  }
+  if (mUsingLiquid) {
     tmpString += liquid_variables;
-  if (mUsingGuiding)
+  }
+  if (mUsingGuiding) {
     tmpString += fluid_variables_guiding;
+  }
   if (mUsingNoise) {
     tmpString += fluid_variables_noise;
     tmpString += smoke_variables_noise;
@@ -1594,8 +1716,9 @@ bool MANTA::updateVariables(FluidModifierData *fmd)
     tmpString += fluid_variables_particles;
     tmpString += liquid_variables_particles;
   }
-  if (mUsingMesh)
+  if (mUsingMesh) {
     tmpString += fluid_variables_mesh;
+  }
 
   finalString = parseScript(tmpString, fmd);
   pythonCommands.push_back(finalString);
@@ -1605,21 +1728,20 @@ bool MANTA::updateVariables(FluidModifierData *fmd)
 
 bool MANTA::exportSmokeScript(FluidModifierData *fmd)
 {
-  if (with_debug)
+  if (with_debug) {
     cout << "MANTA::exportSmokeScript()" << endl;
+  }
 
   char cacheDir[FILE_MAX] = "\0";
   char cacheDirScript[FILE_MAX] = "\0";
 
   FluidDomainSettings *fds = fmd->domain;
 
-  BLI_path_join(
-      cacheDir, sizeof(cacheDir), fds->cache_directory, FLUID_DOMAIN_DIR_SCRIPT, nullptr);
+  BLI_path_join(cacheDir, sizeof(cacheDir), fds->cache_directory, FLUID_DOMAIN_DIR_SCRIPT);
   BLI_path_make_safe(cacheDir);
   /* Create 'script' subdir if it does not exist already */
   BLI_dir_create_recursive(cacheDir);
-  BLI_path_join(
-      cacheDirScript, sizeof(cacheDirScript), cacheDir, FLUID_DOMAIN_SMOKE_SCRIPT, nullptr);
+  BLI_path_join(cacheDirScript, sizeof(cacheDirScript), cacheDir, FLUID_DOMAIN_SMOKE_SCRIPT);
   BLI_path_make_safe(cacheDir);
 
   bool noise = fds->flags & FLUID_DOMAIN_USE_NOISE;
@@ -1641,53 +1763,68 @@ bool MANTA::exportSmokeScript(FluidModifierData *fmd)
   if (noise) {
     manta_script += fluid_variables_noise + smoke_variables_noise;
   }
-  if (guiding)
+  if (guiding) {
     manta_script += fluid_variables_guiding;
+  }
 
   /* Solvers. */
   manta_script += header_solvers + fluid_solver;
-  if (noise)
+  if (noise) {
     manta_script += fluid_solver_noise;
-  if (guiding)
+  }
+  if (guiding) {
     manta_script += fluid_solver_guiding;
+  }
 
   /* Grids. */
   manta_script += header_grids + fluid_alloc + smoke_alloc;
   if (noise) {
     manta_script += smoke_alloc_noise;
-    if (colors)
+    if (colors) {
       manta_script += smoke_alloc_colors_noise;
-    if (fire)
+    }
+    if (fire) {
       manta_script += smoke_alloc_fire_noise;
+    }
   }
-  if (heat)
+  if (heat) {
     manta_script += smoke_alloc_heat;
-  if (colors)
+  }
+  if (colors) {
     manta_script += smoke_alloc_colors;
-  if (fire)
+  }
+  if (fire) {
     manta_script += smoke_alloc_fire;
-  if (guiding)
+  }
+  if (guiding) {
     manta_script += fluid_alloc_guiding;
-  if (obstacle)
+  }
+  if (obstacle) {
     manta_script += fluid_alloc_obstacle;
-  if (invel)
+  }
+  if (invel) {
     manta_script += fluid_alloc_invel;
-  if (outflow)
+  }
+  if (outflow) {
     manta_script += fluid_alloc_outflow;
+  }
 
   /* Noise field. */
-  if (noise)
+  if (noise) {
     manta_script += smoke_wavelet_noise;
+  }
 
   /* Time. */
   manta_script += header_time + fluid_time_stepping + fluid_adapt_time_step;
 
   /* Import. */
   manta_script += header_import + fluid_file_import + fluid_cache_helper + smoke_load_data;
-  if (noise)
+  if (noise) {
     manta_script += smoke_load_noise;
-  if (guiding)
+  }
+  if (guiding) {
     manta_script += fluid_load_guiding;
+  }
 
   /* Pre/Post Steps. */
   manta_script += header_prepost + fluid_pre_step + fluid_post_step;
@@ -1718,21 +1855,20 @@ bool MANTA::exportSmokeScript(FluidModifierData *fmd)
 
 bool MANTA::exportLiquidScript(FluidModifierData *fmd)
 {
-  if (with_debug)
+  if (with_debug) {
     cout << "MANTA::exportLiquidScript()" << endl;
+  }
 
   char cacheDir[FILE_MAX] = "\0";
   char cacheDirScript[FILE_MAX] = "\0";
 
   FluidDomainSettings *fds = fmd->domain;
 
-  BLI_path_join(
-      cacheDir, sizeof(cacheDir), fds->cache_directory, FLUID_DOMAIN_DIR_SCRIPT, nullptr);
+  BLI_path_join(cacheDir, sizeof(cacheDir), fds->cache_directory, FLUID_DOMAIN_DIR_SCRIPT);
   BLI_path_make_safe(cacheDir);
   /* Create 'script' subdir if it does not exist already */
   BLI_dir_create_recursive(cacheDir);
-  BLI_path_join(
-      cacheDirScript, sizeof(cacheDirScript), cacheDir, FLUID_DOMAIN_LIQUID_SCRIPT, nullptr);
+  BLI_path_join(cacheDirScript, sizeof(cacheDirScript), cacheDir, FLUID_DOMAIN_LIQUID_SCRIPT);
   BLI_path_make_safe(cacheDirScript);
 
   bool mesh = fds->flags & FLUID_DOMAIN_USE_MESH;
@@ -1754,44 +1890,60 @@ bool MANTA::exportLiquidScript(FluidModifierData *fmd)
 
   /* Variables. */
   manta_script += header_variables + fluid_variables + liquid_variables;
-  if (mesh)
+  if (mesh) {
     manta_script += fluid_variables_mesh;
-  if (drops || bubble || floater || tracer)
+  }
+  if (drops || bubble || floater || tracer) {
     manta_script += fluid_variables_particles + liquid_variables_particles;
-  if (guiding)
+  }
+  if (guiding) {
     manta_script += fluid_variables_guiding;
-  if (viscosity)
+  }
+  if (viscosity) {
     manta_script += fluid_variables_viscosity;
+  }
 
   /* Solvers. */
   manta_script += header_solvers + fluid_solver;
-  if (mesh)
+  if (mesh) {
     manta_script += fluid_solver_mesh;
-  if (drops || bubble || floater || tracer)
+  }
+  if (drops || bubble || floater || tracer) {
     manta_script += fluid_solver_particles;
-  if (guiding)
+  }
+  if (guiding) {
     manta_script += fluid_solver_guiding;
-  if (viscosity)
+  }
+  if (viscosity) {
     manta_script += fluid_solver_viscosity;
+  }
 
   /* Grids. */
   manta_script += header_grids + fluid_alloc + liquid_alloc;
-  if (mesh)
+  if (mesh) {
     manta_script += liquid_alloc_mesh;
-  if (drops || bubble || floater || tracer)
+  }
+  if (drops || bubble || floater || tracer) {
     manta_script += liquid_alloc_particles;
-  if (guiding)
+  }
+  if (guiding) {
     manta_script += fluid_alloc_guiding;
-  if (obstacle)
+  }
+  if (obstacle) {
     manta_script += fluid_alloc_obstacle;
-  if (fractions)
+  }
+  if (fractions) {
     manta_script += fluid_alloc_fractions;
-  if (invel)
+  }
+  if (invel) {
     manta_script += fluid_alloc_invel;
-  if (outflow)
+  }
+  if (outflow) {
     manta_script += fluid_alloc_outflow;
-  if (viscosity)
+  }
+  if (viscosity) {
     manta_script += liquid_alloc_viscosity;
+  }
 
   /* Domain init. */
   manta_script += header_gridinit + liquid_init_phi;
@@ -1801,22 +1953,27 @@ bool MANTA::exportLiquidScript(FluidModifierData *fmd)
 
   /* Import. */
   manta_script += header_import + fluid_file_import + fluid_cache_helper + liquid_load_data;
-  if (mesh)
+  if (mesh) {
     manta_script += liquid_load_mesh;
-  if (drops || bubble || floater || tracer)
+  }
+  if (drops || bubble || floater || tracer) {
     manta_script += liquid_load_particles;
-  if (guiding)
+  }
+  if (guiding) {
     manta_script += fluid_load_guiding;
+  }
 
   /* Pre/Post Steps. */
   manta_script += header_prepost + fluid_pre_step + fluid_post_step;
 
   /* Steps. */
   manta_script += header_steps + liquid_adaptive_step + liquid_step;
-  if (mesh)
+  if (mesh) {
     manta_script += liquid_step_mesh;
-  if (drops || bubble || floater || tracer)
+  }
+  if (drops || bubble || floater || tracer) {
     manta_script += liquid_step_particles;
+  }
 
   /* Main. */
   manta_script += header_main + liquid_standalone + fluid_standalone;
@@ -1846,9 +2003,10 @@ bool MANTA::exportLiquidScript(FluidModifierData *fmd)
 static PyObject *callPythonFunction(string varName, string functionName, bool isAttribute = false)
 {
   if ((varName == "") || (functionName == "")) {
-    if (MANTA::with_debug)
+    if (MANTA::with_debug) {
       cout << "Fluid: Missing Python variable name and/or function name -- name is: " << varName
            << ", function name is: " << functionName << endl;
+    }
     return nullptr;
   }
 
@@ -1897,8 +2055,9 @@ static PyObject *callPythonFunction(string varName, string functionName, bool is
  * If it's not function will handle the reference count decrement of that argument. */
 static void *pyObjectToPointer(PyObject *inputObject)
 {
-  if (!inputObject)
+  if (!inputObject) {
     return nullptr;
+  }
 
   PyGILState_STATE gilstate = PyGILState_Ensure();
 
@@ -1922,8 +2081,9 @@ static void *pyObjectToPointer(PyObject *inputObject)
  * If it's not function will handle the reference count decrement of that argument. */
 static double pyObjectToDouble(PyObject *inputObject)
 {
-  if (!inputObject)
+  if (!inputObject) {
     return 0.0;
+  }
 
   PyGILState_STATE gilstate = PyGILState_Ensure();
 
@@ -1940,8 +2100,9 @@ static double pyObjectToDouble(PyObject *inputObject)
  * If it's not function will handle the reference count decrement of that argument. */
 static long pyObjectToLong(PyObject *inputObject)
 {
-  if (!inputObject)
+  if (!inputObject) {
     return 0;
+  }
 
   PyGILState_STATE gilstate = PyGILState_Ensure();
 
@@ -1959,8 +2120,9 @@ template<class T> static T *getPointer(string pyObjectName, string pyFunctionNam
 
 int MANTA::getFrame()
 {
-  if (with_debug)
+  if (with_debug) {
     cout << "MANTA::getFrame()" << endl;
+  }
 
   string func = "frame";
   string id = to_string(mCurrentID);
@@ -1971,8 +2133,9 @@ int MANTA::getFrame()
 
 float MANTA::getTimestep()
 {
-  if (with_debug)
+  if (with_debug) {
     cout << "MANTA::getTimestep()" << endl;
+  }
 
   string func = "timestep";
   string id = to_string(mCurrentID);
@@ -1991,8 +2154,9 @@ bool MANTA::needsRealloc(FluidModifierData *fmd)
 
 void MANTA::adaptTimestep()
 {
-  if (with_debug)
+  if (with_debug) {
     cout << "MANTA::adaptTimestep()" << endl;
+  }
 
   vector<string> pythonCommands;
   ostringstream ss;
@@ -2005,8 +2169,9 @@ void MANTA::adaptTimestep()
 
 void MANTA::updatePointers(FluidModifierData *fmd, bool flush)
 {
-  if (with_debug)
+  if (with_debug) {
     cout << "MANTA::updatePointers()" << endl;
+  }
 
   FluidDomainSettings *fds = fmd->domain;
 
@@ -2161,8 +2326,9 @@ bool MANTA::hasData(FluidModifierData *fmd, int framenr)
     string filename = (mUsingSmoke) ? FLUID_NAME_DENSITY : FLUID_NAME_PP;
     exists = BLI_exists(getFile(fmd, FLUID_DOMAIN_DIR_DATA, filename, extension, framenr).c_str());
   }
-  if (with_debug)
+  if (with_debug) {
     cout << "Fluid: Has Data: " << exists << endl;
+  }
 
   return exists;
 }
@@ -2187,8 +2353,9 @@ bool MANTA::hasNoise(FluidModifierData *fmd, int framenr)
         getFile(fmd, FLUID_DOMAIN_DIR_NOISE, FLUID_NAME_DENSITY_NOISE, extension, framenr)
             .c_str());
   }
-  if (with_debug)
+  if (with_debug) {
     cout << "Fluid: Has Noise: " << exists << endl;
+  }
 
   return exists;
 }
@@ -2204,8 +2371,9 @@ bool MANTA::hasMesh(FluidModifierData *fmd, int framenr)
     exists = BLI_exists(
         getFile(fmd, FLUID_DOMAIN_DIR_MESH, FLUID_NAME_LMESH, extension, framenr).c_str());
   }
-  if (with_debug)
+  if (with_debug) {
     cout << "Fluid: Has Mesh: " << exists << endl;
+  }
 
   return exists;
 }
@@ -2230,8 +2398,9 @@ bool MANTA::hasParticles(FluidModifierData *fmd, int framenr)
         getFile(fmd, FLUID_DOMAIN_DIR_PARTICLES, FLUID_NAME_PP_PARTICLES, extension, framenr)
             .c_str());
   }
-  if (with_debug)
+  if (with_debug) {
     cout << "Fluid: Has Particles: " << exists << endl;
+  }
 
   return exists;
 }
@@ -2249,8 +2418,9 @@ bool MANTA::hasGuiding(FluidModifierData *fmd, int framenr, bool sourceDomain)
     exists = BLI_exists(getFile(fmd, subdirectory, filename, extension, framenr).c_str());
   }
 
-  if (with_debug)
+  if (with_debug) {
     cout << "Fluid: Has Guiding: " << exists << endl;
+  }
 
   return exists;
 }
@@ -2258,8 +2428,7 @@ bool MANTA::hasGuiding(FluidModifierData *fmd, int framenr, bool sourceDomain)
 string MANTA::getDirectory(FluidModifierData *fmd, string subdirectory)
 {
   char directory[FILE_MAX];
-  BLI_path_join(
-      directory, sizeof(directory), fmd->domain->cache_directory, subdirectory.c_str(), nullptr);
+  BLI_path_join(directory, sizeof(directory), fmd->domain->cache_directory, subdirectory.c_str());
   BLI_path_make_safe(directory);
   return directory;
 }
@@ -2270,7 +2439,7 @@ string MANTA::getFile(
   char targetFile[FILE_MAX];
   string path = getDirectory(fmd, subdirectory);
   string filename = fname + "_####" + extension;
-  BLI_join_dirfile(targetFile, sizeof(targetFile), path.c_str(), filename.c_str());
-  BLI_path_frame(targetFile, framenr, 0);
+  BLI_path_join(targetFile, sizeof(targetFile), path.c_str(), filename.c_str());
+  BLI_path_frame(targetFile, sizeof(targetFile), framenr, 0);
   return targetFile;
 }

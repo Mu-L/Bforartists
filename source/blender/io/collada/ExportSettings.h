@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup collada
@@ -30,30 +18,30 @@
 extern "C" {
 #endif
 
-typedef enum BC_export_mesh_type {
+enum BC_export_mesh_type {
   BC_MESH_TYPE_VIEW,
   BC_MESH_TYPE_RENDER,
-} BC_export_mesh_type;
+};
 
-typedef enum BC_export_transformation_type {
+enum BC_export_transformation_type {
   BC_TRANSFORMATION_TYPE_MATRIX,
   BC_TRANSFORMATION_TYPE_DECOMPOSED,
-} BC_export_transformation_type;
+};
 
-typedef enum BC_export_animation_type {
+enum BC_export_animation_type {
   BC_ANIMATION_EXPORT_SAMPLES,
   BC_ANIMATION_EXPORT_KEYS,
-} BC_export_animation_type;
+};
 
-typedef enum BC_ui_export_section {
+enum BC_ui_export_section {
   BC_UI_SECTION_MAIN,
   BC_UI_SECTION_GEOMETRY,
   BC_UI_SECTION_ARMATURE,
   BC_UI_SECTION_ANIMATION,
   BC_UI_SECTION_COLLADA,
-} BC_ui_export_section;
+};
 
-typedef struct ExportSettings {
+struct ExportSettings {
   bool apply_modifiers;
   BC_global_forward_axis global_forward;
   BC_global_up_axis global_up;
@@ -90,12 +78,15 @@ typedef struct ExportSettings {
 
   char *filepath;
   LinkNode *export_set;
-} ExportSettings;
+};
 
 #ifdef __cplusplus
 }
 
-void bc_get_children(std::vector<Object *> &child_set, Object *ob, ViewLayer *view_layer);
+void bc_get_children(std::vector<Object *> &child_set,
+                     Object *ob,
+                     const Scene *scene,
+                     ViewLayer *view_layer);
 
 class BCExportSettings {
 
@@ -109,7 +100,6 @@ class BCExportSettings {
       : export_settings(*exportSettings),
         blender_context(blenderContext),
         global_transform(BCMatrix(exportSettings->global_forward, exportSettings->global_up))
-
   {
   }
 
@@ -285,7 +275,7 @@ class BCExportSettings {
 
   bool is_export_root(Object *ob)
   {
-    return bc_is_base_node(get_export_set(), ob, get_view_layer());
+    return bc_is_base_node(get_export_set(), ob, get_scene(), get_view_layer());
   }
 };
 

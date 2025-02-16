@@ -1,4 +1,6 @@
-/* Apache License, Version 2.0 */
+/* SPDX-FileCopyrightText: 2023 Blender Authors
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "testing/testing.h"
 
@@ -12,8 +14,9 @@
 #include "MEM_guardedalloc.h"
 
 #include "BLI_array_utils.h"
-#include "BLI_edgehash.h"
-#include "BLI_math.h"
+#include "BLI_map.hh"
+#include "BLI_math_geom.h"
+#include "BLI_ordered_edge.hh"
 #include "BLI_polyfill_2d.h"
 #include "BLI_utildefines.h"
 
@@ -29,20 +32,26 @@
 
 static void polyfill_to_obj(const char *id,
                             const float poly[][2],
-                            const unsigned int poly_tot,
-                            const unsigned int tris[][3],
-                            const unsigned int tris_tot);
+                            const uint poly_num,
+                            const uint tris[][3],
+                            const uint tris_num);
+
+enum ePolyFill2DTestFlag {
+  POLYFILL2D_TEST_IS_DEGENERATE = (1 << 0),
+  POLYFILL2D_TEST_NO_ZERO_AREA_TRIS = (1 << 1),
+  POLYFILL2D_TEST_NOP = 0,
+};
 
 /* -------------------------------------------------------------------- */
 /* test utility functions */
 
-#define TRI_ERROR_VALUE (unsigned int)-1
+#define TRI_ERROR_VALUE uint(-1)
 
-static void test_valid_polyfill_prepare(unsigned int tris[][3], unsigned int tris_tot)
+static void test_valid_polyfill_prepare(uint tris[][3], uint tris_num)
 {
-  unsigned int i;
-  for (i = 0; i < tris_tot; i++) {
-    unsigned int j;
+  uint i;
+  for (i = 0; i < tris_num; i++) {
+    uint j;
     for (j = 0; j < 3; j++) {
       tris[i][j] = TRI_ERROR_VALUE;
     }
@@ -57,81 +66,69 @@ static void test_valid_polyfill_prepare(unsigned int tris[][3], unsigned int tri
  * - all verts used at least once.
  */
 static void test_polyfill_simple(const float /*poly*/[][2],
-                                 const unsigned int poly_tot,
-                                 const unsigned int tris[][3],
-                                 const unsigned int tris_tot)
+                                 const uint poly_num,
+                                 const uint tris[][3],
+                                 const uint tris_num)
 {
-  unsigned int i;
-  int *tot_used = (int *)MEM_callocN(poly_tot * sizeof(int), __func__);
-  for (i = 0; i < tris_tot; i++) {
-    unsigned int j;
+  uint i;
+  int *used_num = (int *)MEM_callocN(poly_num * sizeof(int), __func__);
+  for (i = 0; i < tris_num; i++) {
+    uint j;
     for (j = 0; j < 3; j++) {
       EXPECT_NE(TRI_ERROR_VALUE, tris[i][j]);
-      tot_used[tris[i][j]] += 1;
+      used_num[tris[i][j]] += 1;
     }
     EXPECT_NE(tris[i][0], tris[i][1]);
     EXPECT_NE(tris[i][1], tris[i][2]);
     EXPECT_NE(tris[i][2], tris[i][0]);
   }
-  for (i = 0; i < poly_tot; i++) {
-    EXPECT_NE(0, tot_used[i]);
+  for (i = 0; i < poly_num; i++) {
+    EXPECT_NE(0, used_num[i]);
   }
-  MEM_freeN(tot_used);
+  MEM_freeN(used_num);
 }
 
 static void test_polyfill_topology(const float /*poly*/[][2],
-                                   const unsigned int poly_tot,
-                                   const unsigned int tris[][3],
-                                   const unsigned int tris_tot)
+                                   const uint poly_num,
+                                   const uint tris[][3],
+                                   const uint tris_num)
 {
-  EdgeHash *edgehash = BLI_edgehash_new(__func__);
-  EdgeHashIterator *ehi;
-  unsigned int i;
-  for (i = 0; i < tris_tot; i++) {
-    unsigned int j;
+  blender::Map<blender::OrderedEdge, int> edgehash;
+  uint i;
+  for (i = 0; i < tris_num; i++) {
+    uint j;
     for (j = 0; j < 3; j++) {
-      const unsigned int v1 = tris[i][j];
-      const unsigned int v2 = tris[i][(j + 1) % 3];
-      void **p = BLI_edgehash_lookup_p(edgehash, v1, v2);
-      if (p) {
-        *p = (void *)((intptr_t)*p + (intptr_t)1);
-      }
-      else {
-        BLI_edgehash_insert(edgehash, v1, v2, (void *)(intptr_t)1);
-      }
+      const uint v1 = tris[i][j];
+      const uint v2 = tris[i][(j + 1) % 3];
+      edgehash.add_or_modify(
+          {v1, v2}, [](int *value) { *value = 1; }, [](int *value) { (*value)++; });
     }
   }
-  EXPECT_EQ(BLI_edgehash_len(edgehash), poly_tot + (poly_tot - 3));
+  EXPECT_EQ(edgehash.size(), poly_num + (poly_num - 3));
 
-  for (i = 0; i < poly_tot; i++) {
-    const unsigned int v1 = i;
-    const unsigned int v2 = (i + 1) % poly_tot;
-    void **p = BLI_edgehash_lookup_p(edgehash, v1, v2);
-    EXPECT_NE((void *)p, nullptr);
-    EXPECT_EQ((intptr_t)*p, 1);
+  for (i = 0; i < poly_num; i++) {
+    const uint v1 = i;
+    const uint v2 = (i + 1) % poly_num;
+    EXPECT_TRUE(edgehash.contains({v1, v2}));
+    EXPECT_EQ(edgehash.lookup({v1, v2}), 1);
   }
 
-  for (ehi = BLI_edgehashIterator_new(edgehash), i = 0; BLI_edgehashIterator_isDone(ehi) == false;
-       BLI_edgehashIterator_step(ehi), i++) {
-    void **p = BLI_edgehashIterator_getValue_p(ehi);
-    EXPECT_TRUE(ELEM((intptr_t)*p, 1, 2));
+  for (const int value : edgehash.values()) {
+    EXPECT_TRUE(ELEM(value, 1, 2));
   }
-
-  BLI_edgehashIterator_free(ehi);
-  BLI_edgehash_free(edgehash, nullptr);
 }
 
 /**
  * Check all faces are flipped the same way
  */
 static void test_polyfill_winding(const float poly[][2],
-                                  const unsigned int /*poly_tot*/,
-                                  const unsigned int tris[][3],
-                                  const unsigned int tris_tot)
+                                  const uint /*poly_num*/,
+                                  const uint tris[][3],
+                                  const uint tris_num)
 {
-  unsigned int i;
-  unsigned int count[2] = {0, 0};
-  for (i = 0; i < tris_tot; i++) {
+  uint i;
+  uint count[2] = {0, 0};
+  for (i = 0; i < tris_num; i++) {
     float winding_test = cross_tri_v2(poly[tris[i][0]], poly[tris[i][1]], poly[tris[i][2]]);
     if (fabsf(winding_test) > FLT_EPSILON) {
       count[winding_test < 0.0f] += 1;
@@ -144,19 +141,37 @@ static void test_polyfill_winding(const float poly[][2],
  * Check the accumulated triangle area is close to the original area.
  */
 static void test_polyfill_area(const float poly[][2],
-                               const unsigned int poly_tot,
-                               const unsigned int tris[][3],
-                               const unsigned int tris_tot)
+                               const uint poly_num,
+                               const uint tris[][3],
+                               const uint tris_num)
 {
-  unsigned int i;
-  const float area_tot = area_poly_v2(poly, poly_tot);
-  float area_tot_tris = 0.0f;
+  uint i;
+  const float area_total = area_poly_v2(poly, poly_num);
+  float area_total_tris = 0.0f;
   const float eps_abs = 0.00001f;
-  const float eps = area_tot > 1.0f ? (area_tot * eps_abs) : eps_abs;
-  for (i = 0; i < tris_tot; i++) {
-    area_tot_tris += area_tri_v2(poly[tris[i][0]], poly[tris[i][1]], poly[tris[i][2]]);
+  const float eps = area_total > 1.0f ? (area_total * eps_abs) : eps_abs;
+  for (i = 0; i < tris_num; i++) {
+    area_total_tris += area_tri_v2(poly[tris[i][0]], poly[tris[i][1]], poly[tris[i][2]]);
   }
-  EXPECT_NEAR(area_tot, area_tot_tris, eps);
+  EXPECT_NEAR(area_total, area_total_tris, eps);
+}
+
+/**
+ * Check that none of the tessellated triangles are zero area.
+ */
+static void test_polyfill_area_tri_nonzero(const float poly[][2],
+                                           const uint /*poly_num*/,
+                                           const uint tris[][3],
+                                           const uint tris_num)
+{
+  uint i;
+  uint total = 0;
+  for (i = 0; i < tris_num; i++) {
+    if (area_tri_v2(poly[tris[i][0]], poly[tris[i][1]], poly[tris[i][2]]) < 1e-6f) {
+      total += 1;
+    }
+  }
+  EXPECT_EQ(total, 0);
 }
 
 /* -------------------------------------------------------------------- */
@@ -165,34 +180,40 @@ static void test_polyfill_area(const float poly[][2],
  * Main template for polyfill testing.
  */
 static void test_polyfill_template_check(const char *id,
-                                         bool is_degenerate,
+                                         const ePolyFill2DTestFlag test_flag,
                                          const float poly[][2],
-                                         const unsigned int poly_tot,
-                                         const unsigned int tris[][3],
-                                         const unsigned int tris_tot)
+                                         const uint poly_num,
+                                         const uint tris[][3],
+                                         const uint tris_num)
 {
-  test_polyfill_simple(poly, poly_tot, tris, tris_tot);
-  test_polyfill_topology(poly, poly_tot, tris, tris_tot);
-  if (!is_degenerate) {
-    test_polyfill_winding(poly, poly_tot, tris, tris_tot);
+  test_polyfill_simple(poly, poly_num, tris, tris_num);
+  test_polyfill_topology(poly, poly_num, tris, tris_num);
+  if (!(test_flag & POLYFILL2D_TEST_IS_DEGENERATE)) {
+    test_polyfill_winding(poly, poly_num, tris, tris_num);
 
-    test_polyfill_area(poly, poly_tot, tris, tris_tot);
+    test_polyfill_area(poly, poly_num, tris, tris_num);
+
+    /* Only check when non-degenerate, because the number of zero area triangles
+     * are undefined for degenerate polygons as there is no correct solution. */
+    if (test_flag & POLYFILL2D_TEST_NO_ZERO_AREA_TRIS) {
+      test_polyfill_area_tri_nonzero(poly, poly_num, tris, tris_num);
+    }
   }
-  polyfill_to_obj(id, poly, poly_tot, tris, tris_tot);
+  polyfill_to_obj(id, poly, poly_num, tris, tris_num);
 }
 
 static void test_polyfill_template(const char *id,
-                                   bool is_degenerate,
+                                   const ePolyFill2DTestFlag test_flag,
                                    const float poly[][2],
-                                   const unsigned int poly_tot,
-                                   unsigned int tris[][3],
-                                   const unsigned int tris_tot)
+                                   const uint poly_num,
+                                   uint tris[][3],
+                                   const uint tris_num)
 {
-  test_valid_polyfill_prepare(tris, tris_tot);
-  BLI_polyfill_calc(poly, poly_tot, 0, tris);
+  test_valid_polyfill_prepare(tris, tris_num);
+  BLI_polyfill_calc(poly, poly_num, 0, tris);
 
   /* check all went well */
-  test_polyfill_template_check(id, is_degenerate, poly, poly_tot, tris, tris_tot);
+  test_polyfill_template_check(id, test_flag, poly, poly_num, tris, tris_num);
 
 #ifdef USE_BEAUTIFY
   /* check beautify gives good results too */
@@ -200,9 +221,9 @@ static void test_polyfill_template(const char *id,
     MemArena *pf_arena = BLI_memarena_new(BLI_POLYFILL_ARENA_SIZE, __func__);
     Heap *pf_heap = BLI_heap_new_ex(BLI_POLYFILL_ALLOC_NGON_RESERVE);
 
-    BLI_polyfill_beautify(poly, poly_tot, tris, pf_arena, pf_heap);
+    BLI_polyfill_beautify(poly, poly_num, tris, pf_arena, pf_heap);
 
-    test_polyfill_template_check(id, is_degenerate, poly, poly_tot, tris, tris_tot);
+    test_polyfill_template_check(id, test_flag, poly, poly_num, tris, tris_num);
 
     BLI_memarena_free(pf_arena);
     BLI_heap_free(pf_heap, nullptr);
@@ -211,22 +232,22 @@ static void test_polyfill_template(const char *id,
 }
 
 static void test_polyfill_template_flip_sign(const char *id,
-                                             bool is_degenerate,
+                                             const ePolyFill2DTestFlag test_flag,
                                              const float poly[][2],
-                                             const unsigned int poly_tot,
-                                             unsigned int tris[][3],
-                                             const unsigned int tris_tot)
+                                             const uint poly_num,
+                                             uint tris[][3],
+                                             const uint tris_num)
 {
-  float(*poly_copy)[2] = (float(*)[2])MEM_mallocN(sizeof(float[2]) * poly_tot, id);
+  float(*poly_copy)[2] = (float(*)[2])MEM_mallocN(sizeof(float[2]) * poly_num, id);
   for (int flip_x = 0; flip_x < 2; flip_x++) {
     for (int flip_y = 0; flip_y < 2; flip_y++) {
       float sign_x = flip_x ? -1.0f : 1.0f;
       float sign_y = flip_y ? -1.0f : 1.0f;
-      for (int i = 0; i < poly_tot; i++) {
+      for (int i = 0; i < poly_num; i++) {
         poly_copy[i][0] = poly[i][0] * sign_x;
         poly_copy[i][1] = poly[i][1] * sign_y;
       }
-      test_polyfill_template(id, is_degenerate, poly_copy, poly_tot, tris, tris_tot);
+      test_polyfill_template(id, test_flag, poly_copy, poly_num, tris, tris_num);
     }
   }
   MEM_freeN(poly_copy);
@@ -234,34 +255,34 @@ static void test_polyfill_template_flip_sign(const char *id,
 
 #ifdef USE_COMBINATIONS_ALL
 static void test_polyfill_template_main(const char *id,
-                                        bool is_degenerate,
+                                        const ePolyFill2DTestFlag test_flag,
                                         const float poly[][2],
-                                        const unsigned int poly_tot,
-                                        unsigned int tris[][3],
-                                        const unsigned int tris_tot)
+                                        const uint poly_num,
+                                        uint tris[][3],
+                                        const uint tris_num)
 {
   /* overkill? - try at _every_ offset & reverse */
-  unsigned int poly_reverse;
-  float(*poly_copy)[2] = (float(*)[2])MEM_mallocN(sizeof(float[2]) * poly_tot, id);
+  uint poly_reverse;
+  float(*poly_copy)[2] = (float(*)[2])MEM_mallocN(sizeof(float[2]) * poly_num, id);
   float tmp[2];
 
-  memcpy(poly_copy, poly, sizeof(float[2]) * poly_tot);
+  memcpy(poly_copy, poly, sizeof(float[2]) * poly_num);
 
   for (poly_reverse = 0; poly_reverse < 2; poly_reverse++) {
-    unsigned int poly_cycle;
+    uint poly_cycle;
 
     if (poly_reverse) {
-      BLI_array_reverse(poly_copy, poly_tot);
+      BLI_array_reverse(poly_copy, poly_num);
     }
 
-    for (poly_cycle = 0; poly_cycle < poly_tot; poly_cycle++) {
+    for (poly_cycle = 0; poly_cycle < poly_num; poly_cycle++) {
       // printf("polytest %s ofs=%d, reverse=%d\n", id, poly_cycle, poly_reverse);
-      test_polyfill_template_flip_sign(id, is_degenerate, poly, poly_tot, tris, tris_tot);
+      test_polyfill_template_flip_sign(id, test_flag, poly, poly_num, tris, tris_num);
 
       /* cycle */
       copy_v2_v2(tmp, poly_copy[0]);
-      memmove(&poly_copy[0], &poly_copy[1], (poly_tot - 1) * sizeof(float[2]));
-      copy_v2_v2(poly_copy[poly_tot - 1], tmp);
+      memmove(&poly_copy[0], &poly_copy[1], (poly_num - 1) * sizeof(float[2]));
+      copy_v2_v2(poly_copy[poly_num - 1], tmp);
     }
   }
 
@@ -269,24 +290,24 @@ static void test_polyfill_template_main(const char *id,
 }
 #else  /* USE_COMBINATIONS_ALL */
 static void test_polyfill_template_main(const char *id,
-                                        bool is_degenerate,
+                                        const ePolyFill2DTestFlag test_flag,
                                         const float poly[][2],
-                                        const unsigned int poly_tot,
-                                        unsigned int tris[][3],
-                                        const unsigned int tris_tot)
+                                        const uint poly_num,
+                                        uint tris[][3],
+                                        const uint tris_num)
 {
-  test_polyfill_template_flip_sign(id, is_degenerate, poly, poly_tot, tris, tris_tot);
+  test_polyfill_template_flip_sign(id, test_flag, poly, poly_num, tris, tris_num);
 }
 #endif /* USE_COMBINATIONS_ALL */
 
-#define TEST_POLYFILL_TEMPLATE_STATIC(poly, is_degenerate) \
+#define TEST_POLYFILL_TEMPLATE_STATIC(poly, test_flag) \
   { \
-    unsigned int tris[POLY_TRI_COUNT(ARRAY_SIZE(poly))][3]; \
-    const unsigned int poly_tot = ARRAY_SIZE(poly); \
-    const unsigned int tris_tot = ARRAY_SIZE(tris); \
+    uint tris[POLY_TRI_COUNT(ARRAY_SIZE(poly))][3]; \
+    const uint poly_num = ARRAY_SIZE(poly); \
+    const uint tris_num = ARRAY_SIZE(tris); \
     const char *id = typeid(*this).name(); \
 \
-    test_polyfill_template_main(id, is_degenerate, poly, poly_tot, tris, tris_tot); \
+    test_polyfill_template_main(id, test_flag, poly, poly_num, tris, tris_num); \
   } \
   (void)0
 
@@ -296,26 +317,26 @@ static void test_polyfill_template_main(const char *id,
 #ifdef USE_OBJ_PREVIEW
 static void polyfill_to_obj(const char *id,
                             const float poly[][2],
-                            const unsigned int poly_tot,
-                            const unsigned int tris[][3],
-                            const unsigned int tris_tot)
+                            const uint poly_num,
+                            const uint tris[][3],
+                            const uint tris_num)
 {
   char path[1024];
   FILE *f;
-  unsigned int i;
+  uint i;
 
-  BLI_snprintf(path, sizeof(path), "%s.obj", id);
+  SNPRINTF(path, "%s.obj", id);
 
   f = fopen(path, "w");
   if (!f) {
     return;
   }
 
-  for (i = 0; i < poly_tot; i++) {
+  for (i = 0; i < poly_num; i++) {
     fprintf(f, "v %f %f 0.0\n", UNPACK2(poly[i]));
   }
 
-  for (i = 0; i < tris_tot; i++) {
+  for (i = 0; i < tris_num; i++) {
     fprintf(f, "f %u %u %u\n", UNPACK3_EX(1 +, tris[i], ));
   }
 
@@ -324,13 +345,13 @@ static void polyfill_to_obj(const char *id,
 #else
 static void polyfill_to_obj(const char *id,
                             const float poly[][2],
-                            const unsigned int poly_tot,
-                            const unsigned int tris[][3],
-                            const unsigned int tris_tot)
+                            const uint poly_num,
+                            const uint tris[][3],
+                            const uint tris_num)
 {
   (void)id;
-  (void)poly, (void)poly_tot;
-  (void)tris, (void)tris_tot;
+  (void)poly, (void)poly_num;
+  (void)tris, (void)tris_num;
 }
 #endif /* USE_OBJ_PREVIEW */
 
@@ -380,56 +401,56 @@ static void polyfill_to_obj(const char *id,
 TEST(polyfill2d, TriangleCCW)
 {
   const float poly[][2] = {{0, 0}, {0, 1}, {1, 0}};
-  TEST_POLYFILL_TEMPLATE_STATIC(poly, false);
+  TEST_POLYFILL_TEMPLATE_STATIC(poly, POLYFILL2D_TEST_NOP);
 }
 
 /* A counterclockwise square */
 TEST(polyfill2d, SquareCCW)
 {
   const float poly[][2] = {{0, 0}, {0, 1}, {1, 1}, {1, 0}};
-  TEST_POLYFILL_TEMPLATE_STATIC(poly, false);
+  TEST_POLYFILL_TEMPLATE_STATIC(poly, POLYFILL2D_TEST_NOP);
 }
 
 /* A clockwise square */
 TEST(polyfill2d, SquareCW)
 {
   const float poly[][2] = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
-  TEST_POLYFILL_TEMPLATE_STATIC(poly, false);
+  TEST_POLYFILL_TEMPLATE_STATIC(poly, POLYFILL2D_TEST_NOP);
 }
 
-/* Starfleet insigna */
+/* Star-fleet insignia. */
 TEST(polyfill2d, Starfleet)
 {
   const float poly[][2] = {{0, 0}, {0.6f, 0.4f}, {1, 0}, {0.5f, 1}};
-  TEST_POLYFILL_TEMPLATE_STATIC(poly, false);
+  TEST_POLYFILL_TEMPLATE_STATIC(poly, POLYFILL2D_TEST_NOP);
 }
 
-/* Starfleet insigna with repeated point */
+/* Star-fleet insignia with repeated point. */
 TEST(polyfill2d, StarfleetDegenerate)
 {
   const float poly[][2] = {{0, 0}, {0.6f, 0.4f}, {0.6f, 0.4f}, {1, 0}, {0.5f, 1}};
-  TEST_POLYFILL_TEMPLATE_STATIC(poly, false);
+  TEST_POLYFILL_TEMPLATE_STATIC(poly, POLYFILL2D_TEST_NOP);
 }
 
 /* Three collinear points */
 TEST(polyfill2d, 3Colinear)
 {
   const float poly[][2] = {{0, 0}, {1, 0}, {2, 0}};
-  TEST_POLYFILL_TEMPLATE_STATIC(poly, false);
+  TEST_POLYFILL_TEMPLATE_STATIC(poly, POLYFILL2D_TEST_NOP);
 }
 
 /* Four collinear points */
 TEST(polyfill2d, 4Colinear)
 {
   const float poly[][2] = {{0, 0}, {1, 0}, {2, 0}, {3, 0}};
-  TEST_POLYFILL_TEMPLATE_STATIC(poly, false);
+  TEST_POLYFILL_TEMPLATE_STATIC(poly, POLYFILL2D_TEST_NOP);
 }
 
 /* Non-consecutive collinear points */
 TEST(polyfill2d, UnorderedColinear)
 {
   const float poly[][2] = {{0, 0}, {1, 1}, {2, 0}, {3, 1}, {4, 0}};
-  TEST_POLYFILL_TEMPLATE_STATIC(poly, false);
+  TEST_POLYFILL_TEMPLATE_STATIC(poly, POLYFILL2D_TEST_NOP);
 }
 
 /* Plus shape */
@@ -449,14 +470,14 @@ TEST(polyfill2d, PlusShape)
       {0, 1},
       {1, 1},
   };
-  TEST_POLYFILL_TEMPLATE_STATIC(poly, false);
+  TEST_POLYFILL_TEMPLATE_STATIC(poly, POLYFILL2D_TEST_NOP);
 }
 
 /* Star shape */
 TEST(polyfill2d, StarShape)
 {
   const float poly[][2] = {{4, 0}, {5, 3}, {8, 4}, {5, 5}, {4, 8}, {3, 5}, {0, 4}, {3, 3}};
-  TEST_POLYFILL_TEMPLATE_STATIC(poly, false);
+  TEST_POLYFILL_TEMPLATE_STATIC(poly, POLYFILL2D_TEST_NOP);
 }
 
 /* U shape */
@@ -464,7 +485,7 @@ TEST(polyfill2d, UShape)
 {
   const float poly[][2] = {
       {1, 0}, {2, 0}, {3, 1}, {3, 3}, {2, 3}, {2, 1}, {1, 1}, {1, 3}, {0, 3}, {0, 1}};
-  TEST_POLYFILL_TEMPLATE_STATIC(poly, false);
+  TEST_POLYFILL_TEMPLATE_STATIC(poly, POLYFILL2D_TEST_NOP);
 }
 
 /* Spiral */
@@ -488,7 +509,7 @@ TEST(polyfill2d, Spiral)
       {4, 1},
       {0, 1},
   };
-  TEST_POLYFILL_TEMPLATE_STATIC(poly, false);
+  TEST_POLYFILL_TEMPLATE_STATIC(poly, POLYFILL2D_TEST_NOP);
 }
 
 /* Test case from http://www.flipcode.com/archives/Efficient_Polygon_Triangulation.shtml */
@@ -511,14 +532,14 @@ TEST(polyfill2d, TestFlipCode)
       {4, 3},
       {2, 6},
   };
-  TEST_POLYFILL_TEMPLATE_STATIC(poly, false);
+  TEST_POLYFILL_TEMPLATE_STATIC(poly, POLYFILL2D_TEST_NOP);
 }
 
 /* Self-intersection */
 TEST(polyfill2d, SelfIntersect)
 {
   const float poly[][2] = {{0, 0}, {1, 1}, {2, -1}, {3, 1}, {4, 0}};
-  TEST_POLYFILL_TEMPLATE_STATIC(poly, true);
+  TEST_POLYFILL_TEMPLATE_STATIC(poly, POLYFILL2D_TEST_IS_DEGENERATE);
 }
 
 /* Self-touching */
@@ -538,7 +559,7 @@ TEST(polyfill2d, SelfTouch)
       {2, 4},
       {0, 4},
   };
-  TEST_POLYFILL_TEMPLATE_STATIC(poly, false);
+  TEST_POLYFILL_TEMPLATE_STATIC(poly, POLYFILL2D_TEST_NOP);
 }
 
 /* Self-overlapping */
@@ -558,7 +579,7 @@ TEST(polyfill2d, SelfOverlap)
       {3, 4},
       {0, 4},
   };
-  TEST_POLYFILL_TEMPLATE_STATIC(poly, true);
+  TEST_POLYFILL_TEMPLATE_STATIC(poly, POLYFILL2D_TEST_IS_DEGENERATE);
 }
 
 /* Test case from http://www.davdata.nl/math/polygons.html */
@@ -570,7 +591,7 @@ TEST(polyfill2d, TestDavData)
       {410, 30},  {470, 440}, {640, 410}, {630, 140}, {590, 140}, {580, 360}, {510, 370},
       {510, 60},  {650, 70},  {660, 450}, {190, 480},
   };
-  TEST_POLYFILL_TEMPLATE_STATIC(poly, false);
+  TEST_POLYFILL_TEMPLATE_STATIC(poly, POLYFILL2D_TEST_NOP);
 }
 
 /* Issue 815, http://code.google.com/p/libgdx/issues/detail?id=815 */
@@ -586,7 +607,7 @@ TEST(polyfill2d, Issue815)
       {2.0f, 1.0f},
       {2.0f, 0.0f},
   };
-  TEST_POLYFILL_TEMPLATE_STATIC(poly, false);
+  TEST_POLYFILL_TEMPLATE_STATIC(poly, POLYFILL2D_TEST_NOP);
 }
 
 /* Issue 207, comment #1, http://code.google.com/p/libgdx/issues/detail?id=207#c1 */
@@ -605,7 +626,7 @@ TEST(polyfill2d, Issue207_1)
       {126.70667f, 170.07617f},
       {73.22717f, 199.51062f},
   };
-  TEST_POLYFILL_TEMPLATE_STATIC(poly, true);
+  TEST_POLYFILL_TEMPLATE_STATIC(poly, POLYFILL2D_TEST_IS_DEGENERATE);
 }
 
 /* Issue 207, comment #11, http://code.google.com/p/libgdx/issues/detail?id=207#c11 */
@@ -625,7 +646,7 @@ TEST(polyfill2d, Issue207_11)
       {1934.0381f, 485.3833f},  {1934.5234f, 484.11328f}, {1934.9502f, 482.9663f},
       {1935.3125f, 481.96875f}, {1935.6045f, 481.14697f}, {1935.8203f, 480.52734f},
       {1935.9541f, 480.13623f}, {1936.0f, 480.0f}};
-  TEST_POLYFILL_TEMPLATE_STATIC(poly, false);
+  TEST_POLYFILL_TEMPLATE_STATIC(poly, POLYFILL2D_TEST_NOP);
 }
 
 /* Issue 1407, http://code.google.com/p/libgdx/issues/detail?id=1407 */
@@ -637,7 +658,7 @@ TEST(polyfill2d, Issue1407)
       {4.8973203f, 1.9063174f},
       {5.4979978f, 1.9096732f},
   };
-  TEST_POLYFILL_TEMPLATE_STATIC(poly, false);
+  TEST_POLYFILL_TEMPLATE_STATIC(poly, POLYFILL2D_TEST_NOP);
 }
 
 /* Issue 1407, http://code.google.com/p/libgdx/issues/detail?id=1407, */
@@ -651,10 +672,10 @@ TEST(polyfill2d, Issue1407_pt)
       {5.4979978f, 1.9096732f},
       {4, 4},
   };
-  TEST_POLYFILL_TEMPLATE_STATIC(poly, false);
+  TEST_POLYFILL_TEMPLATE_STATIC(poly, POLYFILL2D_TEST_NOP);
 }
 
-/* Simplified from Blender bug T40777 */
+/* Simplified from Blender bug #40777 */
 TEST(polyfill2d, IssueT40777_colinear)
 {
   const float poly[][2] = {
@@ -662,10 +683,10 @@ TEST(polyfill2d, IssueT40777_colinear)
       {0.88, 0.4},  {0.94, 0.4}, {0.94, 0}, {1, 0},      {1, 0.4},    {0.03, 0.62}, {0.03, 0.89},
       {0.59, 0.89}, {0.03, 1},   {0, 1},    {0, 0},      {0.03, 0},   {0.03, 0.37},
   };
-  TEST_POLYFILL_TEMPLATE_STATIC(poly, false);
+  TEST_POLYFILL_TEMPLATE_STATIC(poly, POLYFILL2D_TEST_NOP);
 }
 
-/* Blender bug T41986 */
+/* Blender bug #41986 */
 TEST(polyfill2d, IssueT41986_axis_align)
 {
   const float poly[][2] = {
@@ -677,10 +698,10 @@ TEST(polyfill2d, IssueT41986_axis_align)
       {0.68, 0.06},   {0.57, -0.36},  {-0.25, -0.37}, {0.49, -0.74},  {-0.59, -1.21},
       {-0.25, -0.15}, {-0.46, -0.52}, {-1.08, -0.83}, {-1.45, -0.33}, {-1.25, -0.04}};
 
-  TEST_POLYFILL_TEMPLATE_STATIC(poly, false);
+  TEST_POLYFILL_TEMPLATE_STATIC(poly, POLYFILL2D_TEST_NOP);
 }
 
-/* Blender bug T52834 */
+/* Blender bug #52834 */
 TEST(polyfill2d, IssueT52834_axis_align_co_linear)
 {
   const float poly[][2] = {
@@ -692,10 +713,10 @@ TEST(polyfill2d, IssueT52834_axis_align_co_linear)
       {18, -2}, {23, -2}, {24, -2}, {29, -2}, {30, -2}, {35, -2}, {36, -2}, {40, -2},
   };
 
-  TEST_POLYFILL_TEMPLATE_STATIC(poly, false);
+  TEST_POLYFILL_TEMPLATE_STATIC(poly, POLYFILL2D_TEST_NOP);
 }
 
-/* Blender bug T67109 (version a). */
+/* Blender bug #67109 (version a). */
 /* Multiple versions are offset & rotated, this fails in cases where others works. */
 TEST(polyfill2d, IssueT67109_axis_align_co_linear_a)
 {
@@ -711,10 +732,10 @@ TEST(polyfill2d, IssueT67109_axis_align_co_linear_a)
       {2.8720665, -2.6659985},
       {2.8720665, -0.15499878},
   };
-  TEST_POLYFILL_TEMPLATE_STATIC(poly, false);
+  TEST_POLYFILL_TEMPLATE_STATIC(poly, POLYFILL2D_TEST_NOP);
 }
 
-/* Blender bug T67109, (version b). */
+/* Blender bug #67109, (version b). */
 TEST(polyfill2d, IssueT67109_axis_align_co_linear_b)
 {
   const float poly[][2] = {
@@ -729,10 +750,10 @@ TEST(polyfill2d, IssueT67109_axis_align_co_linear_b)
       {25.825695, -6.320076},
       {24.00582, -4.5899982},
   };
-  TEST_POLYFILL_TEMPLATE_STATIC(poly, false);
+  TEST_POLYFILL_TEMPLATE_STATIC(poly, POLYFILL2D_TEST_NOP);
 }
 
-/* Blender bug T67109 (version c). */
+/* Blender bug #67109 (version c). */
 TEST(polyfill2d, IssueT67109_axis_align_co_linear_c)
 {
   const float poly[][2] = {
@@ -747,5 +768,19 @@ TEST(polyfill2d, IssueT67109_axis_align_co_linear_c)
       {-60.546703, 71.07365},
       {-58.37554, 78.83239},
   };
-  TEST_POLYFILL_TEMPLATE_STATIC(poly, false);
+  TEST_POLYFILL_TEMPLATE_STATIC(poly, POLYFILL2D_TEST_NOP);
+}
+
+/* Blender bug #103913 where co-linear edges create zero area tessellation
+ * when a valid solution exists without zero area triangles. */
+TEST(polyfill2d, Issue103913_axis_align_co_linear_no_zero_area_tri)
+{
+  const float poly[][2] = {
+      {-10, 0}, {-10, 2}, {-8, 2},  {-6, 2},  {-4, 2},  {-2, 2},  {-2, 4},  {-2, 6},
+      {-2, 8},  {-2, 10}, {0, 10},  {2, 10},  {2, 8},   {2, 6},   {2, 4},   {2, 2},
+      {4, 2},   {6, 2},   {8, 2},   {10, 2},  {10, 0},  {10, -2}, {8, -2},  {6, -2},
+      {4, -2},  {2, -2},  {2, -4},  {2, -6},  {2, -8},  {2, -10}, {0, -10}, {-2, -10},
+      {-2, -8}, {-2, -6}, {-2, -4}, {-2, -2}, {-4, -2}, {-6, -2}, {-8, -2}, {-10, -2},
+  };
+  TEST_POLYFILL_TEMPLATE_STATIC(poly, POLYFILL2D_TEST_NO_ZERO_AREA_TRIS);
 }

@@ -1,34 +1,23 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
 /** \file
  * \ingroup fn
  *
- * A MFDataType describes what type of data a multi-function gets as input, outputs or mutates.
+ * A DataType describes what type of data a multi-function gets as input, outputs or mutates.
  * Currently, only individual elements or vectors of elements are supported. Adding more data types
  * is possible when necessary.
  */
 
-#include "FN_cpp_type.hh"
+#include "BLI_cpp_type.hh"
+#include "BLI_struct_equality_utils.hh"
 
-namespace blender::fn {
+namespace blender::fn::multi_function {
 
-class MFDataType {
+class DataType {
  public:
   enum Category {
     Single,
@@ -39,89 +28,105 @@ class MFDataType {
   Category category_;
   const CPPType *type_;
 
-  MFDataType(Category category, const CPPType &type) : category_(category), type_(&type)
-  {
-  }
+  DataType(Category category, const CPPType &type);
 
  public:
-  MFDataType() = default;
+  DataType() = default;
 
-  static MFDataType ForSingle(const CPPType &type)
-  {
-    return MFDataType(Single, type);
-  }
+  static DataType ForSingle(const CPPType &type);
+  static DataType ForVector(const CPPType &type);
 
-  static MFDataType ForVector(const CPPType &type)
-  {
-    return MFDataType(Vector, type);
-  }
+  template<typename T> static DataType ForSingle();
+  template<typename T> static DataType ForVector();
 
-  template<typename T> static MFDataType ForSingle()
-  {
-    return MFDataType::ForSingle(CPPType::get<T>());
-  }
+  bool is_single() const;
+  bool is_vector() const;
 
-  template<typename T> static MFDataType ForVector()
-  {
-    return MFDataType::ForVector(CPPType::get<T>());
-  }
+  Category category() const;
 
-  bool is_single() const
-  {
-    return category_ == Single;
-  }
+  const CPPType &single_type() const;
+  const CPPType &vector_base_type() const;
 
-  bool is_vector() const
-  {
-    return category_ == Vector;
-  }
+  BLI_STRUCT_EQUALITY_OPERATORS_2(DataType, category_, type_)
 
-  Category category() const
-  {
-    return category_;
-  }
+  std::string to_string() const;
 
-  const CPPType &single_type() const
-  {
-    BLI_assert(this->is_single());
-    return *type_;
-  }
-
-  const CPPType &vector_base_type() const
-  {
-    BLI_assert(this->is_vector());
-    return *type_;
-  }
-
-  friend bool operator==(const MFDataType &a, const MFDataType &b);
-  friend bool operator!=(const MFDataType &a, const MFDataType &b);
-
-  std::string to_string() const
-  {
-    switch (category_) {
-      case Single:
-        return type_->name();
-      case Vector:
-        return type_->name() + " Vector";
-    }
-    BLI_assert(false);
-    return "";
-  }
-
-  uint64_t hash() const
-  {
-    return get_default_hash_2(*type_, category_);
-  }
+  uint64_t hash() const;
 };
 
-inline bool operator==(const MFDataType &a, const MFDataType &b)
+/* -------------------------------------------------------------------- */
+/** \name #DataType Inline Methods
+ * \{ */
+
+inline DataType::DataType(Category category, const CPPType &type)
+    : category_(category), type_(&type)
 {
-  return a.category_ == b.category_ && a.type_ == b.type_;
 }
 
-inline bool operator!=(const MFDataType &a, const MFDataType &b)
+inline DataType DataType::ForSingle(const CPPType &type)
 {
-  return !(a == b);
+  return DataType(Single, type);
 }
 
-}  // namespace blender::fn
+inline DataType DataType::ForVector(const CPPType &type)
+{
+  return DataType(Vector, type);
+}
+
+template<typename T> inline DataType DataType::ForSingle()
+{
+  return DataType::ForSingle(CPPType::get<T>());
+}
+
+template<typename T> inline DataType DataType::ForVector()
+{
+  return DataType::ForVector(CPPType::get<T>());
+}
+
+inline bool DataType::is_single() const
+{
+  return category_ == Single;
+}
+
+inline bool DataType::is_vector() const
+{
+  return category_ == Vector;
+}
+
+inline DataType::Category DataType::category() const
+{
+  return category_;
+}
+
+inline const CPPType &DataType::single_type() const
+{
+  BLI_assert(this->is_single());
+  return *type_;
+}
+
+inline const CPPType &DataType::vector_base_type() const
+{
+  BLI_assert(this->is_vector());
+  return *type_;
+}
+
+inline std::string DataType::to_string() const
+{
+  switch (category_) {
+    case Single:
+      return type_->name();
+    case Vector:
+      return type_->name() + " Vector";
+  }
+  BLI_assert(false);
+  return "";
+}
+
+inline uint64_t DataType::hash() const
+{
+  return get_default_hash(*type_, category_);
+}
+
+/** \} */
+
+}  // namespace blender::fn::multi_function

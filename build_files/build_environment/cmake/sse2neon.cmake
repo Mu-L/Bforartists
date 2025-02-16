@@ -1,28 +1,25 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2002-2022 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 ExternalProject_Add(external_sse2neon
-  GIT_REPOSITORY  ${SSE2NEON_GIT}
-  GIT_TAG ${SSE2NEON_GIT_HASH}
+  URL file://${PACKAGE_DIR}/${SSE2NEON_FILE}
   DOWNLOAD_DIR ${DOWNLOAD_DIR}
+  URL_HASH ${SSE2NEON_HASH_TYPE}=${SSE2NEON_HASH}
   PREFIX ${BUILD_DIR}/sse2neon
   CONFIGURE_COMMAND echo sse2neon - Nothing to configure
   BUILD_COMMAND echo sse2neon - nothing to build
-  INSTALL_COMMAND mkdir -p ${LIBDIR}/sse2neon && cp ${BUILD_DIR}/sse2neon/src/external_sse2neon/sse2neon.h ${LIBDIR}/sse2neon
+  INSTALL_COMMAND ${CMAKE_COMMAND} -E copy ${BUILD_DIR}/sse2neon/src/external_sse2neon/sse2neon.h ${LIBDIR}/sse2neon
   INSTALL_DIR ${LIBDIR}/sse2neon
 )
+
+if(WIN32)
+  if(BUILD_MODE STREQUAL Release)
+    ExternalProject_Add_Step(external_sse2neon after_install
+      COMMAND ${CMAKE_COMMAND} -E copy_directory ${LIBDIR}/sse2neon ${HARVEST_TARGET}/sse2neon
+      DEPENDEES install
+    )
+  endif()
+else()
+  harvest(external_sse2neon sse2neon sse2neon "*.h")
+endif()

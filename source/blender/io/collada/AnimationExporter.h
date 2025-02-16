@@ -1,89 +1,32 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdlib>
 
 #include "BCAnimationCurve.h"
 
 #include "DNA_action_types.h"
-#include "DNA_anim_types.h"
 #include "DNA_armature_types.h"
-#include "DNA_camera_types.h"
-#include "DNA_constraint_types.h"
-#include "DNA_curve_types.h"
-#include "DNA_light_types.h"
-#include "DNA_material_types.h"
 #include "DNA_object_types.h"
-#include "DNA_scene_types.h"
 
-#include "BLI_listbase.h"
-#include "BLI_math.h"
-#include "BLI_string.h"
-#include "BLI_utildefines.h"
-
-#include "BIK_api.h"
-#include "BKE_action.h" /* pose functions */
-#include "BKE_armature.h"
-#include "BKE_constraint.h"
-#include "BKE_fcurve.h"
-#include "BKE_object.h"
-#include "BKE_scene.h"
-#include "ED_object.h"
-
-#include "MEM_guardedalloc.h"
-
-#include "RNA_access.h"
-
-#include "COLLADASWBaseInputElement.h"
-#include "COLLADASWConstants.h"
 #include "COLLADASWInputList.h"
-#include "COLLADASWInstanceGeometry.h"
 #include "COLLADASWLibraryAnimations.h"
-#include "COLLADASWParamBase.h"
-#include "COLLADASWParamTemplate.h"
-#include "COLLADASWPrimitves.h"
-#include "COLLADASWSampler.h"
 #include "COLLADASWSource.h"
-#include "COLLADASWVertices.h"
 
 #include "BCAnimationSampler.h"
-#include "EffectExporter.h"
-#include "collada_internal.h"
 
-#include "IK_solver.h"
-
-#include <algorithm> /* std::find */
-#include <map>
 #include <vector>
 
-typedef enum BC_animation_source_type {
+enum BC_animation_source_type {
   BC_SOURCE_TYPE_VALUE,
   BC_SOURCE_TYPE_ANGLE,
   BC_SOURCE_TYPE_TIMEFRAME,
-} BC_animation_source_type;
+};
 
-typedef enum BC_global_rotation_type {
-  BC_NO_ROTATION,
-  BC_OBJECT_ROTATION,
-  BC_DATA_ROTATION
-} BC_global_rotation_type;
+enum BC_global_rotation_type { BC_NO_ROTATION, BC_OBJECT_ROTATION, BC_DATA_ROTATION };
 
 class AnimationExporter : COLLADASW::LibraryAnimations {
  private:
@@ -100,7 +43,7 @@ class AnimationExporter : COLLADASW::LibraryAnimations {
 
   bool exportAnimations();
 
-  /* called for each exported object */
+  /** Called for each exported object. */
   void operator()(Object *ob);
 
  protected:
@@ -148,25 +91,34 @@ class AnimationExporter : COLLADASW::LibraryAnimations {
 
   std::vector<std::vector<std::string>> anim_meta;
 
-  /* Main entry point into Animation export (called for each exported object) */
+  /** Main entry point into Animation export (called for each exported object). */
   void exportAnimation(Object *ob, BCAnimationSampler &sampler);
 
-  /* export animation as separate trans/rot/scale curves */
+  /**
+   * Export all animation FCurves of an Object.
+   *
+   * \note This uses the keyframes as sample points,
+   * and exports "baked keyframes" while keeping the tangent information
+   * of the FCurves intact. This works for simple cases, but breaks
+   * especially when negative scales are involved in the animation.
+   * And when parent inverse matrices are involved (when exporting
+   * object hierarchies)
+   */
   void export_curve_animation_set(Object *ob, BCAnimationSampler &sampler, bool export_as_matrix);
 
-  /* export one single curve */
+  /** Export one single curve. */
   void export_curve_animation(Object *ob, BCAnimationCurve &curve);
 
-  /* export animation as matrix data */
+  /** Export animation as matrix data. */
   void export_matrix_animation(Object *ob, BCAnimationSampler &sampler);
 
-  /* step through the bone hierarchy */
+  /** Write bone animations in transform matrix sources (step through the bone hierarchy). */
   void export_bone_animations_recursive(Object *ob_arm, Bone *bone, BCAnimationSampler &sampler);
 
-  /* Export for one bone */
+  /** Export for one bone. */
   void export_bone_animation(Object *ob, Bone *bone, BCFrames &frames, BCMatrixSampleMap &samples);
 
-  /* call to the low level collada exporter */
+  /** Call to the low level collada exporter. */
   void export_collada_curve_animation(std::string id,
                                       std::string name,
                                       std::string target,
@@ -174,7 +126,7 @@ class AnimationExporter : COLLADASW::LibraryAnimations {
                                       BCAnimationCurve &curve,
                                       BC_global_rotation_type global_rotation_type);
 
-  /* call to the low level collada exporter */
+  /** Call to the low level collada exporter. */
   void export_collada_matrix_animation(std::string id,
                                        std::string name,
                                        std::string target,
@@ -183,29 +135,38 @@ class AnimationExporter : COLLADASW::LibraryAnimations {
                                        BC_global_rotation_type global_rotation_type,
                                        Matrix &parentinv);
 
+  /**
+   * In some special cases the exported Curve needs to be replaced
+   * by a modified curve (for collada purposes)
+   * This method checks if a conversion is necessary and if applicable
+   * returns a pointer to the modified BCAnimationCurve.
+   * IMPORTANT: the modified curve must be deleted by the caller when no longer needed
+   * if no conversion is needed this method returns a NULL;
+   */
   BCAnimationCurve *get_modified_export_curve(Object *ob,
                                               BCAnimationCurve &curve,
                                               BCAnimationCurveMap &curves);
 
-  /* Helper functions */
+  /* Helper functions. */
+
   void openAnimationWithClip(std::string id, std::string name);
   bool open_animation_container(bool has_container, Object *ob);
   void close_animation_container(bool has_container);
 
-  /* Input and Output sources (single valued) */
+  /** Input and Output sources (single valued). */
   std::string collada_source_from_values(BC_animation_source_type source_type,
                                          COLLADASW::InputSemantic::Semantics semantic,
                                          std::vector<float> &values,
                                          const std::string &anim_id,
                                          const std::string axis_name);
 
-  /* Output sources (matrix data) */
+  /** Output sources (matrix data). * Create a collada matrix source for a set of samples. */
   std::string collada_source_from_values(BCMatrixSampleMap &samples,
                                          const std::string &anim_id,
                                          BC_global_rotation_type global_rotation_type,
                                          Matrix &parentinv);
 
-  /* Interpolation sources */
+  /** Interpolation sources. */
   std::string collada_linear_interpolation_source(int tot, const std::string &anim_id);
 
   /* source ID = animation_name + semantic_suffix */
@@ -240,6 +201,10 @@ class AnimationExporter : COLLADASW::LibraryAnimations {
 
   std::string get_axis_name(std::string channel, int id);
   std::string get_collada_name(std::string channel_type) const;
+  /**
+   * Assign sid of the animated parameter or transform for rotation,
+   * axis name is always appended and the value of append_axis is ignored.
+   */
   std::string get_collada_sid(const BCAnimationCurve &curve, const std::string axis_name);
 
   /* ===================================== */

@@ -1,10 +1,14 @@
-/* Apache License, Version 2.0 */
+/* SPDX-FileCopyrightText: 2023 Blender Authors
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
+
+#include "testing/testing.h"
 
 #include "BLI_exception_safety_test_utils.hh"
 #include "BLI_stack.hh"
-#include "BLI_strict_flags.h"
 #include "BLI_vector.hh"
-#include "testing/testing.h"
+
+#include "BLI_strict_flags.h" /* IWYU pragma: keep. Keep last. */
 
 namespace blender::tests {
 
@@ -118,19 +122,19 @@ TEST(stack, PushPopMany)
   Stack<int> stack;
   for (int i = 0; i < 1000; i++) {
     stack.push(i);
-    EXPECT_EQ(stack.size(), static_cast<unsigned int>(i + 1));
+    EXPECT_EQ(stack.size(), uint(i + 1));
   }
   for (int i = 999; i > 50; i--) {
     EXPECT_EQ(stack.pop(), i);
-    EXPECT_EQ(stack.size(), static_cast<unsigned int>(i));
+    EXPECT_EQ(stack.size(), uint(i));
   }
   for (int i = 51; i < 5000; i++) {
     stack.push(i);
-    EXPECT_EQ(stack.size(), static_cast<unsigned int>(i + 1));
+    EXPECT_EQ(stack.size(), uint(i + 1));
   }
   for (int i = 4999; i >= 0; i--) {
     EXPECT_EQ(stack.pop(), i);
-    EXPECT_EQ(stack.size(), static_cast<unsigned int>(i));
+    EXPECT_EQ(stack.size(), uint(i));
   }
 }
 
@@ -191,7 +195,7 @@ TEST(stack, OveralignedValues)
   Stack<AlignedBuffer<1, 512>, 2> stack;
   for (int i = 0; i < 100; i++) {
     stack.push({});
-    EXPECT_EQ((uintptr_t)&stack.peek() % 512, 0);
+    EXPECT_EQ(uintptr_t(&stack.peek()) % 512, 0);
   }
 }
 

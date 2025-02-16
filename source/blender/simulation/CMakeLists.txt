@@ -1,35 +1,11 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2014 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# The Original Code is Copyright (C) 2014, Blender Foundation
-# All rights reserved.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(INC
   .
   intern
-  ../blenkernel
-  ../blenlib
-  ../depsgraph
-  ../functions
-  ../imbuf
-  ../makesdna
   ../makesrna
-  ../nodes
-  ../../../intern/guardedalloc
 )
 
 set(INC_SYS
@@ -37,10 +13,10 @@ set(INC_SYS
 )
 
 set(SRC
-  intern/SIM_mass_spring.cpp
-  intern/hair_volume.cpp
-  intern/implicit_blender.c
-  intern/implicit_eigen.cpp
+  intern/SIM_mass_spring.cc
+  intern/hair_volume.cc
+  intern/implicit_blender.cc
+  intern/implicit_eigen.cc
 
   intern/ConstrainedConjugateGradient.h
   intern/eigen_utils.h
@@ -50,10 +26,18 @@ set(SRC
 )
 
 set(LIB
-  bf_blenkernel
+  PRIVATE bf::blenkernel
+  PRIVATE bf::blenlib
+  PRIVATE bf::depsgraph
+  PRIVATE bf::dna
+  PRIVATE bf::functions
+  PRIVATE bf::imbuf
+  PRIVATE bf::intern::guardedalloc
+  PRIVATE bf::nodes
 )
 
-if(WITH_OPENMP_STATIC)
+
+if(WITH_OPENMP AND WITH_OPENMP_STATIC)
   list(APPEND LIB
     ${OpenMP_LIBRARIES}
   )

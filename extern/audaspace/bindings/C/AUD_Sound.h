@@ -36,7 +36,15 @@ extern AUD_API AUD_Specs AUD_Sound_getSpecs(AUD_Sound* sound);
  * \return The length of the sound in samples.
  * \note This function creates a reader from the sound and deletes it again.
  */
-extern AUD_API int AUD_getLength(AUD_Sound* sound);
+extern AUD_API int AUD_Sound_getLength(AUD_Sound* sound);
+
+/**
+ * Retrieves the stream infos of a sound file.
+ * \param sound The sound to retrieve from which must be a file sound.
+ * \param infos A pointer to a AUD_StreamInfo array that will be allocated and must afterwards be freed by the caller.
+ * \return The number of items in the infos array.
+ */
+extern AUD_API int AUD_Sound_getFileStreams(AUD_Sound* sound, AUD_StreamInfo** stream_infos);
 
 /**
  * Reads a sound's samples into memory.
@@ -90,6 +98,15 @@ extern AUD_API AUD_Sound* AUD_Sound_buffer(sample_t* data, int length, AUD_Specs
 extern AUD_API AUD_Sound* AUD_Sound_bufferFile(unsigned char* buffer, int size);
 
 /**
+ * Loads a sound file from a memory buffer.
+ * \param buffer The buffer which contains the sound file.
+ * \param size The size of the buffer.
+ * \param stream The index of the audio stream within the file if it contains multiple audio streams.
+ * \return A handle of the sound file.
+ */
+extern AUD_API AUD_Sound* AUD_Sound_bufferFileStream(unsigned char* buffer, int size, int stream);
+
+/**
  * Caches a sound into a memory buffer.
  * \param sound The sound to cache.
  * \return A handle of the cached sound.
@@ -102,6 +119,14 @@ extern AUD_API AUD_Sound* AUD_Sound_cache(AUD_Sound* sound);
  * \return A handle of the sound file.
  */
 extern AUD_API AUD_Sound* AUD_Sound_file(const char* filename);
+
+/**
+ * Loads a sound file.
+ * \param filename The filename of the sound file.
+ * \param stream The index of the audio stream within the file if it contains multiple audio streams.
+ * \return A handle of the sound file.
+ */
+extern AUD_API AUD_Sound* AUD_Sound_fileStream(const char* filename, int stream);
 
 /**
  * Creates a sawtooth sound.
@@ -275,10 +300,10 @@ extern AUD_API AUD_Sound* AUD_Sound_rechannel(AUD_Sound* sound, AUD_Channels cha
  * Resamples the sound.
  * \param sound The sound to resample.
  * \param rate The new sample rate.
- * \param high_quality When true use a higher quality but slower resampler.
+ * \param quality Resampling quality vs performance choice.
  * \return The resampled sound.
  */
-extern AUD_API AUD_Sound* AUD_Sound_resample(AUD_Sound* sound, AUD_SampleRate rate, bool high_quality);
+extern AUD_API AUD_Sound* AUD_Sound_resample(AUD_Sound* sound, AUD_SampleRate rate, AUD_ResampleQuality quality);
 
 /**
  * Reverses a sound. Make sure the sound source can be reversed.
@@ -372,6 +397,16 @@ extern AUD_API AUD_Sound* AUD_Sound_mutable(AUD_Sound* sound);
 #ifdef WITH_CONVOLUTION
 	extern AUD_API AUD_Sound* AUD_Sound_Convolver(AUD_Sound* sound, AUD_ImpulseResponse* filter, AUD_ThreadPool* threadPool);
 	extern AUD_API AUD_Sound* AUD_Sound_Binaural(AUD_Sound* sound, AUD_HRTF* hrtfs, AUD_Source* source, AUD_ThreadPool* threadPool);
+
+	/**
+	 * Creates an Equalizer for the sound
+	 * \param sound The handle of the sound
+	 * \param definition buffer of size*sizeof(float) with the array of equalization values
+	 * \param maxFreqEq Maximum frequency refered by the array
+	 * \param sizeConversion Size of the transformation. Must be 2^number (for example 1024, 2048,...)
+	 * \return A handle to the Equalizer refered to that sound
+	 */
+	extern AUD_API AUD_Sound* AUD_Sound_equalize(AUD_Sound* sound, float *definition, int size, float maxFreqEq, int sizeConversion);
 #endif
 
 #ifdef __cplusplus

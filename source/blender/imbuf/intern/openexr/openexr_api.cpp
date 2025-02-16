@@ -1,121 +1,118 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2005 `Gernot Ziegler <gz@lysator.liu.se>`. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * Copyright by Gernot Ziegler <gz@lysator.liu.se>.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup openexr
  */
 
 #include <algorithm>
+#include <cctype>
 #include <cerrno>
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
+#include <fcntl.h>
 #include <fstream>
 #include <iostream>
 #include <set>
-#include <stdexcept>
 #include <string>
 
-#include <Iex.h>
-#include <ImathBox.h>
-#include <ImfArray.h>
-#include <ImfChannelList.h>
-#include <ImfCompression.h>
-#include <ImfCompressionAttribute.h>
-#include <ImfIO.h>
-#include <ImfInputFile.h>
-#include <ImfOutputFile.h>
-#include <ImfPixelType.h>
-#include <ImfStandardAttributes.h>
-#include <ImfStringAttribute.h>
-#include <ImfVersion.h>
-#include <half.h>
+/* The OpenEXR version can reliably be found in this header file from OpenEXR,
+ * for both 2.x and 3.x:
+ */
+#include <OpenEXR/OpenEXRConfig.h>
+#define COMBINED_OPENEXR_VERSION \
+  ((10000 * OPENEXR_VERSION_MAJOR) + (100 * OPENEXR_VERSION_MINOR) + OPENEXR_VERSION_PATCH)
+
+#if COMBINED_OPENEXR_VERSION >= 20599
+/* >=2.5.99 -> OpenEXR >=3.0 */
+#  include <Imath/half.h>
+#  include <OpenEXR/ImfFrameBuffer.h>
+#  define exr_file_offset_t uint64_t
+#else
+/* OpenEXR 2.x, use the old locations. */
+#  include <OpenEXR/half.h>
+#  define exr_file_offset_t Int64
+#endif
+
+#include <OpenEXR/Iex.h>
+#include <OpenEXR/ImfArray.h>
+#include <OpenEXR/ImfChannelList.h>
+#include <OpenEXR/ImfCompression.h>
+#include <OpenEXR/ImfCompressionAttribute.h>
+#include <OpenEXR/ImfIO.h>
+#include <OpenEXR/ImfInputFile.h>
+#include <OpenEXR/ImfOutputFile.h>
+#include <OpenEXR/ImfPixelType.h>
+#include <OpenEXR/ImfPreviewImage.h>
+#include <OpenEXR/ImfRgbaFile.h>
+#include <OpenEXR/ImfStandardAttributes.h>
+#include <OpenEXR/ImfStringAttribute.h>
+#include <OpenEXR/ImfVersion.h>
 
 /* multiview/multipart */
-#include <ImfInputPart.h>
-#include <ImfMultiPartInputFile.h>
-#include <ImfMultiPartOutputFile.h>
-#include <ImfMultiView.h>
-#include <ImfOutputPart.h>
-#include <ImfPartHelper.h>
-#include <ImfPartType.h>
-#include <ImfTiledOutputPart.h>
+#include <OpenEXR/ImfInputPart.h>
+#include <OpenEXR/ImfMultiPartInputFile.h>
+#include <OpenEXR/ImfMultiPartOutputFile.h>
+#include <OpenEXR/ImfMultiView.h>
+#include <OpenEXR/ImfOutputPart.h>
+#include <OpenEXR/ImfPartHelper.h>
+#include <OpenEXR/ImfPartType.h>
+#include <OpenEXR/ImfTiledOutputPart.h>
 
 #include "DNA_scene_types.h" /* For OpenEXR compression constants */
 
 #include <openexr_api.h>
 
 #if defined(WIN32)
-#  include "utfconv.h"
+#  include "utfconv.hh"
+#  include <io.h>
+#else
+#  include <unistd.h>
 #endif
 
 #include "MEM_guardedalloc.h"
 
-extern "C" {
-
-// The following prevents a linking error in debug mode for MSVC using the libs in CVS
-#if defined(WITH_OPENEXR) && defined(_WIN32) && defined(DEBUG) && _MSC_VER < 1900
-_CRTIMP void __cdecl _invalid_parameter_noinfo(void)
-{
-}
-#endif
-}
-#include "BLI_blenlib.h"
+#include "BLI_fileops.h"
+#include "BLI_listbase.h"
+#include "BLI_math_base.hh"
 #include "BLI_math_color.h"
+#include "BLI_mmap.h"
+#include "BLI_path_utils.hh"
+#include "BLI_string.h"
 #include "BLI_threads.h"
 
-#include "BKE_idprop.h"
-#include "BKE_image.h"
+#include "BKE_idprop.hh"
+#include "BKE_image.hh"
 
-#include "IMB_allocimbuf.h"
-#include "IMB_colormanagement.h"
-#include "IMB_colormanagement_intern.h"
-#include "IMB_imbuf.h"
-#include "IMB_imbuf_types.h"
-#include "IMB_metadata.h"
-
-#include "openexr_multi.h"
+#include "IMB_allocimbuf.hh"
+#include "IMB_colormanagement.hh"
+#include "IMB_imbuf.hh"
+#include "IMB_imbuf_types.hh"
+#include "IMB_metadata.hh"
+#include "IMB_openexr.hh"
 
 using namespace Imf;
 using namespace Imath;
 
-extern "C" {
 /* prototype */
-static struct ExrPass *imb_exr_get_pass(ListBase *lb, char *passname);
+static struct ExrPass *imb_exr_get_pass(ListBase *lb, const char *passname);
 static bool exr_has_multiview(MultiPartInputFile &file);
 static bool exr_has_multipart_file(MultiPartInputFile &file);
 static bool exr_has_alpha(MultiPartInputFile &file);
-static bool exr_has_zbuffer(MultiPartInputFile &file);
 static void exr_printf(const char *__restrict fmt, ...);
 static void imb_exr_type_by_channels(ChannelList &channels,
                                      StringVector &views,
                                      bool *r_singlelayer,
                                      bool *r_multilayer,
                                      bool *r_multiview);
-}
 
 /* Memory Input Stream */
 
 class IMemStream : public Imf::IStream {
  public:
-  IMemStream(unsigned char *exrbuf, size_t exrsize)
-      : IStream("<memory>"), _exrpos(0), _exrsize(exrsize)
+  IMemStream(uchar *exrbuf, size_t exrsize) : IStream("<memory>"), _exrpos(0), _exrsize(exrsize)
   {
     _exrbuf = exrbuf;
   }
@@ -131,39 +128,97 @@ class IMemStream : public Imf::IStream {
     return false;
   }
 
-  Int64 tellg() override
+  exr_file_offset_t tellg() override
   {
     return _exrpos;
   }
 
-  void seekg(Int64 pos) override
+  void seekg(exr_file_offset_t pos) override
   {
     _exrpos = pos;
   }
 
-  void clear() override
+  void clear() override {}
+
+ private:
+  exr_file_offset_t _exrpos;
+  exr_file_offset_t _exrsize;
+  uchar *_exrbuf;
+};
+
+/* Memory-Mapped Input Stream */
+
+class IMMapStream : public Imf::IStream {
+ public:
+  IMMapStream(const char *filepath) : IStream(filepath)
   {
+    const int file = BLI_open(filepath, O_BINARY | O_RDONLY, 0);
+    if (file < 0) {
+      throw IEX_NAMESPACE::InputExc("file not found");
+    }
+    _exrpos = 0;
+    imb_mmap_lock();
+    _mmap_file = BLI_mmap_open(file);
+    imb_mmap_unlock();
+    close(file);
+    if (_mmap_file == nullptr) {
+      throw IEX_NAMESPACE::InputExc("BLI_mmap_open failed");
+    }
+    _exrbuf = (uchar *)BLI_mmap_get_pointer(_mmap_file);
+    _exrsize = BLI_mmap_get_length(_mmap_file);
+  }
+
+  ~IMMapStream() override
+  {
+    imb_mmap_lock();
+    BLI_mmap_free(_mmap_file);
+    imb_mmap_unlock();
+  }
+
+  /* This is implementing regular `read`, not `readMemoryMapped`, because DWAA and DWAB
+   * decompressors load on unaligned offsets. Therefore we can't avoid the memory copy. */
+
+  bool read(char c[], int n) override
+  {
+    if (_exrpos + n > _exrsize) {
+      throw Iex::InputExc("Unexpected end of file.");
+    }
+    memcpy(c, _exrbuf + _exrpos, n);
+    _exrpos += n;
+
+    return _exrpos < _exrsize;
+  }
+
+  exr_file_offset_t tellg() override
+  {
+    return _exrpos;
+  }
+
+  void seekg(exr_file_offset_t pos) override
+  {
+    _exrpos = pos;
   }
 
  private:
-  Int64 _exrpos;
-  Int64 _exrsize;
-  unsigned char *_exrbuf;
+  BLI_mmap_file *_mmap_file;
+  exr_file_offset_t _exrpos;
+  exr_file_offset_t _exrsize;
+  uchar *_exrbuf;
 };
 
 /* File Input Stream */
 
 class IFileStream : public Imf::IStream {
  public:
-  IFileStream(const char *filename) : IStream(filename)
+  IFileStream(const char *filepath) : IStream(filepath)
   {
     /* utf-8 file path support on windows */
 #if defined(WIN32)
-    wchar_t *wfilename = alloc_utf16_from_8(filename, 0);
-    ifs.open(wfilename, std::ios_base::binary);
-    free(wfilename);
+    wchar_t *wfilepath = alloc_utf16_from_8(filepath, 0);
+    ifs.open(wfilepath, std::ios_base::binary);
+    free(wfilepath);
 #else
-    ifs.open(filename, std::ios_base::binary);
+    ifs.open(filepath, std::ios_base::binary);
 #endif
 
     if (!ifs) {
@@ -182,12 +237,12 @@ class IFileStream : public Imf::IStream {
     return check_error();
   }
 
-  Int64 tellg() override
+  exr_file_offset_t tellg() override
   {
     return std::streamoff(ifs.tellg());
   }
 
-  void seekg(Int64 pos) override
+  void seekg(exr_file_offset_t pos) override
   {
     ifs.seekg(pos);
     check_error();
@@ -219,34 +274,32 @@ class IFileStream : public Imf::IStream {
 
 class OMemStream : public OStream {
  public:
-  OMemStream(ImBuf *ibuf_) : OStream("<memory>"), ibuf(ibuf_), offset(0)
-  {
-  }
+  OMemStream(ImBuf *ibuf_) : OStream("<memory>"), ibuf(ibuf_), offset(0) {}
 
   void write(const char c[], int n) override
   {
     ensure_size(offset + n);
-    memcpy(ibuf->encodedbuffer + offset, c, n);
+    memcpy(ibuf->encoded_buffer.data + offset, c, n);
     offset += n;
-    ibuf->encodedsize += n;
+    ibuf->encoded_size += n;
   }
 
-  Int64 tellp() override
+  exr_file_offset_t tellp() override
   {
     return offset;
   }
 
-  void seekp(Int64 pos) override
+  void seekp(exr_file_offset_t pos) override
   {
     offset = pos;
     ensure_size(offset);
   }
 
  private:
-  void ensure_size(Int64 size)
+  void ensure_size(exr_file_offset_t size)
   {
     /* if buffer is too small increase it. */
-    while (size > ibuf->encodedbuffersize) {
+    while (size > ibuf->encoded_buffer_size) {
       if (!imb_enlargeencodedbufferImBuf(ibuf)) {
         throw Iex::ErrnoExc("Out of memory.");
       }
@@ -254,22 +307,22 @@ class OMemStream : public OStream {
   }
 
   ImBuf *ibuf;
-  Int64 offset;
+  exr_file_offset_t offset;
 };
 
 /* File Output Stream */
 
 class OFileStream : public OStream {
  public:
-  OFileStream(const char *filename) : OStream(filename)
+  OFileStream(const char *filepath) : OStream(filepath)
   {
     /* utf-8 file path support on windows */
 #if defined(WIN32)
-    wchar_t *wfilename = alloc_utf16_from_8(filename, 0);
-    ofs.open(wfilename, std::ios_base::binary);
-    free(wfilename);
+    wchar_t *wfilepath = alloc_utf16_from_8(filepath, 0);
+    ofs.open(wfilepath, std::ios_base::binary);
+    free(wfilepath);
 #else
-    ofs.open(filename, std::ios_base::binary);
+    ofs.open(filepath, std::ios_base::binary);
 #endif
 
     if (!ofs) {
@@ -284,12 +337,12 @@ class OFileStream : public OStream {
     check_error();
   }
 
-  Int64 tellp() override
+  exr_file_offset_t tellp() override
   {
     return std::streamoff(ofs.tellp());
   }
 
-  void seekp(Int64 pos) override
+  void seekp(exr_file_offset_t pos) override
   {
     ofs.seekp(pos);
     check_error();
@@ -325,13 +378,7 @@ static half float_to_half_safe(const float value)
   return half(clamp_f(value, -HALF_MAX, HALF_MAX));
 }
 
-extern "C" {
-
-/**
- * Test presence of OpenEXR file.
- * \param mem: pointer to loaded OpenEXR bitstream
- */
-bool imb_is_a_openexr(const unsigned char *mem, const size_t size)
+bool imb_is_a_openexr(const uchar *mem, const size_t size)
 {
   /* No define is exposed for this size. */
   if (size < 4) {
@@ -340,7 +387,20 @@ bool imb_is_a_openexr(const unsigned char *mem, const size_t size)
   return Imf::isImfMagic((const char *)mem);
 }
 
-static void openexr_header_compression(Header *header, int compression)
+static int openexr_jpg_like_quality_to_dwa_quality(int q)
+{
+  q = blender::math::clamp(q, 0, 100);
+
+  /* Map "visually lossless" JPG quality of 97 to default DWA level of 45,
+   * "lossless" JPG quality of 100 to DWA level of 0, and everything else
+   * linearly based on those. */
+  constexpr int x0 = 100, y0 = 0;
+  constexpr int x1 = 97, y1 = 45;
+  q = y0 + (q - x0) * (y1 - y0) / (x1 - x0);
+  return q;
+}
+
+static void openexr_header_compression(Header *header, int compression, int quality)
 {
   switch (compression) {
     case R_IMF_EXR_CODEC_NONE:
@@ -367,12 +427,14 @@ static void openexr_header_compression(Header *header, int compression)
     case R_IMF_EXR_CODEC_B44A:
       header->compression() = B44A_COMPRESSION;
       break;
-#if OPENEXR_VERSION_MAJOR >= 2 && OPENEXR_VERSION_MINOR >= 2
+#if OPENEXR_VERSION_MAJOR > 2 || (OPENEXR_VERSION_MAJOR >= 2 && OPENEXR_VERSION_MINOR >= 2)
     case R_IMF_EXR_CODEC_DWAA:
       header->compression() = DWAA_COMPRESSION;
+      header->dwaCompressionLevel() = openexr_jpg_like_quality_to_dwa_quality(quality);
       break;
     case R_IMF_EXR_CODEC_DWAB:
       header->compression() = DWAB_COMPRESSION;
+      header->dwaCompressionLevel() = openexr_jpg_like_quality_to_dwa_quality(quality);
       break;
 #endif
     default:
@@ -381,13 +443,11 @@ static void openexr_header_compression(Header *header, int compression)
   }
 }
 
-static void openexr_header_metadata(Header *header, struct ImBuf *ibuf)
+static void openexr_header_metadata(Header *header, ImBuf *ibuf)
 {
   if (ibuf->metadata) {
-    IDProperty *prop;
-
-    for (prop = (IDProperty *)ibuf->metadata->data.group.first; prop; prop = prop->next) {
-      if (prop->type == IDP_STRING) {
+    LISTBASE_FOREACH (IDProperty *, prop, &ibuf->metadata->data.group) {
+      if (prop->type == IDP_STRING && !STREQ(prop->name, "compression")) {
         header->insert(prop->name, StringAttribute(IDP_String(prop)));
       }
     }
@@ -402,17 +462,16 @@ static void openexr_header_metadata(Header *header, struct ImBuf *ibuf)
 static void openexr_header_metadata_callback(void *data,
                                              const char *propname,
                                              char *prop,
-                                             int UNUSED(len))
+                                             int /*len*/)
 {
   Header *header = (Header *)data;
   header->insert(propname, StringAttribute(prop));
 }
 
-static bool imb_save_openexr_half(ImBuf *ibuf, const char *name, const int flags)
+static bool imb_save_openexr_half(ImBuf *ibuf, const char *filepath, const int flags)
 {
   const int channels = ibuf->channels;
   const bool is_alpha = (channels >= 4) && (ibuf->planes == 32);
-  const bool is_zbuf = (flags & IB_zbuffloat) && ibuf->zbuf_float != nullptr; /* summarize */
   const int width = ibuf->x;
   const int height = ibuf->y;
   OStream *file_stream = nullptr;
@@ -420,7 +479,8 @@ static bool imb_save_openexr_half(ImBuf *ibuf, const char *name, const int flags
   try {
     Header header(width, height);
 
-    openexr_header_compression(&header, ibuf->foptions.flag & OPENEXR_COMPRESS);
+    openexr_header_compression(
+        &header, ibuf->foptions.flag & OPENEXR_CODEC_MASK, ibuf->foptions.quality);
     openexr_header_metadata(&header, ibuf);
 
     /* create channels */
@@ -430,10 +490,6 @@ static bool imb_save_openexr_half(ImBuf *ibuf, const char *name, const int flags
     if (is_alpha) {
       header.channels().insert("A", Channel(HALF));
     }
-    if (is_zbuf) {
-      /* z we do as float always */
-      header.channels().insert("Z", Channel(Imf::FLOAT));
-    }
 
     FrameBuffer frameBuffer;
 
@@ -442,13 +498,13 @@ static bool imb_save_openexr_half(ImBuf *ibuf, const char *name, const int flags
       file_stream = new OMemStream(ibuf);
     }
     else {
-      file_stream = new OFileStream(name);
+      file_stream = new OFileStream(filepath);
     }
     OutputFile file(*file_stream, header);
 
     /* we store first everything in half array */
     std::vector<RGBAZ> pixels(height * width);
-    RGBAZ *to = &pixels[0];
+    RGBAZ *to = pixels.data();
     int xstride = sizeof(RGBAZ);
     int ystride = xstride * width;
 
@@ -459,18 +515,11 @@ static bool imb_save_openexr_half(ImBuf *ibuf, const char *name, const int flags
     if (is_alpha) {
       frameBuffer.insert("A", Slice(HALF, (char *)&to->a, xstride, ystride));
     }
-    if (is_zbuf) {
-      frameBuffer.insert("Z",
-                         Slice(Imf::FLOAT,
-                               (char *)(ibuf->zbuf_float + (height - 1) * width),
-                               sizeof(float),
-                               sizeof(float) * -width));
-    }
-    if (ibuf->rect_float) {
+    if (ibuf->float_buffer.data) {
       float *from;
 
       for (int i = ibuf->y - 1; i >= 0; i--) {
-        from = ibuf->rect_float + channels * i * width;
+        from = ibuf->float_buffer.data + channels * i * width;
 
         for (int j = ibuf->x; j > 0; j--) {
           to->r = float_to_half_safe(from[0]);
@@ -483,16 +532,16 @@ static bool imb_save_openexr_half(ImBuf *ibuf, const char *name, const int flags
       }
     }
     else {
-      unsigned char *from;
+      uchar *from;
 
       for (int i = ibuf->y - 1; i >= 0; i--) {
-        from = (unsigned char *)ibuf->rect + 4 * i * width;
+        from = ibuf->byte_buffer.data + 4 * i * width;
 
         for (int j = ibuf->x; j > 0; j--) {
-          to->r = srgb_to_linearrgb((float)from[0] / 255.0f);
-          to->g = srgb_to_linearrgb((float)from[1] / 255.0f);
-          to->b = srgb_to_linearrgb((float)from[2] / 255.0f);
-          to->a = channels >= 4 ? (float)from[3] / 255.0f : 1.0f;
+          to->r = srgb_to_linearrgb(float(from[0]) / 255.0f);
+          to->g = srgb_to_linearrgb(float(from[1]) / 255.0f);
+          to->b = srgb_to_linearrgb(float(from[2]) / 255.0f);
+          to->a = channels >= 4 ? float(from[3]) / 255.0f : 1.0f;
           to++;
           from += 4;
         }
@@ -510,16 +559,21 @@ static bool imb_save_openexr_half(ImBuf *ibuf, const char *name, const int flags
 
     return false;
   }
+  catch (...) { /* Catch-all for edge cases or compiler bugs. */
+    delete file_stream;
+    printf("OpenEXR-save: UNKNOWN ERROR\n");
+
+    return false;
+  }
 
   delete file_stream;
   return true;
 }
 
-static bool imb_save_openexr_float(ImBuf *ibuf, const char *name, const int flags)
+static bool imb_save_openexr_float(ImBuf *ibuf, const char *filepath, const int flags)
 {
   const int channels = ibuf->channels;
   const bool is_alpha = (channels >= 4) && (ibuf->planes == 32);
-  const bool is_zbuf = (flags & IB_zbuffloat) && ibuf->zbuf_float != nullptr; /* summarize */
   const int width = ibuf->x;
   const int height = ibuf->y;
   OStream *file_stream = nullptr;
@@ -527,7 +581,8 @@ static bool imb_save_openexr_float(ImBuf *ibuf, const char *name, const int flag
   try {
     Header header(width, height);
 
-    openexr_header_compression(&header, ibuf->foptions.flag & OPENEXR_COMPRESS);
+    openexr_header_compression(
+        &header, ibuf->foptions.flag & OPENEXR_CODEC_MASK, ibuf->foptions.quality);
     openexr_header_metadata(&header, ibuf);
 
     /* create channels */
@@ -537,9 +592,6 @@ static bool imb_save_openexr_float(ImBuf *ibuf, const char *name, const int flag
     if (is_alpha) {
       header.channels().insert("A", Channel(Imf::FLOAT));
     }
-    if (is_zbuf) {
-      header.channels().insert("Z", Channel(Imf::FLOAT));
-    }
 
     FrameBuffer frameBuffer;
 
@@ -548,16 +600,16 @@ static bool imb_save_openexr_float(ImBuf *ibuf, const char *name, const int flag
       file_stream = new OMemStream(ibuf);
     }
     else {
-      file_stream = new OFileStream(name);
+      file_stream = new OFileStream(filepath);
     }
     OutputFile file(*file_stream, header);
 
     int xstride = sizeof(float) * channels;
     int ystride = -xstride * width;
 
-    /* last scanline, stride negative */
+    /* Last scan-line, stride negative. */
     float *rect[4] = {nullptr, nullptr, nullptr, nullptr};
-    rect[0] = ibuf->rect_float + channels * (height - 1) * width;
+    rect[0] = ibuf->float_buffer.data + channels * (height - 1) * width;
     rect[1] = (channels >= 2) ? rect[0] + 1 : rect[0];
     rect[2] = (channels >= 3) ? rect[0] + 2 : rect[0];
     rect[3] = (channels >= 4) ?
@@ -570,13 +622,6 @@ static bool imb_save_openexr_float(ImBuf *ibuf, const char *name, const int flag
     if (is_alpha) {
       frameBuffer.insert("A", Slice(Imf::FLOAT, (char *)rect[3], xstride, ystride));
     }
-    if (is_zbuf) {
-      frameBuffer.insert("Z",
-                         Slice(Imf::FLOAT,
-                               (char *)(ibuf->zbuf_float + (height - 1) * width),
-                               sizeof(float),
-                               sizeof(float) * -width));
-    }
 
     file.setFrameBuffer(frameBuffer);
     file.writePixels(height);
@@ -586,28 +631,33 @@ static bool imb_save_openexr_float(ImBuf *ibuf, const char *name, const int flag
     delete file_stream;
     return false;
   }
+  catch (...) { /* Catch-all for edge cases or compiler bugs. */
+    printf("OpenEXR-save: UNKNOWN ERROR\n");
+    delete file_stream;
+    return false;
+  }
 
   delete file_stream;
   return true;
 }
 
-bool imb_save_openexr(struct ImBuf *ibuf, const char *name, int flags)
+bool imb_save_openexr(ImBuf *ibuf, const char *filepath, int flags)
 {
   if (flags & IB_mem) {
     imb_addencodedbufferImBuf(ibuf);
-    ibuf->encodedsize = 0;
+    ibuf->encoded_size = 0;
   }
 
   if (ibuf->foptions.flag & OPENEXR_HALF) {
-    return imb_save_openexr_half(ibuf, name, flags);
+    return imb_save_openexr_half(ibuf, filepath, flags);
   }
 
   /* when no float rect, we save as half (16 bits is sufficient) */
-  if (ibuf->rect_float == nullptr) {
-    return imb_save_openexr_half(ibuf, name, flags);
+  if (ibuf->float_buffer.data == nullptr) {
+    return imb_save_openexr_half(ibuf, filepath, flags);
   }
 
-  return imb_save_openexr_float(ibuf, name, flags);
+  return imb_save_openexr_float(ibuf, filepath, flags);
 }
 
 /* ******* Nicer API, MultiLayer and with Tile file support ************************************ */
@@ -622,7 +672,7 @@ bool imb_save_openexr(struct ImBuf *ibuf, const char *name, int flags)
 static ListBase exrhandles = {nullptr, nullptr};
 
 struct ExrHandle {
-  struct ExrHandle *next, *prev;
+  ExrHandle *next, *prev;
   char name[FILE_MAX];
 
   IStream *ifile_stream;
@@ -645,16 +695,17 @@ struct ExrHandle {
   ListBase channels; /* flattened out, ExrChannel */
   ListBase layers;   /* hierarchical, pointing in end to ExrChannel */
 
-  int num_half_channels; /* used during filr save, allows faster temporary buffers allocation */
+  /** Used during file save, allows faster temporary buffers allocation. */
+  int num_half_channels;
 };
 
 /* flattened out channel */
 struct ExrChannel {
-  struct ExrChannel *next, *prev;
+  ExrChannel *next, *prev;
 
   char name[EXR_TOT_MAXNAME + 1]; /* full name with everything */
-  struct MultiViewChannelName *m; /* struct to store all multipart channel info */
-  int xstride, ystride;           /* step to next pixel, to next scanline */
+  MultiViewChannelName *m;        /* struct to store all multipart channel info */
+  int xstride, ystride;           /* step to next pixel, to next scan-line. */
   float *rect;                    /* first pointer to write in */
   char chan_id;                   /* quick lookup of channel char */
   int view_id;                    /* quick lookup of channel view */
@@ -663,11 +714,11 @@ struct ExrChannel {
 
 /* hierarchical; layers -> passes -> channels[] */
 struct ExrPass {
-  struct ExrPass *next, *prev;
+  ExrPass *next, *prev;
   char name[EXR_PASS_MAXNAME];
   int totchan;
   float *rect;
-  struct ExrChannel *chan[EXR_PASS_MAXCHAN];
+  ExrChannel *chan[EXR_PASS_MAXCHAN];
   char chan_id[EXR_PASS_MAXCHAN];
 
   char internal_name[EXR_PASS_MAXNAME]; /* name with no view */
@@ -676,16 +727,18 @@ struct ExrPass {
 };
 
 struct ExrLayer {
-  struct ExrLayer *next, *prev;
+  ExrLayer *next, *prev;
   char name[EXR_LAY_MAXNAME + 1];
   ListBase passes;
 };
 
+static bool imb_exr_multilayer_parse_channels_from_file(ExrHandle *data);
+
 /* ********************** */
 
-void *IMB_exr_get_handle(void)
+void *IMB_exr_get_handle()
 {
-  ExrHandle *data = (ExrHandle *)MEM_callocN(sizeof(ExrHandle), "exr handle");
+  ExrHandle *data = MEM_cnew<ExrHandle>("exr handle");
   data->multiView = new StringVector();
 
   BLI_addtail(&exrhandles, data);
@@ -698,20 +751,17 @@ void *IMB_exr_get_handle_name(const char *name)
 
   if (data == nullptr) {
     data = (ExrHandle *)IMB_exr_get_handle();
-    BLI_strncpy(data->name, name, strlen(name) + 1);
+    STRNCPY(data->name, name);
   }
   return data;
 }
 
 /* multiview functions */
-} /* extern "C" */
-
-extern "C" {
 
 void IMB_exr_add_view(void *handle, const char *name)
 {
   ExrHandle *data = (ExrHandle *)handle;
-  data->multiView->push_back(name);
+  data->multiView->emplace_back(name);
 }
 
 static int imb_exr_get_multiView_id(StringVector &views, const std::string &name)
@@ -754,13 +804,17 @@ static void imb_exr_get_views(MultiPartInputFile &file, StringVector &views)
   }
 }
 
-/* Multilayer Blender files have the view name in all the passes (even the default view one) */
-static void imb_exr_insert_view_name(char *name_full, const char *passname, const char *viewname)
+/* Multi-layer Blender files have the view name in all the passes (even the default view one). */
+static void imb_exr_insert_view_name(char name_full[EXR_TOT_MAXNAME + 1],
+                                     const char *passname,
+                                     const char *viewname)
 {
+  /* Match: `sizeof(ExrChannel::name)`. */
+  const size_t name_full_maxncpy = EXR_TOT_MAXNAME + 1;
   BLI_assert(!ELEM(name_full, passname, viewname));
 
   if (viewname == nullptr || viewname[0] == '\0') {
-    BLI_strncpy(name_full, passname, sizeof(((ExrChannel *)nullptr)->name));
+    BLI_strncpy(name_full, passname, name_full_maxncpy);
     return;
   }
 
@@ -772,16 +826,13 @@ static void imb_exr_insert_view_name(char *name_full, const char *passname, cons
   len = BLI_str_rpartition(passname, delims, &sep, &token);
 
   if (sep) {
-    BLI_snprintf(name_full, EXR_PASS_MAXNAME, "%.*s.%s.%s", (int)len, passname, viewname, token);
+    BLI_snprintf(name_full, name_full_maxncpy, "%.*s.%s.%s", int(len), passname, viewname, token);
   }
   else {
-    BLI_snprintf(name_full, EXR_PASS_MAXNAME, "%s.%s", passname, viewname);
+    BLI_snprintf(name_full, name_full_maxncpy, "%s.%s", passname, viewname);
   }
 }
 
-/* adds flattened ExrChannels */
-/* xstride, ystride and rect can be done in set_channel too, for tile writing */
-/* passname does not include view */
 void IMB_exr_add_channel(void *handle,
                          const char *layname,
                          const char *passname,
@@ -794,7 +845,7 @@ void IMB_exr_add_channel(void *handle,
   ExrHandle *data = (ExrHandle *)handle;
   ExrChannel *echan;
 
-  echan = (ExrChannel *)MEM_callocN(sizeof(ExrChannel), "exr channel");
+  echan = MEM_cnew<ExrChannel>("exr channel");
   echan->m = new MultiViewChannelName();
 
   if (layname && layname[0] != '\0') {
@@ -819,10 +870,10 @@ void IMB_exr_add_channel(void *handle,
   }
   else if (!data->multiView->empty()) {
     std::string raw_name = insertViewName(echan->m->name, *data->multiView, echan->view_id);
-    BLI_strncpy(echan->name, raw_name.c_str(), sizeof(echan->name));
+    STRNCPY(echan->name, raw_name.c_str());
   }
   else {
-    BLI_strncpy(echan->name, echan->m->name.c_str(), sizeof(echan->name));
+    STRNCPY(echan->name, echan->m->name.c_str());
   }
 
   echan->xstride = xstride;
@@ -838,28 +889,27 @@ void IMB_exr_add_channel(void *handle,
   BLI_addtail(&data->channels, echan);
 }
 
-/* used for output files (from RenderResult) (single and multilayer, single and multiview) */
-int IMB_exr_begin_write(void *handle,
-                        const char *filename,
-                        int width,
-                        int height,
-                        int compress,
-                        const StampData *stamp)
+bool IMB_exr_begin_write(void *handle,
+                         const char *filepath,
+                         int width,
+                         int height,
+                         int compress,
+                         int quality,
+                         const StampData *stamp)
 {
   ExrHandle *data = (ExrHandle *)handle;
   Header header(width, height);
-  ExrChannel *echan;
 
   data->width = width;
   data->height = height;
 
   bool is_singlelayer, is_multilayer, is_multiview;
 
-  for (echan = (ExrChannel *)data->channels.first; echan; echan = echan->next) {
+  LISTBASE_FOREACH (ExrChannel *, echan, &data->channels) {
     header.channels().insert(echan->name, Channel(echan->use_half_float ? Imf::HALF : Imf::FLOAT));
   }
 
-  openexr_header_compression(&header, compress);
+  openexr_header_compression(&header, compress, quality);
   BKE_stamp_info_callback(
       &header, const_cast<StampData *>(stamp), openexr_header_metadata_callback, false);
   /* header.lineOrder() = DECREASING_Y; this crashes in windows for file read! */
@@ -878,7 +928,7 @@ int IMB_exr_begin_write(void *handle,
   /* avoid crash/abort when we don't have permission to write here */
   /* manually create ofstream, so we can handle utf-8 filepaths on windows */
   try {
-    data->ofile_stream = new OFileStream(filename);
+    data->ofile_stream = new OFileStream(filepath);
     data->ofile = new OutputFile(*(data->ofile_stream), header);
   }
   catch (const std::exception &exc) {
@@ -890,19 +940,25 @@ int IMB_exr_begin_write(void *handle,
     data->ofile = nullptr;
     data->ofile_stream = nullptr;
   }
+  catch (...) { /* Catch-all for edge cases or compiler bugs. */
+    std::cerr << "IMB_exr_begin_write: UNKNOWN ERROR" << std::endl;
+
+    delete data->ofile;
+    delete data->ofile_stream;
+
+    data->ofile = nullptr;
+    data->ofile_stream = nullptr;
+  }
 
   return (data->ofile != nullptr);
 }
 
-/* only used for writing temp. render results (not image files)
- * (FSA and Save Buffers) */
 void IMB_exrtile_begin_write(
-    void *handle, const char *filename, int mipmap, int width, int height, int tilex, int tiley)
+    void *handle, const char *filepath, int mipmap, int width, int height, int tilex, int tiley)
 {
   ExrHandle *data = (ExrHandle *)handle;
   Header header(width, height);
   std::vector<Header> headers;
-  ExrChannel *echan;
 
   data->tilex = tilex;
   data->tiley = tiley;
@@ -931,7 +987,7 @@ void IMB_exrtile_begin_write(
   exr_printf("---------------------------------------------------------------\n");
 
   /* Assign channels. */
-  for (echan = (ExrChannel *)data->channels.first; echan; echan = echan->next) {
+  LISTBASE_FOREACH (ExrChannel *, echan, &data->channels) {
     /* Tiles are expected to be saved with full float currently. */
     BLI_assert(echan->use_half_float == 0);
 
@@ -949,10 +1005,10 @@ void IMB_exrtile_begin_write(
   /* avoid crash/abort when we don't have permission to write here */
   /* manually create ofstream, so we can handle utf-8 filepaths on windows */
   try {
-    data->ofile_stream = new OFileStream(filename);
-    data->mpofile = new MultiPartOutputFile(*(data->ofile_stream), &headers[0], headers.size());
+    data->ofile_stream = new OFileStream(filepath);
+    data->mpofile = new MultiPartOutputFile(*(data->ofile_stream), headers.data(), headers.size());
   }
-  catch (const std::exception &) {
+  catch (...) { /* Catch-all for edge cases or compiler bugs. */
     delete data->mpofile;
     delete data->ofile_stream;
 
@@ -961,61 +1017,70 @@ void IMB_exrtile_begin_write(
   }
 }
 
-/* read from file */
-int IMB_exr_begin_read(void *handle, const char *filename, int *width, int *height)
+bool IMB_exr_begin_read(
+    void *handle, const char *filepath, int *width, int *height, const bool parse_channels)
 {
   ExrHandle *data = (ExrHandle *)handle;
   ExrChannel *echan;
 
   /* 32 is arbitrary, but zero length files crashes exr. */
-  if (BLI_exists(filename) && BLI_file_size(filename) > 32) {
-    /* avoid crash/abort when we don't have permission to write here */
-    try {
-      data->ifile_stream = new IFileStream(filename);
-      data->ifile = new MultiPartInputFile(*(data->ifile_stream));
-    }
-    catch (const std::exception &) {
-      delete data->ifile;
-      delete data->ifile_stream;
+  if (!(BLI_exists(filepath) && BLI_file_size(filepath) > 32)) {
+    return false;
+  }
 
-      data->ifile = nullptr;
-      data->ifile_stream = nullptr;
-    }
+  /* avoid crash/abort when we don't have permission to write here */
+  try {
+    data->ifile_stream = new IFileStream(filepath);
+    data->ifile = new MultiPartInputFile(*(data->ifile_stream));
+  }
+  catch (...) { /* Catch-all for edge cases or compiler bugs. */
+    delete data->ifile;
+    delete data->ifile_stream;
 
-    if (data->ifile) {
-      Box2i dw = data->ifile->header(0).dataWindow();
-      data->width = *width = dw.max.x - dw.min.x + 1;
-      data->height = *height = dw.max.y - dw.min.y + 1;
+    data->ifile = nullptr;
+    data->ifile_stream = nullptr;
+  }
 
-      imb_exr_get_views(*data->ifile, *data->multiView);
+  if (!data->ifile) {
+    return false;
+  }
 
-      std::vector<MultiViewChannelName> channels;
-      GetChannelsInMultiPartFile(*data->ifile, channels);
+  Box2i dw = data->ifile->header(0).dataWindow();
+  data->width = *width = dw.max.x - dw.min.x + 1;
+  data->height = *height = dw.max.y - dw.min.y + 1;
 
-      for (const MultiViewChannelName &channel : channels) {
-        IMB_exr_add_channel(
-            data, nullptr, channel.name.c_str(), channel.view.c_str(), 0, 0, nullptr, false);
-
-        echan = (ExrChannel *)data->channels.last;
-        echan->m->name = channel.name;
-        echan->m->view = channel.view;
-        echan->m->part_number = channel.part_number;
-        echan->m->internal_name = channel.internal_name;
-      }
-
-      return 1;
+  if (parse_channels) {
+    /* Parse channels into view/layer/pass. */
+    if (!imb_exr_multilayer_parse_channels_from_file(data)) {
+      return false;
     }
   }
-  return 0;
+  else {
+    /* Read view and channels without parsing. */
+    imb_exr_get_views(*data->ifile, *data->multiView);
+
+    std::vector<MultiViewChannelName> channels;
+    GetChannelsInMultiPartFile(*data->ifile, channels);
+
+    for (const MultiViewChannelName &channel : channels) {
+      IMB_exr_add_channel(
+          data, nullptr, channel.name.c_str(), channel.view.c_str(), 0, 0, nullptr, false);
+
+      echan = (ExrChannel *)data->channels.last;
+      echan->m->name = channel.name;
+      echan->m->view = channel.view;
+      echan->m->part_number = channel.part_number;
+      echan->m->internal_name = channel.internal_name;
+    }
+  }
+
+  return true;
 }
 
-/* still clumsy name handling, layers/channels can be ordered as list in list later */
-/* passname here is the raw channel name without the layer */
-void IMB_exr_set_channel(
+bool IMB_exr_set_channel(
     void *handle, const char *layname, const char *passname, int xstride, int ystride, float *rect)
 {
   ExrHandle *data = (ExrHandle *)handle;
-  ExrChannel *echan;
   char name[EXR_TOT_MAXNAME + 1];
 
   if (layname && layname[0] != '\0') {
@@ -1023,22 +1088,23 @@ void IMB_exr_set_channel(
     BLI_strncpy(lay, layname, EXR_LAY_MAXNAME);
     BLI_strncpy(pass, passname, EXR_PASS_MAXNAME);
 
-    BLI_snprintf(name, sizeof(name), "%s.%s", lay, pass);
+    SNPRINTF(name, "%s.%s", lay, pass);
   }
   else {
     BLI_strncpy(name, passname, EXR_TOT_MAXNAME - 1);
   }
 
-  echan = (ExrChannel *)BLI_findstring(&data->channels, name, offsetof(ExrChannel, name));
+  ExrChannel *echan = (ExrChannel *)BLI_findstring(
+      &data->channels, name, offsetof(ExrChannel, name));
 
-  if (echan) {
-    echan->xstride = xstride;
-    echan->ystride = ystride;
-    echan->rect = rect;
+  if (echan == nullptr) {
+    return false;
   }
-  else {
-    printf("IMB_exr_set_channel error %s\n", name);
-  }
+
+  echan->xstride = xstride;
+  echan->ystride = ystride;
+  echan->rect = rect;
+  return true;
 }
 
 float *IMB_exr_channel_rect(void *handle,
@@ -1055,7 +1121,7 @@ float *IMB_exr_channel_rect(void *handle,
     BLI_strncpy(lay, layname, EXR_LAY_MAXNAME);
     BLI_strncpy(pass, passname, EXR_PASS_MAXNAME);
 
-    BLI_snprintf(name, sizeof(name), "%s.%s", lay, pass);
+    SNPRINTF(name, "%s.%s", lay, pass);
   }
   else {
     BLI_strncpy(name, passname, EXR_TOT_MAXNAME - 1);
@@ -1063,14 +1129,14 @@ float *IMB_exr_channel_rect(void *handle,
 
   /* name has to be unique, thus it's a combination of layer, pass, view, and channel */
   if (layname && layname[0] != '\0') {
-    char temp_buf[EXR_PASS_MAXNAME];
+    char temp_buf[EXR_TOT_MAXNAME + 1];
     imb_exr_insert_view_name(temp_buf, name, viewname);
-    BLI_strncpy(name, temp_buf, sizeof(name));
+    STRNCPY(name, temp_buf);
   }
   else if (!data->multiView->empty()) {
     const int view_id = std::max(0, imb_exr_get_multiView_id(*data->multiView, viewname));
     std::string raw_name = insertViewName(name, *data->multiView, view_id);
-    BLI_strncpy(name, raw_name.c_str(), sizeof(name));
+    STRNCPY(name, raw_name.c_str());
   }
 
   echan = (ExrChannel *)BLI_findstring(&data->channels, name, offsetof(ExrChannel, name));
@@ -1085,9 +1151,8 @@ float *IMB_exr_channel_rect(void *handle,
 void IMB_exr_clear_channels(void *handle)
 {
   ExrHandle *data = (ExrHandle *)handle;
-  ExrChannel *chan;
 
-  for (chan = (ExrChannel *)data->channels.first; chan; chan = chan->next) {
+  LISTBASE_FOREACH (ExrChannel *, chan, &data->channels) {
     delete chan->m;
   }
 
@@ -1098,10 +1163,9 @@ void IMB_exr_write_channels(void *handle)
 {
   ExrHandle *data = (ExrHandle *)handle;
   FrameBuffer frameBuffer;
-  ExrChannel *echan;
 
   if (data->channels.first) {
-    const size_t num_pixels = ((size_t)data->width) * data->height;
+    const size_t num_pixels = size_t(data->width) * data->height;
     half *rect_half = nullptr, *current_rect_half = nullptr;
 
     /* We allocate temporary storage for half pixels for all the channels at once. */
@@ -1111,10 +1175,10 @@ void IMB_exr_write_channels(void *handle)
       current_rect_half = rect_half;
     }
 
-    for (echan = (ExrChannel *)data->channels.first; echan; echan = echan->next) {
-      /* Writing starts from last scanline, stride negative. */
+    LISTBASE_FOREACH (ExrChannel *, echan, &data->channels) {
+      /* Writing starts from last scan-line, stride negative. */
       if (echan->use_half_float) {
-        float *rect = echan->rect;
+        const float *rect = echan->rect;
         half *cur = current_rect_half;
         for (size_t i = 0; i < num_pixels; i++, cur++) {
           *cur = float_to_half_safe(rect[i * echan->xstride]);
@@ -1142,6 +1206,9 @@ void IMB_exr_write_channels(void *handle)
     catch (const std::exception &exc) {
       std::cerr << "OpenEXR-writePixels: ERROR: " << exc.what() << std::endl;
     }
+    catch (...) { /* Catch-all for edge cases or compiler bugs. */
+      std::cerr << "OpenEXR-writePixels: UNKNOWN ERROR" << std::endl;
+    }
     /* Free temporary buffers. */
     if (rect_half != nullptr) {
       MEM_freeN(rect_half);
@@ -1152,8 +1219,6 @@ void IMB_exr_write_channels(void *handle)
   }
 }
 
-/* temporary function, used for FSA and Save Buffers */
-/* called once per tile * view */
 void IMB_exrtile_write_channels(
     void *handle, int partx, int party, int level, const char *viewname, bool empty)
 {
@@ -1168,10 +1233,7 @@ void IMB_exrtile_write_channels(
   exr_printf("---------------------------------------------------------------------\n");
 
   if (!empty) {
-    ExrChannel *echan;
-
-    for (echan = (ExrChannel *)data->channels.first; echan; echan = echan->next) {
-
+    LISTBASE_FOREACH (ExrChannel *, echan, &data->channels) {
       /* eventually we can make the parts' channels to include
        * only the current view TODO */
       if (!STREQ(viewname, echan->m->view.c_str())) {
@@ -1203,6 +1265,9 @@ void IMB_exrtile_write_channels(
   catch (const std::exception &exc) {
     std::cerr << "OpenEXR-writeTile: ERROR: " << exc.what() << std::endl;
   }
+  catch (...) { /* Catch-all for edge cases or compiler bugs. */
+    std::cerr << "OpenEXR-writeTile: UNKNOWN ERROR" << std::endl;
+  }
 }
 
 void IMB_exr_read_channels(void *handle)
@@ -1233,9 +1298,8 @@ void IMB_exr_read_channels(void *handle)
 
     /* Insert all matching channel into frame-buffer. */
     FrameBuffer frameBuffer;
-    ExrChannel *echan;
 
-    for (echan = (ExrChannel *)data->channels.first; echan; echan = echan->next) {
+    LISTBASE_FOREACH (ExrChannel *, echan, &data->channels) {
       if (echan->m->part_number != i) {
         continue;
       }
@@ -1254,7 +1318,7 @@ void IMB_exr_read_channels(void *handle)
         if (!flip) {
           /* Inverse correct first pixel for data-window coordinates. */
           rect -= echan->xstride * (dw.min.x - dw.min.y * data->width);
-          /* move to last scanline to flip to Blender convention */
+          /* Move to last scan-line to flip to Blender convention. */
           rect += echan->xstride * (data->height - 1) * data->width;
           ystride = -ystride;
         }
@@ -1266,9 +1330,6 @@ void IMB_exr_read_channels(void *handle)
         frameBuffer.insert(echan->m->internal_name,
                            Slice(Imf::FLOAT, (char *)rect, xstride, ystride));
       }
-      else {
-        printf("warning, channel with no rect set %s\n", echan->m->internal_name.c_str());
-      }
     }
 
     /* Read pixels. */
@@ -1279,6 +1340,10 @@ void IMB_exr_read_channels(void *handle)
     }
     catch (const std::exception &exc) {
       std::cerr << "OpenEXR-readPixels: ERROR: " << exc.what() << std::endl;
+      break;
+    }
+    catch (...) { /* Catch-all for edge cases or compiler bugs. */
+      std::cerr << "OpenEXR-readPixels: UNKNOWN ERROR: " << std::endl;
       break;
     }
   }
@@ -1297,8 +1362,6 @@ void IMB_exr_multilayer_convert(void *handle,
                                                 const char *view))
 {
   ExrHandle *data = (ExrHandle *)handle;
-  ExrLayer *lay;
-  ExrPass *pass;
 
   /* RenderResult needs at least one RenderView */
   if (data->multiView->empty()) {
@@ -1316,10 +1379,10 @@ void IMB_exr_multilayer_convert(void *handle,
     return;
   }
 
-  for (lay = (ExrLayer *)data->layers.first; lay; lay = lay->next) {
+  LISTBASE_FOREACH (ExrLayer *, lay, &data->layers) {
     void *laybase = addlayer(base, lay->name);
     if (laybase) {
-      for (pass = (ExrPass *)lay->passes.first; pass; pass = pass->next) {
+      LISTBASE_FOREACH (ExrPass *, pass, &lay->passes) {
         addpass(base,
                 laybase,
                 pass->internal_name,
@@ -1336,9 +1399,6 @@ void IMB_exr_multilayer_convert(void *handle,
 void IMB_exr_close(void *handle)
 {
   ExrHandle *data = (ExrHandle *)handle;
-  ExrLayer *lay;
-  ExrPass *pass;
-  ExrChannel *chan;
 
   delete data->ifile;
   delete data->ifile_stream;
@@ -1353,13 +1413,13 @@ void IMB_exr_close(void *handle)
   data->mpofile = nullptr;
   data->ofile_stream = nullptr;
 
-  for (chan = (ExrChannel *)data->channels.first; chan; chan = chan->next) {
+  LISTBASE_FOREACH (ExrChannel *, chan, &data->channels) {
     delete chan->m;
   }
   BLI_freelistN(&data->channels);
 
-  for (lay = (ExrLayer *)data->layers.first; lay; lay = lay->next) {
-    for (pass = (ExrPass *)lay->passes.first; pass; pass = pass->next) {
+  LISTBASE_FOREACH (ExrLayer *, lay, &data->layers) {
+    LISTBASE_FOREACH (ExrPass *, pass, &lay->passes) {
       if (pass->rect) {
         MEM_freeN(pass->rect);
       }
@@ -1374,7 +1434,7 @@ void IMB_exr_close(void *handle)
 
 /* ********* */
 
-/* get a substring from the end of the name, separated by '.' */
+/** Get a sub-string from the end of the name, separated by '.'. */
 static int imb_exr_split_token(const char *str, const char *end, const char **token)
 {
   const char delims[] = {'.', '\0'};
@@ -1386,103 +1446,140 @@ static int imb_exr_split_token(const char *str, const char *end, const char **to
     *token = str;
   }
 
-  return (int)(end - *token);
+  return int(end - *token);
 }
 
-static int imb_exr_split_channel_name(ExrChannel *echan, char *layname, char *passname)
+static void imb_exr_pass_name_from_channel(char *passname,
+                                           const ExrChannel *echan,
+                                           const char *channelname,
+                                           const bool has_xyz_channels)
 {
+  const int passname_maxncpy = EXR_TOT_MAXNAME;
+
+  if (echan->chan_id == 'Z' && (!has_xyz_channels || BLI_strcaseeq(channelname, "depth"))) {
+    BLI_strncpy(passname, "Depth", passname_maxncpy);
+  }
+  else if (echan->chan_id == 'Y' && !has_xyz_channels) {
+    BLI_strncpy(passname, channelname, passname_maxncpy);
+  }
+  else if (ELEM(echan->chan_id, 'R', 'G', 'B', 'A', 'V', 'X', 'Y', 'Z')) {
+    BLI_strncpy(passname, "Combined", passname_maxncpy);
+  }
+  else {
+    BLI_strncpy(passname, channelname, passname_maxncpy);
+  }
+}
+
+static void imb_exr_pass_name_from_channel_name(char *passname,
+                                                const ExrChannel * /*echan*/,
+                                                const char *channelname,
+                                                const bool /*has_xyz_channels*/)
+{
+  const int passname_maxncpy = EXR_TOT_MAXNAME;
+
+  /* TODO: Are special tricks similar to imb_exr_pass_name_from_channel() needed here?
+   * Note that unknown passes are default to chan_id='X'. The place where this function is called
+   * is when the channel name is more than 1 character, so perhaps using just channel ID is not
+   * fully correct here. */
+
+  BLI_strncpy(passname, channelname, passname_maxncpy);
+}
+
+static int imb_exr_split_channel_name(ExrChannel *echan,
+                                      char *layname,
+                                      char *passname,
+                                      bool has_xyz_channels)
+{
+  const int layname_maxncpy = EXR_TOT_MAXNAME;
   const char *name = echan->m->name.c_str();
   const char *end = name + strlen(name);
   const char *token;
-  char tokenbuf[EXR_TOT_MAXNAME];
-  int len;
 
-  /* some multilayers have the combined buffer with names A B G R saved */
+  /* Some multi-layers have the combined buffer with names V, RGBA, or XYZ saved. Additionally, the
+   * Z channel can be interpreted as a Depth channel, but we only detect it as such if no X and Y
+   * channels exists, since the Z in this case is part of XYZ. The same goes for the Y channel,
+   * which can be detected as a luminance channel with the same name. */
   if (name[1] == 0) {
-    echan->chan_id = name[0];
+    /* Notice that we will be comparing with this upper-case version of the channel name, so the
+     * below comparisons are effectively not case sensitive, and would also consider lowercase
+     * versions of the listed channels. */
+    echan->chan_id = BLI_toupper_ascii(name[0]);
     layname[0] = '\0';
-
-    if (ELEM(name[0], 'R', 'G', 'B', 'A')) {
-      strcpy(passname, "Combined");
-    }
-    else if (name[0] == 'Z') {
-      strcpy(passname, "Depth");
-    }
-    else {
-      strcpy(passname, name);
-    }
-
+    imb_exr_pass_name_from_channel(passname, echan, name, has_xyz_channels);
     return 1;
   }
 
   /* last token is channel identifier */
-  len = imb_exr_split_token(name, end, &token);
+  size_t len = imb_exr_split_token(name, end, &token);
   if (len == 0) {
     printf("multilayer read: bad channel name: %s\n", name);
     return 0;
   }
-  if (len == 1) {
-    echan->chan_id = token[0];
-  }
-  else if (len > 1) {
-    bool ok = false;
 
+  char channelname[EXR_TOT_MAXNAME];
+  BLI_strncpy(channelname, token, std::min(len + 1, sizeof(channelname)));
+
+  if (len == 1) {
+    echan->chan_id = BLI_toupper_ascii(channelname[0]);
+  }
+  else {
+    BLI_assert(len > 1); /* Checks above ensure. */
     if (len == 2) {
-      /* some multilayers are using two-letter channels name,
+      /* Some multi-layers are using two-letter channels name,
        * like, MX or NZ, which is basically has structure of
        *   <pass_prefix><component>
        *
-       * This is a bit silly, but see file from T35658.
+       * This is a bit silly, but see file from #35658.
        *
        * Here we do some magic to distinguish such cases.
        */
-      if (ELEM(token[1], 'X', 'Y', 'Z') || ELEM(token[1], 'R', 'G', 'B') ||
-          ELEM(token[1], 'U', 'V', 'A')) {
-        echan->chan_id = token[1];
-        ok = true;
+      const char chan_id = BLI_toupper_ascii(channelname[1]);
+      if (ELEM(chan_id, 'X', 'Y', 'Z', 'R', 'G', 'B', 'U', 'V', 'A')) {
+        echan->chan_id = chan_id;
+      }
+      else {
+        echan->chan_id = 'X'; /* Default to X if unknown. */
       }
     }
-    else if (BLI_strcaseeq(token, "red")) {
+    else if (BLI_strcaseeq(channelname, "red")) {
       echan->chan_id = 'R';
-      ok = true;
     }
-    else if (BLI_strcaseeq(token, "green")) {
+    else if (BLI_strcaseeq(channelname, "green")) {
       echan->chan_id = 'G';
-      ok = true;
     }
-    else if (BLI_strcaseeq(token, "blue")) {
+    else if (BLI_strcaseeq(channelname, "blue")) {
       echan->chan_id = 'B';
-      ok = true;
     }
-    else if (BLI_strcaseeq(token, "alpha")) {
+    else if (BLI_strcaseeq(channelname, "alpha")) {
       echan->chan_id = 'A';
-      ok = true;
     }
-    else if (BLI_strcaseeq(token, "depth")) {
+    else if (BLI_strcaseeq(channelname, "depth")) {
       echan->chan_id = 'Z';
-      ok = true;
     }
+    else {
+      echan->chan_id = 'X'; /* Default to X if unknown. */
+    }
+  }
+  end -= len + 1; /* +1 to skip '.' separator */
 
-    if (ok == false) {
-      BLI_strncpy(tokenbuf, token, std::min(len + 1, EXR_TOT_MAXNAME));
-      printf("multilayer read: unknown channel token: %s\n", tokenbuf);
+  if (end > name) {
+    /* second token is pass name */
+    len = imb_exr_split_token(name, end, &token);
+    if (len == 0) {
+      printf("multilayer read: bad channel name: %s\n", name);
       return 0;
     }
+    BLI_strncpy(passname, token, len + 1);
+    end -= len + 1; /* +1 to skip '.' separator */
   }
-  end -= len + 1; /* +1 to skip '.' separator */
-
-  /* second token is pass name */
-  len = imb_exr_split_token(name, end, &token);
-  if (len == 0) {
-    printf("multilayer read: bad channel name: %s\n", name);
-    return 0;
+  else {
+    /* Single token, determine pass name from channel name. */
+    imb_exr_pass_name_from_channel_name(passname, echan, channelname, has_xyz_channels);
   }
-  BLI_strncpy(passname, token, len + 1);
-  end -= len + 1; /* +1 to skip '.' separator */
 
   /* all preceding tokens combined as layer name */
   if (end > name) {
-    BLI_strncpy(layname, name, (int)(end - name) + 1);
+    BLI_strncpy(layname, name, std::min(layname_maxncpy, int(end - name) + 1));
   }
   else {
     layname[0] = '\0';
@@ -1491,12 +1588,12 @@ static int imb_exr_split_channel_name(ExrChannel *echan, char *layname, char *pa
   return 1;
 }
 
-static ExrLayer *imb_exr_get_layer(ListBase *lb, char *layname)
+static ExrLayer *imb_exr_get_layer(ListBase *lb, const char *layname)
 {
   ExrLayer *lay = (ExrLayer *)BLI_findstring(lb, layname, offsetof(ExrLayer, name));
 
   if (lay == nullptr) {
-    lay = (ExrLayer *)MEM_callocN(sizeof(ExrLayer), "exr layer");
+    lay = MEM_cnew<ExrLayer>("exr layer");
     BLI_addtail(lb, lay);
     BLI_strncpy(lay->name, layname, EXR_LAY_MAXNAME);
   }
@@ -1504,12 +1601,12 @@ static ExrLayer *imb_exr_get_layer(ListBase *lb, char *layname)
   return lay;
 }
 
-static ExrPass *imb_exr_get_pass(ListBase *lb, char *passname)
+static ExrPass *imb_exr_get_pass(ListBase *lb, const char *passname)
 {
   ExrPass *pass = (ExrPass *)BLI_findstring(lb, passname, offsetof(ExrPass, name));
 
   if (pass == nullptr) {
-    pass = (ExrPass *)MEM_callocN(sizeof(ExrPass), "exr pass");
+    pass = MEM_cnew<ExrPass>("exr pass");
 
     if (STREQ(passname, "Combined")) {
       BLI_addhead(lb, pass);
@@ -1519,32 +1616,90 @@ static ExrPass *imb_exr_get_pass(ListBase *lb, char *passname)
     }
   }
 
-  BLI_strncpy(pass->name, passname, EXR_LAY_MAXNAME);
+  STRNCPY(pass->name, passname);
 
   return pass;
 }
 
-/* creates channels, makes a hierarchy and assigns memory to channels */
-static ExrHandle *imb_exr_begin_read_mem(IStream &file_stream,
-                                         MultiPartInputFile &file,
-                                         int width,
-                                         int height)
+static bool exr_has_xyz_channels(ExrHandle *exr_handle)
 {
-  ExrLayer *lay;
-  ExrPass *pass;
-  ExrChannel *echan;
-  ExrHandle *data = (ExrHandle *)IMB_exr_get_handle();
-  int a;
-  char layname[EXR_TOT_MAXNAME], passname[EXR_TOT_MAXNAME];
+  bool x_found = false;
+  bool y_found = false;
+  bool z_found = false;
+  LISTBASE_FOREACH (ExrChannel *, channel, &exr_handle->channels) {
+    if (ELEM(channel->m->name, "X", "x")) {
+      x_found = true;
+    }
+    if (ELEM(channel->m->name, "Y", "y")) {
+      y_found = true;
+    }
+    if (ELEM(channel->m->name, "Z", "z")) {
+      z_found = true;
+    }
+  }
 
-  data->ifile_stream = &file_stream;
-  data->ifile = &file;
+  return x_found && y_found && z_found;
+}
 
-  data->width = width;
-  data->height = height;
-
+/* Replacement for OpenEXR GetChannelsInMultiPartFile, that also handles the
+ * case where parts are used for passes instead of multiview. */
+static std::vector<MultiViewChannelName> exr_channels_in_multi_part_file(
+    const MultiPartInputFile &file)
+{
   std::vector<MultiViewChannelName> channels;
-  GetChannelsInMultiPartFile(*data->ifile, channels);
+
+  /* Detect if file has multiview. */
+  StringVector multiview;
+  bool has_multiview = false;
+  if (file.parts() == 1) {
+    if (hasMultiView(file.header(0))) {
+      multiview = multiView(file.header(0));
+      has_multiview = true;
+    }
+  }
+
+  /* Get channels from each part. */
+  for (int p = 0; p < file.parts(); p++) {
+    const ChannelList &c = file.header(p).channels();
+
+    std::string part_view;
+    if (file.header(p).hasView()) {
+      part_view = file.header(p).view();
+    }
+    std::string part_name;
+    if (file.header(p).hasName()) {
+      part_name = file.header(p).name();
+    }
+
+    for (ChannelList::ConstIterator i = c.begin(); i != c.end(); i++) {
+      MultiViewChannelName m;
+      m.name = std::string(i.name());
+      m.internal_name = m.name;
+
+      if (has_multiview) {
+        m.view = viewFromChannelName(m.name, multiview);
+        m.name = removeViewName(m.internal_name, m.view);
+      }
+      else {
+        m.view = part_view;
+      }
+
+      /* Prepend part name as potential layer or pass name. */
+      if (!part_name.empty()) {
+        m.name = part_name + "." + m.name;
+      }
+
+      m.part_number = p;
+      channels.push_back(m);
+    }
+  }
+
+  return channels;
+}
+
+static bool imb_exr_multilayer_parse_channels_from_file(ExrHandle *data)
+{
+  std::vector<MultiViewChannelName> channels = exr_channels_in_multi_part_file(*data->ifile);
 
   imb_exr_get_views(*data->ifile, *data->multiView);
 
@@ -1552,27 +1707,30 @@ static ExrHandle *imb_exr_begin_read_mem(IStream &file_stream,
     IMB_exr_add_channel(
         data, nullptr, channel.name.c_str(), channel.view.c_str(), 0, 0, nullptr, false);
 
-    echan = (ExrChannel *)data->channels.last;
+    ExrChannel *echan = (ExrChannel *)data->channels.last;
     echan->m->name = channel.name;
     echan->m->view = channel.view;
     echan->m->part_number = channel.part_number;
     echan->m->internal_name = channel.internal_name;
   }
 
+  const bool has_xyz_channels = exr_has_xyz_channels(data);
+
   /* now try to sort out how to assign memory to the channels */
   /* first build hierarchical layer list */
-  for (echan = (ExrChannel *)data->channels.first; echan; echan = echan->next) {
-    if (imb_exr_split_channel_name(echan, layname, passname)) {
-
+  ExrChannel *echan = (ExrChannel *)data->channels.first;
+  for (; echan; echan = echan->next) {
+    char layname[EXR_TOT_MAXNAME], passname[EXR_TOT_MAXNAME];
+    if (imb_exr_split_channel_name(echan, layname, passname, has_xyz_channels)) {
       const char *view = echan->m->view.c_str();
       char internal_name[EXR_PASS_MAXNAME];
 
-      BLI_strncpy(internal_name, passname, EXR_PASS_MAXNAME);
+      STRNCPY(internal_name, passname);
 
       if (view[0] != '\0') {
         char tmp_pass[EXR_PASS_MAXNAME];
-        BLI_snprintf(tmp_pass, sizeof(tmp_pass), "%s.%s", passname, view);
-        BLI_strncpy(passname, tmp_pass, sizeof(passname));
+        SNPRINTF(tmp_pass, "%s.%s", passname, view);
+        STRNCPY(passname, tmp_pass);
       }
 
       ExrLayer *lay = imb_exr_get_layer(&data->layers, layname);
@@ -1581,8 +1739,8 @@ static ExrHandle *imb_exr_begin_read_mem(IStream &file_stream,
       pass->chan[pass->totchan] = echan;
       pass->totchan++;
       pass->view_id = echan->view_id;
-      BLI_strncpy(pass->view, view, sizeof(pass->view));
-      BLI_strncpy(pass->internal_name, internal_name, EXR_PASS_MAXNAME);
+      STRNCPY(pass->view, view);
+      STRNCPY(pass->internal_name, internal_name);
 
       if (pass->totchan >= EXR_PASS_MAXCHAN) {
         break;
@@ -1591,21 +1749,20 @@ static ExrHandle *imb_exr_begin_read_mem(IStream &file_stream,
   }
   if (echan) {
     printf("error, too many channels in one pass: %s\n", echan->m->name.c_str());
-    IMB_exr_close(data);
-    return nullptr;
+    return false;
   }
 
   /* with some heuristics, try to merge the channels in buffers */
-  for (lay = (ExrLayer *)data->layers.first; lay; lay = lay->next) {
-    for (pass = (ExrPass *)lay->passes.first; pass; pass = pass->next) {
+  LISTBASE_FOREACH (ExrLayer *, lay, &data->layers) {
+    LISTBASE_FOREACH (ExrPass *, pass, &lay->passes) {
       if (pass->totchan) {
-        pass->rect = (float *)MEM_callocN(width * height * pass->totchan * sizeof(float),
-                                          "pass rect");
+        pass->rect = (float *)MEM_callocN(
+            data->width * data->height * pass->totchan * sizeof(float), "pass rect");
         if (pass->totchan == 1) {
-          echan = pass->chan[0];
+          ExrChannel *echan = pass->chan[0];
           echan->rect = pass->rect;
           echan->xstride = 1;
-          echan->ystride = width;
+          echan->ystride = data->width;
           pass->chan_id[0] = echan->chan_id;
         }
         else {
@@ -1616,44 +1773,68 @@ static ExrHandle *imb_exr_begin_read_mem(IStream &file_stream,
           /* we can have RGB(A), XYZ(W), UVA */
           if (ELEM(pass->totchan, 3, 4)) {
             if (pass->chan[0]->chan_id == 'B' || pass->chan[1]->chan_id == 'B' ||
-                pass->chan[2]->chan_id == 'B') {
-              lookup[(unsigned int)'R'] = 0;
-              lookup[(unsigned int)'G'] = 1;
-              lookup[(unsigned int)'B'] = 2;
-              lookup[(unsigned int)'A'] = 3;
+                pass->chan[2]->chan_id == 'B')
+            {
+              lookup[uint('R')] = 0;
+              lookup[uint('G')] = 1;
+              lookup[uint('B')] = 2;
+              lookup[uint('A')] = 3;
             }
             else if (pass->chan[0]->chan_id == 'Y' || pass->chan[1]->chan_id == 'Y' ||
-                     pass->chan[2]->chan_id == 'Y') {
-              lookup[(unsigned int)'X'] = 0;
-              lookup[(unsigned int)'Y'] = 1;
-              lookup[(unsigned int)'Z'] = 2;
-              lookup[(unsigned int)'W'] = 3;
+                     pass->chan[2]->chan_id == 'Y')
+            {
+              lookup[uint('X')] = 0;
+              lookup[uint('Y')] = 1;
+              lookup[uint('Z')] = 2;
+              lookup[uint('W')] = 3;
             }
             else {
-              lookup[(unsigned int)'U'] = 0;
-              lookup[(unsigned int)'V'] = 1;
-              lookup[(unsigned int)'A'] = 2;
+              lookup[uint('U')] = 0;
+              lookup[uint('V')] = 1;
+              lookup[uint('A')] = 2;
             }
-            for (a = 0; a < pass->totchan; a++) {
+            for (int a = 0; a < pass->totchan; a++) {
               echan = pass->chan[a];
-              echan->rect = pass->rect + lookup[(unsigned int)echan->chan_id];
+              echan->rect = pass->rect + lookup[uint(echan->chan_id)];
               echan->xstride = pass->totchan;
-              echan->ystride = width * pass->totchan;
-              pass->chan_id[(unsigned int)lookup[(unsigned int)echan->chan_id]] = echan->chan_id;
+              echan->ystride = data->width * pass->totchan;
+              pass->chan_id[uint(lookup[uint(echan->chan_id)])] = echan->chan_id;
             }
           }
           else { /* unknown */
-            for (a = 0; a < pass->totchan; a++) {
-              echan = pass->chan[a];
+            for (int a = 0; a < pass->totchan; a++) {
+              ExrChannel *echan = pass->chan[a];
               echan->rect = pass->rect + a;
               echan->xstride = pass->totchan;
-              echan->ystride = width * pass->totchan;
+              echan->ystride = data->width * pass->totchan;
               pass->chan_id[a] = echan->chan_id;
             }
           }
         }
       }
     }
+  }
+
+  return true;
+}
+
+/* creates channels, makes a hierarchy and assigns memory to channels */
+static ExrHandle *imb_exr_begin_read_mem(IStream &file_stream,
+                                         MultiPartInputFile &file,
+                                         int width,
+                                         int height)
+{
+  ExrHandle *data = (ExrHandle *)IMB_exr_get_handle();
+
+  data->ifile_stream = &file_stream;
+  data->ifile = &file;
+
+  data->width = width;
+  data->height = height;
+
+  if (!imb_exr_multilayer_parse_channels_from_file(data)) {
+    IMB_exr_close(data);
+    return nullptr;
   }
 
   return data;
@@ -1665,12 +1846,10 @@ static ExrHandle *imb_exr_begin_read_mem(IStream &file_stream,
 static void exr_printf(const char *fmt, ...)
 {
 #if 0
-  char output[1024];
   va_list args;
   va_start(args, fmt);
-  std::vsprintf(output, fmt, args);
+  vprintf(fmt, args);
   va_end(args);
-  printf("%s", output);
 #else
   (void)fmt;
 #endif
@@ -1711,7 +1890,7 @@ static const char *exr_rgba_channelname(MultiPartInputFile &file, const char *ch
   const ChannelList &channels = file.header(0).channels();
 
   for (ChannelList::ConstIterator i = channels.begin(); i != channels.end(); ++i) {
-    /* const Channel &channel = i.channel(); */ /* Not used yet */
+    // const Channel &channel = i.channel(); /* Not used yet. */
     const char *str = i.name();
     int len = strlen(str);
     if (len) {
@@ -1725,15 +1904,25 @@ static const char *exr_rgba_channelname(MultiPartInputFile &file, const char *ch
 
 static int exr_has_rgb(MultiPartInputFile &file, const char *rgb_channels[3])
 {
-  /* Common names for RGB-like channels in order. */
+  /* Common names for RGB-like channels in order. The V channel name is used by convention for BW
+   * images, which will be broadcast to RGB channel at the end. */
   static const char *channel_names[] = {
-      "R", "Red", "G", "Green", "B", "Blue", "AR", "RA", "AG", "GA", "AB", "BA", nullptr};
+      "V", "R", "Red", "G", "Green", "B", "Blue", "AR", "RA", "AG", "GA", "AB", "BA", nullptr};
 
   const Header &header = file.header(0);
   int num_channels = 0;
 
   for (int i = 0; channel_names[i]; i++) {
-    if (header.channels().findChannel(channel_names[i])) {
+    /* Also try to match lower case variant of the channel names. */
+    std::string lower_case_name = std::string(channel_names[i]);
+    std::transform(lower_case_name.begin(),
+                   lower_case_name.end(),
+                   lower_case_name.begin(),
+                   [](uchar c) { return std::tolower(c); });
+
+    if (header.channels().findChannel(channel_names[i]) ||
+        header.channels().findChannel(lower_case_name))
+    {
       rgb_channels[num_channels++] = channel_names[i];
       if (num_channels == 3) {
         break;
@@ -1760,16 +1949,21 @@ static bool exr_has_chroma(MultiPartInputFile &file)
          header.channels().findChannel("RY") != nullptr;
 }
 
-static bool exr_has_zbuffer(MultiPartInputFile &file)
-{
-  const Header &header = file.header(0);
-  return !(header.channels().findChannel("Z") == nullptr);
-}
-
 static bool exr_has_alpha(MultiPartInputFile &file)
 {
   const Header &header = file.header(0);
   return !(header.channels().findChannel("A") == nullptr);
+}
+
+static bool exr_has_xyz(MultiPartInputFile &file)
+{
+  const Header &header = file.header(0);
+  return (header.channels().findChannel("X") != nullptr ||
+          header.channels().findChannel("x") != nullptr) &&
+         (header.channels().findChannel("Y") != nullptr ||
+          header.channels().findChannel("y") != nullptr) &&
+         (header.channels().findChannel("Z") != nullptr ||
+          header.channels().findChannel("z") != nullptr);
 }
 
 static bool exr_is_half_float(MultiPartInputFile &file)
@@ -1793,7 +1987,7 @@ static bool imb_exr_is_multilayer_file(MultiPartInputFile &file)
    * channels without a layer name will be single layer. */
   channels.layers(layerNames);
 
-  return (!layerNames.empty());
+  return !layerNames.empty();
 }
 
 static void imb_exr_type_by_channels(ChannelList &channels,
@@ -1830,7 +2024,7 @@ static void imb_exr_type_by_channels(ChannelList &channels,
      */
     for (ChannelList::ConstIterator i = channels.begin(); i != channels.end(); i++) {
       for (const std::string &layer_name : layerNames) {
-        /* see if any layername differs from a viewname */
+        /* see if any layer_name differs from a view_name. */
         if (imb_exr_get_multiView_id(views, layer_name) == -1) {
           std::string layerName = layer_name;
           size_t pos = layerName.rfind('.');
@@ -1894,12 +2088,9 @@ bool IMB_exr_has_multilayer(void *handle)
   return imb_exr_is_multi(*data->ifile);
 }
 
-struct ImBuf *imb_load_openexr(const unsigned char *mem,
-                               size_t size,
-                               int flags,
-                               char colorspace[IM_MAX_SPACE])
+ImBuf *imb_load_openexr(const uchar *mem, size_t size, int flags, char colorspace[IM_MAX_SPACE])
 {
-  struct ImBuf *ibuf = nullptr;
+  ImBuf *ibuf = nullptr;
   IMemStream *membuf = nullptr;
   MultiPartInputFile *file = nullptr;
 
@@ -1912,12 +2103,12 @@ struct ImBuf *imb_load_openexr(const unsigned char *mem,
   try {
     bool is_multi;
 
-    membuf = new IMemStream((unsigned char *)mem, size);
+    membuf = new IMemStream((uchar *)mem, size);
     file = new MultiPartInputFile(*membuf);
 
     Box2i dw = file->header(0).dataWindow();
-    const int width = dw.max.x - dw.min.x + 1;
-    const int height = dw.max.y - dw.min.y + 1;
+    const size_t width = dw.max.x - dw.min.x + 1;
+    const size_t height = dw.max.y - dw.min.y + 1;
 
     // printf("OpenEXR-load: image data window %d %d %d %d\n",
     //     dw.min.x, dw.min.y, dw.max.x, dw.max.y);
@@ -1933,15 +2124,15 @@ struct ImBuf *imb_load_openexr(const unsigned char *mem,
       printf("Error: can't process EXR multilayer file\n");
     }
     else {
-      const int is_alpha = exr_has_alpha(*file);
+      const bool is_alpha = exr_has_alpha(*file);
 
       ibuf = IMB_allocImBuf(width, height, is_alpha ? 32 : 24, 0);
       ibuf->flags |= exr_is_half_float(*file) ? IB_halffloat : 0;
 
       if (hasXDensity(file->header(0))) {
         /* Convert inches to meters. */
-        ibuf->ppm[0] = (double)xDensity(file->header(0)) / 0.0254;
-        ibuf->ppm[1] = ibuf->ppm[0] * (double)file->header(0).pixelAspectRatio();
+        ibuf->ppm[0] = double(xDensity(file->header(0))) / 0.0254;
+        ibuf->ppm[1] = ibuf->ppm[0] * double(file->header(0).pixelAspectRatio());
       }
 
       ibuf->ftype = IMB_FTYPE_OPENEXR;
@@ -1978,17 +2169,19 @@ struct ImBuf *imb_load_openexr(const unsigned char *mem,
           const char *rgb_channels[3];
           const int num_rgb_channels = exr_has_rgb(*file, rgb_channels);
           const bool has_luma = exr_has_luma(*file);
+          const bool has_xyz = exr_has_xyz(*file);
           FrameBuffer frameBuffer;
           float *first;
-          int xstride = sizeof(float[4]);
-          int ystride = -xstride * width;
+          size_t xstride = sizeof(float[4]);
+          size_t ystride = -xstride * width;
 
-          imb_addrectfloatImBuf(ibuf);
+          /* No need to clear image memory, it will be fully written below. */
+          imb_addrectfloatImBuf(ibuf, 4, false);
 
           /* Inverse correct first pixel for data-window
            * coordinates (- dw.min.y because of y flip). */
-          first = ibuf->rect_float - 4 * (dw.min.x - dw.min.y * width);
-          /* but, since we read y-flipped (negative y stride) we move to last scanline */
+          first = ibuf->float_buffer.data - 4 * (dw.min.x - dw.min.y * width);
+          /* But, since we read y-flipped (negative y stride) we move to last scan-line. */
           first += 4 * (height - 1) * width;
 
           if (num_rgb_channels > 0) {
@@ -1996,6 +2189,14 @@ struct ImBuf *imb_load_openexr(const unsigned char *mem,
               frameBuffer.insert(exr_rgba_channelname(*file, rgb_channels[i]),
                                  Slice(Imf::FLOAT, (char *)(first + i), xstride, ystride));
             }
+          }
+          else if (has_xyz) {
+            frameBuffer.insert(exr_rgba_channelname(*file, "X"),
+                               Slice(Imf::FLOAT, (char *)first, xstride, ystride));
+            frameBuffer.insert(exr_rgba_channelname(*file, "Y"),
+                               Slice(Imf::FLOAT, (char *)(first + 1), xstride, ystride));
+            frameBuffer.insert(exr_rgba_channelname(*file, "Z"),
+                               Slice(Imf::FLOAT, (char *)(first + 2), xstride, ystride));
           }
           else if (has_luma) {
             frameBuffer.insert(exr_rgba_channelname(*file, "Y"),
@@ -2011,16 +2212,6 @@ struct ImBuf *imb_load_openexr(const unsigned char *mem,
           /* 1.0 is fill value, this still needs to be assigned even when (is_alpha == 0) */
           frameBuffer.insert(exr_rgba_channelname(*file, "A"),
                              Slice(Imf::FLOAT, (char *)(first + 3), xstride, ystride, 1, 1, 1.0f));
-
-          if (exr_has_zbuffer(*file)) {
-            float *firstz;
-
-            addzbuffloatImBuf(ibuf);
-            firstz = ibuf->zbuf_float - (dw.min.x - dw.min.y * width);
-            firstz += (height - 1) * width;
-            frameBuffer.insert(
-                "Z", Slice(Imf::FLOAT, (char *)firstz, sizeof(float), -width * sizeof(float)));
-          }
 
           InputPart in(*file, 0);
           in.setFrameBuffer(frameBuffer);
@@ -2040,8 +2231,8 @@ struct ImBuf *imb_load_openexr(const unsigned char *mem,
 #endif
 
           if (num_rgb_channels == 0 && has_luma && exr_has_chroma(*file)) {
-            for (size_t a = 0; a < (size_t)ibuf->x * ibuf->y; a++) {
-              float *color = ibuf->rect_float + a * 4;
+            for (size_t a = 0; a < size_t(ibuf->x) * ibuf->y; a++) {
+              float *color = ibuf->float_buffer.data + a * 4;
               ycc_to_rgb(color[0] * 255.0f,
                          color[1] * 255.0f,
                          color[2] * 255.0f,
@@ -2051,16 +2242,12 @@ struct ImBuf *imb_load_openexr(const unsigned char *mem,
                          BLI_YCC_ITU_BT709);
             }
           }
-          else if (num_rgb_channels <= 1) {
+          else if (!has_xyz && num_rgb_channels <= 1) {
             /* Convert 1 to 3 channels. */
-            for (size_t a = 0; a < (size_t)ibuf->x * ibuf->y; a++) {
-              float *color = ibuf->rect_float + a * 4;
-              if (num_rgb_channels <= 1) {
-                color[1] = color[0];
-              }
-              if (num_rgb_channels <= 2) {
-                color[2] = color[0];
-              }
+            for (size_t a = 0; a < size_t(ibuf->x) * ibuf->y; a++) {
+              float *color = ibuf->float_buffer.data + a * 4;
+              color[1] = color[0];
+              color[2] = color[0];
             }
           }
 
@@ -2090,21 +2277,138 @@ struct ImBuf *imb_load_openexr(const unsigned char *mem,
 
     return nullptr;
   }
+  catch (...) { /* Catch-all for edge cases or compiler bugs. */
+    std::cerr << "OpenEXR-Load: UNKNOWN ERROR" << std::endl;
+    if (ibuf) {
+      IMB_freeImBuf(ibuf);
+    }
+    delete file;
+    delete membuf;
+
+    return nullptr;
+  }
 }
 
-void imb_initopenexr(void)
+ImBuf *imb_load_filepath_thumbnail_openexr(const char *filepath,
+                                           const int /*flags*/,
+                                           const size_t max_thumb_size,
+                                           char colorspace[],
+                                           size_t *r_width,
+                                           size_t *r_height)
 {
-  int num_threads = BLI_system_thread_count();
+  IStream *stream = nullptr;
+  Imf::RgbaInputFile *file = nullptr;
 
-  setGlobalThreadCount(num_threads);
+  /* OpenExr uses exceptions for error-handling. */
+  try {
+
+    /* The memory-mapped stream is faster, but don't use for huge files as it requires contiguous
+     * address space and we are processing multiple files at once (typically one per processor
+     * core). The 100 MB limit here is arbitrary, but seems reasonable and conservative. */
+    if (BLI_file_size(filepath) < 100 * 1024 * 1024) {
+      stream = new IMMapStream(filepath);
+    }
+    else {
+      stream = new IFileStream(filepath);
+    }
+
+    /* imb_initopenexr() creates a global pool of worker threads. But we thumbnail multiple images
+     * at once, and by default each file will attempt to use the entire pool for itself, stalling
+     * the others. So each thumbnail should use a single thread of the pool. */
+    file = new RgbaInputFile(*stream, 1);
+
+    if (!file->isComplete()) {
+      return nullptr;
+    }
+
+    Imath::Box2i dw = file->dataWindow();
+    int source_w = dw.max.x - dw.min.x + 1;
+    int source_h = dw.max.y - dw.min.y + 1;
+    *r_width = source_w;
+    *r_height = source_h;
+
+    /* If there is an embedded thumbnail, return that instead of making a new one. */
+    if (file->header().hasPreviewImage()) {
+      const Imf::PreviewImage &preview = file->header().previewImage();
+      ImBuf *ibuf = IMB_allocFromBuffer(
+          (uint8_t *)preview.pixels(), nullptr, preview.width(), preview.height(), 4);
+      delete file;
+      delete stream;
+      IMB_flipy(ibuf);
+      return ibuf;
+    }
+
+    /* Create a new thumbnail. */
+
+    if (colorspace && colorspace[0]) {
+      colorspace_set_default_role(colorspace, IM_MAX_SPACE, COLOR_ROLE_DEFAULT_FLOAT);
+    }
+
+    float scale_factor = std::min(float(max_thumb_size) / float(source_w),
+                                  float(max_thumb_size) / float(source_h));
+    int dest_w = std::max(int(source_w * scale_factor), 1);
+    int dest_h = std::max(int(source_h * scale_factor), 1);
+
+    ImBuf *ibuf = IMB_allocImBuf(dest_w, dest_h, 32, IB_rectfloat);
+
+    /* A single row of source pixels. */
+    Imf::Array<Imf::Rgba> pixels(source_w);
+
+    /* Loop through destination thumbnail rows. */
+    for (int h = 0; h < dest_h; h++) {
+
+      /* Load the single source row that corresponds with destination row. */
+      int source_y = int(float(h) / scale_factor) + dw.min.y;
+      file->setFrameBuffer(&pixels[0] - dw.min.x - source_y * source_w, 1, source_w);
+      file->readPixels(source_y);
+
+      for (int w = 0; w < dest_w; w++) {
+        /* For each destination pixel find single corresponding source pixel. */
+        int source_x = int(std::min<int>((w / scale_factor), dw.max.x - 1));
+        float *dest_px = &ibuf->float_buffer.data[(h * dest_w + w) * 4];
+        dest_px[0] = pixels[source_x].r;
+        dest_px[1] = pixels[source_x].g;
+        dest_px[2] = pixels[source_x].b;
+        dest_px[3] = pixels[source_x].a;
+      }
+    }
+
+    if (file->lineOrder() == INCREASING_Y) {
+      IMB_flipy(ibuf);
+    }
+
+    delete file;
+    delete stream;
+
+    return ibuf;
+  }
+
+  catch (const std::exception &exc) {
+    std::cerr << exc.what() << std::endl;
+    delete file;
+    delete stream;
+    return nullptr;
+  }
+  catch (...) { /* Catch-all for edge cases or compiler bugs. */
+    std::cerr << "OpenEXR-Thumbnail: UNKNOWN ERROR" << std::endl;
+    delete file;
+    delete stream;
+    return nullptr;
+  }
+
+  return nullptr;
 }
 
-void imb_exitopenexr(void)
+void imb_initopenexr()
 {
-  /* Tells OpenEXR to free thread pool, also ensures there is no running
-   * tasks.
-   */
-  setGlobalThreadCount(0);
+  /* In a multithreaded program, staticInitialize() must be called once during startup, before the
+   * program accesses any other functions or classes in the IlmImf library. */
+  Imf::staticInitialize();
+  Imf::setGlobalThreadCount(BLI_system_thread_count());
 }
 
-} /* export "C" */
+void imb_exitopenexr()
+{
+  /* Tells OpenEXR to free thread pool, also ensures there is no running tasks. */
+  Imf::setGlobalThreadCount(0);
+}

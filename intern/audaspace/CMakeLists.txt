@@ -1,42 +1,26 @@
-# ***** BEGIN LGPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2009 Jörg Hermann Müller
 #
-# Copyright 2009 Jrg Hermann Mller
-#
-# This file is part of AudaSpace.
-#
-# AudaSpace is free software: you can redistribute it and/or modify
-# it under the terms of the GNU Lesser General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# AudaSpace is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU Lesser General Public License for more details.
-#
-# You should have received a copy of the GNU Lesser General Public License
-# along with AudaSpace.  If not, see <http://www.gnu.org/licenses/>.
-#
-# ***** END LGPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 remove_strict_flags()
 
 if(CMAKE_COMPILER_IS_GNUCC)
   remove_cc_flag("-Wunused-macros")
 endif()
-  set(INC
-    .
-  )
 
-  set(INC_SYS
-    ${AUDASPACE_C_INCLUDE_DIRS}
-    ${AUDASPACE_PY_INCLUDE_DIRS}
-  )
+set(INC
+  .
+)
 
-  set(SRC
-    intern/AUD_Set.cpp
-    intern/AUD_Set.h
-  )
+set(INC_SYS
+  ${AUDASPACE_C_INCLUDE_DIRS}
+  ${AUDASPACE_PY_INCLUDE_DIRS}
+)
+
+set(SRC
+  intern/AUD_Set.cpp
+  intern/AUD_Set.h
+)
 
 set(LIB
 )
@@ -45,19 +29,18 @@ if(NOT WITH_SYSTEM_AUDASPACE)
   list(APPEND LIB
     audaspace
   )
-  if(WITH_SDL_DYNLOAD)
-    list(APPEND LIB
-      extern_sdlew
-    )
-  endif()
 else()
   list(APPEND LIB
     ${AUDASPACE_C_LIBRARIES}
-    ${AUDASPACE_PY_LIBRARIES}
   )
+  if(WITH_PYTHON AND WITH_PYTHON_NUMPY)
+    list(APPEND LIB
+      ${AUDASPACE_PY_LIBRARIES}
+    )
+  endif()
 endif()
 
-if(WITH_PYTHON)
+if(WITH_PYTHON AND WITH_PYTHON_NUMPY)
   list(APPEND INC_SYS
     ${PYTHON_INCLUDE_DIRS}
   )
@@ -66,8 +49,8 @@ if(WITH_PYTHON)
     intern/AUD_PyInit.h
   )
   list(APPEND LIB
-      ${PYTHON_LINKFLAGS}
-      ${PYTHON_LIBRARIES}
+    ${PYTHON_LINKFLAGS}
+    ${PYTHON_LIBRARIES}
   )
   if(NOT WITH_SYSTEM_AUDASPACE)
     list(APPEND LIB

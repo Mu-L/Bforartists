@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2014 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2014 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup depsgraph
@@ -26,20 +11,19 @@
 #include <cstdarg>
 
 #include "BLI_dot_export.hh"
-#include "BLI_utildefines.h"
 
-#include "DNA_listBase.h"
+#include "DEG_depsgraph.hh"
+#include "DEG_depsgraph_debug.hh"
 
-#include "DEG_depsgraph.h"
-#include "DEG_depsgraph_debug.h"
+#include "intern/depsgraph.hh"
+#include "intern/depsgraph_relation.hh"
 
-#include "intern/depsgraph.h"
-#include "intern/depsgraph_relation.h"
+#include "intern/node/deg_node_component.hh"
+#include "intern/node/deg_node_id.hh"
+#include "intern/node/deg_node_operation.hh"
+#include "intern/node/deg_node_time.hh"
 
-#include "intern/node/deg_node_component.h"
-#include "intern/node/deg_node_id.h"
-#include "intern/node/deg_node_operation.h"
-#include "intern/node/deg_node_time.h"
+#include <sstream>
 
 namespace deg = blender::deg;
 namespace dot = blender::dot;
@@ -53,7 +37,7 @@ namespace blender::deg {
  * get colored by individual types or classes.
  */
 #define COLOR_SCHEME_NODE_CLASS 1
-//#define COLOR_SCHEME_NODE_TYPE  2
+// #define COLOR_SCHEME_NODE_TYPE  2
 
 static const char *deg_debug_graphviz_fontname = "helvetica";
 static float deg_debug_graphviz_graph_label_size = 20.0f;
@@ -99,17 +83,15 @@ static const int deg_debug_node_type_color_map[][2] = {
 
     /* Outer Types */
     {NodeType::PARAMETERS, 2},
-    {NodeType::PROXY, 3},
     {NodeType::ANIMATION, 4},
     {NodeType::TRANSFORM, 5},
     {NodeType::GEOMETRY, 6},
     {NodeType::SEQUENCER, 7},
     {NodeType::SHADING, 8},
-    {NodeType::SHADING_PARAMETERS, 9},
-    {NodeType::CACHE, 10},
-    {NodeType::POINT_CACHE, 11},
-    {NodeType::LAYER_COLLECTIONS, 12},
-    {NodeType::COPY_ON_WRITE, 13},
+    {NodeType::CACHE, 9},
+    {NodeType::POINT_CACHE, 10},
+    {NodeType::LAYER_COLLECTIONS, 11},
+    {NodeType::COPY_ON_EVAL, 12},
     {-1, 0},
 };
 #endif
@@ -301,11 +283,15 @@ static void deg_debug_graphviz_relation_arrowhead(const Relation *rel, dot::Dire
   const char *shape_no_cow = "box";
   const char *shape = shape_default;
   if (rel->from->get_class() == NodeClass::OPERATION &&
-      rel->to->get_class() == NodeClass::OPERATION) {
+      rel->to->get_class() == NodeClass::OPERATION)
+  {
     OperationNode *op_from = (OperationNode *)rel->from;
     OperationNode *op_to = (OperationNode *)rel->to;
-    if (op_from->owner->type == NodeType::COPY_ON_WRITE &&
-        !op_to->owner->need_tag_cow_before_update()) {
+    if (op_from->owner->type == NodeType::COPY_ON_EVAL &&
+        /* The #ID::recalc flag depends on run-time state which is not valid at this point in time.
+         * Pass in all flags although there may be a better way to represent this. */
+        !op_to->owner->need_tag_cow_before_update(ID_RECALC_ALL))
+    {
       shape = shape_no_cow;
     }
   }
@@ -342,7 +328,7 @@ static void deg_debug_graphviz_node_single(DotExportContext &ctx,
                                            const Node *node,
                                            dot::Cluster *parent_cluster)
 {
-  string name = node->identifier();
+  std::string name = node->identifier();
 
   dot::Node &dot_node = ctx.digraph.new_node(name);
   ctx.nodes_map.add_new(node, &dot_node);
@@ -361,7 +347,7 @@ static dot::Cluster &deg_debug_graphviz_node_cluster_create(DotExportContext &ct
                                                             const Node *node,
                                                             dot::Cluster *parent_cluster)
 {
-  string name = node->identifier();
+  std::string name = node->identifier();
   dot::Cluster &cluster = ctx.digraph.new_cluster(name);
   cluster.set_parent_cluster(parent_cluster);
   cluster.attributes.set("fontname", deg_debug_graphviz_fontname);
@@ -405,28 +391,30 @@ static void deg_debug_graphviz_node(DotExportContext &ctx,
     case NodeType::PARAMETERS:
     case NodeType::ANIMATION:
     case NodeType::TRANSFORM:
-    case NodeType::PROXY:
     case NodeType::GEOMETRY:
     case NodeType::SEQUENCER:
     case NodeType::EVAL_POSE:
     case NodeType::BONE:
     case NodeType::SHADING:
-    case NodeType::SHADING_PARAMETERS:
     case NodeType::CACHE:
     case NodeType::POINT_CACHE:
     case NodeType::IMAGE_ANIMATION:
     case NodeType::LAYER_COLLECTIONS:
     case NodeType::PARTICLE_SYSTEM:
     case NodeType::PARTICLE_SETTINGS:
-    case NodeType::COPY_ON_WRITE:
+    case NodeType::COPY_ON_EVAL:
     case NodeType::OBJECT_FROM_LAYER:
+    case NodeType::HIERARCHY:
     case NodeType::BATCH_CACHE:
-    case NodeType::DUPLI:
+    case NodeType::INSTANCING:
     case NodeType::SYNCHRONIZATION:
     case NodeType::AUDIO:
     case NodeType::ARMATURE:
     case NodeType::GENERIC_DATABLOCK:
-    case NodeType::SIMULATION: {
+    case NodeType::SCENE:
+    case NodeType::VISIBILITY:
+    case NodeType::NTREE_OUTPUT:
+    case NodeType::NTREE_GEOMETRY_PREPROCESS: {
       ComponentNode *comp_node = (ComponentNode *)node;
       if (comp_node->operations.is_empty()) {
         deg_debug_graphviz_node_single(ctx, node, parent_cluster);
@@ -468,7 +456,7 @@ static void deg_debug_graphviz_node_relations(DotExportContext &ctx, const Node 
     deg_debug_graphviz_relation_arrowhead(rel, edge);
     edge.attributes.set("penwidth", penwidth);
 
-    /* NOTE: edge from node to own cluster is not possible and gives graphviz
+    /* NOTE: edge from node to our own cluster is not possible and gives graphviz
      * warning, avoid this here by just linking directly to the invisible
      * placeholder node. */
     dot::Cluster *tail_cluster = ctx.clusters_map.lookup_default(tail, nullptr);
@@ -511,13 +499,9 @@ static void deg_debug_graphviz_graph_relations(DotExportContext &ctx, const Deps
 
 }  // namespace blender::deg
 
-void DEG_debug_relations_graphviz(const Depsgraph *graph, FILE *fp, const char *label)
+std::string DEG_debug_graph_to_dot(const Depsgraph &graph, const blender::StringRef label)
 {
-  if (!graph) {
-    return;
-  }
-
-  const deg::Depsgraph *deg_graph = reinterpret_cast<const deg::Depsgraph *>(graph);
+  const deg::Depsgraph &deg_graph = reinterpret_cast<const deg::Depsgraph &>(graph);
 
   dot::DirectedGraph digraph;
   deg::DotExportContext ctx{false, digraph};
@@ -531,11 +515,10 @@ void DEG_debug_relations_graphviz(const Depsgraph *graph, FILE *fp, const char *
   digraph.attributes.set("splines", "ortho");
   digraph.attributes.set("overlap", "scalexy");
 
-  deg::deg_debug_graphviz_graph_nodes(ctx, deg_graph);
-  deg::deg_debug_graphviz_graph_relations(ctx, deg_graph);
+  deg::deg_debug_graphviz_graph_nodes(ctx, &deg_graph);
+  deg::deg_debug_graphviz_graph_relations(ctx, &deg_graph);
 
   deg::deg_debug_graphviz_legend(ctx);
 
-  std::string dot_string = digraph.to_dot_string();
-  fprintf(fp, "%s", dot_string.c_str());
+  return digraph.to_dot_string();
 }

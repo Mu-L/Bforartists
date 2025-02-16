@@ -1,73 +1,52 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2005 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2005 by the Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup modifiers
  */
 
-#include <cstdio>
-
 #include "BLI_utildefines.h"
 
 #include "BLI_array.hh"
-#include "BLI_float4x4.hh"
 #include "BLI_math_geom.h"
 #include "BLI_math_matrix.h"
+#include "BLI_math_matrix_types.hh"
 #include "BLI_vector.hh"
+#include "BLI_vector_set.hh"
 
-#include "BLT_translation.h"
+#include "BLT_translation.hh"
 
-#include "DNA_collection_types.h"
 #include "DNA_defaults.h"
 #include "DNA_mesh_types.h"
-#include "DNA_meshdata_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
 
-#include "BKE_collection.h"
-#include "BKE_context.h"
-#include "BKE_global.h" /* only to check G.debug */
-#include "BKE_lib_id.h"
-#include "BKE_lib_query.h"
-#include "BKE_material.h"
-#include "BKE_mesh.h"
-#include "BKE_mesh_boolean_convert.hh"
-#include "BKE_mesh_wrapper.h"
-#include "BKE_modifier.h"
+#include "BKE_collection.hh"
+#include "BKE_global.hh" /* only to check G.debug */
+#include "BKE_lib_id.hh"
+#include "BKE_lib_query.hh"
+#include "BKE_material.hh"
+#include "BKE_mesh.hh"
+#include "BKE_mesh_wrapper.hh"
+#include "BKE_modifier.hh"
 
-#include "UI_interface.h"
-#include "UI_resources.h"
+#include "UI_interface.hh"
+#include "UI_resources.hh"
 
-#include "RNA_access.h"
+#include "RNA_access.hh"
+#include "RNA_prototypes.hh"
 
-#include "MOD_ui_common.h"
-#include "MOD_util.h"
-
-#include "DEG_depsgraph_query.h"
+#include "MOD_ui_common.hh"
 
 #include "MEM_guardedalloc.h"
 
-#include "bmesh.h"
-#include "bmesh_tools.h"
-#include "tools/bmesh_boolean.h"
-#include "tools/bmesh_intersect.h"
+#include "GEO_mesh_boolean.hh"
+#include "GEO_randomize.hh"
+
+#include "bmesh.hh"
+#include "tools/bmesh_intersect.hh"
 
 // #define DEBUG_TIME
 
@@ -76,10 +55,15 @@
 #endif
 
 using blender::Array;
+using blender::float3;
 using blender::float4x4;
+using blender::IndexRange;
+using blender::MutableSpan;
+using blender::Span;
 using blender::Vector;
+using blender::VectorSet;
 
-static void initData(ModifierData *md)
+static void init_data(ModifierData *md)
 {
   BooleanModifierData *bmd = (BooleanModifierData *)md;
 
@@ -88,9 +72,7 @@ static void initData(ModifierData *md)
   MEMCPY_STRUCT_AFTER(bmd, DNA_struct_default_get(BooleanModifierData), modifier);
 }
 
-static bool isDisabled(const struct Scene *UNUSED(scene),
-                       ModifierData *md,
-                       bool UNUSED(useRenderParams))
+static bool is_disabled(const Scene * /*scene*/, ModifierData *md, bool /*use_render_params*/)
 {
   BooleanModifierData *bmd = (BooleanModifierData *)md;
   Collection *col = bmd->collection;
@@ -100,20 +82,20 @@ static bool isDisabled(const struct Scene *UNUSED(scene),
   }
   if (bmd->flag & eBooleanModifierFlag_Collection) {
     /* The Exact solver tolerates an empty collection. */
-    return !col && bmd->solver != eBooleanModifierSolver_Exact;
+    return !col && bmd->solver != eBooleanModifierSolver_Mesh_Arr;
   }
   return false;
 }
 
-static void foreachIDLink(ModifierData *md, Object *ob, IDWalkFunc walk, void *userData)
+static void foreach_ID_link(ModifierData *md, Object *ob, IDWalkFunc walk, void *user_data)
 {
   BooleanModifierData *bmd = (BooleanModifierData *)md;
 
-  walk(userData, ob, (ID **)&bmd->collection, IDWALK_CB_USER);
-  walk(userData, ob, (ID **)&bmd->object, IDWALK_CB_NOP);
+  walk(user_data, ob, (ID **)&bmd->collection, IDWALK_CB_USER);
+  walk(user_data, ob, (ID **)&bmd->object, IDWALK_CB_NOP);
 }
 
-static void updateDepsgraph(ModifierData *md, const ModifierUpdateDepsgraphContext *ctx)
+static void update_depsgraph(ModifierData *md, const ModifierUpdateDepsgraphContext *ctx)
 {
   BooleanModifierData *bmd = (BooleanModifierData *)md;
   if ((bmd->flag & eBooleanModifierFlag_Object) && bmd->object != nullptr) {
@@ -127,7 +109,7 @@ static void updateDepsgraph(ModifierData *md, const ModifierUpdateDepsgraphConte
     DEG_add_collection_geometry_relation(ctx->node, col, "Boolean Modifier");
   }
   /* We need own transformation as well. */
-  DEG_add_modifier_to_transform_relation(ctx->node, "Boolean Modifier");
+  DEG_add_depends_on_transform_relation(ctx->node, "Boolean Modifier");
 }
 
 static Mesh *get_quick_mesh(
@@ -135,14 +117,14 @@ static Mesh *get_quick_mesh(
 {
   Mesh *result = nullptr;
 
-  if (mesh_self->totpoly == 0 || mesh_operand_ob->totpoly == 0) {
+  if (mesh_self->faces_num == 0 || mesh_operand_ob->faces_num == 0) {
     switch (operation) {
       case eBooleanModifierOp_Intersect:
-        result = BKE_mesh_new_nomain(0, 0, 0, 0, 0);
+        result = BKE_mesh_new_nomain(0, 0, 0, 0);
         break;
 
       case eBooleanModifierOp_Union:
-        if (mesh_self->totpoly != 0) {
+        if (mesh_self->faces_num != 0) {
           result = mesh_self;
         }
         else {
@@ -151,17 +133,15 @@ static Mesh *get_quick_mesh(
 
           float imat[4][4];
           float omat[4][4];
-          invert_m4_m4(imat, ob_self->obmat);
-          mul_m4_m4m4(omat, imat, ob_operand_ob->obmat);
+          invert_m4_m4(imat, ob_self->object_to_world().ptr());
+          mul_m4_m4m4(omat, imat, ob_operand_ob->object_to_world().ptr());
 
-          const int mverts_len = result->totvert;
-          MVert *mv = result->mvert;
-
-          for (int i = 0; i < mverts_len; i++, mv++) {
-            mul_m4_v3(omat, mv->co);
+          MutableSpan<float3> positions = result->vert_positions_for_write();
+          for (const int i : positions.index_range()) {
+            mul_m4_v3(omat, positions[i]);
           }
 
-          result->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
+          result->tag_positions_changed();
         }
 
         break;
@@ -181,7 +161,7 @@ static Mesh *get_quick_mesh(
 /**
  * Compare selected/unselected.
  */
-static int bm_face_isect_pair(BMFace *f, void *UNUSED(user_data))
+static int bm_face_isect_pair(BMFace *f, void * /*user_data*/)
 {
   return BM_elem_flag_test(f, BM_FACE_TAG) ? 1 : 0;
 }
@@ -194,7 +174,7 @@ static bool BMD_error_messages(const Object *ob, ModifierData *md)
   bool error_returns_result = false;
 
   const bool operand_collection = (bmd->flag & eBooleanModifierFlag_Collection) != 0;
-  const bool use_exact = bmd->solver == eBooleanModifierSolver_Exact;
+  const bool use_exact = bmd->solver == eBooleanModifierSolver_Mesh_Arr;
   const bool operation_intersect = bmd->operation == eBooleanModifierOp_Intersect;
 
 #ifndef WITH_GMP
@@ -238,19 +218,30 @@ static BMesh *BMD_mesh_bm_create(
     Mesh *mesh, Object *object, Mesh *mesh_operand_ob, Object *operand_ob, bool *r_is_flip)
 {
 #ifdef DEBUG_TIME
-  SCOPED_TIMER(__func__)
+  SCOPED_TIMER(__func__);
 #endif
 
-  *r_is_flip = (is_negative_m4(object->obmat) != is_negative_m4(operand_ob->obmat));
+  *r_is_flip = (is_negative_m4(object->object_to_world().ptr()) !=
+                is_negative_m4(operand_ob->object_to_world().ptr()));
 
   const BMAllocTemplate allocsize = BMALLOC_TEMPLATE_FROM_ME(mesh, mesh_operand_ob);
 
-  BMeshCreateParams bmcp = {false};
-  BMesh *bm = BM_mesh_create(&allocsize, &bmcp);
+  BMeshCreateParams bmesh_create_params{};
+  BMesh *bm = BM_mesh_create(&allocsize, &bmesh_create_params);
 
-  BMeshFromMeshParams params{};
-  params.calc_face_normal = true;
-  BM_mesh_bm_from_me(bm, mesh_operand_ob, &params);
+  /* Keep `mesh` first, needed so active layers are set based on `mesh` not `mesh_operand_ob`,
+   * otherwise the wrong active render layer is used, see #92384.
+   *
+   * NOTE: while initializing customer data layers the is not essential,
+   * it avoids the overhead of having to re-allocate #BMHeader.data when the 2nd mesh is added
+   * (if it contains additional custom-data layers). */
+  const Mesh *mesh_array[2] = {mesh, mesh_operand_ob};
+  BM_mesh_copy_init_customdata_from_mesh_array(bm, mesh_array, ARRAY_SIZE(mesh_array), &allocsize);
+
+  BMeshFromMeshParams bmesh_from_mesh_params{};
+  bmesh_from_mesh_params.calc_face_normal = true;
+  bmesh_from_mesh_params.calc_vert_normal = true;
+  BM_mesh_bm_from_me(bm, mesh_operand_ob, &bmesh_from_mesh_params);
 
   if (UNLIKELY(*r_is_flip)) {
     const int cd_loop_mdisp_offset = CustomData_get_offset(&bm->ldata, CD_MDISPS);
@@ -261,7 +252,7 @@ static BMesh *BMD_mesh_bm_create(
     }
   }
 
-  BM_mesh_bm_from_me(bm, mesh, &params);
+  BM_mesh_bm_from_me(bm, mesh, &bmesh_from_mesh_params);
 
   return bm;
 }
@@ -275,17 +266,15 @@ static void BMD_mesh_intersection(BMesh *bm,
                                   bool is_flip)
 {
 #ifdef DEBUG_TIME
-  SCOPED_TIMER(__func__)
+  SCOPED_TIMER(__func__);
 #endif
 
   BooleanModifierData *bmd = (BooleanModifierData *)md;
 
-  /* main bmesh intersection setup */
-  /* create tessface & intersect */
+  /* Main BMesh intersection setup. */
+  /* Create tessellation & intersect. */
   const int looptris_tot = poly_to_tri_count(bm->totface, bm->totloop);
-  BMLoop *(*looptris)[3] = (BMLoop * (*)[3])
-      MEM_malloc_arrayN(looptris_tot, sizeof(*looptris), __func__);
-
+  blender::Array<std::array<BMLoop *, 3>> looptris(looptris_tot);
   BM_mesh_calc_tessellation_beauty(bm, looptris);
 
   /* postpone this until after tessellating
@@ -293,13 +282,13 @@ static void BMD_mesh_intersection(BMesh *bm,
   {
     BMIter iter;
     int i;
-    const int i_verts_end = mesh_operand_ob->totvert;
-    const int i_faces_end = mesh_operand_ob->totpoly;
+    const int i_verts_end = mesh_operand_ob->verts_num;
+    const int i_faces_end = mesh_operand_ob->faces_num;
 
     float imat[4][4];
     float omat[4][4];
-    invert_m4_m4(imat, object->obmat);
-    mul_m4_m4m4(omat, imat, operand_ob->obmat);
+    invert_m4_m4(imat, object->object_to_world().ptr());
+    mul_m4_m4m4(omat, imat, operand_ob->object_to_world().ptr());
 
     BMVert *eve;
     i = 0;
@@ -323,7 +312,7 @@ static void BMD_mesh_intersection(BMesh *bm,
     Array<short> material_remap(operand_ob->totcol ? operand_ob->totcol : 1);
 
     /* Using original (not evaluated) object here since we are writing to it. */
-    /* XXX Pretty sure comment above is fully wrong now with CoW & co ? */
+    /* XXX Pretty sure comment above is fully wrong now with copy-on-eval & co ? */
     BKE_object_material_remap_calc(ctx->object, operand_ob, material_remap.data());
 
     BMFace *efa;
@@ -338,6 +327,9 @@ static void BMD_mesh_intersection(BMesh *bm,
       /* remap material */
       if (LIKELY(efa->mat_nr < operand_ob->totcol)) {
         efa->mat_nr = material_remap[efa->mat_nr];
+      }
+      else {
+        efa->mat_nr = 0;
       }
 
       if (++i == i_faces_end) {
@@ -363,7 +355,6 @@ static void BMD_mesh_intersection(BMesh *bm,
 
   BM_mesh_intersect(bm,
                     looptris,
-                    looptris_tot,
                     bm_face_isect_pair,
                     nullptr,
                     false,
@@ -374,25 +365,37 @@ static void BMD_mesh_intersection(BMesh *bm,
                     false,
                     bmd->operation,
                     bmd->double_threshold);
-
-  MEM_freeN(looptris);
 }
 
 #ifdef WITH_GMP
 
 /* Get a mapping from material slot numbers in the src_ob to slot numbers in the dst_ob.
  * If a material doesn't exist in the dst_ob, the mapping just goes to the same slot
- * or to zero if there aren't enough slots in the destination.
- * Caller owns the returned array. */
-static Array<short> get_material_remap(Object *dest_ob, Object *src_ob)
+ * or to zero if there aren't enough slots in the destination. */
+static Array<short> get_material_remap_index_based(Object *dest_ob, Object *src_ob)
 {
-  int n = dest_ob->totcol;
+  const int n = src_ob->totcol;
   if (n <= 0) {
-    n = 1;
+    return Array<short>(1, 0);
   }
   Array<short> remap(n);
   BKE_object_material_remap_calc(dest_ob, src_ob, remap.data());
   return remap;
+}
+
+/* Get a mapping from material slot numbers in the source geometry to slot numbers in the result
+ * geometry. The material is added to the result geometry if it doesn't already use it. */
+static Array<short> get_material_remap_transfer(Object &object,
+                                                const Mesh &mesh,
+                                                VectorSet<Material *> &materials)
+{
+  const int material_num = mesh.totcol;
+  Array<short> map(material_num);
+  for (const int i : IndexRange(material_num)) {
+    Material *material = BKE_object_material_get_eval(&object, i + 1);
+    map[i] = material ? materials.index_of_or_add(material) : -1;
+  }
+  return map;
 }
 
 static Mesh *exact_boolean_mesh(BooleanModifierData *bmd,
@@ -400,11 +403,12 @@ static Mesh *exact_boolean_mesh(BooleanModifierData *bmd,
                                 Mesh *mesh)
 {
   Vector<const Mesh *> meshes;
-  Vector<float4x4 *> obmats;
+  Vector<float4x4> obmats;
+
   Vector<Array<short>> material_remaps;
 
 #  ifdef DEBUG_TIME
-  SCOPED_TIMER(__func__)
+  SCOPED_TIMER(__func__);
 #  endif
 
   if ((bmd->flag & eBooleanModifierFlag_Object) && bmd->object == nullptr) {
@@ -412,17 +416,36 @@ static Mesh *exact_boolean_mesh(BooleanModifierData *bmd,
   }
 
   meshes.append(mesh);
-  obmats.append((float4x4 *)&ctx->object->obmat);
+  obmats.append(ctx->object->object_to_world());
   material_remaps.append({});
+
+  const BooleanModifierMaterialMode material_mode = BooleanModifierMaterialMode(
+      bmd->material_mode);
+  VectorSet<Material *> materials;
+  if (material_mode == eBooleanModifierMaterialMode_Transfer) {
+    if (mesh->totcol == 0) {
+      /* Necessary for faces using the default material when there are no material slots. */
+      materials.add(nullptr);
+    }
+    else {
+      materials.add_multiple({mesh->mat, mesh->totcol});
+    }
+  }
+
   if (bmd->flag & eBooleanModifierFlag_Object) {
-    Mesh *mesh_operand = BKE_modifier_get_evaluated_mesh_from_evaluated_object(bmd->object, false);
+    Mesh *mesh_operand = BKE_modifier_get_evaluated_mesh_from_evaluated_object(bmd->object);
     if (!mesh_operand) {
       return mesh;
     }
     BKE_mesh_wrapper_ensure_mdata(mesh_operand);
     meshes.append(mesh_operand);
-    obmats.append((float4x4 *)&bmd->object->obmat);
-    material_remaps.append(get_material_remap(ctx->object, bmd->object));
+    obmats.append(bmd->object->object_to_world());
+    if (material_mode == eBooleanModifierMaterialMode_Index) {
+      material_remaps.append(get_material_remap_index_based(ctx->object, bmd->object));
+    }
+    else {
+      material_remaps.append(get_material_remap_transfer(*bmd->object, *mesh_operand, materials));
+    }
   }
   else if (bmd->flag & eBooleanModifierFlag_Collection) {
     Collection *collection = bmd->collection;
@@ -430,14 +453,19 @@ static Mesh *exact_boolean_mesh(BooleanModifierData *bmd,
     if (collection) {
       FOREACH_COLLECTION_OBJECT_RECURSIVE_BEGIN (collection, ob) {
         if (ob->type == OB_MESH && ob != ctx->object) {
-          Mesh *collection_mesh = BKE_modifier_get_evaluated_mesh_from_evaluated_object(ob, false);
+          Mesh *collection_mesh = BKE_modifier_get_evaluated_mesh_from_evaluated_object(ob);
           if (!collection_mesh) {
             continue;
           }
           BKE_mesh_wrapper_ensure_mdata(collection_mesh);
           meshes.append(collection_mesh);
-          obmats.append((float4x4 *)&ob->obmat);
-          material_remaps.append(get_material_remap(ctx->object, ob));
+          obmats.append(ob->object_to_world());
+          if (material_mode == eBooleanModifierMaterialMode_Index) {
+            material_remaps.append(get_material_remap_index_based(ctx->object, ob));
+          }
+          else {
+            material_remaps.append(get_material_remap_transfer(*ob, *collection_mesh, materials));
+          }
         }
       }
       FOREACH_COLLECTION_OBJECT_RECURSIVE_END;
@@ -446,17 +474,34 @@ static Mesh *exact_boolean_mesh(BooleanModifierData *bmd,
 
   const bool use_self = (bmd->flag & eBooleanModifierFlag_Self) != 0;
   const bool hole_tolerant = (bmd->flag & eBooleanModifierFlag_HoleTolerant) != 0;
-  return blender::meshintersect::direct_mesh_boolean(meshes,
-                                                     obmats,
-                                                     *(float4x4 *)&ctx->object->obmat,
-                                                     material_remaps,
-                                                     use_self,
-                                                     hole_tolerant,
-                                                     bmd->operation);
+  blender::geometry::boolean::BooleanOpParameters op_params;
+  op_params.boolean_mode = blender::geometry::boolean::Operation(bmd->operation);
+  op_params.no_self_intersections = !use_self;
+  op_params.watertight = !hole_tolerant;
+  op_params.no_nested_components = false;
+  Mesh *result = blender::geometry::boolean::mesh_boolean(
+      meshes,
+      obmats,
+      ctx->object->object_to_world(),
+      material_remaps,
+      op_params,
+      blender::geometry::boolean::Solver::MeshArr,
+      nullptr);
+
+  if (material_mode == eBooleanModifierMaterialMode_Transfer) {
+    MEM_SAFE_FREE(result->mat);
+    result->mat = (Material **)MEM_malloc_arrayN(materials.size(), sizeof(Material *), __func__);
+    result->totcol = materials.size();
+    MutableSpan(result->mat, result->totcol).copy_from(materials);
+  }
+
+  blender::geometry::debug_randomize_mesh_order(result);
+
+  return result;
 }
 #endif
 
-static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *mesh)
+static Mesh *modify_mesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *mesh)
 {
   BooleanModifierData *bmd = (BooleanModifierData *)md;
   Object *object = ctx->object;
@@ -469,13 +514,13 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
   }
 
 #ifdef WITH_GMP
-  if (bmd->solver == eBooleanModifierSolver_Exact) {
+  if (bmd->solver == eBooleanModifierSolver_Mesh_Arr) {
     return exact_boolean_mesh(bmd, ctx, mesh);
   }
 #endif
 
 #ifdef DEBUG_TIME
-  SCOPED_TIMER(__func__)
+  SCOPED_TIMER(__func__);
 #endif
 
   if (bmd->flag & eBooleanModifierFlag_Object) {
@@ -485,8 +530,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
 
     Object *operand_ob = bmd->object;
 
-    Mesh *mesh_operand_ob = BKE_modifier_get_evaluated_mesh_from_evaluated_object(operand_ob,
-                                                                                  false);
+    Mesh *mesh_operand_ob = BKE_modifier_get_evaluated_mesh_from_evaluated_object(operand_ob);
 
     if (mesh_operand_ob) {
       /* XXX This is utterly non-optimal, we may go from a bmesh to a mesh back to a bmesh!
@@ -494,7 +538,7 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
       BKE_mesh_wrapper_ensure_mdata(mesh_operand_ob);
       /* when one of objects is empty (has got no faces) we could speed up
        * calculation a bit returning one of objects' derived meshes (or empty one)
-       * Returning mesh is depended on modifiers operation (sergey) */
+       * Returning mesh is dependent on modifiers operation (sergey) */
       result = get_quick_mesh(object, mesh, operand_ob, mesh_operand_ob, bmd->operation);
 
       if (result == nullptr) {
@@ -506,7 +550,6 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
         result = BKE_mesh_from_bmesh_for_eval_nomain(bm, nullptr, mesh);
 
         BM_mesh_free(bm);
-        result->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
       }
 
       if (result == nullptr) {
@@ -521,94 +564,116 @@ static Mesh *modifyMesh(ModifierData *md, const ModifierEvalContext *ctx, Mesh *
 
     FOREACH_COLLECTION_OBJECT_RECURSIVE_BEGIN (collection, operand_ob) {
       if (operand_ob->type == OB_MESH && operand_ob != ctx->object) {
-        Mesh *mesh_operand_ob = BKE_modifier_get_evaluated_mesh_from_evaluated_object(operand_ob,
-                                                                                      false);
+        Mesh *mesh_operand_ob = BKE_modifier_get_evaluated_mesh_from_evaluated_object(operand_ob);
 
-        if (mesh_operand_ob) {
-          /* XXX This is utterly non-optimal, we may go from a bmesh to a mesh back to a bmesh!
-           * But for 2.90 better not try to be smart here. */
-          BKE_mesh_wrapper_ensure_mdata(mesh_operand_ob);
-
-          bool is_flip;
-          BMesh *bm = BMD_mesh_bm_create(mesh, object, mesh_operand_ob, operand_ob, &is_flip);
-
-          BMD_mesh_intersection(bm, md, ctx, mesh_operand_ob, object, operand_ob, is_flip);
-
-          /* Needed for multiple objects to work. */
-          BMeshToMeshParams params{};
-          params.calc_object_remap = false;
-          BM_mesh_bm_to_me(nullptr, bm, mesh, &params);
-
-          result = BKE_mesh_from_bmesh_for_eval_nomain(bm, nullptr, mesh);
-          BM_mesh_free(bm);
-          result->runtime.cd_dirty_vert |= CD_MASK_NORMAL;
+        if (mesh_operand_ob == nullptr) {
+          continue;
         }
+
+        /* XXX This is utterly non-optimal, we may go from a bmesh to a mesh back to a bmesh!
+         * But for 2.90 better not try to be smart here. */
+        BKE_mesh_wrapper_ensure_mdata(mesh_operand_ob);
+
+        bool is_flip;
+        BMesh *bm = BMD_mesh_bm_create(result, object, mesh_operand_ob, operand_ob, &is_flip);
+
+        BMD_mesh_intersection(bm, md, ctx, mesh_operand_ob, object, operand_ob, is_flip);
+
+        /* Needed for multiple objects to work. */
+        if (result == mesh) {
+          result = BKE_mesh_from_bmesh_for_eval_nomain(bm, nullptr, mesh);
+        }
+        else {
+          BMeshToMeshParams bmesh_to_mesh_params{};
+          bmesh_to_mesh_params.calc_object_remap = false;
+          BM_mesh_bm_to_me(nullptr, bm, result, &bmesh_to_mesh_params);
+        }
+        BM_mesh_free(bm);
       }
     }
     FOREACH_COLLECTION_OBJECT_RECURSIVE_END;
   }
 
+  blender::geometry::debug_randomize_mesh_order(result);
+
   return result;
 }
 
-static void requiredDataMask(Object *UNUSED(ob),
-                             ModifierData *UNUSED(md),
-                             CustomData_MeshMasks *r_cddata_masks)
+static void required_data_mask(ModifierData * /*md*/, CustomData_MeshMasks *r_cddata_masks)
 {
   r_cddata_masks->vmask |= CD_MASK_MDEFORMVERT;
-  r_cddata_masks->emask |= CD_MASK_MEDGE;
   r_cddata_masks->fmask |= CD_MASK_MTFACE;
 }
 
-static void panel_draw(const bContext *UNUSED(C), Panel *panel)
+static void panel_draw(const bContext * /*C*/, Panel *panel)
 {
   uiLayout *layout = panel->layout;
   PointerRNA *ptr = modifier_panel_get_property_pointers(panel, nullptr);
 
-  uiItemR(layout, ptr, "operation", UI_ITEM_R_EXPAND, nullptr, ICON_NONE);
+  uiItemR(layout, ptr, "operation", UI_ITEM_R_EXPAND, std::nullopt, ICON_NONE);
 
   uiLayoutSetPropSep(layout, true);
 
-  uiItemR(layout, ptr, "operand_type", 0, nullptr, ICON_NONE);
+  uiItemR(layout, ptr, "operand_type", UI_ITEM_NONE, std::nullopt, ICON_NONE);
   if (RNA_enum_get(ptr, "operand_type") == eBooleanModifierFlag_Object) {
-    uiItemR(layout, ptr, "object", 0, nullptr, ICON_NONE);
+    uiItemR(layout, ptr, "object", UI_ITEM_NONE, std::nullopt, ICON_NONE);
   }
   else {
-    uiItemR(layout, ptr, "collection", 0, nullptr, ICON_NONE);
+    uiItemR(layout, ptr, "collection", UI_ITEM_NONE, std::nullopt, ICON_NONE);
   }
 
-  uiItemR(layout, ptr, "solver", UI_ITEM_R_EXPAND, nullptr, ICON_NONE);
+  uiItemR(layout, ptr, "solver", UI_ITEM_R_EXPAND, std::nullopt, ICON_NONE);
 
   modifier_panel_end(layout, ptr);
 }
 
-static void solver_options_panel_draw(const bContext *UNUSED(C), Panel *panel)
+static void solver_options_panel_draw(const bContext * /*C*/, Panel *panel)
 {
   uiLayout *layout = panel->layout;
   PointerRNA *ptr = modifier_panel_get_property_pointers(panel, nullptr);
 
-  const bool use_exact = RNA_enum_get(ptr, "solver") == eBooleanModifierSolver_Exact;
+  const bool use_exact = RNA_enum_get(ptr, "solver") == eBooleanModifierSolver_Mesh_Arr;
 
   uiLayoutSetPropSep(layout, true);
 
   uiLayout *col = uiLayoutColumn(layout, true);
   if (use_exact) {
+    uiItemR(col, ptr, "material_mode", UI_ITEM_NONE, IFACE_("Materials"), ICON_NONE);
     /* When operand is collection, we always use_self. */
     if (RNA_enum_get(ptr, "operand_type") == eBooleanModifierFlag_Object) {
-      uiItemR(col, ptr, "use_self", 0, nullptr, ICON_NONE);
+
+      /*------------------- bfa - original prop */
+      // uiItemR(col, ptr, "use_self", UI_ITEM_NONE, nullptr, ICON_NONE);
+
+      uiLayout *row;
+      col = uiLayoutColumn(layout, true);
+      row = uiLayoutRow(col, true);
+      uiLayoutSetPropSep(row, false); /* bfa - use_property_split = False */
+      uiItemR(row, ptr, "use_self", UI_ITEM_NONE, std::nullopt, ICON_NONE);
+      uiItemDecoratorR(row, ptr, "use_self", 0); /*bfa - decorator*/
+      /* ------------ end bfa */
     }
-    uiItemR(col, ptr, "use_hole_tolerant", 0, nullptr, ICON_NONE);
+    /*------------------- bfa - original prop */
+    // uiItemR(col, ptr, "use_hole_tolerant", UI_ITEM_NONE, nullptr, ICON_NONE);
+
+    uiLayout *row;
+    col = uiLayoutColumn(layout, true);
+    row = uiLayoutRow(col, true);
+    uiLayoutSetPropSep(row, false); /* bfa - use_property_split = False */
+    uiItemR(row, ptr, "use_hole_tolerant", UI_ITEM_NONE, std::nullopt, ICON_NONE);
+    uiItemDecoratorR(row, ptr, "use_hole_tolerant", 0); /*bfa - decorator*/
+                                                        /* ------------ end bfa */
   }
   else {
-    uiItemR(col, ptr, "double_threshold", 0, nullptr, ICON_NONE);
+    uiItemR(col, ptr, "double_threshold", UI_ITEM_NONE, std::nullopt, ICON_NONE);
   }
 
   if (G.debug) {
-    uiItemR(col, ptr, "debug_options", 0, nullptr, ICON_NONE);
+    uiItemR(col, ptr, "debug_options", UI_ITEM_NONE, std::nullopt, ICON_NONE);
   }
 }
 
-static void panelRegister(ARegionType *region_type)
+static void panel_register(ARegionType *region_type)
 {
   PanelType *panel = modifier_panel_register(region_type, eModifierType_Boolean, panel_draw);
   modifier_subpanel_register(
@@ -616,36 +681,37 @@ static void panelRegister(ARegionType *region_type)
 }
 
 ModifierTypeInfo modifierType_Boolean = {
-    /* name */ "Boolean",
-    /* structName */ "BooleanModifierData",
-    /* structSize */ sizeof(BooleanModifierData),
-    /* srna */ &RNA_BooleanModifier,
-    /* type */ eModifierTypeType_Nonconstructive,
-    /* flags */
-    (ModifierTypeFlag)(eModifierTypeFlag_AcceptsMesh | eModifierTypeFlag_SupportsEditmode),
-    /* icon */ ICON_MOD_BOOLEAN,
+    /*idname*/ "Boolean",
+    /*name*/ N_("Boolean"),
+    /*struct_name*/ "BooleanModifierData",
+    /*struct_size*/ sizeof(BooleanModifierData),
+    /*srna*/ &RNA_BooleanModifier,
+    /*type*/ ModifierTypeType::Nonconstructive,
+    /*flags*/
+    (eModifierTypeFlag_AcceptsMesh | eModifierTypeFlag_SupportsEditmode),
+    /*icon*/ ICON_MOD_BOOLEAN,
 
-    /* copyData */ BKE_modifier_copydata_generic,
+    /*copy_data*/ BKE_modifier_copydata_generic,
 
-    /* deformVerts */ nullptr,
-    /* deformMatrices */ nullptr,
-    /* deformVertsEM */ nullptr,
-    /* deformMatricesEM */ nullptr,
-    /* modifyMesh */ modifyMesh,
-    /* modifyHair */ nullptr,
-    /* modifyGeometrySet */ nullptr,
+    /*deform_verts*/ nullptr,
+    /*deform_matrices*/ nullptr,
+    /*deform_verts_EM*/ nullptr,
+    /*deform_matrices_EM*/ nullptr,
+    /*modify_mesh*/ modify_mesh,
+    /*modify_geometry_set*/ nullptr,
 
-    /* initData */ initData,
-    /* requiredDataMask */ requiredDataMask,
-    /* freeData */ nullptr,
-    /* isDisabled */ isDisabled,
-    /* updateDepsgraph */ updateDepsgraph,
-    /* dependsOnTime */ nullptr,
-    /* dependsOnNormals */ nullptr,
-    /* foreachIDLink */ foreachIDLink,
-    /* foreachTexLink */ nullptr,
-    /* freeRuntimeData */ nullptr,
-    /* panelRegister */ panelRegister,
-    /* blendWrite */ nullptr,
-    /* blendRead */ nullptr,
+    /*init_data*/ init_data,
+    /*required_data_mask*/ required_data_mask,
+    /*free_data*/ nullptr,
+    /*is_disabled*/ is_disabled,
+    /*update_depsgraph*/ update_depsgraph,
+    /*depends_on_time*/ nullptr,
+    /*depends_on_normals*/ nullptr,
+    /*foreach_ID_link*/ foreach_ID_link,
+    /*foreach_tex_link*/ nullptr,
+    /*free_runtime_data*/ nullptr,
+    /*panel_register*/ panel_register,
+    /*blend_write*/ nullptr,
+    /*blend_read*/ nullptr,
+    /*foreach_cache*/ nullptr,
 };

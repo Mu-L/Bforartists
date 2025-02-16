@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup bli
@@ -22,6 +10,7 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "BLI_lazy_threading.hh"
 #include "BLI_task.h"
 #include "BLI_threads.h"
 
@@ -45,14 +34,14 @@ static tbb::global_control *task_scheduler_global_control = nullptr;
 void BLI_task_scheduler_init()
 {
 #ifdef WITH_TBB_GLOBAL_CONTROL
-  const int num_threads_override = BLI_system_num_threads_override_get();
+  const int threads_override_num = BLI_system_num_threads_override_get();
 
-  if (num_threads_override > 0) {
+  if (threads_override_num > 0) {
     /* Override number of threads. This settings is used within the lifetime
      * of tbb::global_control, so we allocate it on the heap. */
-    task_scheduler_global_control = OBJECT_GUARDED_NEW(
-        tbb::global_control, tbb::global_control::max_allowed_parallelism, num_threads_override);
-    task_scheduler_num_threads = num_threads_override;
+    task_scheduler_global_control = MEM_new<tbb::global_control>(
+        __func__, tbb::global_control::max_allowed_parallelism, threads_override_num);
+    task_scheduler_num_threads = threads_override_num;
   }
   else {
     /* Let TBB choose the number of threads. For (legacy) code that calls
@@ -69,7 +58,7 @@ void BLI_task_scheduler_init()
 void BLI_task_scheduler_exit()
 {
 #ifdef WITH_TBB_GLOBAL_CONTROL
-  OBJECT_GUARDED_DELETE(task_scheduler_global_control, tbb::global_control);
+  MEM_delete(task_scheduler_global_control);
 #endif
 }
 
@@ -81,6 +70,7 @@ int BLI_task_scheduler_num_threads()
 void BLI_task_isolate(void (*func)(void *userdata), void *userdata)
 {
 #ifdef WITH_TBB
+  blender::lazy_threading::ReceiverIsolation isolation;
   tbb::this_task_arena::isolate([&] { func(userdata); });
 #else
   func(userdata);

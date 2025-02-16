@@ -1,17 +1,9 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2020-2022 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * SPDX-License-Identifier: GPL-2.0-or-later */
+
+/** \file
+ * \ingroup intern_sky_modal
  */
 
 #ifndef __SKY_FLOAT3_H__
@@ -19,7 +11,7 @@
 
 // minimal float3 + util_math.h implementation for nishita sky model
 
-#include <math.h>
+#include <cmath>
 
 #ifndef M_PI_F
 #  define M_PI_F (3.1415926535897932f) /* pi */
@@ -36,25 +28,15 @@ struct float3 {
 
   float3() = default;
 
-  float3(const float *ptr) : x{ptr[0]}, y{ptr[1]}, z{ptr[2]}
-  {
-  }
+  float3(const float *ptr) : x{ptr[0]}, y{ptr[1]}, z{ptr[2]} {}
 
-  float3(const float (*ptr)[3]) : float3((const float *)ptr)
-  {
-  }
+  float3(const float (*ptr)[3]) : float3((const float *)ptr) {}
 
-  explicit float3(float value) : x(value), y(value), z(value)
-  {
-  }
+  explicit float3(float value) : x(value), y(value), z(value) {}
 
-  explicit float3(int value) : x(value), y(value), z(value)
-  {
-  }
+  explicit float3(int value) : x(value), y(value), z(value) {}
 
-  float3(float x, float y, float z) : x{x}, y{y}, z{z}
-  {
-  }
+  float3(float x, float y, float z) : x{x}, y{y}, z{z} {}
 
   operator const float *() const
   {

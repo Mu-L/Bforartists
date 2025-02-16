@@ -1,21 +1,11 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2011-2022 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #ifndef __QUEUE_H__
 #define __QUEUE_H__
+
+#include "MemoryAllocator.h"
 
 struct gridQueueEle {
   int x, y, z;
@@ -31,8 +21,8 @@ class GridQueue {
  public:
   GridQueue()
   {
-    head = NULL;
-    tail = NULL;
+    head = nullptr;
+    tail = nullptr;
     numEles = 0;
   }
 
@@ -46,15 +36,15 @@ class GridQueue {
     return numEles;
   }
 
-  void pushQueue(int st[3], int dir)
+  void pushQueue(const int st[3], int dir)
   {
     gridQueueEle *ele = new gridQueueEle;
     ele->x = st[0];
     ele->y = st[1];
     ele->z = st[2];
     ele->dir = (UCHAR)dir;
-    ele->next = NULL;
-    if (head == NULL) {
+    ele->next = nullptr;
+    if (head == nullptr) {
       head = ele;
     }
     else {
@@ -66,7 +56,7 @@ class GridQueue {
 
   int popQueue(int st[3], int &dir)
   {
-    if (head == NULL) {
+    if (head == nullptr) {
       return 0;
     }
 
@@ -79,17 +69,15 @@ class GridQueue {
     head = head->next;
     delete temp;
 
-    if (head == NULL) {
-      tail = NULL;
+    if (head == nullptr) {
+      tail = nullptr;
     }
     numEles--;
 
     return 1;
   }
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("DUALCON:GridQueue")
-#endif
 };
 
 #endif /* __QUEUE_H__ */

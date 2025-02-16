@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2020 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * Copyright 2020, Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup gpu
@@ -27,13 +12,15 @@
 
 namespace blender::gpu {
 
-typedef enum GPUQueryType {
+#define QUERY_MIN_LEN 16
+
+enum GPUQueryType {
   GPU_QUERY_OCCLUSION = 0,
-} GPUQueryType;
+};
 
 class QueryPool {
  public:
-  virtual ~QueryPool(){};
+  virtual ~QueryPool() = default;
 
   /**
    * Will start and end the query at this index inside the pool. The pool will resize
@@ -45,8 +32,8 @@ class QueryPool {
    * Will start and end the query at this index inside the pool.
    * The pool will resize automatically.
    */
-  virtual void begin_query(void) = 0;
-  virtual void end_query(void) = 0;
+  virtual void begin_query() = 0;
+  virtual void end_query() = 0;
 
   /**
    * Must be fed with a buffer large enough to contain all the queries issued.

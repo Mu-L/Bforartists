@@ -1,12 +1,11 @@
-/** \file itasc/Cache.cpp
- * \ingroup itasc
- */
-/*
- * Cache.cpp
+/* SPDX-FileCopyrightText: 2009 Benoit Bolsee
  *
- *  Created on: Feb 24, 2009
- *      Author: benoit bolsee
+ * SPDX-License-Identifier: LGPL-2.1-or-later */
+
+/** \file
+ * \ingroup intern_itasc
  */
+
 #include <string.h>
 #include <assert.h>
 #include <math.h>
@@ -215,8 +214,10 @@ int Cache::addChannel(const void *device, const char *name, unsigned int maxItem
 		entry = new CacheEntry();
 		if (entry == NULL)
 			return -1;
-		if (!m_cache.insert(CacheMap::value_type(device,entry)).second)
+		if (!m_cache.insert(CacheMap::value_type(device,entry)).second) {
+			delete entry;
 			return -1;
+		}
 	} else {
 		entry = it->second;
 	}

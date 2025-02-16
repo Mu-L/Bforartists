@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2016 Kévin Dietrich. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2016 Kévin Dietrich.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup balembic
@@ -23,21 +8,28 @@
 
 #include "abc_reader_archive.h"
 
-#include "BKE_main.h"
+#include "Alembic/Abc/ArchiveInfo.h"
+#include "Alembic/AbcCoreAbstract/MetaData.h"
+#include "Alembic/AbcCoreLayer/Read.h"
+#include "Alembic/AbcCoreOgawa/ReadWrite.h"
 
-#include "BLI_path_util.h"
+#include "BKE_main.hh"
+
+#include "BLI_path_utils.hh"
 #include "BLI_string.h"
 
 #ifdef WIN32
-#  include "utfconv.h"
+#  include "utfconv.hh"
 #endif
 
 #include <fstream>
+#include <vector>
 
 using Alembic::Abc::ErrorHandler;
 using Alembic::Abc::Exception;
 using Alembic::Abc::IArchive;
 using Alembic::Abc::kWrapExisting;
+using Alembic::Abc::MetaData;
 
 namespace blender::io::alembic {
 
@@ -76,24 +68,71 @@ static IArchive open_archive(const std::string &filename,
   return IArchive();
 }
 
-ArchiveReader::ArchiveReader(struct Main *bmain, const char *filename)
+ArchiveReader *ArchiveReader::get(const Main *bmain, const std::vector<const char *> &filenames)
 {
-  char abs_filename[FILE_MAX];
-  BLI_strncpy(abs_filename, filename, FILE_MAX);
-  BLI_path_abs(abs_filename, BKE_main_blendfile_path(bmain));
+  std::vector<ArchiveReader *> readers;
+
+  for (const char *filename : filenames) {
+    ArchiveReader *reader = new ArchiveReader(bmain, filename);
+
+    if (!reader->valid()) {
+      delete reader;
+      continue;
+    }
+
+    readers.push_back(reader);
+  }
+
+  if (readers.empty()) {
+    return nullptr;
+  }
+
+  if (readers.size() == 1) {
+    return readers[0];
+  }
+
+  return new ArchiveReader(readers);
+}
+
+ArchiveReader::ArchiveReader(const std::vector<ArchiveReader *> &readers) : m_readers(readers)
+{
+  Alembic::AbcCoreLayer::ArchiveReaderPtrs archives;
+
+  for (ArchiveReader *reader : readers) {
+    archives.push_back(reader->m_archive.getPtr());
+  }
+
+  Alembic::AbcCoreLayer::ReadArchive layer;
+  Alembic::AbcCoreAbstract::ArchiveReaderPtr arPtr = layer(archives);
+
+  m_archive = IArchive(arPtr, kWrapExisting, ErrorHandler::kThrowPolicy);
+}
+
+ArchiveReader::ArchiveReader(const Main *bmain, const char *filename)
+{
+  char abs_filepath[FILE_MAX];
+  STRNCPY(abs_filepath, filename);
+  BLI_path_abs(abs_filepath, BKE_main_blendfile_path(bmain));
 
 #ifdef WIN32
-  UTF16_ENCODE(abs_filename);
-  std::wstring wstr(abs_filename_16);
+  UTF16_ENCODE(abs_filepath);
+  std::wstring wstr(abs_filepath_16);
   m_infile.open(wstr.c_str(), std::ios::in | std::ios::binary);
-  UTF16_UN_ENCODE(abs_filename);
+  UTF16_UN_ENCODE(abs_filepath);
 #else
-  m_infile.open(abs_filename, std::ios::in | std::ios::binary);
+  m_infile.open(abs_filepath, std::ios::in | std::ios::binary);
 #endif
 
   m_streams.push_back(&m_infile);
 
-  m_archive = open_archive(abs_filename, m_streams);
+  m_archive = open_archive(abs_filepath, m_streams);
+}
+
+ArchiveReader::~ArchiveReader()
+{
+  for (ArchiveReader *reader : m_readers) {
+    delete reader;
+  }
 }
 
 bool ArchiveReader::valid() const
@@ -104,6 +143,18 @@ bool ArchiveReader::valid() const
 Alembic::Abc::IObject ArchiveReader::getTop()
 {
   return m_archive.getTop();
+}
+
+bool ArchiveReader::is_blender_archive_version_prior_44()
+{
+  const MetaData &abc_metadata = m_archive.getPtr()->getMetaData();
+
+  /* Was the incoming Archive written by Blender? If so, make the version check. */
+  if (abc_metadata.get(Alembic::Abc::kApplicationNameKey) == "Blender") {
+    return abc_metadata.get("blender_version") < "v4.4";
+  }
+
+  return false;
 }
 
 }  // namespace blender::io::alembic

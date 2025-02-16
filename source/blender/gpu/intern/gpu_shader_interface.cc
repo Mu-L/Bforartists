@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2016 by Mike Erwin. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2016 by Mike Erwin.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup gpu
@@ -38,13 +23,13 @@ ShaderInterface::ShaderInterface() = default;
 ShaderInterface::~ShaderInterface()
 {
   /* Free memory used by name_buffer. */
-  MEM_freeN(name_buffer_);
-  MEM_freeN(inputs_);
+  MEM_SAFE_FREE(name_buffer_);
+  MEM_SAFE_FREE(inputs_);
 }
 
 static void sort_input_list(MutableSpan<ShaderInput> dst)
 {
-  if (dst.size() == 0) {
+  if (dst.is_empty()) {
     return;
   }
 
@@ -54,7 +39,7 @@ static void sort_input_list(MutableSpan<ShaderInput> dst)
 
   /* Simple sorting by going through the array and selecting the biggest element each time. */
   for (uint i = 0; i < dst.size(); i++) {
-    ShaderInput *input_src = &src[0];
+    ShaderInput *input_src = src.data();
     for (uint j = 1; j < src.size(); j++) {
       if (src[j].name_hash > input_src->name_hash) {
         input_src = &src[j];
@@ -65,17 +50,25 @@ static void sort_input_list(MutableSpan<ShaderInput> dst)
   }
 }
 
-/* Sorts all inputs inside their respective array.
- * This is to allow fast hash collision detection.
- * See ShaderInterface::input_lookup for more details. */
 void ShaderInterface::sort_inputs()
 {
-  sort_input_list(MutableSpan<ShaderInput>(inputs_, attr_len_));
-  sort_input_list(MutableSpan<ShaderInput>(inputs_ + attr_len_, ubo_len_));
-  sort_input_list(MutableSpan<ShaderInput>(inputs_ + attr_len_ + ubo_len_, uniform_len_));
+  /* Sorts all inputs inside their respective array.
+   * This is to allow fast hash collision detection.
+   * See `ShaderInterface::input_lookup` for more details. */
+  uint offset = 0;
+  sort_input_list(MutableSpan<ShaderInput>(inputs_ + offset, attr_len_));
+  offset += attr_len_;
+  sort_input_list(MutableSpan<ShaderInput>(inputs_ + offset, ubo_len_));
+  offset += ubo_len_;
+  sort_input_list(MutableSpan<ShaderInput>(inputs_ + offset, uniform_len_));
+  offset += uniform_len_;
+  sort_input_list(MutableSpan<ShaderInput>(inputs_ + offset, ssbo_len_));
+  offset += ssbo_len_;
+  sort_input_list(MutableSpan<ShaderInput>(inputs_ + offset, constant_len_));
+  offset += constant_len_;
 }
 
-void ShaderInterface::debug_print()
+void ShaderInterface::debug_print() const
 {
   Span<ShaderInput> attrs = Span<ShaderInput>(inputs_, attr_len_);
   Span<ShaderInput> ubos = Span<ShaderInput>(inputs_ + attr_len_, ubo_len_);

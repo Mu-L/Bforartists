@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -79,9 +67,7 @@ class AdjacencyIterator : public Iterator {
     return *this;
   }
 
-  virtual ~AdjacencyIterator()
-  {
-  }
+  virtual ~AdjacencyIterator() {}
 
   virtual string getExactTypeName() const
   {
@@ -173,14 +159,14 @@ class ChainingIterator : public ViewEdgeInternal::ViewEdgeIterator {
    */
   ChainingIterator(bool iRestrictToSelection = true,
                    bool iRestrictToUnvisited = true,
-                   ViewEdge *begin = NULL,
+                   ViewEdge *begin = nullptr,
                    bool orientation = true)
       : ViewEdgeIterator(begin, orientation)
   {
     _restrictToSelection = iRestrictToSelection;
     _restrictToUnvisited = iRestrictToUnvisited;
     _increment = true;
-    py_c_it = NULL;
+    py_c_it = nullptr;
   }
 
   /** Copy constructor */
@@ -198,7 +184,7 @@ class ChainingIterator : public ViewEdgeInternal::ViewEdgeIterator {
     return "ChainingIterator";
   }
 
-  /** Inits the iterator context.
+  /** Initializes the iterator context.
    *  This method is called each time a new chain is started.
    *  It can be used to reset some history information that you might want to keep.
    */
@@ -276,16 +262,14 @@ class ChainSilhouetteIterator : public ChainingIterator {
    *    ViewVertex of begin.
    */
   ChainSilhouetteIterator(bool iRestrictToSelection = true,
-                          ViewEdge *begin = NULL,
+                          ViewEdge *begin = nullptr,
                           bool orientation = true)
       : ChainingIterator(iRestrictToSelection, true, begin, orientation)
   {
   }
 
   /** Copy constructor */
-  ChainSilhouetteIterator(const ChainSilhouetteIterator &brother) : ChainingIterator(brother)
-  {
-  }
+  ChainSilhouetteIterator(const ChainSilhouetteIterator &brother) : ChainingIterator(brother) {}
 
   /** Returns the string "ChainSilhouetteIterator" */
   virtual string getExactTypeName() const
@@ -299,7 +283,7 @@ class ChainSilhouetteIterator : public ChainingIterator {
    */
   virtual int traverse(const AdjacencyIterator &it);
 
-  /** Inits the iterator context */
+  /** Initializes the iterator context */
   virtual int init()
   {
     return 0;
@@ -342,7 +326,7 @@ class ChainPredicateIterator : public ChainingIterator {
    */
   ChainPredicateIterator(bool iRestrictToSelection = true,
                          bool iRestrictToUnvisited = true,
-                         ViewEdge *begin = NULL,
+                         ViewEdge *begin = nullptr,
                          bool orientation = true)
       : ChainingIterator(iRestrictToSelection, iRestrictToUnvisited, begin, orientation)
   {
@@ -373,7 +357,7 @@ class ChainPredicateIterator : public ChainingIterator {
                          BinaryPredicate1D &bpred,
                          bool iRestrictToSelection = true,
                          bool iRestrictToUnvisited = true,
-                         ViewEdge *begin = NULL,
+                         ViewEdge *begin = nullptr,
                          bool orientation = true)
       : ChainingIterator(iRestrictToSelection, iRestrictToUnvisited, begin, orientation)
   {
@@ -406,7 +390,7 @@ class ChainPredicateIterator : public ChainingIterator {
    */
   virtual int traverse(const AdjacencyIterator &it);
 
-  /** Inits the iterator context */
+  /** Initializes the iterator context. */
   virtual int init()
   {
     return 0;

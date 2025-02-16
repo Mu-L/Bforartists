@@ -1,3 +1,6 @@
+/* SPDX-FileCopyrightText: 2003-2023 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \defgroup render Rendering
  *  \ingroup blender
@@ -5,7 +8,8 @@
 /** \defgroup bmesh BMesh
  *  \ingroup blender
  */
-/** \defgroup compositor Compositing */
+/** \defgroup compositor Compositing
+ *  \ingroup blender */
 
 /** \defgroup python Python
  *  \ingroup blender
@@ -78,7 +82,8 @@
  *  \ingroup blender
  */
 
-/** \defgroup data DNA, RNA and .blend access*/
+/** \defgroup data DNA, RNA and .blend access
+ *  \ingroup blender */
 
 /** \defgroup gpu GPU
  *  \ingroup blender
@@ -101,11 +106,12 @@
  *   merged in docs.
  */
 
-/** \defgroup gui GUI */
+/** \defgroup gui GUI
+ *  \ingroup blender
+ */
 
 /** \defgroup wm Window Manager
- *  \ingroup blender gui
- */
+ *  \ingroup gui */
 
 /* ================================ */
 
@@ -279,7 +285,8 @@
  *  \ingroup gui
  */
 
-/** \defgroup externformats External Formats */
+/** \defgroup externformats External Formats
+ *  \ingroup blender */
 
 /** \defgroup collada COLLADA
  *  \ingroup externformats
@@ -297,10 +304,6 @@
  *  \ingroup imbuf
  */
 
-/** \defgroup imbdds DDS
- *  \ingroup imbuf
- */
-
 /** \defgroup openexr OpenEXR
  *  \ingroup imbuf
  */
@@ -308,4 +311,7 @@
 /* ================================ */
 
 /** \defgroup undoc Undocumented
- *  \brief Modules and libraries that are still undocumented, or lacking proper integration into the doxygen system, are marked in this group. */
+ *
+ * \brief Modules and libraries that are still undocumented,
+ * or lacking proper integration into the doxygen system, are marked in this group.
+ */

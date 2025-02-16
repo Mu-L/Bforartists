@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2008-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -22,6 +10,8 @@
 #include <iostream>
 
 #include "WEdge.h"
+
+#include "BLI_sys_types.h"
 
 namespace Freestyle {
 
@@ -465,7 +455,7 @@ WShape *WFace::getShape()
  *                                *
  **********************************/
 
-unsigned WShape::_SceneCurrentId = 0;
+uint WShape::_SceneCurrentId = 0;
 
 WShape *WShape::duplicate()
 {
@@ -514,7 +504,7 @@ WShape::WShape(WShape &iBrother)
   for (v = _VertexList.begin(); v != vend; ++v) {
     const vector<WEdge *> &vedgeList = (*v)->GetEdges();
     vector<WEdge *> newvedgelist;
-    unsigned int i;
+    uint i;
     for (i = 0; i < vedgeList.size(); i++) {
       WEdge *current = vedgeList[i];
       edgedata *currentvedata = (edgedata *)current->userdata;
@@ -550,11 +540,11 @@ WShape::WShape(WShape &iBrother)
 
   fend = _FaceList.end();
   for (f = _FaceList.begin(); f != fend; ++f) {
-    unsigned int i;
+    uint i;
     const vector<WOEdge *> &oedgeList = (*f)->getEdgeList();
     vector<WOEdge *> newoedgelist;
 
-    unsigned int n = oedgeList.size();
+    uint n = oedgeList.size();
     for (i = 0; i < n; i++) {
       WOEdge *current = oedgeList[i];
       oedgedata *currentoedata = (oedgedata *)current->userdata;
@@ -599,7 +589,7 @@ WShape::WShape(WShape &iBrother)
 
 WFace *WShape::MakeFace(vector<WVertex *> &iVertexList,
                         vector<bool> &iFaceEdgeMarksList,
-                        unsigned iMaterial)
+                        uint iMaterial)
 {
   // allocate the new face
   WFace *face = instanciateFace();
@@ -615,7 +605,7 @@ WFace *WShape::MakeFace(vector<WVertex *> &iVertexList,
                         vector<Vec3f> &iNormalsList,
                         vector<Vec2f> &iTexCoordsList,
                         vector<bool> &iFaceEdgeMarksList,
-                        unsigned iMaterial)
+                        uint iMaterial)
 {
   // allocate the new face
   WFace *face = MakeFace(iVertexList, iFaceEdgeMarksList, iMaterial);
@@ -634,7 +624,7 @@ WFace *WShape::MakeFace(vector<WVertex *> &iVertexList,
 
 WFace *WShape::MakeFace(vector<WVertex *> &iVertexList,
                         vector<bool> &iFaceEdgeMarksList,
-                        unsigned iMaterial,
+                        uint iMaterial,
                         WFace *face)
 {
   int id = _FaceList.size();
@@ -647,7 +637,8 @@ WFace *WShape::MakeFace(vector<WVertex *> &iVertexList,
 
   if (3 == iVertexList.size()) {
     if ((iVertexList[0] == iVertexList[1]) || (iVertexList[0] == iVertexList[2]) ||
-        (iVertexList[2] == iVertexList[1])) {
+        (iVertexList[2] == iVertexList[1]))
+    {
       cerr << "Warning: degenerated triangle detected, correcting" << endl;
       return nullptr;
     }
@@ -656,7 +647,7 @@ WFace *WShape::MakeFace(vector<WVertex *> &iVertexList,
   vector<WVertex *>::iterator it;
 
   // compute the face normal (v1v2 ^ v1v3)
-  // Double precision numbers are used here to avoid truncation errors [T47705]
+  // Double precision numbers are used here to avoid truncation errors [#47705]
   Vec3r v1, v2, v3;
   it = iVertexList.begin();
   v1 = (*it)->GetVertex();
@@ -725,7 +716,8 @@ real WShape::ComputeMeanEdgeSize() const
   real meanEdgeSize = 0.0;
   for (vector<WEdge *>::const_iterator it = _EdgeList.begin(), itend = _EdgeList.end();
        it != itend;
-       it++) {
+       it++)
+  {
     meanEdgeSize += (*it)->GetaOEdge()->GetVec().norm();
   }
   return meanEdgeSize / (real)_EdgeList.size();

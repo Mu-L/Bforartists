@@ -71,7 +71,7 @@ sf_count_t SndFileReader::vio_tell(void* user_data)
 	return reader->m_memoffset;
 }
 
-SndFileReader::SndFileReader(std::string filename) :
+SndFileReader::SndFileReader(const std::string &filename) :
 	m_position(0)
 {
 	SF_INFO sfinfo;
@@ -116,6 +116,21 @@ SndFileReader::SndFileReader(std::shared_ptr<Buffer> buffer) :
 SndFileReader::~SndFileReader()
 {
 	sf_close(m_sndfile);
+}
+
+std::vector<StreamInfo> SndFileReader::queryStreams()
+{
+	std::vector<StreamInfo> result;
+
+	StreamInfo info;
+	info.start = 0;
+	info.duration = double(getLength()) / m_specs.rate;
+	info.specs.specs = m_specs;
+	info.specs.format = FORMAT_FLOAT32;
+
+	result.emplace_back(info);
+
+	return result;
 }
 
 bool SndFileReader::isSeekable() const

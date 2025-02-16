@@ -1,23 +1,7 @@
 #!/usr/bin/env python3
-# ##### BEGIN GPL LICENSE BLOCK #####
+# SPDX-FileCopyrightText: 2017-2023 Blender Authors
 #
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ##### END GPL LICENSE BLOCK #####
-
-# <pep8 compliant>
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 """
 Alembic Export Tests
@@ -32,7 +16,6 @@ import pathlib
 import subprocess
 import sys
 import unittest
-from typing import Tuple
 
 from modules.test_utils import (
     with_tempdir,
@@ -60,7 +43,7 @@ class AbstractAlembicTest(AbstractBlenderRunnerTest):
         # 'abcls' array notation, like "name[16]"
         cls.abcls_array = re.compile(r'^(?P<name>[^\[]+)(\[(?P<arraysize>\d+)\])?$')
 
-    def abcls(self, *arguments) -> Tuple[int, str]:
+    def abcls(self, *arguments) -> tuple[int, str]:
         """Uses abcls and return its output.
 
         :return: tuple (process exit status code, stdout)
@@ -414,12 +397,12 @@ class UVMapExportTest(AbstractAlembicTest):
     def test_uvmap_export(self, tempdir: pathlib.Path):
         """Minimal test for exporting multiple UV maps on an animated mesh.
 
-        This covers the issue reported in T77021.
+        This covers the issue reported in #77021.
         """
         basename = 'T77021-multiple-uvmaps-animated-mesh'
         abc = tempdir / f'{basename}.abc'
         script = f"import bpy; bpy.ops.wm.alembic_export(filepath='{abc.as_posix()}', start=1, end=1, " \
-                 f"visible_objects_only=True, flatten=False)"
+            f"visible_objects_only=True, flatten=False)"
         self.run_blender(f'{basename}.blend', script)
 
         self.maxDiff = 1000
@@ -558,7 +541,7 @@ class InvisibleObjectExportTest(AbstractAlembicTest):
     This test only tests a small subset of the functionality that is required to
     export invisible objects. It just tests that the visibility property is
     written, and that it has the correct initial value. This is a limitation
-    caused by these tests relying on `abcls`.
+    caused by these tests relying on ``abcls``.
     """
 
     @with_tempdir

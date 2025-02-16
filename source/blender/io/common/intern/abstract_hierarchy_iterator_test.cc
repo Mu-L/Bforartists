@@ -1,30 +1,15 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2019 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2019 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "IO_abstract_hierarchy_iterator.h"
 
 #include "tests/blendfile_loading_base_test.h"
 
-#include "BKE_scene.h"
-#include "BLI_math.h"
-#include "BLO_readfile.h"
-#include "DEG_depsgraph.h"
-#include "DEG_depsgraph_build.h"
+#include "BKE_scene.hh"
+#include "BLI_path_utils.hh"
+#include "BLO_readfile.hh"
+#include "DEG_depsgraph.hh"
+#include "DEG_depsgraph_build.hh"
 #include "DNA_object_types.h"
 
 #include <map>
@@ -70,7 +55,8 @@ class TestingHierarchyIterator : public AbstractHierarchyIterator {
   used_writers hair_writers;
   used_writers particle_writers;
 
-  explicit TestingHierarchyIterator(Depsgraph *depsgraph) : AbstractHierarchyIterator(depsgraph)
+  explicit TestingHierarchyIterator(Main *bmain, Depsgraph *depsgraph)
+      : AbstractHierarchyIterator(bmain, depsgraph)
   {
   }
   ~TestingHierarchyIterator() override
@@ -121,7 +107,7 @@ class AbstractHierarchyIteratorTest : public BlendfileLoadingBaseTest {
   /* Create a test iterator. */
   void iterator_create()
   {
-    iterator = new TestingHierarchyIterator(depsgraph);
+    iterator = new TestingHierarchyIterator(bfile->main, depsgraph);
   }
   /* Free the test iterator if it is not nullptr. */
   void iterator_free()
@@ -137,7 +123,7 @@ class AbstractHierarchyIteratorTest : public BlendfileLoadingBaseTest {
 TEST_F(AbstractHierarchyIteratorTest, ExportHierarchyTest)
 {
   /* Load the test blend file. */
-  if (!blendfile_load("usd/usd_hierarchy_export_test.blend")) {
+  if (!blendfile_load("usd" SEP_STR "usd_hierarchy_export_test.blend")) {
     return;
   }
   depsgraph_create(DAG_EVAL_RENDER);
@@ -215,7 +201,7 @@ TEST_F(AbstractHierarchyIteratorTest, ExportSubsetTest)
    * so not included here. Update this test when hair & particle systems are included. */
 
   /* Load the test blend file. */
-  if (!blendfile_load("usd/usd_hierarchy_export_test.blend")) {
+  if (!blendfile_load("usd" SEP_STR "usd_hierarchy_export_test.blend")) {
     return;
   }
   depsgraph_create(DAG_EVAL_RENDER);
@@ -335,7 +321,7 @@ class AbstractHierarchyIteratorInvisibleTest : public AbstractHierarchyIteratorT
 
 TEST_F(AbstractHierarchyIteratorInvisibleTest, ExportInvisibleTest)
 {
-  if (!blendfile_load("alembic/visibility.blend")) {
+  if (!blendfile_load("alembic" SEP_STR "visibility.blend")) {
     return;
   }
   depsgraph_create(DAG_EVAL_RENDER);

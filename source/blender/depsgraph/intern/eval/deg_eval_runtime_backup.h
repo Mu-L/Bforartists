@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2019 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2019 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup depsgraph
@@ -32,8 +17,7 @@
 #include "intern/eval/deg_eval_runtime_backup_sound.h"
 #include "intern/eval/deg_eval_runtime_backup_volume.h"
 
-namespace blender {
-namespace deg {
+namespace blender::deg {
 
 struct Depsgraph;
 
@@ -49,13 +33,13 @@ class RuntimeBackup {
 
   /* Denotes whether init_from_id did put anything into the backup storage.
    * This will not be the case when init_from_id() is called for an ID which has never been
-   * copied-on-write. In this case there is no need to backup or restore anything.
+   * copied-on-eval. In this case there is no need to backup or restore anything.
    *
    * It also allows to have restore() logic to be symmetrical to init() without need to worry
    * that init() might not have happened.
    *
    * In practice this is used by audio system to lock audio while scene is going through
-   * copy-on-write mechanism. */
+   * copy-on-evaluation mechanism. */
   bool have_backup;
 
   /* Struct members of the ID pointer. */
@@ -73,5 +57,4 @@ class RuntimeBackup {
   VolumeBackup volume_backup;
 };
 
-}  // namespace deg
-}  // namespace blender
+}  // namespace blender::deg

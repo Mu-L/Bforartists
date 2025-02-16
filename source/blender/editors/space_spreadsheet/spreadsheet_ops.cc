@@ -1,50 +1,27 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
-#include "BKE_screen.h"
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "DNA_space_types.h"
 
-#include "ED_screen.h"
-
-#include "RNA_access.h"
-#include "RNA_define.h"
-
-#include "WM_api.h"
-#include "WM_types.h"
+#include "ED_screen.hh"
 
 #include "BLI_listbase.h"
 
-#include "MEM_guardedalloc.h"
+#include "BKE_context.hh"
 
-#include "BKE_context.h"
+#include "RNA_access.hh"
+#include "RNA_define.hh"
 
-#include "RNA_access.h"
-#include "RNA_define.h"
-
-#include "ED_screen.h"
-
-#include "WM_api.h"
-#include "WM_types.h"
+#include "WM_api.hh"
+#include "WM_types.hh"
 
 #include "spreadsheet_intern.hh"
 #include "spreadsheet_row_filter.hh"
 
-using namespace blender::ed::spreadsheet;
+namespace blender::ed::spreadsheet {
 
-static int row_filter_add_exec(bContext *C, wmOperator *UNUSED(op))
+static int row_filter_add_exec(bContext *C, wmOperator * /*op*/)
 {
   SpaceSpreadsheet *sspreadsheet = CTX_wm_space_spreadsheet(C);
 
@@ -100,18 +77,14 @@ static void SPREADSHEET_OT_remove_row_filter_rule(wmOperatorType *ot)
   RNA_def_int(ot->srna, "index", 0, 0, INT_MAX, "Index", "", 0, INT_MAX);
 }
 
-static int select_component_domain_invoke(bContext *C,
-                                          wmOperator *op,
-                                          const wmEvent *UNUSED(event))
+static int select_component_domain_invoke(bContext *C, wmOperator *op, const wmEvent * /*event*/)
 {
-  GeometryComponentType component_type = static_cast<GeometryComponentType>(
-      RNA_int_get(op->ptr, "component_type"));
-  AttributeDomain attribute_domain = static_cast<AttributeDomain>(
-      RNA_int_get(op->ptr, "attribute_domain_type"));
+  const auto component_type = bke::GeometryComponent::Type(RNA_int_get(op->ptr, "component_type"));
+  bke::AttrDomain domain = bke::AttrDomain(RNA_int_get(op->ptr, "attribute_domain_type"));
 
   SpaceSpreadsheet *sspreadsheet = CTX_wm_space_spreadsheet(C);
-  sspreadsheet->geometry_component_type = component_type;
-  sspreadsheet->attribute_domain = attribute_domain;
+  sspreadsheet->geometry_component_type = uint8_t(component_type);
+  sspreadsheet->attribute_domain = uint8_t(domain);
 
   /* Refresh header and main region. */
   WM_main_add_notifier(NC_SPACE | ND_SPACE_SPREADSHEET, nullptr);
@@ -126,6 +99,7 @@ static void SPREADSHEET_OT_change_spreadsheet_data_source(wmOperatorType *ot)
   ot->idname = "SPREADSHEET_OT_change_spreadsheet_data_source";
 
   ot->invoke = select_component_domain_invoke;
+  ot->poll = ED_operator_spreadsheet_active;
 
   RNA_def_int(ot->srna, "component_type", 0, 0, INT16_MAX, "Component Type", "", 0, INT16_MAX);
   RNA_def_int(ot->srna,
@@ -147,3 +121,5 @@ void spreadsheet_operatortypes()
   WM_operatortype_append(SPREADSHEET_OT_remove_row_filter_rule);
   WM_operatortype_append(SPREADSHEET_OT_change_spreadsheet_data_source);
 }
+
+}  // namespace blender::ed::spreadsheet

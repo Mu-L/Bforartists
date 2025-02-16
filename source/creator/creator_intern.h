@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -22,21 +10,44 @@
  * Functionality for main() initialization.
  */
 
+struct BA_ArgCallback_Deferred;
 struct bArgs;
 struct bContext;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifndef WITH_PYTHON_MODULE
 
-/* creator_args.c */
-void main_args_setup(struct bContext *C, struct bArgs *ba);
-void main_args_setup_post(struct bContext *C, struct bArgs *ba);
+/* `creator_args.cc` */
 
-/* creator_signals.c */
+/**
+ * \param all: When enabled, all arguments are initialized
+ * even for configurations that don't apply to the current system.
+ * Used for documentation (see Python API: `bpy.app.help_text(all=True)`).
+ */
+void main_args_setup(struct bContext *C, struct bArgs *ba, bool all);
+/**
+ * Handler for loading blend files.
+ * \note arguments that cannot be parsed are assumed to be blend files.
+ */
+int main_args_handle_load_file(int argc, const char **argv, void *data);
+
+/**
+ * Handle an argument which requested deferred evaluation.
+ * Needed when arguments which evaluate early need Python to be initialized for example.
+ */
+int main_arg_deferred_handle();
+void main_arg_deferred_free();
+
+/* `creator_signals.cc` */
+
 void main_signal_setup(void);
 void main_signal_setup_background(void);
 void main_signal_setup_fpe(void);
 
-#endif /* WITH_PYTHON_MODULE */
+#endif /* !WITH_PYTHON_MODULE */
 
 /** Shared data for argument handlers to store state in. */
 struct ApplicationState {
@@ -45,12 +56,16 @@ struct ApplicationState {
     bool use_abort_handler;
   } signal;
 
-  /* we may want to set different exit codes for other kinds of errors */
+  /* We may want to set different exit codes for other kinds of errors. */
   struct {
     unsigned char python;
   } exit_code_on_error;
+
+  /** Store the argument state for later handling. */
+  struct BA_ArgCallback_Deferred *main_arg_deferred;
 };
-extern struct ApplicationState app_state; /* creator.c */
+
+extern struct ApplicationState app_state; /* `creator.cc` */
 
 /**
  * Passes for use by #main_args_setup.
@@ -66,7 +81,12 @@ enum {
   /** Currently use for audio devices. */
   ARG_PASS_SETTINGS_FORCE = 4,
 
-  /** Actions & fall back to loading blend file. */
+  /**
+   * Actions & fall back to loading blend file.
+   *
+   * \note arguments in the final pass must use #WM_exit instead of `exit()`  environment is
+   * properly shut-down (temporary directory deleted, etc).
+   */
   ARG_PASS_FINAL = 5,
 };
 
@@ -80,14 +100,14 @@ enum {
 #  define BUILD_DATE
 #endif
 
-/* from buildinfo.c */
+/* From `buildinfo.c`. */
 #ifdef BUILD_DATE
 extern char build_date[];
 extern char build_time[];
 extern char build_hash[];
 extern unsigned long build_commit_timestamp;
 
-/* TODO(sergey): ideally size need to be in sync with buildinfo.c */
+/* TODO(@sergey): ideally size need to be in sync with `buildinfo.c`. */
 extern char build_commit_date[16];
 extern char build_commit_time[16];
 
@@ -99,3 +119,7 @@ extern char build_cxxflags[];
 extern char build_linkflags[];
 extern char build_system[];
 #endif /* BUILD_DATE */
+
+#ifdef __cplusplus
+}
+#endif

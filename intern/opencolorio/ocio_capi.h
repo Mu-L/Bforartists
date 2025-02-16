@@ -1,35 +1,21 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2012 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2012 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #ifndef __OCIO_CAPI_H__
 #define __OCIO_CAPI_H__
+
+#include <cstddef>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef struct OCIO_GPUShader OCIO_GPUShader;
+using OCIO_GPUShader = struct OCIO_GPUShader;
 
 #define OCIO_DECLARE_HANDLE(name) \
-  typedef struct name##__ { \
-    int unused; \
-  } * name
+  struct name; \
+  typedef struct name *name##Ptr;
 
 #define OCIO_ROLE_DATA "data"
 #define OCIO_ROLE_SCENE_LINEAR "scene_linear"
@@ -39,24 +25,29 @@ typedef struct OCIO_GPUShader OCIO_GPUShader;
 #define OCIO_ROLE_DEFAULT_FLOAT "default_float"
 #define OCIO_ROLE_DEFAULT_SEQUENCER "default_sequencer"
 
-OCIO_DECLARE_HANDLE(OCIO_ConstConfigRcPtr);
-OCIO_DECLARE_HANDLE(OCIO_ConstColorSpaceRcPtr);
-OCIO_DECLARE_HANDLE(OCIO_ConstProcessorRcPtr);
-OCIO_DECLARE_HANDLE(OCIO_ConstCPUProcessorRcPtr);
-OCIO_DECLARE_HANDLE(OCIO_ConstContextRcPtr);
+OCIO_DECLARE_HANDLE(OCIO_ConstConfigRc);
+OCIO_DECLARE_HANDLE(OCIO_ConstColorSpaceRc);
+OCIO_DECLARE_HANDLE(OCIO_ConstProcessorRc);
+OCIO_DECLARE_HANDLE(OCIO_ConstCPUProcessorRc);
+OCIO_DECLARE_HANDLE(OCIO_ConstContextRc);
 OCIO_DECLARE_HANDLE(OCIO_PackedImageDesc);
-OCIO_DECLARE_HANDLE(OCIO_ConstLookRcPtr);
+OCIO_DECLARE_HANDLE(OCIO_ConstLookRc);
 
-/* Standard XYZ to linear sRGB transform, for fallback. */
-static const float OCIO_XYZ_TO_LINEAR_SRGB[3][3] = {{3.2404542f, -0.9692660f, 0.0556434f},
-                                                    {-1.5371385f, 1.8760108f, -0.2040259f},
-                                                    {-0.4985314f, 0.0415560f, 1.0572252f}};
+/* Standard XYZ (D65) to linear Rec.709 transform. */
+static const float OCIO_XYZ_TO_REC709[3][3] = {{3.2404542f, -0.9692660f, 0.0556434f},
+                                               {-1.5371385f, 1.8760108f, -0.2040259f},
+                                               {-0.4985314f, 0.0415560f, 1.0572252f}};
+/* Standard ACES to XYZ (D65) transform.
+ * Matches OpenColorIO builtin transform: UTILITY - ACES-AP0_to_CIE-XYZ-D65_BFD. */
+static const float OCIO_ACES_TO_XYZ[3][3] = {{0.938280f, 0.337369f, 0.001174f},
+                                             {-0.004451f, 0.729522f, -0.003711f},
+                                             {0.016628f, -0.066890f, 1.091595f}};
 
 /* This structure is used to pass curve mapping settings from
  * blender's DNA structure stored in view transform settings
  * to a generic OpenColorIO C-API.
  */
-typedef struct OCIO_CurveMappingSettings {
+struct OCIO_CurveMappingSettings {
   /* This is a LUT which contain values for all 4 curve mapping tables
    * (combined, R, G and B).
    *
@@ -106,7 +97,7 @@ typedef struct OCIO_CurveMappingSettings {
    * upload of new settings to GPU is needed.
    */
   size_t cache_id;
-} OCIO_CurveMappingSettings;
+};
 
 void OCIO_init(void);
 void OCIO_exit(void);
@@ -146,7 +137,8 @@ const char *OCIO_configGetDisplayColorSpaceName(OCIO_ConstConfigRcPtr *config,
                                                 const char *view);
 
 void OCIO_configGetDefaultLumaCoefs(OCIO_ConstConfigRcPtr *config, float *rgb);
-void OCIO_configGetXYZtoRGB(OCIO_ConstConfigRcPtr *config, float xyz_to_rgb[3][3]);
+void OCIO_configGetXYZtoSceneLinear(OCIO_ConstConfigRcPtr *config,
+                                    float xyz_to_scene_linear[3][3]);
 
 int OCIO_configGetNumLooks(OCIO_ConstConfigRcPtr *config);
 const char *OCIO_configGetLookNameByIndex(OCIO_ConstConfigRcPtr *config, int index);
@@ -161,9 +153,11 @@ OCIO_ConstProcessorRcPtr *OCIO_configGetProcessorWithNames(OCIO_ConstConfigRcPtr
 void OCIO_processorRelease(OCIO_ConstProcessorRcPtr *cpu_processor);
 
 OCIO_ConstCPUProcessorRcPtr *OCIO_processorGetCPUProcessor(OCIO_ConstProcessorRcPtr *processor);
-void OCIO_cpuProcessorApply(OCIO_ConstCPUProcessorRcPtr *cpu_processor, OCIO_PackedImageDesc *img);
+bool OCIO_cpuProcessorIsNoOp(OCIO_ConstCPUProcessorRcPtr *cpu_processor);
+void OCIO_cpuProcessorApply(OCIO_ConstCPUProcessorRcPtr *cpu_processor,
+                            struct OCIO_PackedImageDesc *img);
 void OCIO_cpuProcessorApply_predivide(OCIO_ConstCPUProcessorRcPtr *cpu_processor,
-                                      OCIO_PackedImageDesc *img);
+                                      struct OCIO_PackedImageDesc *img);
 void OCIO_cpuProcessorApplyRGB(OCIO_ConstCPUProcessorRcPtr *cpu_processor, float *pixel);
 void OCIO_cpuProcessorApplyRGBA(OCIO_ConstCPUProcessorRcPtr *cpu_processor, float *pixel);
 void OCIO_cpuProcessorApplyRGBA_predivide(OCIO_ConstCPUProcessorRcPtr *cpu_processor,
@@ -173,6 +167,8 @@ void OCIO_cpuProcessorRelease(OCIO_ConstCPUProcessorRcPtr *processor);
 const char *OCIO_colorSpaceGetName(OCIO_ConstColorSpaceRcPtr *cs);
 const char *OCIO_colorSpaceGetDescription(OCIO_ConstColorSpaceRcPtr *cs);
 const char *OCIO_colorSpaceGetFamily(OCIO_ConstColorSpaceRcPtr *cs);
+int OCIO_colorSpaceGetNumAliases(OCIO_ConstColorSpaceRcPtr *cs);
+const char *OCIO_colorSpaceGetAlias(OCIO_ConstColorSpaceRcPtr *cs, const int index);
 
 OCIO_ConstProcessorRcPtr *OCIO_createDisplayProcessor(OCIO_ConstConfigRcPtr *config,
                                                       const char *input,
@@ -180,17 +176,21 @@ OCIO_ConstProcessorRcPtr *OCIO_createDisplayProcessor(OCIO_ConstConfigRcPtr *con
                                                       const char *display,
                                                       const char *look,
                                                       const float scale,
-                                                      const float exponent);
+                                                      const float exponent,
+                                                      const float temperature,
+                                                      const float tint,
+                                                      const bool use_white_balance,
+                                                      const bool inverse);
 
-OCIO_PackedImageDesc *OCIO_createOCIO_PackedImageDesc(float *data,
-                                                      long width,
-                                                      long height,
-                                                      long numChannels,
-                                                      long chanStrideBytes,
-                                                      long xStrideBytes,
-                                                      long yStrideBytes);
+struct OCIO_PackedImageDesc *OCIO_createOCIO_PackedImageDesc(float *data,
+                                                             long width,
+                                                             long height,
+                                                             long numChannels,
+                                                             long chanStrideBytes,
+                                                             long xStrideBytes,
+                                                             long yStrideBytes);
 
-void OCIO_PackedImageDescRelease(OCIO_PackedImageDesc *p);
+void OCIO_PackedImageDescRelease(struct OCIO_PackedImageDesc *id);
 
 bool OCIO_supportGPUShader(void);
 bool OCIO_gpuDisplayShaderBind(OCIO_ConstConfigRcPtr *config,
@@ -202,8 +202,12 @@ bool OCIO_gpuDisplayShaderBind(OCIO_ConstConfigRcPtr *config,
                                const float scale,
                                const float exponent,
                                const float dither,
+                               const float temperature,
+                               const float tint,
                                const bool use_predivide,
-                               const bool use_overlay);
+                               const bool use_overlay,
+                               const bool use_hdr,
+                               const bool use_white_balance);
 void OCIO_gpuDisplayShaderUnbind(void);
 void OCIO_gpuCacheFree(void);
 

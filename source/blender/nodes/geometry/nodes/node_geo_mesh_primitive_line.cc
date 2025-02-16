@@ -1,67 +1,62 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#include "DNA_mesh_types.h"
-#include "DNA_meshdata_types.h"
+#include "BLI_math_quaternion.hh"
 
-#include "BKE_material.h"
-#include "BKE_mesh.h"
+#include "BKE_material.hh"
 
-#include "UI_interface.h"
-#include "UI_resources.h"
+#include "NOD_rna_define.hh"
+
+#include "RNA_access.hh"
+
+#include "UI_interface.hh"
+#include "UI_resources.hh"
+
+#include "GEO_mesh_primitive_line.hh"
+
+#include "NOD_socket_search_link.hh"
 
 #include "node_geometry_util.hh"
 
-static bNodeSocketTemplate geo_node_mesh_primitive_line_in[] = {
-    {SOCK_INT, N_("Count"), 10, 0.0f, 0.0f, 0.0f, 1, 10000},
-    {SOCK_FLOAT, N_("Resolution"), 1.0f, 0.0f, 0.0f, 0.0f, 0.01f, FLT_MAX, PROP_DISTANCE},
-    {SOCK_VECTOR,
-     N_("Start Location"),
-     0.0f,
-     0.0f,
-     0.0f,
-     1.0f,
-     -FLT_MAX,
-     FLT_MAX,
-     PROP_TRANSLATION},
-    {SOCK_VECTOR, N_("Offset"), 0.0f, 0.0f, 1.0f, 0.0f, -FLT_MAX, FLT_MAX, PROP_TRANSLATION},
-    {-1, ""},
-};
+namespace blender::nodes::node_geo_mesh_primitive_line_cc {
 
-static bNodeSocketTemplate geo_node_mesh_primitive_line_out[] = {
-    {SOCK_GEOMETRY, N_("Geometry")},
-    {-1, ""},
-};
+NODE_STORAGE_FUNCS(NodeGeometryMeshLine)
 
-static void geo_node_mesh_primitive_line_layout(uiLayout *layout,
-                                                bContext *UNUSED(C),
-                                                PointerRNA *ptr)
+static void node_declare(NodeDeclarationBuilder &b)
+{
+  b.add_input<decl::Int>("Count").default_value(10).min(1).max(10000).description(
+      "Number of vertices on the line");
+  b.add_input<decl::Float>("Resolution")
+      .default_value(1.0f)
+      .min(0.1f)
+      .subtype(PROP_DISTANCE)
+      .description("Length of each individual edge");
+  b.add_input<decl::Vector>("Start Location")
+      .subtype(PROP_TRANSLATION)
+      .description("Position of the first vertex");
+  b.add_input<decl::Vector>("Offset")
+      .default_value({0.0f, 0.0f, 1.0f})
+      .subtype(PROP_TRANSLATION)
+      .description(
+          "In offset mode, the distance between each socket on each axis. In end points mode, the "
+          "position of the final vertex");
+  b.add_output<decl::Geometry>("Mesh");
+}
+
+static void node_layout(uiLayout *layout, bContext * /*C*/, PointerRNA *ptr)
 {
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
-  uiItemR(layout, ptr, "mode", 0, "", ICON_NONE);
+  uiItemR(layout, ptr, "mode", UI_ITEM_NONE, "", ICON_NONE);
   if (RNA_enum_get(ptr, "mode") == GEO_NODE_MESH_LINE_MODE_END_POINTS) {
-    uiItemR(layout, ptr, "count_mode", 0, "", ICON_NONE);
+    uiItemR(layout, ptr, "count_mode", UI_ITEM_NONE, "", ICON_NONE);
   }
 }
 
-static void geo_node_mesh_primitive_line_init(bNodeTree *UNUSED(ntree), bNode *node)
+static void node_init(bNodeTree * /*tree*/, bNode *node)
 {
-  NodeGeometryMeshLine *node_storage = (NodeGeometryMeshLine *)MEM_callocN(
-      sizeof(NodeGeometryMeshLine), __func__);
+  NodeGeometryMeshLine *node_storage = MEM_cnew<NodeGeometryMeshLine>(__func__);
 
   node_storage->mode = GEO_NODE_MESH_LINE_MODE_OFFSET;
   node_storage->count_mode = GEO_NODE_MESH_LINE_COUNT_TOTAL;
@@ -69,72 +64,75 @@ static void geo_node_mesh_primitive_line_init(bNodeTree *UNUSED(ntree), bNode *n
   node->storage = node_storage;
 }
 
-static void geo_node_mesh_primitive_line_update(bNodeTree *UNUSED(tree), bNode *node)
+static void node_update(bNodeTree *ntree, bNode *node)
 {
-  bNodeSocket *count_socket = (bNodeSocket *)node->inputs.first;
+  bNodeSocket *count_socket = static_cast<bNodeSocket *>(node->inputs.first);
   bNodeSocket *resolution_socket = count_socket->next;
   bNodeSocket *start_socket = resolution_socket->next;
   bNodeSocket *end_and_offset_socket = start_socket->next;
 
-  const NodeGeometryMeshLine &storage = *(const NodeGeometryMeshLine *)node->storage;
-  const GeometryNodeMeshLineMode mode = (const GeometryNodeMeshLineMode)storage.mode;
-  const GeometryNodeMeshLineCountMode count_mode = (const GeometryNodeMeshLineCountMode)
+  const NodeGeometryMeshLine &storage = node_storage(*node);
+  const GeometryNodeMeshLineMode mode = (GeometryNodeMeshLineMode)storage.mode;
+  const GeometryNodeMeshLineCountMode count_mode = (GeometryNodeMeshLineCountMode)
                                                        storage.count_mode;
 
   node_sock_label(end_and_offset_socket,
                   (mode == GEO_NODE_MESH_LINE_MODE_END_POINTS) ? N_("End Location") :
                                                                  N_("Offset"));
 
-  nodeSetSocketAvailability(resolution_socket,
-                            mode == GEO_NODE_MESH_LINE_MODE_END_POINTS &&
-                                count_mode == GEO_NODE_MESH_LINE_COUNT_RESOLUTION);
-  nodeSetSocketAvailability(count_socket,
-                            mode == GEO_NODE_MESH_LINE_MODE_OFFSET ||
-                                count_mode == GEO_NODE_MESH_LINE_COUNT_TOTAL);
+  bke::node_set_socket_availability(ntree,
+                                    resolution_socket,
+                                    mode == GEO_NODE_MESH_LINE_MODE_END_POINTS &&
+                                        count_mode == GEO_NODE_MESH_LINE_COUNT_RESOLUTION);
+  bke::node_set_socket_availability(ntree,
+                                    count_socket,
+                                    mode == GEO_NODE_MESH_LINE_MODE_OFFSET ||
+                                        count_mode == GEO_NODE_MESH_LINE_COUNT_TOTAL);
 }
 
-namespace blender::nodes {
-
-static void fill_edge_data(MutableSpan<MEdge> edges)
+static void node_gather_link_searches(GatherLinkSearchOpParams &params)
 {
-  for (const int i : edges.index_range()) {
-    edges[i].v1 = i;
-    edges[i].v2 = i + 1;
-    edges[i].flag |= ME_LOOSEEDGE;
+  const NodeDeclaration &declaration = *params.node_type().static_declaration;
+  if (params.in_out() == SOCK_OUT) {
+    search_link_ops_for_declarations(params, declaration.outputs);
+    return;
+  }
+  if (params.node_tree().typeinfo->validate_link(eNodeSocketDatatype(params.other_socket().type),
+                                                 SOCK_FLOAT))
+  {
+    params.add_item(IFACE_("Count"), [](LinkSearchOpParams &params) {
+      bNode &node = params.add_node("GeometryNodeMeshLine");
+      node_storage(node).mode = GEO_NODE_MESH_LINE_MODE_OFFSET;
+      params.connect_available_socket(node, "Count");
+    });
+    params.add_item(IFACE_("Resolution"), [](LinkSearchOpParams &params) {
+      bNode &node = params.add_node("GeometryNodeMeshLine");
+      node_storage(node).mode = GEO_NODE_MESH_LINE_MODE_OFFSET;
+      node_storage(node).count_mode = GEO_NODE_MESH_LINE_COUNT_RESOLUTION;
+      params.connect_available_socket(node, "Resolution");
+    });
+    params.add_item(IFACE_("Start Location"), [](LinkSearchOpParams &params) {
+      bNode &node = params.add_node("GeometryNodeMeshLine");
+      params.connect_available_socket(node, "Start Location");
+    });
+    params.add_item(IFACE_("Offset"), [](LinkSearchOpParams &params) {
+      bNode &node = params.add_node("GeometryNodeMeshLine");
+      params.connect_available_socket(node, "Offset");
+    });
+    /* The last socket is reused in end points mode. */
+    params.add_item(IFACE_("End Location"), [](LinkSearchOpParams &params) {
+      bNode &node = params.add_node("GeometryNodeMeshLine");
+      node_storage(node).mode = GEO_NODE_MESH_LINE_MODE_END_POINTS;
+      params.connect_available_socket(node, "Offset");
+    });
   }
 }
 
-static Mesh *create_line_mesh(const float3 start, const float3 delta, const int count)
+static void node_geo_exec(GeoNodeExecParams params)
 {
-  if (count < 1) {
-    return nullptr;
-  }
-
-  Mesh *mesh = BKE_mesh_new_nomain(count, count - 1, 0, 0, 0);
-  BKE_id_material_eval_ensure_default_slot(&mesh->id);
-  MutableSpan<MVert> verts{mesh->mvert, mesh->totvert};
-  MutableSpan<MEdge> edges{mesh->medge, mesh->totedge};
-
-  short normal[3];
-  normal_float_to_short_v3(normal, delta.normalized());
-
-  float3 co = start;
-  for (const int i : verts.index_range()) {
-    copy_v3_v3(verts[i].co, co);
-    copy_v3_v3_short(verts[i].no, normal);
-    co += delta;
-  }
-
-  fill_edge_data(edges);
-
-  return mesh;
-}
-
-static void geo_node_mesh_primitive_line_exec(GeoNodeExecParams params)
-{
-  const NodeGeometryMeshLine &storage = *(const NodeGeometryMeshLine *)params.node().storage;
-  const GeometryNodeMeshLineMode mode = (const GeometryNodeMeshLineMode)storage.mode;
-  const GeometryNodeMeshLineCountMode count_mode = (const GeometryNodeMeshLineCountMode)
+  const NodeGeometryMeshLine &storage = node_storage(params.node());
+  const GeometryNodeMeshLineMode mode = (GeometryNodeMeshLineMode)storage.mode;
+  const GeometryNodeMeshLineCountMode count_mode = (GeometryNodeMeshLineCountMode)
                                                        storage.count_mode;
 
   Mesh *mesh = nullptr;
@@ -147,44 +145,102 @@ static void geo_node_mesh_primitive_line_exec(GeoNodeExecParams params)
     if (count_mode == GEO_NODE_MESH_LINE_COUNT_RESOLUTION) {
       /* Don't allow asymptotic count increase for low resolution values. */
       const float resolution = std::max(params.extract_input<float>("Resolution"), 0.0001f);
-      const int count = total_delta.length() / resolution + 1;
-      const float3 delta = total_delta.normalized() * resolution;
-      mesh = create_line_mesh(start, delta, count);
+      const int count = math::length(total_delta) / resolution + 1;
+      const float3 delta = math::normalize(total_delta) * resolution;
+      mesh = geometry::create_line_mesh(start, delta, count);
     }
     else if (count_mode == GEO_NODE_MESH_LINE_COUNT_TOTAL) {
       const int count = params.extract_input<int>("Count");
       if (count == 1) {
-        mesh = create_line_mesh(start, float3(0), count);
+        mesh = geometry::create_line_mesh(start, float3(0), count);
       }
       else {
-        const float3 delta = total_delta / (float)(count - 1);
-        mesh = create_line_mesh(start, delta, count);
+        const float3 delta = total_delta / float(count - 1);
+        mesh = geometry::create_line_mesh(start, delta, count);
       }
     }
   }
   else if (mode == GEO_NODE_MESH_LINE_MODE_OFFSET) {
     const float3 delta = params.extract_input<float3>("Offset");
     const int count = params.extract_input<int>("Count");
-    mesh = create_line_mesh(start, delta, count);
+    mesh = geometry::create_line_mesh(start, delta, count);
   }
 
-  params.set_output("Geometry", GeometrySet::create_with_mesh(mesh));
+  if (mesh) {
+    BKE_id_material_eval_ensure_default_slot(reinterpret_cast<ID *>(mesh));
+  }
+
+  params.set_output("Mesh", GeometrySet::from_mesh(mesh));
 }
 
-}  // namespace blender::nodes
-
-void register_node_type_geo_mesh_primitive_line()
+static void node_rna(StructRNA *srna)
 {
-  static bNodeType ntype;
+  static EnumPropertyItem mode_items[] = {
+      {GEO_NODE_MESH_LINE_MODE_OFFSET,
+       "OFFSET",
+       0,
+       "Offset",
+       "Specify the offset from one vertex to the next"},
+      {GEO_NODE_MESH_LINE_MODE_END_POINTS,
+       "END_POINTS",
+       0,
+       "End Points",
+       "Specify the line's start and end points"},
+      {0, nullptr, 0, nullptr, nullptr},
+  };
 
-  geo_node_type_base(&ntype, GEO_NODE_MESH_PRIMITIVE_LINE, "Mesh Line", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(
-      &ntype, geo_node_mesh_primitive_line_in, geo_node_mesh_primitive_line_out);
-  node_type_init(&ntype, geo_node_mesh_primitive_line_init);
-  node_type_update(&ntype, geo_node_mesh_primitive_line_update);
-  node_type_storage(
-      &ntype, "NodeGeometryMeshLine", node_free_standard_storage, node_copy_standard_storage);
-  ntype.geometry_node_execute = blender::nodes::geo_node_mesh_primitive_line_exec;
-  ntype.draw_buttons = geo_node_mesh_primitive_line_layout;
-  nodeRegisterType(&ntype);
+  static EnumPropertyItem count_mode_items[] = {
+      {GEO_NODE_MESH_LINE_COUNT_TOTAL,
+       "TOTAL",
+       0,
+       "Count",
+       "Specify the total number of vertices"},
+      {GEO_NODE_MESH_LINE_COUNT_RESOLUTION,
+       "RESOLUTION",
+       0,
+       "Resolution",
+       "Specify the distance between vertices"},
+      {0, nullptr, 0, nullptr, nullptr},
+  };
+
+  RNA_def_node_enum(srna,
+                    "mode",
+                    "Mode",
+                    "",
+                    mode_items,
+                    NOD_storage_enum_accessors(mode),
+                    GEO_NODE_MESH_LINE_MODE_OFFSET);
+
+  RNA_def_node_enum(srna,
+                    "count_mode",
+                    "Count Mode",
+                    "",
+                    count_mode_items,
+                    NOD_storage_enum_accessors(count_mode),
+                    GEO_NODE_MESH_LINE_COUNT_TOTAL);
 }
+
+static void node_register()
+{
+  static blender::bke::bNodeType ntype;
+
+  geo_node_type_base(&ntype, "GeometryNodeMeshLine", GEO_NODE_MESH_PRIMITIVE_LINE);
+  ntype.ui_name = "Mesh Line";
+  ntype.ui_description = "Generate vertices in a line and connect them with edges";
+  ntype.enum_name_legacy = "MESH_PRIMITIVE_LINE";
+  ntype.nclass = NODE_CLASS_GEOMETRY;
+  ntype.declare = node_declare;
+  ntype.initfunc = node_init;
+  blender::bke::node_type_storage(
+      &ntype, "NodeGeometryMeshLine", node_free_standard_storage, node_copy_standard_storage);
+  ntype.geometry_node_execute = node_geo_exec;
+  ntype.draw_buttons = node_layout;
+  ntype.updatefunc = node_update;
+  ntype.gather_link_search_ops = node_gather_link_searches;
+  blender::bke::node_register_type(&ntype);
+
+  node_rna(ntype.rna_ext.srna);
+}
+NOD_REGISTER_NODE(node_register)
+
+}  // namespace blender::nodes::node_geo_mesh_primitive_line_cc

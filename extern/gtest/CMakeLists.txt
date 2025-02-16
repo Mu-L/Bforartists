@@ -1,22 +1,6 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2014 Blender Foundation
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# The Original Code is Copyright (C) 2014, Blender Foundation
-# All rights reserved.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 # avoid noisy warnings
 if(CMAKE_COMPILER_IS_GNUCC)
@@ -39,6 +23,7 @@ set(SRC
   # src/gtest_main.cc
 
   src/gtest.cc
+  src/gtest-assertion-result.cc
   src/gtest-death-test.cc
   src/gtest-filepath.cc
   src/gtest-matchers.cc
@@ -52,6 +37,7 @@ set(SRC
   include/gtest/gtest.h
   include/gtest/gtest_pred_impl.h
   include/gtest/gtest_prod.h
+  include/gtest/gtest-assertion-result.h
   include/gtest/gtest-death-test.h
   include/gtest/gtest-matchers.h
   include/gtest/gtest-message.h

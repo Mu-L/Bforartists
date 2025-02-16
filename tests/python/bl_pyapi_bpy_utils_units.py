@@ -1,6 +1,13 @@
-# Apache License, Version 2.0
+# SPDX-FileCopyrightText: 2014-2022 Blender Authors
+#
+# SPDX-License-Identifier: Apache-2.0
 
-# ./blender.bin --background -noaudio --python tests/python/bl_pyapi_bpy_utils_units.py -- --verbose
+# ./blender.bin --background --python tests/python/bl_pyapi_bpy_utils_units.py -- --verbose
+
+__all__ = (
+    "main",
+)
+
 import unittest
 
 from bpy.utils import units
@@ -27,6 +34,24 @@ class UnitsTesting(unittest.TestCase):
         ('METRIC', 'LENGTH', "", "1+1ft", 1.3048),  # no metric units, we default to meters.
         ('IMPERIAL', 'LENGTH', "", "3+1in+1ft", 0.3048 * 4 + 0.0254),  # bigger unit becomes default one!
         ('IMPERIAL', 'LENGTH', "", "(3+1)in+1ft", 0.3048 + 0.0254 * 4),
+
+        # Support successive leading unary operators.
+        ('IMPERIAL', 'LENGTH', "", "-1ft", -0.3048),
+        ('IMPERIAL', 'LENGTH', "", "--1ft", --0.3048),
+        ('IMPERIAL', 'LENGTH', "", "---1ft", ---0.3048),
+
+        ('IMPERIAL', 'LENGTH', "", "- 1ft", -0.3048),
+        ('IMPERIAL', 'LENGTH', "", "- - 1ft", --0.3048),
+        ('IMPERIAL', 'LENGTH', "", "- - - 1ft", ---0.3048),
+
+        ('IMPERIAL', 'LENGTH', "", "-+1ft", -+0.3048),
+        ('IMPERIAL', 'LENGTH', "", "+-1ft", +-0.3048),
+
+        ('METRIC', 'LENGTH', "", "~+-32m", ~+-32),
+        ('METRIC', 'LENGTH', "", "-+~32m", -+~32),
+
+        ('METRIC', 'LENGTH', "", "~ + - 32m", ~+-32),
+        ('METRIC', 'LENGTH', "", "- + ~ 32m", -+~32),
     )
 
     # From 'internal' Blender value to user-friendly printing
@@ -73,7 +98,11 @@ class UnitsTesting(unittest.TestCase):
             )
 
 
-if __name__ == '__main__':
+def main():
     import sys
     sys.argv = [__file__] + (sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else [])
     unittest.main()
+
+
+if __name__ == '__main__':
+    main()

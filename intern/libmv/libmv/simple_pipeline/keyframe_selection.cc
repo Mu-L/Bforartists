@@ -140,7 +140,6 @@ void SelectKeyframesBasedOnGRICAndVariance(const Tracks& _tracks,
 
   int max_image = filtered_tracks.MaxImage();
   int next_keyframe = 1;
-  int number_keyframes = 0;
 
   // Limit correspondence ratio from both sides.
   // On the one hand if number of correspondent features is too low,
@@ -162,7 +161,6 @@ void SelectKeyframesBasedOnGRICAndVariance(const Tracks& _tracks,
 
     LG << "Found keyframe " << next_keyframe;
 
-    number_keyframes++;
     next_keyframe = -1;
 
     for (int candidate_image = current_keyframe + 1;
@@ -186,8 +184,9 @@ void SelectKeyframesBasedOnGRICAndVariance(const Tracks& _tracks,
          << current_keyframe << " and " << candidate_image;
 
       // Not enough points to construct fundamental matrix
-      if (x1.cols() < 8 || x2.cols() < 8)
+      if (x1.cols() < 8 || x2.cols() < 8) {
         continue;
+      }
 
       // STEP 1: Correspondence ratio constraint
       int Tc = tracked_markers.size();
@@ -197,8 +196,9 @@ void SelectKeyframesBasedOnGRICAndVariance(const Tracks& _tracks,
       LG << "Correspondence between " << current_keyframe << " and "
          << candidate_image << ": " << Rc;
 
-      if (Rc < Tmin || Rc > Tmax)
+      if (Rc < Tmin || Rc > Tmax) {
         continue;
+      }
 
       Mat3 H, F;
 
@@ -248,8 +248,9 @@ void SelectKeyframesBasedOnGRICAndVariance(const Tracks& _tracks,
       LG << "GRIC values for frames " << current_keyframe << " and "
          << candidate_image << ", H-GRIC: " << GRIC_H << ", F-GRIC: " << GRIC_F;
 
-      if (GRIC_H <= GRIC_F)
+      if (GRIC_H <= GRIC_F) {
         continue;
+      }
 
       // TODO(sergey): STEP 4: PELC criterion
 
@@ -333,7 +334,7 @@ void SelectKeyframesBasedOnGRICAndVariance(const Tracks& _tracks,
       }
 
       double success_intersects_factor =
-          (double)intersects_success / intersects_total;
+          double(intersects_success) / intersects_total;
 
       if (success_intersects_factor < success_intersects_factor_best) {
         LG << "Skip keyframe candidate because of "
@@ -388,8 +389,9 @@ void SelectKeyframesBasedOnGRICAndVariance(const Tracks& _tracks,
          << candidate_image << ": " << Sc;
 
       // Pairing with a lower Sc indicates a better choice
-      if (Sc > Sc_best_candidate)
+      if (Sc > Sc_best_candidate) {
         continue;
+      }
 
       Sc_best_candidate = Sc;
 
@@ -406,10 +408,10 @@ void SelectKeyframesBasedOnGRICAndVariance(const Tracks& _tracks,
     // However, it's just quick hack and smarter way to do this would be nice
     if (next_keyframe == -1) {
       next_keyframe = current_keyframe + 10;
-      number_keyframes = 0;
 
-      if (next_keyframe >= max_image)
+      if (next_keyframe >= max_image) {
         break;
+      }
 
       LG << "Starting searching for keyframes starting from " << next_keyframe;
     } else {

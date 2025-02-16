@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2016 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2016 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup depsgraph
@@ -26,11 +11,13 @@
 struct Base;
 struct ID;
 struct Main;
+struct ModifierData;
 struct Object;
+struct PointerRNA;
+struct Scene;
 struct bPoseChannel;
 
-namespace blender {
-namespace deg {
+namespace blender::deg {
 
 struct Depsgraph;
 class DepsgraphBuilderCache;
@@ -39,11 +26,22 @@ class DepsgraphBuilder {
  public:
   virtual ~DepsgraphBuilder() = default;
 
-  virtual bool need_pull_base_into_graph(Base *base);
+  virtual bool need_pull_base_into_graph(const Base *base);
 
-  virtual bool check_pchan_has_bbone(Object *object, const bPoseChannel *pchan);
-  virtual bool check_pchan_has_bbone_segments(Object *object, const bPoseChannel *pchan);
-  virtual bool check_pchan_has_bbone_segments(Object *object, const char *bone_name);
+  virtual bool is_object_visibility_animated(const Object *object);
+  virtual bool is_modifier_visibility_animated(const Object *object, const ModifierData *modifier);
+
+  virtual bool check_pchan_has_bbone(const Object *object, const bPoseChannel *pchan);
+  virtual bool check_pchan_has_bbone_segments(const Object *object, const bPoseChannel *pchan);
+  virtual bool check_pchan_has_bbone_segments(const Object *object, const char *bone_name);
+
+  /**
+   * If `target_prop` + `rna_path` uses indirection via the `scene.camera` pointer, returns
+   * the sub-string of `rna_path` relative to the camera; otherwise returns nullptr.
+   */
+  static const char *get_rna_path_relative_to_scene_camera(const Scene *scene,
+                                                           const PointerRNA &target_prop,
+                                                           const char *rna_path);
 
  protected:
   /* NOTE: The builder does NOT take ownership over any of those resources. */
@@ -59,5 +57,4 @@ bool deg_check_id_in_depsgraph(const Depsgraph *graph, ID *id_orig);
 bool deg_check_base_in_depsgraph(const Depsgraph *graph, Base *base);
 void deg_graph_build_finalize(Main *bmain, Depsgraph *graph);
 
-}  // namespace deg
-}  // namespace blender
+}  // namespace blender::deg

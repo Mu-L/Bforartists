@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -35,9 +23,7 @@
 #include "../view_map/Interface1D.h"
 #include "../view_map/ViewMap.h"
 
-#ifdef WITH_CXX_GUARDEDALLOC
-#  include "MEM_guardedalloc.h"
-#endif
+#include "MEM_guardedalloc.h"
 
 namespace Freestyle {
 
@@ -210,7 +196,7 @@ class Operators {
                             UnaryPredicate1D &pred,
                             float sampling = 0.0f);
 
-  /** Sorts the current set of chains (or viewedges)
+  /** Sorts the current set of chains (or view-edges)
    *  according to the comparison predicate given as argument.
    *  \param pred:
    *           The binary predicate used for the comparison
@@ -231,32 +217,32 @@ class Operators {
   //
   ////////////////////////////////////////////////
 
-  static ViewEdge *getViewEdgeFromIndex(unsigned i)
+  static ViewEdge *getViewEdgeFromIndex(uint i)
   {
     return dynamic_cast<ViewEdge *>(_current_view_edges_set[i]);
   }
 
-  static Chain *getChainFromIndex(unsigned i)
+  static Chain *getChainFromIndex(uint i)
   {
     return dynamic_cast<Chain *>(_current_chains_set[i]);
   }
 
-  static Stroke *getStrokeFromIndex(unsigned i)
+  static Stroke *getStrokeFromIndex(uint i)
   {
     return _current_strokes_set[i];
   }
 
-  static unsigned getViewEdgesSize()
+  static uint getViewEdgesSize()
   {
     return _current_view_edges_set.size();
   }
 
-  static unsigned getChainsSize()
+  static uint getChainsSize()
   {
     return _current_chains_set.size();
   }
 
-  static unsigned getStrokesSize()
+  static uint getStrokesSize()
   {
     return _current_strokes_set.size();
   }
@@ -274,18 +260,14 @@ class Operators {
   static void reset(bool removeStrokes = true);
 
  private:
-  Operators()
-  {
-  }
+  Operators() {}
 
   static I1DContainer _current_view_edges_set;
   static I1DContainer _current_chains_set;
   static I1DContainer *_current_set;
   static StrokesContainer _current_strokes_set;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:Operators")
-#endif
 };
 
 } /* namespace Freestyle */

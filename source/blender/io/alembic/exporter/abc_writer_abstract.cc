@@ -1,31 +1,12 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2020 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2020 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 #include "abc_writer_abstract.h"
 #include "abc_hierarchy_iterator.h"
 
-#include "BKE_animsys.h"
-#include "BKE_key.h"
-#include "BKE_object.h"
+#include "BKE_object.hh"
 
-#include "DNA_modifier_types.h"
-
-#include "DEG_depsgraph.h"
+#include "DNA_object_types.h"
 
 #include <Alembic/AbcGeom/Visibility.h>
 
@@ -114,25 +95,27 @@ const Imath::Box3d &ABCAbstractWriter::bounding_box() const
 
 void ABCAbstractWriter::update_bounding_box(Object *object)
 {
-  BoundBox *bb = BKE_object_boundbox_get(object);
-
-  if (!bb) {
+  const std::optional<Bounds<float3>> bounds = BKE_object_boundbox_get(object);
+  if (!bounds) {
     if (object->type != OB_CAMERA) {
-      CLOG_WARN(&LOG, "Bounding box is null!\n");
+      CLOG_WARN(&LOG, "Bounding box is null!");
     }
     bounding_box_.min.x = bounding_box_.min.y = bounding_box_.min.z = 0;
     bounding_box_.max.x = bounding_box_.max.y = bounding_box_.max.z = 0;
     return;
   }
 
-  /* Convert Z-up to Y-up. This also changes which vector goes into which min/max property. */
-  bounding_box_.min.x = bb->vec[0][0];
-  bounding_box_.min.y = bb->vec[0][2];
-  bounding_box_.min.z = -bb->vec[6][1];
+  BoundBox bb;
+  BKE_boundbox_init_from_minmax(&bb, bounds->min, bounds->max);
 
-  bounding_box_.max.x = bb->vec[6][0];
-  bounding_box_.max.y = bb->vec[6][2];
-  bounding_box_.max.z = -bb->vec[0][1];
+  /* Convert Z-up to Y-up. This also changes which vector goes into which min/max property. */
+  bounding_box_.min.x = bb.vec[0][0];
+  bounding_box_.min.y = bb.vec[0][2];
+  bounding_box_.min.z = -bb.vec[6][1];
+
+  bounding_box_.max.x = bb.vec[6][0];
+  bounding_box_.max.y = bb.vec[6][2];
+  bounding_box_.max.z = -bb.vec[0][1];
 }
 
 void ABCAbstractWriter::write_visibility(const HierarchyContext &context)

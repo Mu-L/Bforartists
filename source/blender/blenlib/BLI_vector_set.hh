@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -63,6 +51,7 @@
 #include "BLI_hash.hh"
 #include "BLI_hash_tables.hh"
 #include "BLI_probing_strategies.hh"
+#include "BLI_vector.hh"
 #include "BLI_vector_set_slots.hh"
 
 namespace blender {
@@ -86,7 +75,7 @@ template<
      * The equality operator used to compare keys. By default it will simply compare keys using the
      * `==` operator.
      */
-    typename IsEqual = DefaultEquality,
+    typename IsEqual = DefaultEquality<Key>,
     /**
      * This is what will actually be stored in the hash table array. At a minimum a slot has to be
      * able to hold an array index and information about whether the slot is empty, occupied or
@@ -131,10 +120,10 @@ class VectorSet {
   uint64_t slot_mask_;
 
   /** This is called to hash incoming keys. */
-  Hash hash_;
+  BLI_NO_UNIQUE_ADDRESS Hash hash_;
 
   /** This is called to check equality of two keys. */
-  IsEqual is_equal_;
+  BLI_NO_UNIQUE_ADDRESS IsEqual is_equal_;
 
   /** The max load factor is 1/2 = 50% by default. */
 #define LOAD_FACTOR 1, 2
@@ -177,9 +166,7 @@ class VectorSet {
   {
   }
 
-  VectorSet(NoExceptConstructor, Allocator allocator = {}) : VectorSet(allocator)
-  {
-  }
+  VectorSet(NoExceptConstructor, Allocator allocator = {}) : VectorSet(allocator) {}
 
   VectorSet(Span<Key> keys, Allocator allocator = {}) : VectorSet(NoExceptConstructor(), allocator)
   {
@@ -263,7 +250,7 @@ class VectorSet {
   }
 
   /**
-   * Get an Span referencing the keys vector. The referenced memory buffer is only valid as
+   * Get a Span referencing the keys vector. The referenced memory buffer is only valid as
    * long as the vector set is not changed.
    *
    * The keys must not be changed, because this would change their hash value.
@@ -363,6 +350,27 @@ class VectorSet {
   }
 
   /**
+   * Remove all values for which the given predicate is true and return the number or values
+   * removed. This may change the order of elements in the vector.
+   *
+   * This is similar to std::erase_if.
+   */
+  template<typename Predicate> int64_t remove_if(Predicate &&predicate)
+  {
+    const int64_t prev_size = this->size();
+    for (Slot &slot : slots_) {
+      if (slot.is_occupied()) {
+        const int64_t index = slot.index();
+        const Key &key = keys_[index];
+        if (predicate(key)) {
+          this->remove_key_internal(slot);
+        }
+      }
+    }
+    return prev_size - this->size();
+  }
+
+  /**
    * Delete and return a key from the set. This will remove the last element in the vector. The
    * order of the remaining elements in the set is not changed.
    */
@@ -372,7 +380,7 @@ class VectorSet {
   }
 
   /**
-   * Return the location of the key in the vector. It is assumed, that the key is in the vector
+   * Return the location of the key in the vector. It is assumed that the key is in the vector
    * set. If this is not necessarily the case, use `index_of_try`.
    */
   int64_t index_of(const Key &key) const
@@ -465,9 +473,17 @@ class VectorSet {
   }
 
   /**
+   * Get an index range containing all valid indices for this array.
+   */
+  IndexRange index_range() const
+  {
+    return IndexRange(this->size());
+  }
+
+  /**
    * Print common statistics like size and collision count. This is useful for debugging purposes.
    */
-  void print_stats(StringRef name = "") const
+  void print_stats(const char *name) const
   {
     HashTableStats stats(*this, this->as_span());
     stats.print(name);
@@ -519,7 +535,7 @@ class VectorSet {
    */
   int64_t size_in_bytes() const
   {
-    return static_cast<int64_t>(sizeof(Slot) * slots_.size() + sizeof(Key) * usable_slots_);
+    return int64_t(sizeof(Slot) * slots_.size() + sizeof(Key) * usable_slots_);
   }
 
   /**
@@ -533,11 +549,31 @@ class VectorSet {
   }
 
   /**
-   * Remove all keys from the vector set.
+   * Remove all elements. Under some circumstances #clear_and_keep_capacity may be more efficient.
    */
   void clear()
   {
-    this->noexcept_reset();
+    std::destroy_at(this);
+    new (this) VectorSet(NoExceptConstructor{});
+  }
+
+  /**
+   * Remove all elements, but don't free the underlying memory.
+   *
+   * This can be more efficient than using #clear if approximately the same or more elements are
+   * added again afterwards. If way fewer elements are added instead, the cost of maintaining a
+   * large hash table can lead to very bad worst-case performance.
+   */
+  void clear_and_keep_capacity()
+  {
+    destruct_n(keys_, this->size());
+    for (Slot &slot : slots_) {
+      slot.~Slot();
+      new (&slot) Slot();
+    }
+
+    removed_slots_ = 0;
+    occupied_and_removed_slots_ = 0;
   }
 
   /**
@@ -549,6 +585,32 @@ class VectorSet {
     return this->count_collisions__impl(key, hash_(key));
   }
 
+  using VectorT = Vector<Key, default_inline_buffer_capacity(sizeof(Key)), Allocator>;
+
+  /**
+   * Extracts all inserted values as a #Vector. The values are removed from the #VectorSet. This
+   * takes O(1) time.
+   *
+   * One can use this to create a #Vector without duplicates efficiently.
+   */
+  VectorT extract_vector()
+  {
+    VectorData<Key, Allocator> data;
+    data.data = keys_;
+    data.size = this->size();
+    data.capacity = usable_slots_;
+
+    /* Reset some values so that the destructor does not free the data that is moved to the
+     * #Vector. */
+    keys_ = nullptr;
+    occupied_and_removed_slots_ = 0;
+    removed_slots_ = 0;
+    std::destroy_at(this);
+    new (this) VectorSet();
+
+    return VectorT(data);
+  }
+
  private:
   BLI_NOINLINE void realloc_and_reinsert(const int64_t min_usable_slots)
   {
@@ -556,12 +618,16 @@ class VectorSet {
     max_load_factor_.compute_total_and_usable_slots(
         SlotArray::inline_buffer_capacity(), min_usable_slots, &total_slots, &usable_slots);
     BLI_assert(total_slots >= 1);
-    const uint64_t new_slot_mask = static_cast<uint64_t>(total_slots) - 1;
+    const uint64_t new_slot_mask = uint64_t(total_slots) - 1;
 
     /* Optimize the case when the set was empty beforehand. We can avoid some copies here. */
     if (this->size() == 0) {
       try {
         slots_.reinitialize(total_slots);
+        if (keys_ != nullptr) {
+          this->deallocate_keys_array(keys_);
+          keys_ = nullptr;
+        }
         keys_ = this->allocate_keys_array(usable_slots);
       }
       catch (...) {
@@ -654,7 +720,9 @@ class VectorSet {
     VECTOR_SET_SLOT_PROBING_BEGIN (hash, slot) {
       if (slot.is_empty()) {
         int64_t index = this->size();
-        new (keys_ + index) Key(std::forward<ForwardKey>(key));
+        Key *dst = keys_ + index;
+        new (dst) Key(std::forward<ForwardKey>(key));
+        BLI_assert(hash_(*dst) == hash);
         slot.occupy(index, hash);
         occupied_and_removed_slots_++;
         return;
@@ -670,7 +738,9 @@ class VectorSet {
     VECTOR_SET_SLOT_PROBING_BEGIN (hash, slot) {
       if (slot.is_empty()) {
         int64_t index = this->size();
-        new (keys_ + index) Key(std::forward<ForwardKey>(key));
+        Key *dst = keys_ + index;
+        new (dst) Key(std::forward<ForwardKey>(key));
+        BLI_assert(hash_(*dst) == hash);
         slot.occupy(index, hash);
         occupied_and_removed_slots_++;
         return true;
@@ -720,7 +790,9 @@ class VectorSet {
       }
       if (slot.is_empty()) {
         const int64_t index = this->size();
-        new (keys_ + index) Key(std::forward<ForwardKey>(key));
+        Key *dst = keys_ + index;
+        new (dst) Key(std::forward<ForwardKey>(key));
+        BLI_assert(hash_(*dst) == hash);
         slot.occupy(index, hash);
         occupied_and_removed_slots_++;
         return index;
@@ -791,7 +863,6 @@ class VectorSet {
     keys_[last_element_index].~Key();
     slot.remove();
     removed_slots_++;
-    return;
   }
 
   void update_slot_index(const Key &key, const int64_t old_index, const int64_t new_index)
@@ -834,7 +905,7 @@ class VectorSet {
   Key *allocate_keys_array(const int64_t size)
   {
     return static_cast<Key *>(
-        slots_.allocator().allocate(sizeof(Key) * static_cast<size_t>(size), alignof(Key), AT));
+        slots_.allocator().allocate(sizeof(Key) * size_t(size), alignof(Key), AT));
   }
 
   void deallocate_keys_array(Key *keys)
@@ -850,8 +921,49 @@ class VectorSet {
 template<typename Key,
          typename ProbingStrategy = DefaultProbingStrategy,
          typename Hash = DefaultHash<Key>,
-         typename IsEqual = DefaultEquality,
+         typename IsEqual = DefaultEquality<Key>,
          typename Slot = typename DefaultVectorSetSlot<Key>::type>
 using RawVectorSet = VectorSet<Key, ProbingStrategy, Hash, IsEqual, Slot, RawAllocator>;
+
+template<typename T, typename GetIDFn> struct CustomIDHash {
+  using CustomIDType = decltype(GetIDFn{}(std::declval<T>()));
+
+  uint64_t operator()(const T &value) const
+  {
+    return get_default_hash(GetIDFn{}(value));
+  }
+  uint64_t operator()(const CustomIDType &value) const
+  {
+    return get_default_hash(value);
+  }
+};
+
+template<typename T, typename GetIDFn> struct CustomIDEqual {
+  using CustomIDType = decltype(GetIDFn{}(std::declval<T>()));
+
+  bool operator()(const T &a, const T &b) const
+  {
+    return GetIDFn{}(a) == GetIDFn{}(b);
+  }
+  bool operator()(const CustomIDType &a, const T &b) const
+  {
+    return a == GetIDFn{}(b);
+  }
+  bool operator()(const T &a, const CustomIDType &b) const
+  {
+    return GetIDFn{}(a) == b;
+  }
+};
+
+/**
+ * Used for a set where the key itself isn't used for the hash or equality but some part of the
+ * key instead. For example the string identifiers of node types.
+ *
+ * #GetIDFn should have an implementation that returns a hashable and equality comparable type,
+ * i.e. `StringRef operator()(const bNode *value) { return value->idname; }`.
+ */
+template<typename T, typename GetIDFn>
+using CustomIDVectorSet =
+    VectorSet<T, DefaultProbingStrategy, CustomIDHash<T, GetIDFn>, CustomIDEqual<T, GetIDFn>>;
 
 }  // namespace blender

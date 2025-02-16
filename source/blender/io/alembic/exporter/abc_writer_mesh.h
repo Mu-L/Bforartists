@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 #pragma once
 
 /** \file
@@ -45,20 +33,19 @@ class ABCGenericMeshWriter : public ABCAbstractWriter {
    * exported object. */
   bool is_subd_;
   ModifierData *subsurf_modifier_;
-  ModifierData *liquid_sim_modifier_;
 
   CDStreamConfig m_custom_data_config;
 
  public:
   explicit ABCGenericMeshWriter(const ABCWriterConstructorArgs &args);
 
-  virtual void create_alembic_objects(const HierarchyContext *context) override;
-  virtual Alembic::Abc::OObject get_alembic_object() const override;
+  void create_alembic_objects(const HierarchyContext *context) override;
+  Alembic::Abc::OObject get_alembic_object() const override;
   Alembic::Abc::OCompoundProperty abc_prop_for_custom_props() override;
 
  protected:
-  virtual bool is_supported(const HierarchyContext *context) const override;
-  virtual void do_write(HierarchyContext &context) override;
+  bool is_supported(const HierarchyContext *context) const override;
+  void do_write(HierarchyContext &context) override;
 
   virtual Mesh *get_export_mesh(Object *object_eval, bool &r_needsfree) = 0;
   virtual void free_export_mesh(Mesh *mesh);
@@ -70,10 +57,8 @@ class ABCGenericMeshWriter : public ABCAbstractWriter {
   void write_subd(HierarchyContext &context, Mesh *mesh);
   template<typename Schema> void write_face_sets(Object *object, Mesh *mesh, Schema &schema);
 
-  ModifierData *get_liquid_sim_modifier(Scene *scene_eval, Object *ob_eval);
-
-  void write_arb_geo_params(Mesh *me);
-  void get_velocities(Mesh *mesh, std::vector<Imath::V3f> &vels);
+  void write_arb_geo_params(Mesh *mesh);
+  bool get_velocities(Mesh *mesh, std::vector<Imath::V3f> &vels);
   void get_geo_groups(Object *object,
                       Mesh *mesh,
                       std::map<std::string, std::vector<int32_t>> &geo_groups);
@@ -85,7 +70,7 @@ class ABCMeshWriter : public ABCGenericMeshWriter {
   ABCMeshWriter(const ABCWriterConstructorArgs &args);
 
  protected:
-  virtual Mesh *get_export_mesh(Object *object_eval, bool &r_needsfree) override;
+  Mesh *get_export_mesh(Object *object_eval, bool &r_needsfree) override;
 };
 
 }  // namespace blender::io::alembic

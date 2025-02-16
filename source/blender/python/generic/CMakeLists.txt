@@ -1,61 +1,65 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2023 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(INC
   .
-  ../../blenkernel
-  ../../blenlib
-  ../../gpu
-  ../../makesdna
-  ../../../../intern/glew-mx
-  ../../../../intern/guardedalloc
+  ../../makesrna
 )
 
 set(INC_SYS
-  ${GLEW_INCLUDE_PATH}
   ${PYTHON_INCLUDE_DIRS}
 )
 
 set(SRC
-  bgl.c
-  bl_math_py_api.c
-  blf_py_api.c
-  bpy_threads.c
-  idprop_py_api.c
-  imbuf_py_api.c
-  py_capi_utils.c
+  bgl.cc
+  bl_math_py_api.cc
+  blf_py_api.cc
+  bpy_threads.cc
+  idprop_py_api.cc
+  idprop_py_ui_api.cc
+  imbuf_py_api.cc
+  py_capi_rna.cc
+  py_capi_utils.cc
 
-  bgl.h
-  bl_math_py_api.h
-  blf_py_api.h
-  idprop_py_api.h
-  imbuf_py_api.h
-  py_capi_utils.h
+  bgl.hh
+  bl_math_py_api.hh
+  blf_py_api.hh
+  idprop_py_api.hh
+  idprop_py_ui_api.hh
+  imbuf_py_api.hh
+  py_capi_rna.hh
+  py_capi_utils.hh
 
   # header-only
-  python_utildefines.h
+  python_compat.hh
+  python_utildefines.hh
 )
 
 set(LIB
-  ${GLEW_LIBRARY}
   ${PYTHON_LINKFLAGS}
   ${PYTHON_LIBRARIES}
+  PRIVATE bf::blenkernel
+  PRIVATE bf::blenlib
+  PRIVATE bf::dna
+  PRIVATE bf::gpu
+  PRIVATE bf::intern::clog
+  PRIVATE bf::intern::guardedalloc
 )
 
-add_definitions(${GL_DEFINITIONS})
+# NOTE: use irrespective of `WITH_OPENGL_BACKEND` as the `bgl` module uses this for constants.
+list(APPEND INC_SYS
+  ${Epoxy_INCLUDE_DIRS}
+)
+
+if(WITH_OPENGL_BACKEND)
+  list(APPEND LIB
+    ${Epoxy_LIBRARIES}
+  )
+endif()
+
+if(WITH_PYTHON_MODULE)
+  add_definitions(-DWITH_PYTHON_MODULE)
+endif()
 
 blender_add_lib(bf_python_ext "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")

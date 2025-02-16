@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2004-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -27,9 +15,7 @@
 #include "../Interface0D/CurvePoint/BPy_StrokeVertex.h"
 #include "../Iterator/BPy_StrokeVertexIterator.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "BLI_sys_types.h"
 
 using namespace Freestyle;
 
@@ -43,18 +29,20 @@ using namespace Freestyle;
 // pb: - need to be able to switch representation: InputVertexIterator <=> position
 //     - is it even used ? not even in SWIG version
 
-PyDoc_STRVAR(Stroke_doc,
-             "Class hierarchy: :class:`Interface1D` > :class:`Stroke`\n"
-             "\n"
-             "Class to define a stroke.  A stroke is made of a set of 2D vertices\n"
-             "(:class:`StrokeVertex`), regularly spaced out.  This set of vertices\n"
-             "defines the stroke's backbone geometry.  Each of these stroke vertices\n"
-             "defines the stroke's shape and appearance at this vertex position.\n"
-             "\n"
-             ".. method:: Stroke()\n"
-             "            Stroke(brother)\n"
-             "\n"
-             "   Creates a :class:`Stroke` using the default constructor or copy constructor\n");
+PyDoc_STRVAR(
+    /* Wrap. */
+    Stroke_doc,
+    "Class hierarchy: :class:`Interface1D` > :class:`Stroke`\n"
+    "\n"
+    "Class to define a stroke. A stroke is made of a set of 2D vertices\n"
+    "(:class:`StrokeVertex`), regularly spaced out. This set of vertices\n"
+    "defines the stroke's backbone geometry. Each of these stroke vertices\n"
+    "defines the stroke's shape and appearance at this vertex position.\n"
+    "\n"
+    ".. method:: Stroke()\n"
+    "            Stroke(brother)\n"
+    "\n"
+    "   Creates a :class:`Stroke` using the default constructor or copy constructor\n");
 
 static int Stroke_init(BPy_Stroke *self, PyObject *args, PyObject *kwds)
 {
@@ -86,7 +74,7 @@ static Py_ssize_t Stroke_sq_length(BPy_Stroke *self)
   return self->s->strokeVerticesSize();
 }
 
-static PyObject *Stroke_sq_item(BPy_Stroke *self, int keynum)
+static PyObject *Stroke_sq_item(BPy_Stroke *self, Py_ssize_t keynum)
 {
   if (keynum < 0) {
     keynum += Stroke_sq_length(self);
@@ -98,20 +86,22 @@ static PyObject *Stroke_sq_item(BPy_Stroke *self, int keynum)
   return BPy_StrokeVertex_from_StrokeVertex(self->s->strokeVerticeAt(keynum));
 }
 
-PyDoc_STRVAR(Stroke_compute_sampling_doc,
-             ".. method:: compute_sampling(n)\n"
-             "\n"
-             "   Compute the sampling needed to get N vertices.  If the\n"
-             "   specified number of vertices is less than the actual number of\n"
-             "   vertices, the actual sampling value is returned. (To remove Vertices,\n"
-             "   use the RemoveVertex() method of this class.)\n"
-             "\n"
-             "   :arg n: The number of stroke vertices we eventually want\n"
-             "      in our Stroke.\n"
-             "   :type n: int\n"
-             "   :return: The sampling that must be used in the Resample(float)\n"
-             "      method.\n"
-             "   :rtype: float");
+PyDoc_STRVAR(
+    /* Wrap. */
+    Stroke_compute_sampling_doc,
+    ".. method:: compute_sampling(n)\n"
+    "\n"
+    "   Compute the sampling needed to get N vertices. If the\n"
+    "   specified number of vertices is less than the actual number of\n"
+    "   vertices, the actual sampling value is returned. (To remove Vertices,\n"
+    "   use the RemoveVertex() method of this class.)\n"
+    "\n"
+    "   :arg n: The number of stroke vertices we eventually want\n"
+    "      in our Stroke.\n"
+    "   :type n: int\n"
+    "   :return: The sampling that must be used in the Resample(float)\n"
+    "      method.\n"
+    "   :rtype: float");
 
 static PyObject *Stroke_compute_sampling(BPy_Stroke *self, PyObject *args, PyObject *kwds)
 {
@@ -124,21 +114,23 @@ static PyObject *Stroke_compute_sampling(BPy_Stroke *self, PyObject *args, PyObj
   return PyFloat_FromDouble(self->s->ComputeSampling(i));
 }
 
-PyDoc_STRVAR(Stroke_resample_doc,
-             ".. method:: resample(n)\n"
-             "            resample(sampling)\n"
-             "\n"
-             "   Resamples the stroke so using one of two methods with the goal\n"
-             "   of creating a stroke with fewer points and the same shape.\n"
-             "\n"
-             "   :arg n: Resamples the stroke so that it eventually has N points. That means\n"
-             "      it is going to add N-vertices_size, where vertices_size is the\n"
-             "      number of points we already have.  If vertices_size >= N, no\n"
-             "      resampling is done.\n"
-             "   :type n: int\n"
-             "   :arg sampling: Resamples the stroke with a given sampling value. If the\n"
-             "      sampling is smaller than the actual sampling value, no resampling is done.\n"
-             "   :type sampling: float");
+PyDoc_STRVAR(
+    /* Wrap. */
+    Stroke_resample_doc,
+    ".. method:: resample(n)\n"
+    "            resample(sampling)\n"
+    "\n"
+    "   Resamples the stroke so using one of two methods with the goal\n"
+    "   of creating a stroke with fewer points and the same shape.\n"
+    "\n"
+    "   :arg n: Resamples the stroke so that it eventually has N points. That means\n"
+    "      it is going to add N-vertices_size, where vertices_size is the\n"
+    "      number of points we already have. If vertices_size >= N, no\n"
+    "      resampling is done.\n"
+    "   :type n: int\n"
+    "   :arg sampling: Resamples the stroke with a given sampling value. If the\n"
+    "      sampling is smaller than the actual sampling value, no resampling is done.\n"
+    "   :type sampling: float");
 
 static PyObject *Stroke_resample(BPy_Stroke *self, PyObject *args, PyObject *kwds)
 {
@@ -154,7 +146,8 @@ static PyObject *Stroke_resample(BPy_Stroke *self, PyObject *args, PyObject *kwd
     }
   }
   else if ((void)PyErr_Clear(),
-           PyArg_ParseTupleAndKeywords(args, kwds, "f", (char **)kwlist_2, &f)) {
+           PyArg_ParseTupleAndKeywords(args, kwds, "f", (char **)kwlist_2, &f))
+  {
     if (self->s->Resample(f) < 0) {
       PyErr_SetString(PyExc_RuntimeError, "Stroke resampling (by vertex interval) failed");
       return nullptr;
@@ -167,18 +160,20 @@ static PyObject *Stroke_resample(BPy_Stroke *self, PyObject *args, PyObject *kwd
   Py_RETURN_NONE;
 }
 
-PyDoc_STRVAR(Stroke_insert_vertex_doc,
-             ".. method:: insert_vertex(vertex, next)\n"
-             "\n"
-             "   Inserts the StrokeVertex given as argument into the Stroke before the\n"
-             "   point specified by next.  The length and curvilinear abscissa are\n"
-             "   updated consequently.\n"
-             "\n"
-             "   :arg vertex: The StrokeVertex to insert in the Stroke.\n"
-             "   :type vertex: :class:`StrokeVertex`\n"
-             "   :arg next: A StrokeVertexIterator pointing to the StrokeVertex\n"
-             "      before which vertex must be inserted.\n"
-             "   :type next: :class:`StrokeVertexIterator`");
+PyDoc_STRVAR(
+    /* Wrap. */
+    Stroke_insert_vertex_doc,
+    ".. method:: insert_vertex(vertex, next)\n"
+    "\n"
+    "   Inserts the StrokeVertex given as argument into the Stroke before the\n"
+    "   point specified by next. The length and curvilinear abscissa are\n"
+    "   updated consequently.\n"
+    "\n"
+    "   :arg vertex: The StrokeVertex to insert in the Stroke.\n"
+    "   :type vertex: :class:`StrokeVertex`\n"
+    "   :arg next: A StrokeVertexIterator pointing to the StrokeVertex\n"
+    "      before which vertex must be inserted.\n"
+    "   :type next: :class:`StrokeVertexIterator`");
 
 static PyObject *Stroke_insert_vertex(BPy_Stroke *self, PyObject *args, PyObject *kwds)
 {
@@ -192,7 +187,8 @@ static PyObject *Stroke_insert_vertex(BPy_Stroke *self, PyObject *args, PyObject
                                    &StrokeVertex_Type,
                                    &py_sv,
                                    &StrokeVertexIterator_Type,
-                                   &py_sv_it)) {
+                                   &py_sv_it))
+  {
     return nullptr;
   }
 
@@ -205,22 +201,24 @@ static PyObject *Stroke_insert_vertex(BPy_Stroke *self, PyObject *args, PyObject
   Py_RETURN_NONE;
 }
 
-PyDoc_STRVAR(Stroke_remove_vertex_doc,
-             ".. method:: remove_vertex(vertex)\n"
-             "\n"
-             "   Removes the StrokeVertex given as argument from the Stroke. The length\n"
-             "   and curvilinear abscissa are updated consequently.\n"
-             "\n"
-             "   :arg vertex: the StrokeVertex to remove from the Stroke.\n"
-             "   :type vertex: :class:`StrokeVertex`");
+PyDoc_STRVAR(
+    /* Wrap. */
+    Stroke_remove_vertex_doc,
+    ".. method:: remove_vertex(vertex)\n"
+    "\n"
+    "   Removes the StrokeVertex given as argument from the Stroke. The length\n"
+    "   and curvilinear abscissa are updated consequently.\n"
+    "\n"
+    "   :arg vertex: the StrokeVertex to remove from the Stroke.\n"
+    "   :type vertex: :class:`StrokeVertex`");
 
 static PyObject *Stroke_remove_vertex(BPy_Stroke *self, PyObject *args, PyObject *kwds)
 {
   static const char *kwlist[] = {"vertex", nullptr};
   PyObject *py_sv = nullptr;
 
-  if (!PyArg_ParseTupleAndKeywords(
-          args, kwds, "O!", (char **)kwlist, &StrokeVertex_Type, &py_sv)) {
+  if (!PyArg_ParseTupleAndKeywords(args, kwds, "O!", (char **)kwlist, &StrokeVertex_Type, &py_sv))
+  {
     return nullptr;
   }
   if (((BPy_StrokeVertex *)py_sv)->sv) {
@@ -233,10 +231,12 @@ static PyObject *Stroke_remove_vertex(BPy_Stroke *self, PyObject *args, PyObject
   Py_RETURN_NONE;
 }
 
-PyDoc_STRVAR(Stroke_remove_all_vertices_doc,
-             ".. method:: remove_all_vertices()\n"
-             "\n"
-             "   Removes all vertices from the Stroke.");
+PyDoc_STRVAR(
+    /* Wrap. */
+    Stroke_remove_all_vertices_doc,
+    ".. method:: remove_all_vertices()\n"
+    "\n"
+    "   Removes all vertices from the Stroke.");
 
 static PyObject *Stroke_remove_all_vertices(BPy_Stroke *self)
 {
@@ -244,10 +244,12 @@ static PyObject *Stroke_remove_all_vertices(BPy_Stroke *self)
   Py_RETURN_NONE;
 }
 
-PyDoc_STRVAR(Stroke_update_length_doc,
-             ".. method:: update_length()\n"
-             "\n"
-             "   Updates the 2D length of the Stroke.");
+PyDoc_STRVAR(
+    /* Wrap. */
+    Stroke_update_length_doc,
+    ".. method:: update_length()\n"
+    "\n"
+    "   Updates the 2D length of the Stroke.");
 
 static PyObject *Stroke_update_length(BPy_Stroke *self)
 {
@@ -255,18 +257,20 @@ static PyObject *Stroke_update_length(BPy_Stroke *self)
   Py_RETURN_NONE;
 }
 
-PyDoc_STRVAR(Stroke_stroke_vertices_begin_doc,
-             ".. method:: stroke_vertices_begin(t=0.0)\n"
-             "\n"
-             "   Returns a StrokeVertexIterator pointing on the first StrokeVertex of\n"
-             "   the Stroke. One can specify a sampling value to re-sample the Stroke\n"
-             "   on the fly if needed.\n"
-             "\n"
-             "   :arg t: The resampling value with which we want our Stroke to be\n"
-             "      resampled.  If 0 is specified, no resampling is done.\n"
-             "   :type t: float\n"
-             "   :return: A StrokeVertexIterator pointing on the first StrokeVertex.\n"
-             "   :rtype: :class:`StrokeVertexIterator`");
+PyDoc_STRVAR(
+    /* Wrap. */
+    Stroke_stroke_vertices_begin_doc,
+    ".. method:: stroke_vertices_begin(t=0.0)\n"
+    "\n"
+    "   Returns a StrokeVertexIterator pointing on the first StrokeVertex of\n"
+    "   the Stroke. One can specify a sampling value to re-sample the Stroke\n"
+    "   on the fly if needed.\n"
+    "\n"
+    "   :arg t: The resampling value with which we want our Stroke to be\n"
+    "      resampled. If 0 is specified, no resampling is done.\n"
+    "   :type t: float\n"
+    "   :return: A StrokeVertexIterator pointing on the first StrokeVertex.\n"
+    "   :rtype: :class:`StrokeVertexIterator`");
 
 static PyObject *Stroke_stroke_vertices_begin(BPy_Stroke *self, PyObject *args, PyObject *kwds)
 {
@@ -280,14 +284,16 @@ static PyObject *Stroke_stroke_vertices_begin(BPy_Stroke *self, PyObject *args, 
   return BPy_StrokeVertexIterator_from_StrokeVertexIterator(sv_it, false);
 }
 
-PyDoc_STRVAR(Stroke_stroke_vertices_end_doc,
-             ".. method:: stroke_vertices_end()\n"
-             "\n"
-             "   Returns a StrokeVertexIterator pointing after the last StrokeVertex\n"
-             "   of the Stroke.\n"
-             "\n"
-             "   :return: A StrokeVertexIterator pointing after the last StrokeVertex.\n"
-             "   :rtype: :class:`StrokeVertexIterator`");
+PyDoc_STRVAR(
+    /* Wrap. */
+    Stroke_stroke_vertices_end_doc,
+    ".. method:: stroke_vertices_end()\n"
+    "\n"
+    "   Returns a StrokeVertexIterator pointing after the last StrokeVertex\n"
+    "   of the Stroke.\n"
+    "\n"
+    "   :return: A StrokeVertexIterator pointing after the last StrokeVertex.\n"
+    "   :rtype: :class:`StrokeVertexIterator`");
 
 static PyObject *Stroke_stroke_vertices_end(BPy_Stroke *self)
 {
@@ -295,14 +301,16 @@ static PyObject *Stroke_stroke_vertices_end(BPy_Stroke *self)
   return BPy_StrokeVertexIterator_from_StrokeVertexIterator(sv_it, true);
 }
 
-PyDoc_STRVAR(Stroke_reversed_doc,
-             ".. method:: __reversed__()\n"
-             "\n"
-             "   Returns a StrokeVertexIterator iterating over the vertices of the Stroke\n"
-             "   in the reversed order (from the last to the first).\n"
-             "\n"
-             "   :return: A StrokeVertexIterator pointing after the last StrokeVertex.\n"
-             "   :rtype: :class:`StrokeVertexIterator`");
+PyDoc_STRVAR(
+    /* Wrap. */
+    Stroke_reversed_doc,
+    ".. method:: __reversed__()\n"
+    "\n"
+    "   Returns a StrokeVertexIterator iterating over the vertices of the Stroke\n"
+    "   in the reversed order (from the last to the first).\n"
+    "\n"
+    "   :return: A StrokeVertexIterator pointing after the last StrokeVertex.\n"
+    "   :rtype: :class:`StrokeVertexIterator`");
 
 static PyObject *Stroke_reversed(BPy_Stroke *self)
 {
@@ -310,13 +318,15 @@ static PyObject *Stroke_reversed(BPy_Stroke *self)
   return BPy_StrokeVertexIterator_from_StrokeVertexIterator(sv_it, true);
 }
 
-PyDoc_STRVAR(Stroke_stroke_vertices_size_doc,
-             ".. method:: stroke_vertices_size()\n"
-             "\n"
-             "   Returns the number of StrokeVertex constituting the Stroke.\n"
-             "\n"
-             "   :return: The number of stroke vertices.\n"
-             "   :rtype: int");
+PyDoc_STRVAR(
+    /* Wrap. */
+    Stroke_stroke_vertices_size_doc,
+    ".. method:: stroke_vertices_size()\n"
+    "\n"
+    "   Returns the number of StrokeVertex constituting the Stroke.\n"
+    "\n"
+    "   :return: The number of stroke vertices.\n"
+    "   :rtype: int");
 
 static PyObject *Stroke_stroke_vertices_size(BPy_Stroke *self)
 {
@@ -360,17 +370,19 @@ static PyMethodDef BPy_Stroke_methods[] = {
 
 /*----------------------Stroke get/setters ----------------------------*/
 
-PyDoc_STRVAR(Stroke_medium_type_doc,
-             "The MediumType used for this Stroke.\n"
-             "\n"
-             ":type: :class:`MediumType`");
+PyDoc_STRVAR(
+    /* Wrap. */
+    Stroke_medium_type_doc,
+    "The MediumType used for this Stroke.\n"
+    "\n"
+    ":type: :class:`MediumType`");
 
-static PyObject *Stroke_medium_type_get(BPy_Stroke *self, void *UNUSED(closure))
+static PyObject *Stroke_medium_type_get(BPy_Stroke *self, void * /*closure*/)
 {
   return BPy_MediumType_from_MediumType(self->s->getMediumType());
 }
 
-static int Stroke_medium_type_set(BPy_Stroke *self, PyObject *value, void *UNUSED(closure))
+static int Stroke_medium_type_set(BPy_Stroke *self, PyObject *value, void * /*closure*/)
 {
   if (!BPy_MediumType_Check(value)) {
     PyErr_SetString(PyExc_TypeError, "value must be a MediumType");
@@ -380,19 +392,21 @@ static int Stroke_medium_type_set(BPy_Stroke *self, PyObject *value, void *UNUSE
   return 0;
 }
 
-PyDoc_STRVAR(Stroke_texture_id_doc,
-             "The ID of the texture used to simulate th marks system for this Stroke.\n"
-             "\n"
-             ":type: int");
+PyDoc_STRVAR(
+    /* Wrap. */
+    Stroke_texture_id_doc,
+    "The ID of the texture used to simulate th marks system for this Stroke.\n"
+    "\n"
+    ":type: int");
 
-static PyObject *Stroke_texture_id_get(BPy_Stroke *self, void *UNUSED(closure))
+static PyObject *Stroke_texture_id_get(BPy_Stroke *self, void * /*closure*/)
 {
   return PyLong_FromLong(self->s->getTextureId());
 }
 
-static int Stroke_texture_id_set(BPy_Stroke *self, PyObject *value, void *UNUSED(closure))
+static int Stroke_texture_id_set(BPy_Stroke *self, PyObject *value, void * /*closure*/)
 {
-  unsigned int i = PyLong_AsUnsignedLong(value);
+  uint i = PyLong_AsUnsignedLong(value);
   if (PyErr_Occurred()) {
     return -1;
   }
@@ -400,17 +414,19 @@ static int Stroke_texture_id_set(BPy_Stroke *self, PyObject *value, void *UNUSED
   return 0;
 }
 
-PyDoc_STRVAR(Stroke_tips_doc,
-             "True if this Stroke uses a texture with tips, and false otherwise.\n"
-             "\n"
-             ":type: bool");
+PyDoc_STRVAR(
+    /* Wrap. */
+    Stroke_tips_doc,
+    "True if this Stroke uses a texture with tips, and false otherwise.\n"
+    "\n"
+    ":type: bool");
 
-static PyObject *Stroke_tips_get(BPy_Stroke *self, void *UNUSED(closure))
+static PyObject *Stroke_tips_get(BPy_Stroke *self, void * /*closure*/)
 {
   return PyBool_from_bool(self->s->hasTips());
 }
 
-static int Stroke_tips_set(BPy_Stroke *self, PyObject *value, void *UNUSED(closure))
+static int Stroke_tips_set(BPy_Stroke *self, PyObject *value, void * /*closure*/)
 {
   if (!PyBool_Check(value)) {
     return -1;
@@ -419,17 +435,19 @@ static int Stroke_tips_set(BPy_Stroke *self, PyObject *value, void *UNUSED(closu
   return 0;
 }
 
-PyDoc_STRVAR(Stroke_length_2d_doc,
-             "The 2D length of the Stroke.\n"
-             "\n"
-             ":type: float");
+PyDoc_STRVAR(
+    /* Wrap. */
+    Stroke_length_2d_doc,
+    "The 2D length of the Stroke.\n"
+    "\n"
+    ":type: float");
 
-static PyObject *Stroke_length_2d_get(BPy_Stroke *self, void *UNUSED(closure))
+static PyObject *Stroke_length_2d_get(BPy_Stroke *self, void * /*closure*/)
 {
   return PyFloat_FromDouble(self->s->getLength2D());
 }
 
-static int Stroke_length_2d_set(BPy_Stroke *self, PyObject *value, void *UNUSED(closure))
+static int Stroke_length_2d_set(BPy_Stroke *self, PyObject *value, void * /*closure*/)
 {
   float scalar;
   if ((scalar = PyFloat_AsDouble(value)) == -1.0f && PyErr_Occurred()) {
@@ -441,18 +459,20 @@ static int Stroke_length_2d_set(BPy_Stroke *self, PyObject *value, void *UNUSED(
   return 0;
 }
 
-PyDoc_STRVAR(Stroke_id_doc,
-             "The Id of this Stroke.\n"
-             "\n"
-             ":type: :class:`Id`");
+PyDoc_STRVAR(
+    /* Wrap. */
+    Stroke_id_doc,
+    "The Id of this Stroke.\n"
+    "\n"
+    ":type: :class:`Id`");
 
-static PyObject *Stroke_id_get(BPy_Stroke *self, void *UNUSED(closure))
+static PyObject *Stroke_id_get(BPy_Stroke *self, void * /*closure*/)
 {
   Id id(self->s->getId());
   return BPy_Id_from_Id(id);  // return a copy
 }
 
-static int Stroke_id_set(BPy_Stroke *self, PyObject *value, void *UNUSED(closure))
+static int Stroke_id_set(BPy_Stroke *self, PyObject *value, void * /*closure*/)
 {
   if (!BPy_Id_Check(value)) {
     PyErr_SetString(PyExc_TypeError, "value must be an Id");
@@ -486,60 +506,57 @@ static PyGetSetDef BPy_Stroke_getseters[] = {
 /*-----------------------BPy_Stroke type definition ------------------------------*/
 
 static PySequenceMethods BPy_Stroke_as_sequence = {
-    (lenfunc)Stroke_sq_length,    /* sq_length */
-    nullptr,                      /* sq_concat */
-    nullptr,                      /* sq_repeat */
-    (ssizeargfunc)Stroke_sq_item, /* sq_item */
-    nullptr,                      /* sq_slice */
-    nullptr,                      /* sq_ass_item */
-    nullptr,                      /* *was* sq_ass_slice */
-    nullptr,                      /* sq_contains */
-    nullptr,                      /* sq_inplace_concat */
-    nullptr,                      /* sq_inplace_repeat */
+    /*sq_length*/ (lenfunc)Stroke_sq_length,
+    /*sq_concat*/ nullptr,
+    /*sq_repeat*/ nullptr,
+    /*sq_item*/ (ssizeargfunc)Stroke_sq_item,
+    /*was_sq_slice*/ nullptr, /* DEPRECATED. */
+    /*sq_ass_item*/ nullptr,
+    /*was_sq_ass_slice*/ nullptr, /* DEPRECATED. */
+    /*sq_contains*/ nullptr,
+    /*sq_inplace_concat*/ nullptr,
+    /*sq_inplace_repeat*/ nullptr,
 };
 
 PyTypeObject Stroke_Type = {
-    PyVarObject_HEAD_INIT(nullptr, 0) "Stroke", /* tp_name */
-    sizeof(BPy_Stroke),                         /* tp_basicsize */
-    0,                                          /* tp_itemsize */
-    nullptr,                                    /* tp_dealloc */
-    0,                                          /* tp_vectorcall_offset */
-    nullptr,                                    /* tp_getattr */
-    nullptr,                                    /* tp_setattr */
-    nullptr,                                    /* tp_reserved */
-    nullptr,                                    /* tp_repr */
-    nullptr,                                    /* tp_as_number */
-    &BPy_Stroke_as_sequence,                    /* tp_as_sequence */
-    nullptr,                                    /* tp_as_mapping */
-    nullptr,                                    /* tp_hash */
-    nullptr,                                    /* tp_call */
-    nullptr,                                    /* tp_str */
-    nullptr,                                    /* tp_getattro */
-    nullptr,                                    /* tp_setattro */
-    nullptr,                                    /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,   /* tp_flags */
-    Stroke_doc,                                 /* tp_doc */
-    nullptr,                                    /* tp_traverse */
-    nullptr,                                    /* tp_clear */
-    nullptr,                                    /* tp_richcompare */
-    0,                                          /* tp_weaklistoffset */
-    (getiterfunc)Stroke_iter,                   /* tp_iter */
-    nullptr,                                    /* tp_iternext */
-    BPy_Stroke_methods,                         /* tp_methods */
-    nullptr,                                    /* tp_members */
-    BPy_Stroke_getseters,                       /* tp_getset */
-    &Interface1D_Type,                          /* tp_base */
-    nullptr,                                    /* tp_dict */
-    nullptr,                                    /* tp_descr_get */
-    nullptr,                                    /* tp_descr_set */
-    0,                                          /* tp_dictoffset */
-    (initproc)Stroke_init,                      /* tp_init */
-    nullptr,                                    /* tp_alloc */
-    nullptr,                                    /* tp_new */
+    /*ob_base*/ PyVarObject_HEAD_INIT(nullptr, 0)
+    /*tp_name*/ "Stroke",
+    /*tp_basicsize*/ sizeof(BPy_Stroke),
+    /*tp_itemsize*/ 0,
+    /*tp_dealloc*/ nullptr,
+    /*tp_vectorcall_offset*/ 0,
+    /*tp_getattr*/ nullptr,
+    /*tp_setattr*/ nullptr,
+    /*tp_as_async*/ nullptr,
+    /*tp_repr*/ nullptr,
+    /*tp_as_number*/ nullptr,
+    /*tp_as_sequence*/ &BPy_Stroke_as_sequence,
+    /*tp_as_mapping*/ nullptr,
+    /*tp_hash*/ nullptr,
+    /*tp_call*/ nullptr,
+    /*tp_str*/ nullptr,
+    /*tp_getattro*/ nullptr,
+    /*tp_setattro*/ nullptr,
+    /*tp_as_buffer*/ nullptr,
+    /*tp_flags*/ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    /*tp_doc*/ Stroke_doc,
+    /*tp_traverse*/ nullptr,
+    /*tp_clear*/ nullptr,
+    /*tp_richcompare*/ nullptr,
+    /*tp_weaklistoffset*/ 0,
+    /*tp_iter*/ (getiterfunc)Stroke_iter,
+    /*tp_iternext*/ nullptr,
+    /*tp_methods*/ BPy_Stroke_methods,
+    /*tp_members*/ nullptr,
+    /*tp_getset*/ BPy_Stroke_getseters,
+    /*tp_base*/ &Interface1D_Type,
+    /*tp_dict*/ nullptr,
+    /*tp_descr_get*/ nullptr,
+    /*tp_descr_set*/ nullptr,
+    /*tp_dictoffset*/ 0,
+    /*tp_init*/ (initproc)Stroke_init,
+    /*tp_alloc*/ nullptr,
+    /*tp_new*/ nullptr,
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////
-
-#ifdef __cplusplus
-}
-#endif

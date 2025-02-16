@@ -1,28 +1,15 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * BIF_meshlaplacian.h: Algorithms using the mesh laplacian.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup edarmature
+ * BIF_meshlaplacian.h: Algorithms using the mesh laplacian.
  */
 
 #pragma once
 
-//#define RIGID_DEFORM
+// #define RIGID_DEFORM
 
 struct Mesh;
 struct Object;
@@ -48,15 +35,15 @@ float laplacian_system_get_solution(LaplacianSystem *sys, int v);
 /* Heat Weighting */
 
 void heat_bone_weighting(struct Object *ob,
-                         struct Mesh *me,
+                         struct Mesh *mesh,
                          float (*verts)[3],
                          int numbones,
                          struct bDeformGroup **dgrouplist,
                          struct bDeformGroup **dgroupflip,
                          float (*root)[3],
                          float (*tip)[3],
-                         const int *selected,
-                         const char **error_str);
+                         const bool *selected,
+                         const char **r_error_str);
 
 #ifdef RIGID_DEFORM
 /* As-Rigid-As-Possible Deformation */
@@ -68,4 +55,4 @@ void rigid_deform_end(int cancel);
 
 /* Harmonic Coordinates */
 
-/* ED_mesh_deform_bind_callback(...) defined in ED_armature.h */
+/* ED_mesh_deform_bind_callback(...) defined in ED_armature.hh */

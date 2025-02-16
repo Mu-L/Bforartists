@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2005 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2005 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
@@ -26,11 +11,8 @@
 #include "DNA_ID.h"
 #include "DNA_brush_enums.h"
 #include "DNA_curve_types.h"
+#include "DNA_defs.h"
 #include "DNA_texture_types.h" /* for MTex */
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 struct CurveMapping;
 struct Image;
@@ -74,9 +56,10 @@ typedef struct BrushGpencilSettings {
 
   /** Factor for transparency. */
   float fill_threshold;
-  /** Number of pixel to consider the leak is too small (x 2). */
-  short fill_leak;
   char _pad2[2];
+  /* Type of caps: eGPDstroke_Caps. */
+  int8_t caps_type;
+  char _pad[1];
 
   int flag2;
 
@@ -84,14 +67,14 @@ typedef struct BrushGpencilSettings {
   int fill_simplylvl;
   /** Type of control lines drawing mode. */
   int fill_draw_mode;
-  /** Icon identifier. */
-  int icon_id;
+  /** Type of gap filling extension to use. */
+  int fill_extend_mode;
 
   /** Maximum distance before generate new point for very fast mouse movements. */
   int input_samples;
   /** Random factor for UV rotation. */
   float uv_random;
-  /** Moved to 'Brush.gpencil_tool'. */
+  /** Moved to 'Brush.gpencil_brush_type'. */
   int brush_type DNA_DEPRECATED;
   /** Soft, hard or stroke. */
   int eraser_mode;
@@ -105,13 +88,13 @@ typedef struct BrushGpencilSettings {
   int flag;
 
   /** gradient control along y for color */
-  float hardeness;
+  float hardness;
   /** factor xy of shape for dots gradients */
   float aspect_ratio[2];
   /** Simplify adaptive factor */
   float simplify_f;
 
-  /** Mix colorfactor */
+  /** Mix color-factor. */
   float vertex_factor;
   int vertex_mode;
 
@@ -121,7 +104,7 @@ typedef struct BrushGpencilSettings {
   int sculpt_mode_flag;
   /** Preset type (used to reset brushes - internal). */
   short preset_type;
-  /** Brush preselected mode (Active/Material/Vertexcolor). */
+  /** Brush preselected mode (Active/Material/Vertex-color). */
   short brush_draw_mode;
 
   /** Randomness for Hue. */
@@ -146,12 +129,50 @@ typedef struct BrushGpencilSettings {
   struct CurveMapping *curve_rand_saturation;
   struct CurveMapping *curve_rand_value;
 
+  /** Factor for external line thickness conversion to outline. */
+  float outline_fac;
+  /** Screen space simplify threshold. Points within this margin are treated as a straight line. */
+  float simplify_px;
+
   /* optional link of material to replace default in context */
   /** Material. */
   struct Material *material;
+  /** Material Alternative for secondary operations. */
+  struct Material *material_alt;
 } BrushGpencilSettings;
 
+typedef struct BrushCurvesSculptSettings {
+  /** Number of curves added by the add brush. */
+  int add_amount;
+  /** Number of control points in new curves added by the add brush. */
+  int points_per_curve;
+  /* eBrushCurvesSculptFlag. */
+  uint32_t flag;
+  /** When shrinking curves, they shouldn't become shorter than this length. */
+  float minimum_length;
+  /** Length of newly added curves when it is not interpolated from other curves. */
+  float curve_length;
+  /** Minimum distance between curve root points used by the Density brush. */
+  float minimum_distance;
+  /** The initial radius of curve. */
+  float curve_radius;
+  /** How often the Density brush tries to add a new curve. */
+  int density_add_attempts;
+  /** #eBrushCurvesSculptDensityMode. */
+  uint8_t density_mode;
+  char _pad[7];
+  struct CurveMapping *curve_parameter_falloff;
+} BrushCurvesSculptSettings;
+
+/** Max number of propagation steps for automasking settings. */
+#define AUTOMASKING_BOUNDARY_EDGES_MAX_PROPAGATION_STEPS 20
+/**
+ * \note Any change to members that is user visible and that may make the brush differ from the one
+ * saved in the asset library should be followed by a #BKE_brush_tag_unsaved_changes() call.
+ */
 typedef struct Brush {
+  DNA_DEFINE_CXX_METHODS(Brush)
+
   ID id;
 
   struct BrushClone clone;
@@ -187,6 +208,9 @@ typedef struct Brush {
   int flag;
   int flag2;
   int sampling_flag;
+
+  /** Number of samples used to smooth the stroke. */
+  int input_samples;
 
   /** Pressure influence for mask. */
   int mask_pressure;
@@ -241,36 +265,40 @@ typedef struct Brush {
   int gradient_spacing;
   /** Source for stroke color gradient application. */
   char gradient_stroke_mode;
-  /** Source for fill tool color gradient application. */
+  /** Source for fill brush color gradient application. */
   char gradient_fill_mode;
 
-  char _pad0[5];
+  /**
+   * Tag to indicate to the user that the brush has been changed since being imported. Only set for
+   * brushes that are actually imported (must have #ID.lib set). Runtime only.
+   */
+  char has_unsaved_changes;
 
   /** Projection shape (sphere, circle). */
   char falloff_shape;
   float falloff_angle;
 
-  /** Active sculpt tool. */
-  char sculpt_tool;
-  /** Active sculpt tool. */
-  char uv_sculpt_tool;
+  /** Active sculpt brush type. */
+  char sculpt_brush_type;
   /** Active vertex paint. */
-  char vertexpaint_tool;
+  char vertex_brush_type;
   /** Active weight paint. */
-  char weightpaint_tool;
-  /** Active image paint tool. */
-  char imagepaint_tool;
-  /** Enum eBrushMaskTool, only used if sculpt_tool is SCULPT_TOOL_MASK. */
+  char weight_brush_type;
+  /** Active image paint brush type. */
+  char image_brush_type;
+  /** Enum eBrushMaskTool, only used if sculpt_brush_type is SCULPT_BRUSH_TYPE_MASK. */
   char mask_tool;
-  /** Active grease pencil tool. */
-  char gpencil_tool;
-  /** Active grease pencil vertex tool. */
-  char gpencil_vertex_tool;
-  /** Active grease pencil sculpt tool. */
-  char gpencil_sculpt_tool;
-  /** Active grease pencil weight tool. */
-  char gpencil_weight_tool;
-  char _pad1[6];
+  /** Active grease pencil brush type. */
+  char gpencil_brush_type;
+  /** Active grease pencil vertex brush type. */
+  char gpencil_vertex_brush_type;
+  /** Active grease pencil sculpt brush type. */
+  char gpencil_sculpt_brush_type;
+  /** Active grease pencil weight brush type. */
+  char gpencil_weight_brush_type;
+  /** Active curves sculpt brush type (#eBrushCurvesSculptType). */
+  char curves_sculpt_brush_type;
+  char _pad1[2];
 
   float autosmooth_factor;
 
@@ -288,6 +316,13 @@ typedef struct Brush {
   /** Affectable height of brush (layer height for layer tool, i.e.). */
   float height;
 
+  /* Plane Brush */
+  float plane_height;
+  float plane_depth;
+  float stabilize_normal;
+  float stabilize_plane;
+  int plane_inversion_mode;
+
   float texture_sample_bias;
 
   int curve_preset;
@@ -300,6 +335,11 @@ typedef struct Brush {
   /* automasking */
   int automasking_flags;
   int automasking_boundary_edges_propagation_steps;
+
+  float automasking_start_normal_limit;
+  float automasking_start_normal_falloff;
+  float automasking_view_normal_limit;
+  float automasking_view_normal_falloff;
 
   int elastic_deform_type;
   float elastic_deform_volume_preservation;
@@ -372,7 +412,12 @@ typedef struct Brush {
   float mask_stencil_dimension[2];
 
   struct BrushGpencilSettings *gpencil_settings;
+  struct BrushCurvesSculptSettings *curves_sculpt_settings;
 
+  int automasking_cavity_blur_steps;
+  float automasking_cavity_factor;
+
+  struct CurveMapping *automasking_cavity_curve;
 } Brush;
 
 /* Struct to hold palette colors for sorting. */
@@ -416,7 +461,3 @@ typedef struct PaintCurve {
   /** Index where next point will be added. */
   int add_index;
 } PaintCurve;
-
-#ifdef __cplusplus
-}
-#endif

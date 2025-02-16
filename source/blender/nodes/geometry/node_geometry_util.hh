@@ -1,95 +1,85 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
-#include <string.h>
+#include <optional>
 
-#include "BLI_float3.hh"
-#include "BLI_utildefines.h"
+#include "MEM_guardedalloc.h"  // IWYU pragma: export
 
-#include "MEM_guardedalloc.h"
+#include "BKE_node.hh"
+#include "BKE_node_legacy_types.hh"  // IWYU pragma: export
+#include "BKE_node_socket_value.hh"  // IWYU pragma: export
 
-#include "DNA_node_types.h"
+#include "NOD_geometry_exec.hh"                 // IWYU pragma: export
+#include "NOD_register.hh"                      // IWYU pragma: export
+#include "NOD_socket_declarations.hh"           // IWYU pragma: export
+#include "NOD_socket_declarations_geometry.hh"  // IWYU pragma: export
 
-#include "BKE_node.h"
+#include "node_util.hh"  // IWYU pragma: export
 
-#include "BLT_translation.h"
+namespace blender {
+namespace bke {
+struct BVHTreeFromMesh;
+}
+namespace nodes {
+class GatherAddNodeSearchParams;
+class GatherLinkSearchOpParams;
+}  // namespace nodes
+}  // namespace blender
 
-#include "NOD_geometry.h"
-#include "NOD_geometry_exec.hh"
-
-#include "node_util.h"
-
-void geo_node_type_base(
-    struct bNodeType *ntype, int type, const char *name, short nclass, short flag);
-bool geo_node_poll_default(struct bNodeType *ntype,
-                           struct bNodeTree *ntree,
+void geo_node_type_base(blender::bke::bNodeType *ntype,
+                        std::string idname,
+                        std::optional<int16_t> legacy_type = std::nullopt);
+bool geo_node_poll_default(const blender::bke::bNodeType *ntype,
+                           const bNodeTree *ntree,
                            const char **r_disabled_hint);
 
 namespace blender::nodes {
-void update_attribute_input_socket_availabilities(bNode &node,
-                                                  const StringRef name,
-                                                  const GeometryNodeAttributeInputMode mode,
-                                                  const bool name_is_available = true);
 
-Array<uint32_t> get_geometry_element_ids_as_uints(const GeometryComponent &component,
-                                                  const AttributeDomain domain);
+bool check_tool_context_and_error(GeoNodeExecParams &params);
+void search_link_ops_for_tool_node(GatherLinkSearchOpParams &params);
+void search_link_ops_for_volume_grid_node(GatherLinkSearchOpParams &params);
+void search_link_ops_for_import_node(GatherLinkSearchOpParams &params);
 
-void transform_mesh(Mesh *mesh,
-                    const float3 translation,
-                    const float3 rotation,
-                    const float3 scale);
+void get_closest_in_bvhtree(bke::BVHTreeFromMesh &tree_data,
+                            const VArray<float3> &positions,
+                            const IndexMask &mask,
+                            MutableSpan<int> r_indices,
+                            MutableSpan<float> r_distances_sq,
+                            MutableSpan<float3> r_positions);
 
-Mesh *create_cylinder_or_cone_mesh(const float radius_top,
-                                   const float radius_bottom,
-                                   const float depth,
-                                   const int verts_num,
-                                   const GeometryNodeMeshCircleFillType fill_type);
+int apply_offset_in_cyclic_range(IndexRange range, int start_index, int offset);
 
-Mesh *create_cube_mesh(const float size);
+void mix_baked_data_item(eNodeSocketDatatype socket_type,
+                         void *prev,
+                         const void *next,
+                         const float factor);
 
-/**
- * Copies the point domain attributes from `in_component` that are in the mask to `out_component`.
- */
-void copy_point_attributes_based_on_mask(const GeometryComponent &in_component,
-                                         GeometryComponent &result_component,
-                                         Span<bool> masks,
-                                         const bool invert);
+namespace enums {
 
-struct CurveToPointsResults {
-  int result_size;
-  MutableSpan<float3> positions;
-  MutableSpan<float> radii;
-  MutableSpan<float> tilts;
+const EnumPropertyItem *attribute_type_type_with_socket_fn(bContext * /*C*/,
+                                                           PointerRNA * /*ptr*/,
+                                                           PropertyRNA * /*prop*/,
+                                                           bool *r_free);
 
-  Map<std::string, GMutableSpan> point_attributes;
+bool generic_attribute_type_supported(const EnumPropertyItem &item);
 
-  MutableSpan<float3> tangents;
-  MutableSpan<float3> normals;
-  MutableSpan<float3> rotations;
-};
-/**
- * Create references for all result point cloud attributes to simplify accessing them later on.
- */
-CurveToPointsResults curve_to_points_create_result_attributes(PointCloudComponent &points,
-                                                              const CurveEval &curve);
+}  // namespace enums
 
-void curve_create_default_rotation_attribute(Span<float3> tangents,
-                                             Span<float3> normals,
-                                             MutableSpan<float3> rotations);
+bool custom_data_type_supports_grids(eCustomDataType data_type);
+const EnumPropertyItem *grid_custom_data_type_items_filter_fn(bContext *C,
+                                                              PointerRNA *ptr,
+                                                              PropertyRNA *prop,
+                                                              bool *r_free);
+const EnumPropertyItem *grid_socket_type_items_filter_fn(bContext *C,
+                                                         PointerRNA *ptr,
+                                                         PropertyRNA *prop,
+                                                         bool *r_free);
+
+void node_geo_exec_with_missing_openvdb(GeoNodeExecParams &params);
+
+void draw_data_blocks(const bContext *C, uiLayout *layout, PointerRNA &bake_rna);
 
 }  // namespace blender::nodes

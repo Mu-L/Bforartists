@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -47,14 +35,14 @@
  *
  * There are three main ways to provide a hash table implementation with a custom hash function.
  *
- * - When you want to provide a default hash function for your own custom type: Add a `hash`
+ * - When you want to provide a default hash function for your own custom type: Add a `hash()`
  *   member function to it. The function should return `uint64_t` and take no arguments. This
  *   method will be called by the default implementation of #DefaultHash. It will automatically be
  *   used by hash table implementations.
  *
  * - When you want to provide a default hash function for a type that you cannot modify: Add a new
  *   specialization to the #DefaultHash struct. This can be done by writing code like below in
- *   either global or BLI namespace.
+ *   either global or `blender` namespace.
  *
  *     template<> struct blender::DefaultHash<TheType> {
  *       uint64_t operator()(const TheType &value) const {
@@ -73,14 +61,11 @@
  *     };
  */
 
-#include <functional>
 #include <memory>
 #include <string>
 #include <utility>
 
-#include "BLI_math_base.h"
 #include "BLI_string_ref.hh"
-#include "BLI_utildefines.h"
 
 namespace blender {
 
@@ -99,7 +84,7 @@ template<typename T> struct DefaultHash {
   {
     if constexpr (std::is_enum_v<T>) {
       /* For enums use the value as hash directly. */
-      return (uint64_t)value;
+      return uint64_t(value);
     }
     else {
       /* Try to call the `hash()` function on the value. */
@@ -133,7 +118,7 @@ template<typename T> struct DefaultHash<const T> {
   template<> struct DefaultHash<TYPE> { \
     uint64_t operator()(TYPE value) const \
     { \
-      return static_cast<uint64_t>(value); \
+      return uint64_t(value); \
     } \
   }
 
@@ -158,14 +143,22 @@ TRIVIAL_DEFAULT_INT_HASH(uint64_t);
 template<> struct DefaultHash<float> {
   uint64_t operator()(float value) const
   {
-    return *reinterpret_cast<uint32_t *>(&value);
+    /* Explicit `uint64_t` cast to suppress CPPCHECK warning.  */
+    return uint64_t(*reinterpret_cast<uint32_t *>(&value));
+  }
+};
+
+template<> struct DefaultHash<double> {
+  uint64_t operator()(double value) const
+  {
+    return *reinterpret_cast<uint64_t *>(&value);
   }
 };
 
 template<> struct DefaultHash<bool> {
   uint64_t operator()(bool value) const
   {
-    return static_cast<uint64_t>((value != false) * 1298191);
+    return uint64_t((value != false) * 1298191);
   }
 };
 
@@ -216,18 +209,18 @@ template<> struct DefaultHash<std::string_view> {
 template<typename T> struct DefaultHash<T *> {
   uint64_t operator()(const T *value) const
   {
-    uintptr_t ptr = reinterpret_cast<uintptr_t>(value);
-    uint64_t hash = static_cast<uint64_t>(ptr >> 4);
+    uintptr_t ptr = uintptr_t(value);
+    uint64_t hash = uint64_t(ptr >> 4);
     return hash;
   }
 };
 
 template<typename T> uint64_t get_default_hash(const T &v)
 {
-  return DefaultHash<T>{}(v);
+  return DefaultHash<std::decay_t<T>>{}(v);
 }
 
-template<typename T1, typename T2> uint64_t get_default_hash_2(const T1 &v1, const T2 &v2)
+template<typename T1, typename T2> uint64_t get_default_hash(const T1 &v1, const T2 &v2)
 {
   const uint64_t h1 = get_default_hash(v1);
   const uint64_t h2 = get_default_hash(v2);
@@ -235,7 +228,7 @@ template<typename T1, typename T2> uint64_t get_default_hash_2(const T1 &v1, con
 }
 
 template<typename T1, typename T2, typename T3>
-uint64_t get_default_hash_3(const T1 &v1, const T2 &v2, const T3 &v3)
+uint64_t get_default_hash(const T1 &v1, const T2 &v2, const T3 &v3)
 {
   const uint64_t h1 = get_default_hash(v1);
   const uint64_t h2 = get_default_hash(v2);
@@ -243,8 +236,29 @@ uint64_t get_default_hash_3(const T1 &v1, const T2 &v2, const T3 &v3)
   return h1 ^ (h2 * 19349669) ^ (h3 * 83492791);
 }
 
-template<typename T> struct DefaultHash<std::unique_ptr<T>> {
-  uint64_t operator()(const std::unique_ptr<T> &value) const
+template<typename T1, typename T2, typename T3, typename T4>
+uint64_t get_default_hash(const T1 &v1, const T2 &v2, const T3 &v3, const T4 &v4)
+{
+  const uint64_t h1 = get_default_hash(v1);
+  const uint64_t h2 = get_default_hash(v2);
+  const uint64_t h3 = get_default_hash(v3);
+  const uint64_t h4 = get_default_hash(v4);
+  return h1 ^ (h2 * 19349669) ^ (h3 * 83492791) ^ (h4 * 3632623);
+}
+
+/** Support hashing different kinds of pointer types. */
+template<typename T> struct PointerHashes {
+  template<typename U> uint64_t operator()(const U &value) const
+  {
+    return get_default_hash(&*value);
+  }
+};
+
+template<typename T> struct DefaultHash<std::unique_ptr<T>> : public PointerHashes<T> {};
+template<typename T> struct DefaultHash<std::shared_ptr<T>> : public PointerHashes<T> {};
+
+template<typename T> struct DefaultHash<std::reference_wrapper<T>> {
+  uint64_t operator()(const std::reference_wrapper<T> &value) const
   {
     return get_default_hash(value.get());
   }
@@ -253,7 +267,7 @@ template<typename T> struct DefaultHash<std::unique_ptr<T>> {
 template<typename T1, typename T2> struct DefaultHash<std::pair<T1, T2>> {
   uint64_t operator()(const std::pair<T1, T2> &value) const
   {
-    return get_default_hash_2(value.first, value.second);
+    return get_default_hash(value.first, value.second);
   }
 };
 

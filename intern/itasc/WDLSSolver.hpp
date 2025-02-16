@@ -1,8 +1,9 @@
-/*
- * WDLSSolver.hpp
+/* SPDX-FileCopyrightText: 2009 Ruben Smits
  *
- *  Created on: Jan 8, 2009
- *      Author: rubensmits
+ * SPDX-License-Identifier: LGPL-2.1-or-later */
+
+/** \file
+ * \ingroup intern_itasc
  */
 
 #ifndef WDLSSOLVER_HPP_

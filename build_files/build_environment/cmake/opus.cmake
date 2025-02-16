@@ -1,35 +1,59 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2002-2023 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ***** END GPL LICENSE BLOCK *****
-
-ExternalProject_Add(external_opus
-  URL file://${PACKAGE_DIR}/${OPUS_FILE}
-  DOWNLOAD_DIR ${DOWNLOAD_DIR}
-  URL_HASH ${OPUS_HASH_TYPE}=${OPUS_HASH}
-  PREFIX ${BUILD_DIR}/opus
-  CONFIGURE_COMMAND ${CONFIGURE_ENV} && cd ${BUILD_DIR}/opus/src/external_opus/ && ${CONFIGURE_COMMAND} --prefix=${LIBDIR}/opus
-    --disable-shared
-    --enable-static
-    --with-pic
-  BUILD_COMMAND ${CONFIGURE_ENV} && cd ${BUILD_DIR}/opus/src/external_opus/ && make -j${MAKE_THREADS}
-  INSTALL_COMMAND ${CONFIGURE_ENV} && cd ${BUILD_DIR}/opus/src/external_opus/ && make install
-  INSTALL_DIR ${LIBDIR}/opus
-)
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 if(MSVC)
-  set_target_properties(external_opus PROPERTIES FOLDER Mingw)
+  set(OPUS_CMAKE_ARGS
+    -DPACKAGE_VERSION=${OPUS_VERSION}
+    -DOPUS_BUILD_PROGRAMS=OFF
+    -DOPUS_BUILD_TESTING=OFF
+  )
+endif()
+
+if(NOT WIN32)
+  ExternalProject_Add(external_opus
+    URL file://${PACKAGE_DIR}/${OPUS_FILE}
+    DOWNLOAD_DIR ${DOWNLOAD_DIR}
+    URL_HASH ${OPUS_HASH_TYPE}=${OPUS_HASH}
+    PREFIX ${BUILD_DIR}/opus
+
+    CONFIGURE_COMMAND ${CONFIGURE_ENV} &&
+      cd ${BUILD_DIR}/opus/src/external_opus/ &&
+      ${CONFIGURE_COMMAND}
+        --prefix=${LIBDIR}/opus
+        --disable-shared
+        --enable-static
+        --with-pic
+        --disable-maintainer-mode
+
+    BUILD_COMMAND ${CONFIGURE_ENV} &&
+      cd ${BUILD_DIR}/opus/src/external_opus/ &&
+      make -j${MAKE_THREADS}
+
+    INSTALL_COMMAND ${CONFIGURE_ENV} &&
+      cd ${BUILD_DIR}/opus/src/external_opus/ &&
+      make install
+
+    INSTALL_DIR ${LIBDIR}/opus
+  )
+
+  harvest(external_opus opus/lib ffmpeg/lib "*.a")
+else()
+  ExternalProject_Add(external_opus
+    URL file://${PACKAGE_DIR}/${OPUS_FILE}
+    DOWNLOAD_DIR ${DOWNLOAD_DIR}
+    URL_HASH ${OPUS_HASH_TYPE}=${OPUS_HASH}
+    PREFIX ${BUILD_DIR}/opus
+
+    PATCH_COMMAND COMMAND
+      ${PATCH_CMD} -p 1 -d
+        ${BUILD_DIR}/opus/src/external_opus <
+        ${PATCH_DIR}/opus_windows.diff
+
+    CMAKE_ARGS
+      -DCMAKE_INSTALL_PREFIX=${LIBDIR}/opus
+      ${OPUS_CMAKE_ARGS}
+
+    INSTALL_DIR ${LIBDIR}/opus
+  )
 endif()

@@ -1,21 +1,14 @@
+/* SPDX-FileCopyrightText: 2016-2022 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#if defined(USE_COLOR_U32)
-uniform uint color;
-#else
-uniform vec4 color;
-#endif
+#include "infos/gpu_shader_3D_uniform_color_info.hh"
 
-out vec4 fragColor;
+#include "gpu_shader_colorspace_lib.glsl"
+
+FRAGMENT_SHADER_CREATE_INFO(gpu_shader_3D_clipped_uniform_color)
 
 void main()
 {
-#if defined(USE_COLOR_U32)
-  fragColor = vec4(((color)&uint(0xFF)) * (1.0f / 255.0f),
-                   ((color >> 8) & uint(0xFF)) * (1.0f / 255.0f),
-                   ((color >> 16) & uint(0xFF)) * (1.0f / 255.0f),
-                   ((color >> 24)) * (1.0f / 255.0f));
-#else
-  fragColor = color;
-#endif
-  fragColor = blender_srgb_to_framebuffer_space(fragColor);
+  fragColor = blender_srgb_to_framebuffer_space(color);
 }

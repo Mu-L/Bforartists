@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -25,7 +13,7 @@
 
 #include "../geometry/Geom.h"
 
-//#include "../scene_graph/FrsMaterial.h"
+// #include "../scene_graph/FrsMaterial.h"
 
 #include "../view_map/Interface0D.h"
 #include "../view_map/Interface1D.h"
@@ -34,9 +22,7 @@
 
 #include "../system/BaseIterator.h"
 
-#ifdef WITH_CXX_GUARDEDALLOC
-#  include "MEM_guardedalloc.h"
-#endif
+#include "MEM_guardedalloc.h"
 
 using namespace std;
 
@@ -316,7 +302,7 @@ class CurvePoint : public Interface0D {
   const SShape *shape() const;
   // float shape_importance() const;
 
-  // const unsigned qi() const;
+  // const uint qi() const;
   occluder_container::const_iterator occluders_begin() const;
   occluder_container::const_iterator occluders_end() const;
   bool occluders_empty() const;
@@ -346,9 +332,7 @@ class CurvePoint : public Interface0D {
   Vec2d directionFredo() const;
 #endif
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:CurvePoint")
-#endif
 };
 
 /**********************************/
@@ -393,7 +377,7 @@ class Curve : public Interface1D {
   vertex_container _Vertices;
   double _Length;
   Id _Id;
-  unsigned _nSegments;  // number of segments
+  uint _nSegments;  // number of segments
 
  public:
   /** Default Constructor. */
@@ -502,7 +486,7 @@ class Curve : public Interface1D {
   }
 
   /** Returns the number of segments in the polyline constituting the Curve. */
-  inline unsigned int nSegments() const
+  inline uint nSegments() const
   {
     return _nSegments;
   }
@@ -540,7 +524,7 @@ class Curve : public Interface1D {
   }
 
   const SShape *occluded_shape() const;
-  const bool occludee_empty() const;
+  bool occludee_empty() const;
   real z_discontinuity(int iCombination = 0) const;
   int shape_id() const;
   const SShape *shape() const;
@@ -595,9 +579,7 @@ class Curve : public Interface1D {
    */
   virtual Interface0DIterator pointsEnd(float t = 0.0f);
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:Curve")
-#endif
 };
 
 } /* namespace Freestyle */

@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2004-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -23,50 +11,48 @@
 #include "../BPy_Convert.h"
 #include "../Interface1D/BPy_ViewEdge.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 using namespace Freestyle;
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
 //------------------------INSTANCE METHODS ----------------------------------
 
-// ChainSilhouetteIterator (bool restrict_to_selection=true, ViewEdge *begin=NULL, bool
+// ChainSilhouetteIterator (bool restrict_to_selection=true, ViewEdge *begin=nullptr, bool
 // orientation=true) ChainSilhouetteIterator (const ChainSilhouetteIterator &brother)
 
-PyDoc_STRVAR(ChainSilhouetteIterator_doc,
-             "Class hierarchy: :class:`freestyle.types.Iterator` >\n"
-             ":class:`freestyle.types.ViewEdgeIterator` >\n"
-             ":class:`freestyle.types.ChainingIterator` >\n"
-             ":class:`ChainSilhouetteIterator`\n"
-             "\n"
-             "A ViewEdge Iterator used to follow ViewEdges the most naturally.  For\n"
-             "example, it will follow visible ViewEdges of same nature.  As soon, as\n"
-             "the nature or the visibility changes, the iteration stops (by setting\n"
-             "the pointed ViewEdge to 0).  In the case of an iteration over a set of\n"
-             "ViewEdge that are both Silhouette and Crease, there will be a\n"
-             "precedence of the silhouette over the crease criterion.\n"
-             "\n"
-             ".. method:: __init__(restrict_to_selection=True, begin=None, orientation=True)\n"
-             "            __init__(brother)\n"
-             "\n"
-             "   Builds a ChainSilhouetteIterator from the first ViewEdge used for\n"
-             "   iteration and its orientation or the copy constructor.\n"
-             "\n"
-             "   :arg restrict_to_selection: Indicates whether to force the chaining\n"
-             "      to stay within the set of selected ViewEdges or not.\n"
-             "   :type restrict_to_selection: bool\n"
-             "   :arg begin: The ViewEdge from where to start the iteration.\n"
-             "   :type begin: :class:`freestyle.types.ViewEdge` or None\n"
-             "   :arg orientation: If true, we'll look for the next ViewEdge among\n"
-             "      the ViewEdges that surround the ending ViewVertex of begin.  If\n"
-             "      false, we'll search over the ViewEdges surrounding the ending\n"
-             "      ViewVertex of begin.\n"
-             "   :type orientation: bool\n"
-             "   :arg brother: A ChainSilhouetteIterator object.\n"
-             "   :type brother: :class:`ChainSilhouetteIterator`");
+PyDoc_STRVAR(
+    /* Wrap. */
+    ChainSilhouetteIterator_doc,
+    "Class hierarchy: :class:`freestyle.types.Iterator` >\n"
+    ":class:`freestyle.types.ViewEdgeIterator` >\n"
+    ":class:`freestyle.types.ChainingIterator` >\n"
+    ":class:`ChainSilhouetteIterator`\n"
+    "\n"
+    "A ViewEdge Iterator used to follow ViewEdges the most naturally. For\n"
+    "example, it will follow visible ViewEdges of same nature. As soon, as\n"
+    "the nature or the visibility changes, the iteration stops (by setting\n"
+    "the pointed ViewEdge to 0). In the case of an iteration over a set of\n"
+    "ViewEdge that are both Silhouette and Crease, there will be a\n"
+    "precedence of the silhouette over the crease criterion.\n"
+    "\n"
+    ".. method:: __init__(restrict_to_selection=True, begin=None, orientation=True)\n"
+    "            __init__(brother)\n"
+    "\n"
+    "   Builds a ChainSilhouetteIterator from the first ViewEdge used for\n"
+    "   iteration and its orientation or the copy constructor.\n"
+    "\n"
+    "   :arg restrict_to_selection: Indicates whether to force the chaining\n"
+    "      to stay within the set of selected ViewEdges or not.\n"
+    "   :type restrict_to_selection: bool\n"
+    "   :arg begin: The ViewEdge from where to start the iteration.\n"
+    "   :type begin: :class:`freestyle.types.ViewEdge` | None\n"
+    "   :arg orientation: If true, we'll look for the next ViewEdge among\n"
+    "      the ViewEdges that surround the ending ViewVertex of begin. If\n"
+    "      false, we'll search over the ViewEdges surrounding the ending\n"
+    "      ViewVertex of begin.\n"
+    "   :type orientation: bool\n"
+    "   :arg brother: A ChainSilhouetteIterator object.\n"
+    "   :type brother: :class:`ChainSilhouetteIterator`");
 
 static int check_begin(PyObject *obj, void *v)
 {
@@ -86,7 +72,8 @@ static int ChainSilhouetteIterator_init(BPy_ChainSilhouetteIterator *self,
   PyObject *obj1 = nullptr, *obj2 = nullptr, *obj3 = nullptr;
 
   if (PyArg_ParseTupleAndKeywords(
-          args, kwds, "O!", (char **)kwlist_1, &ChainSilhouetteIterator_Type, &obj1)) {
+          args, kwds, "O!", (char **)kwlist_1, &ChainSilhouetteIterator_Type, &obj1))
+  {
     self->cs_it = new ChainSilhouetteIterator(*(((BPy_ChainSilhouetteIterator *)obj1)->cs_it));
   }
   else if ((void)PyErr_Clear(),
@@ -100,7 +87,8 @@ static int ChainSilhouetteIterator_init(BPy_ChainSilhouetteIterator *self,
                                        check_begin,
                                        &obj2,
                                        &PyBool_Type,
-                                       &obj3)) {
+                                       &obj3))
+  {
     bool restrict_to_selection = (!obj1) ? true : bool_from_PyBool(obj1);
     ViewEdge *begin = (!obj2 || obj2 == Py_None) ? nullptr : ((BPy_ViewEdge *)obj2)->ve;
     bool orientation = (!obj3) ? true : bool_from_PyBool(obj3);
@@ -119,47 +107,44 @@ static int ChainSilhouetteIterator_init(BPy_ChainSilhouetteIterator *self,
 /*-----------------------BPy_ChainSilhouetteIterator type definition ----------------------------*/
 
 PyTypeObject ChainSilhouetteIterator_Type = {
-    PyVarObject_HEAD_INIT(nullptr, 0) "ChainSilhouetteIterator", /* tp_name */
-    sizeof(BPy_ChainSilhouetteIterator),                         /* tp_basicsize */
-    0,                                                           /* tp_itemsize */
-    nullptr,                                                     /* tp_dealloc */
-    0,                                                           /* tp_vectorcall_offset */
-    nullptr,                                                     /* tp_getattr */
-    nullptr,                                                     /* tp_setattr */
-    nullptr,                                                     /* tp_reserved */
-    nullptr,                                                     /* tp_repr */
-    nullptr,                                                     /* tp_as_number */
-    nullptr,                                                     /* tp_as_sequence */
-    nullptr,                                                     /* tp_as_mapping */
-    nullptr,                                                     /* tp_hash */
-    nullptr,                                                     /* tp_call */
-    nullptr,                                                     /* tp_str */
-    nullptr,                                                     /* tp_getattro */
-    nullptr,                                                     /* tp_setattro */
-    nullptr,                                                     /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,                    /* tp_flags */
-    ChainSilhouetteIterator_doc,                                 /* tp_doc */
-    nullptr,                                                     /* tp_traverse */
-    nullptr,                                                     /* tp_clear */
-    nullptr,                                                     /* tp_richcompare */
-    0,                                                           /* tp_weaklistoffset */
-    nullptr,                                                     /* tp_iter */
-    nullptr,                                                     /* tp_iternext */
-    nullptr,                                                     /* tp_methods */
-    nullptr,                                                     /* tp_members */
-    nullptr,                                                     /* tp_getset */
-    &ChainingIterator_Type,                                      /* tp_base */
-    nullptr,                                                     /* tp_dict */
-    nullptr,                                                     /* tp_descr_get */
-    nullptr,                                                     /* tp_descr_set */
-    0,                                                           /* tp_dictoffset */
-    (initproc)ChainSilhouetteIterator_init,                      /* tp_init */
-    nullptr,                                                     /* tp_alloc */
-    nullptr,                                                     /* tp_new */
+    /*ob_base*/ PyVarObject_HEAD_INIT(nullptr, 0)
+    /*tp_name*/ "ChainSilhouetteIterator",
+    /*tp_basicsize*/ sizeof(BPy_ChainSilhouetteIterator),
+    /*tp_itemsize*/ 0,
+    /*tp_dealloc*/ nullptr,
+    /*tp_vectorcall_offset*/ 0,
+    /*tp_getattr*/ nullptr,
+    /*tp_setattr*/ nullptr,
+    /*tp_as_async*/ nullptr,
+    /*tp_repr*/ nullptr,
+    /*tp_as_number*/ nullptr,
+    /*tp_as_sequence*/ nullptr,
+    /*tp_as_mapping*/ nullptr,
+    /*tp_hash*/ nullptr,
+    /*tp_call*/ nullptr,
+    /*tp_str*/ nullptr,
+    /*tp_getattro*/ nullptr,
+    /*tp_setattro*/ nullptr,
+    /*tp_as_buffer*/ nullptr,
+    /*tp_flags*/ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    /*tp_doc*/ ChainSilhouetteIterator_doc,
+    /*tp_traverse*/ nullptr,
+    /*tp_clear*/ nullptr,
+    /*tp_richcompare*/ nullptr,
+    /*tp_weaklistoffset*/ 0,
+    /*tp_iter*/ nullptr,
+    /*tp_iternext*/ nullptr,
+    /*tp_methods*/ nullptr,
+    /*tp_members*/ nullptr,
+    /*tp_getset*/ nullptr,
+    /*tp_base*/ &ChainingIterator_Type,
+    /*tp_dict*/ nullptr,
+    /*tp_descr_get*/ nullptr,
+    /*tp_descr_set*/ nullptr,
+    /*tp_dictoffset*/ 0,
+    /*tp_init*/ (initproc)ChainSilhouetteIterator_init,
+    /*tp_alloc*/ nullptr,
+    /*tp_new*/ nullptr,
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////
-
-#ifdef __cplusplus
-}
-#endif

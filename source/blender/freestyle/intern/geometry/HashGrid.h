@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -43,9 +31,9 @@ struct GridHasher {
 #define _MOD 2147483647UL
   inline size_t operator()(const Vec3u &p) const
   {
-    size_t res = ((unsigned long)(p[0] * _MUL)) % _MOD;
-    res = ((res + (unsigned long)(p[1]) * _MUL)) % _MOD;
-    return ((res + (unsigned long)(p[2]) * _MUL)) % _MOD;
+    size_t res = (ulong(p[0] * _MUL)) % _MOD;
+    res = ((res + ulong(p[1]) * _MUL)) % _MOD;
+    return ((res + ulong(p[2]) * _MUL)) % _MOD;
   }
 #undef _MUL
 #undef _MOD
@@ -56,9 +44,7 @@ class HashGrid : public Grid {
  public:
   typedef map<Vec3u, Cell *> GridHashTable;
 
-  HashGrid() : Grid()
-  {
-  }
+  HashGrid() : Grid() {}
 
   virtual ~HashGrid()
   {
@@ -66,7 +52,7 @@ class HashGrid : public Grid {
   }
 
   /** clears the grid
-   *  Deletes all the cells, clears the hashtable, resets size, size of cell, number of cells.
+   *  Deletes all the cells, clears the hash-table, resets size, size of cell, number of cells.
    */
   virtual void clear();
 
@@ -78,12 +64,12 @@ class HashGrid : public Grid {
    *    nb
    *      The number of cells of the grid
    */
-  virtual void configure(const Vec3r &orig, const Vec3r &size, unsigned nb);
+  virtual void configure(const Vec3r &orig, const Vec3r &size, uint nb);
 
   /** returns the cell whose coordinates are passed as argument */
   virtual Cell *getCell(const Vec3u &p)
   {
-    Cell *found_cell = NULL;
+    Cell *found_cell = nullptr;
 
     GridHashTable::const_iterator found = _cells.find(p);
     if (found != _cells.end()) {

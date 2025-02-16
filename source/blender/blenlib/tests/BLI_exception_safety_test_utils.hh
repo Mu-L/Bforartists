@@ -1,3 +1,7 @@
+/* SPDX-FileCopyrightText: 2023 Blender Authors
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
+
 #include "BLI_hash.hh"
 #include "BLI_utildefines.h"
 #include "MEM_guardedalloc.h"
@@ -85,7 +89,7 @@ class ExceptionThrower {
 
   uint64_t hash() const
   {
-    return static_cast<uint64_t>(value);
+    return uint64_t(value);
   }
 
   friend bool operator==(const ExceptionThrower &a, const ExceptionThrower &b)

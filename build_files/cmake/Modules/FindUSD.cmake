@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2019 Blender Authors
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
 # - Find Universal Scene Description (USD) library
 # Find the native USD includes and libraries
 # This module defines
@@ -9,24 +13,21 @@
 #  USD_FOUND, If false, do not try to use USD.
 #
 
-#=============================================================================
-# Copyright 2019 Blender Foundation.
-#
-# Distributed under the OSI-approved BSD 3-Clause License,
-# see accompanying file BSD-3-Clause-license.txt for details.
-#=============================================================================
+# If `USD_ROOT_DIR` was defined in the environment, use it.
+if(DEFINED USD_ROOT_DIR)
+  # Pass.
+elseif(DEFINED ENV{USD_ROOT_DIR})
+  set(USD_ROOT_DIR $ENV{USD_ROOT_DIR})
+else()
+  set(USD_ROOT_DIR "")
+endif()
 
-# If USD_ROOT_DIR was defined in the environment, use it.
-IF(NOT USD_ROOT_DIR AND NOT $ENV{USD_ROOT_DIR} STREQUAL "")
-  SET(USD_ROOT_DIR $ENV{USD_ROOT_DIR})
-ENDIF()
-
-SET(_usd_SEARCH_DIRS
+set(_usd_SEARCH_DIRS
   ${USD_ROOT_DIR}
   /opt/lib/usd
 )
 
-FIND_PATH(USD_INCLUDE_DIR
+find_path(USD_INCLUDE_DIR
   NAMES
     pxr/usd/usd/api.h
   HINTS
@@ -36,9 +37,17 @@ FIND_PATH(USD_INCLUDE_DIR
   DOC "Universal Scene Description (USD) header files"
 )
 
-FIND_LIBRARY(USD_LIBRARY
+if(NOT DEFINED PXR_LIB_PREFIX)
+  set(PXR_LIB_PREFIX "")
+endif()
+
+# Since USD 21.11 the libraries are prefixed with "usd_", i.e.
+# "libusd_m.a" became "libusd_usd_m.a".
+# See https://github.com/PixarAnimationStudios/USD/blob/release/CHANGELOG.md#2111---2021-11-01
+find_library(USD_LIBRARY
   NAMES
-    usd_m usd_ms
+    usd_usd_m usd_usd_ms usd_m usd_ms
+    ${PXR_LIB_PREFIX}usd
   NAMES_PER_DIR
   HINTS
     ${_usd_SEARCH_DIRS}
@@ -47,24 +56,28 @@ FIND_LIBRARY(USD_LIBRARY
   DOC "Universal Scene Description (USD) monolithic library"
 )
 
-IF(${USD_LIBRARY_NOTFOUND})
+if(NOT USD_LIBRARY)
   set(USD_FOUND FALSE)
-ELSE()
+else()
   # handle the QUIETLY and REQUIRED arguments and set USD_FOUND to TRUE if
   # all listed variables are TRUE
-  INCLUDE(FindPackageHandleStandardArgs)
-  FIND_PACKAGE_HANDLE_STANDARD_ARGS(USD DEFAULT_MSG USD_LIBRARY USD_INCLUDE_DIR)
+  include(FindPackageHandleStandardArgs)
+  find_package_handle_standard_args(USD DEFAULT_MSG USD_LIBRARY USD_INCLUDE_DIR)
 
-  IF(USD_FOUND)
+  if(USD_FOUND)
     get_filename_component(USD_LIBRARY_DIR ${USD_LIBRARY} DIRECTORY)
-    SET(USD_INCLUDE_DIRS ${USD_INCLUDE_DIR})
+    set(USD_INCLUDE_DIRS ${USD_INCLUDE_DIR})
     set(USD_LIBRARIES ${USD_LIBRARY})
-  ENDIF()
-ENDIF()
+    if(EXISTS ${USD_INCLUDE_DIR}/pxr/base/tf/pyModule.h)
+      set(USD_PYTHON_SUPPORT ON)
+    endif()
+  endif()
+endif()
 
-MARK_AS_ADVANCED(
+mark_as_advanced(
   USD_INCLUDE_DIR
   USD_LIBRARY_DIR
+  USD_LIBRARY
 )
 
-UNSET(_usd_SEARCH_DIRS)
+unset(_usd_SEARCH_DIRS)

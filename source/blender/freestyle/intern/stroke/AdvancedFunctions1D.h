@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -47,7 +35,7 @@ class DensityF1D : public UnaryFunction1D<double> {
  public:
   /** Builds the functor.
    *  \param sigma:
-   *    Thesigma used in DensityF0D and determining the window size used in each density query.
+   *    The sigma used in DensityF0D and determining the window size used in each density query.
    *  \param iType:
    *    The integration method used to compute a single value from a set of values.
    *  \param sampling:
@@ -62,9 +50,7 @@ class DensityF1D : public UnaryFunction1D<double> {
   }
 
   /** Destructor */
-  virtual ~DensityF1D()
-  {
-  }
+  virtual ~DensityF1D() {}
 
   /** Returns the string "DensityF1D". */
   string getName() const
@@ -141,7 +127,7 @@ class GetCompleteViewMapDensityF1D : public UnaryFunction1D<double> {
    *    combining the resulting values into a single one, following the
    *    method specified by iType.
    */
-  GetCompleteViewMapDensityF1D(unsigned level, IntegrationType iType = MEAN, float sampling = 2.0f)
+  GetCompleteViewMapDensityF1D(uint level, IntegrationType iType = MEAN, float sampling = 2.0f)
       : UnaryFunction1D<double>(iType), _fun(level)
   {
     _sampling = sampling;
@@ -162,7 +148,7 @@ class GetCompleteViewMapDensityF1D : public UnaryFunction1D<double> {
 };
 
 // GetDirectionalViewMapDensity
-/** Returns the density evaluated for an Interface1D in of the steerable viewmaps image.
+/** Returns the density evaluated for an Interface1D in of the steerable view-maps image.
  *  The direction telling which Directional map to choose is explicitly specified by the user.
  *  The density is evaluated for a set of points along the Interface1D
  *  (using the ReadSteerableViewMapPixelF0D functor)
@@ -182,8 +168,8 @@ class GetDirectionalViewMapDensityF1D : public UnaryFunction1D<double> {
    *    each sample point and the result is obtained by combining the resulting values into a
    *    single one, following the method specified by iType.
    */
-  GetDirectionalViewMapDensityF1D(unsigned iOrientation,
-                                  unsigned level,
+  GetDirectionalViewMapDensityF1D(uint iOrientation,
+                                  uint level,
                                   IntegrationType iType = MEAN,
                                   float sampling = 2.0f)
       : UnaryFunction1D<double>(iType), _fun(iOrientation, level)
@@ -233,9 +219,7 @@ class GetSteerableViewMapDensityF1D : public UnaryFunction1D<double> {
   }
 
   /** Destructor */
-  virtual ~GetSteerableViewMapDensityF1D()
-  {
-  }
+  virtual ~GetSteerableViewMapDensityF1D() {}
 
   /** Returns the string "GetSteerableViewMapDensityF1D" */
   string getName() const

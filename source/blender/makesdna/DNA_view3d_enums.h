@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
@@ -20,16 +8,17 @@
 
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/** Settings for offscreen rendering */
+/** Settings for off-screen rendering. */
 typedef enum eV3DOffscreenDrawFlag {
   V3D_OFSDRAW_NONE = (0),
   V3D_OFSDRAW_SHOW_ANNOTATION = (1 << 0),
   V3D_OFSDRAW_OVERRIDE_SCENE_SETTINGS = (1 << 1),
   V3D_OFSDRAW_SHOW_GRIDFLOOR = (1 << 2),
+  V3D_OFSDRAW_SHOW_SELECTION = (1 << 3),
+  V3D_OFSDRAW_XR_SHOW_CONTROLLERS = (1 << 4),
+  V3D_OFSDRAW_XR_SHOW_CUSTOM_OVERLAYS = (1 << 5),
+  V3D_OFSDRAW_SHOW_OBJECT_EXTRAS = (1 << 6),
+  V3D_OFSDRAW_XR_SHOW_PASSTHROUGH = (1 << 7),
 } eV3DOffscreenDrawFlag;
 
 /** #View3DShading.light */
@@ -55,7 +44,3 @@ typedef enum eV3DShadingBackgroundType {
   V3D_SHADING_BACKGROUND_WORLD = 1,
   V3D_SHADING_BACKGROUND_VIEWPORT = 2,
 } eV3DShadingBackgroundType;
-
-#ifdef __cplusplus
-}
-#endif

@@ -1,127 +1,86 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2021 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2021 by Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup draw
  */
 
-#include "draw_cache_extract_mesh_private.h"
+#include "BKE_attribute.hh"
+
+#include "extract_mesh.hh"
 
 namespace blender::draw {
 
-/* ---------------------------------------------------------------------- */
-/** \name Extract Face-dots UV
- * \{ */
-
-struct MeshExtract_FdotUV_Data {
-  float (*vbo_data)[2];
-  MLoopUV *uv_data;
-  int cd_ofs;
-};
-
-static void extract_fdots_uv_init(const MeshRenderData *mr,
-                                  struct MeshBatchCache *UNUSED(cache),
-                                  void *buf,
-                                  void *tls_data)
+static void extract_face_dots_uv_mesh(const MeshRenderData &mr, MutableSpan<float2> vbo_data)
 {
-  GPUVertBuf *vbo = static_cast<GPUVertBuf *>(buf);
+  const Mesh &mesh = *mr.mesh;
+  const StringRef name = CustomData_get_active_layer_name(&mesh.corner_data, CD_PROP_FLOAT2);
+  const bke::AttributeAccessor attributes = mesh.attributes();
+  if (mr.use_subsurf_fdots) {
+    const BitSpan facedot_tags = mesh.runtime->subsurf_face_dot_tags;
+    const OffsetIndices faces = mr.faces;
+    const Span<int> corner_verts = mr.corner_verts;
+    const VArraySpan uv_map = *attributes.lookup<float2>(name, bke::AttrDomain::Corner);
+    threading::parallel_for(faces.index_range(), 4096, [&](const IndexRange range) {
+      for (const int face_index : range) {
+        const IndexRange face = faces[face_index];
+        const auto corner = std::find_if(face.begin(), face.end(), [&](const int corner) {
+          return facedot_tags[corner_verts[corner]].test();
+        });
+        if (corner == face.end()) {
+          vbo_data[face_index] = float2(0);
+        }
+        else {
+          vbo_data[face_index] = uv_map[*corner];
+        }
+      }
+    });
+  }
+  else {
+    /* Use the attribute API to average the attribute on the face domain. */
+    const VArray uv_map = *attributes.lookup<float2>(name, bke::AttrDomain::Face);
+    uv_map.materialize(vbo_data);
+  }
+}
+
+static void extract_face_dots_uv_bm(const MeshRenderData &mr, MutableSpan<float2> vbo_data)
+{
+  const BMesh &bm = *mr.bm;
+  const int offset = CustomData_get_offset(&bm.ldata, CD_PROP_FLOAT2);
+
+  threading::parallel_for(IndexRange(bm.totface), 2048, [&](const IndexRange range) {
+    for (const int face_index : range) {
+      const BMFace &face = *BM_face_at_index(&const_cast<BMesh &>(bm), face_index);
+      const BMLoop *loop = BM_FACE_FIRST_LOOP(&face);
+      vbo_data[face_index] = float2(0);
+      for ([[maybe_unused]] const int i : IndexRange(face.len)) {
+        vbo_data[face_index] += *BM_ELEM_CD_GET_FLOAT2_P(loop, offset);
+        loop = loop->next;
+      }
+      vbo_data[face_index] /= face.len;
+    }
+  });
+}
+
+void extract_face_dots_uv(const MeshRenderData &mr, gpu::VertBuf &vbo)
+{
   static GPUVertFormat format = {0};
   if (format.attr_len == 0) {
     GPU_vertformat_attr_add(&format, "u", GPU_COMP_F32, 2, GPU_FETCH_FLOAT);
     GPU_vertformat_alias_add(&format, "au");
     GPU_vertformat_alias_add(&format, "pos");
   }
+  GPU_vertbuf_init_with_format(vbo, format);
+  GPU_vertbuf_data_alloc(vbo, mr.faces_num);
+  MutableSpan<float2> vbo_data = vbo.data<float2>();
 
-  GPU_vertbuf_init_with_format(vbo, &format);
-  GPU_vertbuf_data_alloc(vbo, mr->poly_len);
-
-  if (!mr->use_subsurf_fdots) {
-    /* Clear so we can accumulate on it. */
-    memset(GPU_vertbuf_get_data(vbo), 0x0, mr->poly_len * GPU_vertbuf_get_format(vbo)->stride);
-  }
-
-  MeshExtract_FdotUV_Data *data = static_cast<MeshExtract_FdotUV_Data *>(tls_data);
-  data->vbo_data = (float(*)[2])GPU_vertbuf_get_data(vbo);
-
-  if (mr->extract_type == MR_EXTRACT_BMESH) {
-    data->cd_ofs = CustomData_get_offset(&mr->bm->ldata, CD_MLOOPUV);
+  if (mr.extract_type == MeshExtractType::Mesh) {
+    extract_face_dots_uv_mesh(mr, vbo_data);
   }
   else {
-    data->uv_data = (MLoopUV *)CustomData_get_layer(&mr->me->ldata, CD_MLOOPUV);
+    extract_face_dots_uv_bm(mr, vbo_data);
   }
 }
-
-static void extract_fdots_uv_iter_poly_bm(const MeshRenderData *UNUSED(mr),
-                                          const BMFace *f,
-                                          const int UNUSED(f_index),
-                                          void *_data)
-{
-  MeshExtract_FdotUV_Data *data = static_cast<MeshExtract_FdotUV_Data *>(_data);
-  BMLoop *l_iter, *l_first;
-  l_iter = l_first = BM_FACE_FIRST_LOOP(f);
-  do {
-    float w = 1.0f / (float)f->len;
-    const MLoopUV *luv = (const MLoopUV *)BM_ELEM_CD_GET_VOID_P(l_iter, data->cd_ofs);
-    madd_v2_v2fl(data->vbo_data[BM_elem_index_get(f)], luv->uv, w);
-  } while ((l_iter = l_iter->next) != l_first);
-}
-
-static void extract_fdots_uv_iter_poly_mesh(const MeshRenderData *mr,
-                                            const MPoly *mp,
-                                            const int mp_index,
-                                            void *_data)
-{
-  MeshExtract_FdotUV_Data *data = static_cast<MeshExtract_FdotUV_Data *>(_data);
-  const MLoop *mloop = mr->mloop;
-  const int ml_index_end = mp->loopstart + mp->totloop;
-  for (int ml_index = mp->loopstart; ml_index < ml_index_end; ml_index += 1) {
-    const MLoop *ml = &mloop[ml_index];
-    if (mr->use_subsurf_fdots) {
-      const MVert *mv = &mr->mvert[ml->v];
-      if (mv->flag & ME_VERT_FACEDOT) {
-        copy_v2_v2(data->vbo_data[mp_index], data->uv_data[ml_index].uv);
-      }
-    }
-    else {
-      float w = 1.0f / (float)mp->totloop;
-      madd_v2_v2fl(data->vbo_data[mp_index], data->uv_data[ml_index].uv, w);
-    }
-  }
-}
-
-constexpr MeshExtract create_extractor_fdots_uv()
-{
-  MeshExtract extractor = {nullptr};
-  extractor.init = extract_fdots_uv_init;
-  extractor.iter_poly_bm = extract_fdots_uv_iter_poly_bm;
-  extractor.iter_poly_mesh = extract_fdots_uv_iter_poly_mesh;
-  extractor.data_type = MR_DATA_NONE;
-  extractor.data_size = sizeof(MeshExtract_FdotUV_Data);
-  extractor.use_threading = true;
-  extractor.mesh_buffer_offset = offsetof(MeshBufferCache, vbo.fdots_uv);
-  return extractor;
-}
-
-/** \} */
 
 }  // namespace blender::draw
-
-extern "C" {
-const MeshExtract extract_fdots_uv = blender::draw::create_extractor_fdots_uv();
-}

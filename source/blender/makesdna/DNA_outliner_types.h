@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2001-2002 NaN Holding BV. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
@@ -24,10 +9,6 @@
 #pragma once
 
 #include "DNA_defs.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 struct ID;
 
@@ -41,13 +22,13 @@ typedef struct TreeStoreElem {
 
 /** Used only to store data in blend files. */
 typedef struct TreeStore {
-  /** Was previously used for memory preallocation. */
+  /** Was previously used for memory pre-allocation. */
   int totelem DNA_DEPRECATED;
   /** Number of elements in data array. */
   int usedelem;
   /**
-   * Elements to be packed from mempool in writefile.c
-   * or extracted to mempool in readfile.c
+   * Elements to be packed from mempool in `writefile.cc`
+   * or extracted to mempool in `readfile.cc`.
    */
   TreeStoreElem *data;
 } TreeStore;
@@ -101,18 +82,18 @@ typedef enum eTreeStoreElemType {
   TSE_DRIVER_BASE = 16,           /* NO ID */
   /* TSE_DRIVER          = 17, */ /* UNUSED */
 
-  TSE_PROXY = 18,
+  /* TSE_PROXY = 18,           */ /* UNUSED */
   TSE_R_LAYER_BASE = 19,
   TSE_R_LAYER = 20,
   /* TSE_R_PASS          = 21, */ /* UNUSED */
   /* TSE_LINKED_MAT = 22, */
   /* NOTE: is used for light group. */
   /* TSE_LINKED_LAMP = 23, */
-  TSE_POSEGRP_BASE = 24,
-  TSE_POSEGRP = 25,
-  TSE_SEQUENCE = 26,     /* NO ID */
-  TSE_SEQ_STRIP = 27,    /* NO ID */
-  TSE_SEQUENCE_DUP = 28, /* NO ID */
+  TSE_BONE_COLLECTION_BASE = 24,
+  TSE_BONE_COLLECTION = 25,
+  TSE_STRIP = 26,      /* NO ID */
+  TSE_STRIP_DATA = 27, /* NO ID */
+  TSE_STRIP_DUP = 28,  /* NO ID */
   TSE_LINKED_PSYS = 29,
   TSE_RNA_STRUCT = 30,        /* NO ID */
   TSE_RNA_PROPERTY = 31,      /* NO ID */
@@ -130,6 +111,10 @@ typedef enum eTreeStoreElemType {
   TSE_GPENCIL_EFFECT = 43,
   TSE_LIBRARY_OVERRIDE_BASE = 44,
   TSE_LIBRARY_OVERRIDE = 45,
+  TSE_LIBRARY_OVERRIDE_OPERATION = 46,
+  TSE_GENERIC_LABEL = 47, /* No ID */
+  TSE_GREASE_PENCIL_NODE = 48,
+  TSE_LINKED_NODE_TREE = 49,
 } eTreeStoreElemType;
 
 /** Check whether given #TreeStoreElem should have a real ID in #TreeStoreElem.id member. */
@@ -138,15 +123,12 @@ typedef enum eTreeStoreElemType {
          TSE_NLA, \
          TSE_NLA_TRACK, \
          TSE_DRIVER_BASE, \
-         TSE_SEQUENCE, \
-         TSE_SEQ_STRIP, \
-         TSE_SEQUENCE_DUP, \
+         TSE_STRIP, \
+         TSE_STRIP_DATA, \
+         TSE_STRIP_DUP, \
          TSE_RNA_STRUCT, \
          TSE_RNA_PROPERTY, \
          TSE_RNA_ARRAY_ELEM, \
          TSE_ID_BASE, \
-         TSE_GP_LAYER))
-
-#ifdef __cplusplus
-}
-#endif
+         TSE_GP_LAYER, \
+         TSE_GENERIC_LABEL))

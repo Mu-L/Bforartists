@@ -1,23 +1,11 @@
-/*
- * Copyright 2011-2016 Blender Foundation
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #pragma once
 
-#include "util/util_map.h"
-#include "util/util_param.h"
+#include "util/map.h"
+#include "util/param.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -30,17 +18,19 @@ struct NodeEnum {
   {
     return left.empty();
   }
-  void insert(const char *x, int y)
+  void insert(const char *x, const int y)
   {
-    left[ustring(x)] = y;
-    right[y] = ustring(x);
+    const ustring ustr_x(x);
+
+    left[ustr_x] = y;
+    right[y] = ustr_x;
   }
 
   bool exists(ustring x) const
   {
     return left.find(x) != left.end();
   }
-  bool exists(int y) const
+  bool exists(const int y) const
   {
     return right.find(y) != right.end();
   }
@@ -58,17 +48,17 @@ struct NodeEnum {
     return right.find(y)->second;
   }
 
-  unordered_map<ustring, int, ustringHash>::const_iterator begin() const
+  unordered_map<ustring, int>::const_iterator begin() const
   {
     return left.begin();
   }
-  unordered_map<ustring, int, ustringHash>::const_iterator end() const
+  unordered_map<ustring, int>::const_iterator end() const
   {
     return left.end();
   }
 
  private:
-  unordered_map<ustring, int, ustringHash> left;
+  unordered_map<ustring, int> left;
   unordered_map<int, ustring> right;
 };
 

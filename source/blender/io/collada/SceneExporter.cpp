@@ -1,30 +1,20 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2011-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup collada
  */
 
-#include "BKE_collection.h"
-#include "BKE_lib_id.h"
-#include "BKE_object.h"
-#include "BLI_listbase.h"
-#include "BLI_utildefines.h"
+#include "COLLADASWInstanceCamera.h"
+#include "COLLADASWInstanceGeometry.h"
+#include "COLLADASWInstanceLight.h"
 
-#include "BCSampleData.h"
+#include "BLI_listbase.h"
+
+#include "BKE_collection.hh"
+#include "BKE_constraint.h"
+
 #include "SceneExporter.h"
 #include "collada_utils.h"
 
@@ -48,7 +38,7 @@ void SceneExporter::exportHierarchy()
   /* Ensure all objects in the export_set are marked */
   for (node = this->export_settings.get_export_set(); node; node = node->next) {
     Object *ob = (Object *)node->link;
-    ob->id.tag |= LIB_TAG_DOIT;
+    ob->id.tag |= ID_TAG_DOIT;
   }
 
   /* Now find all exportable base objects (highest in export hierarchy) */
@@ -60,7 +50,6 @@ void SceneExporter::exportHierarchy()
         case OB_CAMERA:
         case OB_LAMP:
         case OB_EMPTY:
-        case OB_GPENCIL:
         case OB_ARMATURE:
           base_objects.add(ob);
           break;
@@ -96,11 +85,13 @@ void SceneExporter::writeNodeList(std::vector<Object *> &child_objects, Object *
 
 void SceneExporter::writeNode(Object *ob)
 {
+  const Scene *scene = blender_context.get_scene();
   ViewLayer *view_layer = blender_context.get_view_layer();
 
   std::vector<Object *> child_objects;
-  bc_get_children(child_objects, ob, view_layer);
-  bool can_export = bc_is_in_Export_set(this->export_settings.get_export_set(), ob, view_layer);
+  bc_get_children(child_objects, ob, scene, view_layer);
+  bool can_export = bc_is_in_Export_set(
+      this->export_settings.get_export_set(), ob, scene, view_layer);
 
   /* Add associated armature first if available */
   bool armature_exported = false;
@@ -108,7 +99,7 @@ void SceneExporter::writeNode(Object *ob)
 
   if (ob_arm != nullptr) {
     armature_exported = bc_is_in_Export_set(
-        this->export_settings.get_export_set(), ob_arm, view_layer);
+        this->export_settings.get_export_set(), ob_arm, scene, view_layer);
     if (armature_exported && bc_is_marked(ob_arm)) {
       writeNode(ob_arm);
       bc_remove_mark(ob_arm);
@@ -151,6 +142,7 @@ void SceneExporter::writeNode(Object *ob)
 
     /* <instance_controller> */
     else if (ob->type == OB_ARMATURE) {
+      arm_exporter->add_bone_collections(ob, colladaNode);
       arm_exporter->add_armature_bones(ob, view_layer, this, child_objects);
     }
 
@@ -172,7 +164,7 @@ void SceneExporter::writeNode(Object *ob)
     else if (ob->type == OB_EMPTY) { /* TODO: handle groups (OB_DUPLICOLLECTION */
       if ((ob->transflag & OB_DUPLICOLLECTION) == OB_DUPLICOLLECTION && ob->instance_collection) {
         Collection *collection = ob->instance_collection;
-        /* printf("group detected '%s'\n", group->id.name + 2); */
+        // printf("group detected '%s'\n", group->id.name + 2);
         FOREACH_COLLECTION_OBJECT_RECURSIVE_BEGIN (collection, object) {
           printf("\t%s\n", object->id.name);
         }
@@ -203,26 +195,20 @@ void SceneExporter::writeNode(Object *ob)
               "blender", con_tag, "lin_error", con->lin_error);
 
           /* not ideal: add the target object name as another parameter.
-           * No real mapping in the .dae
+           * No real mapping in the `.dae`.
            * Need support for multiple target objects also. */
-          const bConstraintTypeInfo *cti = BKE_constraint_typeinfo_get(con);
-          ListBase targets = {nullptr, nullptr};
-          if (cti && cti->get_constraint_targets) {
 
-            bConstraintTarget *ct;
+          ListBase targets = {nullptr, nullptr};
+          if (BKE_constraint_targets_get(con, &targets)) {
             Object *obtar;
 
-            cti->get_constraint_targets(con, &targets);
-
-            for (ct = (bConstraintTarget *)targets.first; ct; ct = ct->next) {
+            LISTBASE_FOREACH (bConstraintTarget *, ct, &targets) {
               obtar = ct->tar;
               std::string tar_id((obtar) ? id_name(obtar) : "");
               colladaNode.addExtraTechniqueChildParameter("blender", con_tag, "target_id", tar_id);
             }
 
-            if (cti->flush_constraint_targets) {
-              cti->flush_constraint_targets(con, &targets, true);
-            }
+            BKE_constraint_targets_flush(con, &targets, true);
           }
 
           con = con->next;

@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup collada
@@ -22,29 +10,22 @@
 
 #include <list>
 #include <string>
-//#include <vector>
+// #include <vector>
 
-#include "COLLADASWExtraTechnique.h"
-#include "COLLADASWInputList.h"
 #include "COLLADASWInstanceController.h"
 #include "COLLADASWLibraryControllers.h"
-#include "COLLADASWNode.h"
 #include "COLLADASWStreamWriter.h"
 
 #include "DNA_armature_types.h"
-#include "DNA_constraint_types.h"
 #include "DNA_key_types.h"
 #include "DNA_listBase.h"
 #include "DNA_mesh_types.h"
 #include "DNA_object_types.h"
-#include "DNA_scene_types.h"
 
 #include "InstanceWriter.h"
 #include "TransformWriter.h"
 
 #include "ExportSettings.h"
-
-#include "BKE_key.h"
 
 class SceneExporter;
 
@@ -91,8 +72,7 @@ class ControllerExporter : public COLLADASW::LibraryControllers,
 
   std::string get_controller_id(Key *key, Object *ob);
 
-  /* ob should be of type OB_MESH
-   * both args are required */
+  /** `ob` should be of type OB_MESH, both arguments are required. */
   void export_skin_controller(Object *ob, Object *ob_arm);
 
   void export_morph_controller(Object *ob, Key *key);
@@ -107,6 +87,9 @@ class ControllerExporter : public COLLADASW::LibraryControllers,
 
   std::string add_morph_weights(Key *key, Object *ob);
 
+  /**
+   * Added to implement support for animations.
+   */
   void add_weight_extras(Key *key);
 
   std::string add_joints_source(Object *ob_arm,
@@ -121,7 +104,7 @@ class ControllerExporter : public COLLADASW::LibraryControllers,
 
   bool is_bone_defgroup(Object *ob_arm, const bDeformGroup *def);
 
-  std::string add_weights_source(Mesh *me,
+  std::string add_weights_source(Mesh *mesh,
                                  const std::string &controller_id,
                                  const std::list<float> &weights);
 

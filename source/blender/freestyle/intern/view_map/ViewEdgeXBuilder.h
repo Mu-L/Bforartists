@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -41,9 +29,7 @@
 
 #include "../system/FreestyleConfig.h"
 
-#ifdef WITH_CXX_GUARDEDALLOC
-#  include "MEM_guardedalloc.h"
-#endif
+#include "MEM_guardedalloc.h"
 
 using namespace std;
 
@@ -59,9 +45,9 @@ struct SVertexHasher {
 #define _MOD 2147483647UL
   inline size_t operator()(const Vec3r &p) const
   {
-    size_t res = ((unsigned long)(p[0] * _MUL)) % _MOD;
-    res = ((res + (unsigned long)(p[1]) * _MUL)) % _MOD;
-    return ((res + (unsigned long)(p[2]) * _MUL)) % _MOD;
+    size_t res = (ulong(p[0] * _MUL)) % _MOD;
+    res = ((res + ulong(p[1]) * _MUL)) % _MOD;
+    return ((res + ulong(p[2]) * _MUL)) % _MOD;
   }
 #undef _MUL
 #undef _MOD
@@ -89,7 +75,7 @@ class OWXFaceLayer {
 
   OWXFaceLayer()
   {
-    fl = NULL;
+    fl = nullptr;
     order = true;
   }
 
@@ -116,9 +102,7 @@ class OWXFaceLayer {
     return !(*this == b);
   }
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:OWXFaceLayer")
-#endif
 };
 
 class WXEdge;
@@ -131,7 +115,7 @@ class OWXEdge {
 
   OWXEdge()
   {
-    e = NULL;
+    e = nullptr;
     order = true;
   }
 
@@ -158,9 +142,7 @@ class OWXEdge {
     return !(*this == b);
   }
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:OWXEdge")
-#endif
 };
 
 class WOEdge;
@@ -186,9 +168,7 @@ class ViewEdgeXBuilder {
     _currentSVertexId = 0;
   }
 
-  virtual ~ViewEdgeXBuilder()
-  {
-  }
+  virtual ~ViewEdgeXBuilder() {}
 
   /** Builds a view shape from a WXShape in which the feature edges are flagged
    *  Builds chains of feature edges (so ViewEdges) from a WXShape
@@ -285,9 +265,7 @@ class ViewEdgeXBuilder {
   SShape *_pCurrentSShape;
   ViewShape *_pCurrentVShape;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:ViewEdgeXBuilder")
-#endif
 };
 
 } /* namespace Freestyle */

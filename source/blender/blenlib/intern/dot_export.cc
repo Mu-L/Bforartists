@@ -1,22 +1,12 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include <iomanip>
 
 #include "BLI_dot_export.hh"
+
+#include <sstream>
 
 namespace blender::dot {
 
@@ -107,7 +97,7 @@ void Graph::set_random_cluster_bgcolors()
 
 void Cluster::set_random_cluster_bgcolors()
 {
-  float hue = rand() / (float)RAND_MAX;
+  float hue = rand() / float(RAND_MAX);
   float staturation = 0.3f;
   float value = 0.8f;
   this->attributes.set("bgcolor", color_attr_from_hsv(hue, staturation, value));
@@ -241,7 +231,7 @@ void Attributes::export__as_bracket_list(std::stringstream &ss) const
 
 void Node::export__as_id(std::stringstream &ss) const
 {
-  ss << '"' << (uintptr_t)this << '"';
+  ss << '"' << uintptr_t(this) << '"';
 }
 
 void Node::export__as_declaration(std::stringstream &ss) const
@@ -258,6 +248,9 @@ void NodePort::to_dot_string(std::stringstream &ss) const
   if (port_name_.has_value()) {
     ss << ":" << *port_name_;
   }
+  if (port_position_.has_value()) {
+    ss << ":" << *port_position_;
+  }
 }
 
 std::string color_attr_from_hsv(float h, float s, float v)
@@ -267,11 +260,7 @@ std::string color_attr_from_hsv(float h, float s, float v)
   return ss.str();
 }
 
-NodeWithSocketsRef::NodeWithSocketsRef(Node &node,
-                                       StringRef name,
-                                       Span<std::string> input_names,
-                                       Span<std::string> output_names)
-    : node_(&node)
+NodeWithSocketsRef::NodeWithSocketsRef(Node &node, const NodeWithSockets &data) : node_(&node)
 {
   std::stringstream ss;
 
@@ -279,33 +268,39 @@ NodeWithSocketsRef::NodeWithSocketsRef(Node &node,
 
   /* Header */
   ss << R"(<tr><td colspan="3" align="center"><b>)";
-  ss << ((name.size() == 0) ? "No Name" : name);
+  ss << (data.node_name.empty() ? "No Name" : data.node_name);
   ss << "</b></td></tr>";
 
   /* Sockets */
-  int socket_max_amount = std::max(input_names.size(), output_names.size());
+  int socket_max_amount = std::max(data.inputs.size(), data.outputs.size());
   for (int i = 0; i < socket_max_amount; i++) {
     ss << "<tr>";
-    if (i < input_names.size()) {
-      StringRef name = input_names[i];
-      if (name.size() == 0) {
-        name = "No Name";
-      }
+    if (i < data.inputs.size()) {
+      const NodeWithSockets::Input &input = data.inputs[i];
       ss << R"(<td align="left" port="in)" << i << "\">";
-      ss << name;
+      if (input.fontcolor) {
+        ss << R"(<font color=")" << *input.fontcolor << "\">";
+      }
+      ss << (input.name.empty() ? "No Name" : input.name);
+      if (input.fontcolor) {
+        ss << "</font>";
+      }
       ss << "</td>";
     }
     else {
       ss << "<td></td>";
     }
     ss << "<td></td>";
-    if (i < output_names.size()) {
-      StringRef name = output_names[i];
-      if (name.size() == 0) {
-        name = "No Name";
-      }
+    if (i < data.outputs.size()) {
+      const NodeWithSockets::Output &output = data.outputs[i];
       ss << R"(<td align="right" port="out)" << i << "\">";
-      ss << name;
+      if (output.fontcolor) {
+        ss << R"(<font color=")" << *output.fontcolor << "\">";
+      }
+      ss << (output.name.empty() ? "No Name" : output.name);
+      if (output.fontcolor) {
+        ss << "</font>";
+      }
       ss << "</td>";
     }
     else {

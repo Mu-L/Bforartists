@@ -1,49 +1,37 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2006-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
- * \ingroup memutil
+ * \ingroup intern_memutil
  */
 
 #ifndef __MEM_CACHELIMITERC_API_H__
 #define __MEM_CACHELIMITERC_API_H__
 
+#include <cstddef>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include "BLI_utildefines.h"
-
 struct MEM_CacheLimiter_s;
 struct MEM_CacheLimiterHandle_s;
 
-typedef struct MEM_CacheLimiter_s MEM_CacheLimiterC;
-typedef struct MEM_CacheLimiterHandle_s MEM_CacheLimiterHandleC;
+using MEM_CacheLimiterC = struct MEM_CacheLimiter_s;
+using MEM_CacheLimiterHandleC = struct MEM_CacheLimiterHandle_s;
 
 /* function used to remove data from memory */
-typedef void (*MEM_CacheLimiter_Destruct_Func)(void *);
+using MEM_CacheLimiter_Destruct_Func = void (*)(void *);
 
 /* function used to measure stored data element size */
-typedef size_t (*MEM_CacheLimiter_DataSize_Func)(void *);
+using MEM_CacheLimiter_DataSize_Func = size_t (*)(void *);
 
 /* function used to measure priority of item when freeing memory */
-typedef int (*MEM_CacheLimiter_ItemPriority_Func)(void *, int);
+using MEM_CacheLimiter_ItemPriority_Func = int (*)(void *, int);
 
 /* function to check whether item could be destroyed */
-typedef bool (*MEM_CacheLimiter_ItemDestroyable_Func)(void *);
+using MEM_CacheLimiter_ItemDestroyable_Func = bool (*)(void *);
 
 #ifndef __MEM_CACHELIMITER_H__
 void MEM_CacheLimiter_set_maximum(size_t m);
@@ -76,8 +64,8 @@ void delete_MEM_CacheLimiter(MEM_CacheLimiterC *This);
 /**
  * Manage object
  *
- * \param This: "This" pointer, data data object to manage.
- * \return CacheLimiterHandle to ref, unref, touch the managed object
+ * \param This: "This" pointer, data object to manage.
+ * \return The handle to reference/unreference & touch the managed object.
  */
 
 MEM_CacheLimiterHandleC *MEM_CacheLimiter_insert(MEM_CacheLimiterC *This, void *data);

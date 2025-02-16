@@ -1,41 +1,32 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
-#
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+# SPDX-License-Identifier: GPL-2.0-or-later
 #
 # Contributor(s): ?? Grabbed from the UI tutorial here: https://wiki.blender.org/index.php/Dev:Source/UI/Tutorials/AddAnEditor
-#
-# ***** END GPL LICENSE BLOCK *****
+
 
 set(INC
 	../include
 	../../blenkernel
 	../../blenlib
+	../../blenloader
 	../../gpu
 	../../makesdna
 	../../makesrna
 	../../windowmanager
 	../../../../intern/guardedalloc
-	../../../../intern/glew-mx
+
+  # dna_type_offsets.h
+  ${CMAKE_CURRENT_BINARY_DIR}/../../makesdna/intern
 )
- 
+
 set(INC_SYS
 	${GLEW_INCLUDE_PATH}
 )
- 
+
 set(SRC
-	space_toolbar.c
+	space_toolbar.cc
 )
- 
+
 blender_add_lib(bf_editor_space_toolbar "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+
+# dna_type_offsets.h dna_type_offsets.h
+add_dependencies(bf_editor_space_toolbar bf_dna)

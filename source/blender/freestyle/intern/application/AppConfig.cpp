@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2008-2022 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -26,7 +14,7 @@
 
 using namespace std;
 
-#include "BKE_appdir.h"
+#include "BKE_appdir.hh"
 
 namespace Freestyle::Config {
 
@@ -35,7 +23,8 @@ Path::Path()
 {
   // get the root directory
   // soc
-  setRootDir(BKE_appdir_folder_id(BLENDER_SYSTEM_SCRIPTS, nullptr));
+  const std::optional<std::string> path = BKE_appdir_folder_id(BLENDER_SYSTEM_SCRIPTS, nullptr);
+  setRootDir(path.value_or(BKE_appdir_program_dir()));
 
   _pInstance = this;
 }

@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2001-2002 NaN Holding BV. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -24,22 +9,28 @@
  * \brief A general argument parsing module.
  */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 struct bArgs;
-typedef struct bArgs bArgs;
+
+#include <stdarg.h> /* For `va_list`. */
+#include <stdbool.h>
+
+#include "BLI_compiler_attrs.h"
 
 /**
  * Returns the number of extra arguments consumed by the function.
  * -  0 is normal value,
  * - -1 stops parsing arguments, other negative indicates skip
  */
-typedef int (*BA_ArgCallback)(int argc, const char **argv, void *data);
+using BA_ArgCallback = int (*)(int argc, const char **argv, void *data);
 
 struct bArgs *BLI_args_create(int argc, const char **argv);
 void BLI_args_destroy(struct bArgs *ba);
+
+using bArgPrintFn = void (*)(void *user_data, const char *format, va_list args);
+void BLI_args_printf(struct bArgs *ba, const char *format, ...);
+void BLI_args_print_fn_set(struct bArgs *ba,
+                           ATTR_PRINTF_FORMAT(2, 0) bArgPrintFn print_fn,
+                           void *user_data);
 
 /** The pass to use for #BLI_args_add. */
 void BLI_args_pass_set(struct bArgs *ba, int current_pass);
@@ -67,15 +58,11 @@ void BLI_args_add_case(struct bArgs *ba,
                        BA_ArgCallback cb,
                        void *data);
 
-void BLI_args_parse(struct bArgs *ba, int pass, BA_ArgCallback default_cb, void *data);
+void BLI_args_parse(struct bArgs *ba, int pass, BA_ArgCallback default_cb, void *default_data);
 
 void BLI_args_print_arg_doc(struct bArgs *ba, const char *arg);
 void BLI_args_print_other_doc(struct bArgs *ba);
 
 bool BLI_args_has_other_doc(const struct bArgs *ba);
 
-void BLI_args_print(struct bArgs *ba);
-
-#ifdef __cplusplus
-}
-#endif
+void BLI_args_print(const struct bArgs *ba);

@@ -1,27 +1,37 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2002-2023 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 ExternalProject_Add(external_wayland_protocols
   URL file://${PACKAGE_DIR}/${WL_PROTOCOLS_FILE}
   DOWNLOAD_DIR ${DOWNLOAD_DIR}
   URL_HASH ${WL_PROTOCOLS_HASH_TYPE}=${WL_PROTOCOLS_HASH}
   PREFIX ${BUILD_DIR}/wayland-protocols
-  CONFIGURE_COMMAND meson --prefix ${LIBDIR}/wayland-protocols . ../external_wayland_protocols -Dtests=false
+  # Use `-E` so the `PKG_CONFIG_PATH` can be defined to link against our own WAYLAND.
+
+  CONFIGURE_COMMAND ${CMAKE_COMMAND} -E
+    env PKG_CONFIG_PATH=${LIBDIR}/wayland/lib64/pkgconfig:$PKG_CONFIG_PATH
+    ${MESON}
+      --prefix ${LIBDIR}/wayland-protocols
+      ${MESON_BUILD_TYPE}
+      .
+      ../external_wayland_protocols
+      -Dtests=false
+
   BUILD_COMMAND ninja
   INSTALL_COMMAND ninja install
+)
+
+add_dependencies(
+  external_wayland_protocols
+  external_wayland
+  # Needed for `MESON`.
+  external_python_site_packages
+)
+
+harvest(
+  external_wayland_protocols
+  wayland-protocols/share/wayland-protocols
+  wayland-protocols/share/wayland-protocols/
+  "*.xml"
 )

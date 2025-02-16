@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2001-2002 NaN Holding BV. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup spfile
@@ -23,14 +8,10 @@
 
 #pragma once
 
+#include "ED_fileselect.hh"
+
 /* XXX could become UserPref */
 #define FSMENU_RECENT_MAX 10
-
-enum FSMenuCategory;
-enum FSMenuInsert;
-
-struct FSMenu;
-struct FSMenuEntry;
 
 /**
  * Inserts a new fsmenu entry with the given \a path.
@@ -42,7 +23,7 @@ void fsmenu_insert_entry(struct FSMenu *fsmenu,
                          const char *path,
                          const char *name,
                          int icon,
-                         const enum FSMenuInsert flag);
+                         enum FSMenuInsert flag);
 
 /** Refresh 'valid' status of given menu entry */
 void fsmenu_entry_refresh_valid(struct FSMenuEntry *fsentry);
@@ -53,16 +34,19 @@ short fsmenu_can_save(struct FSMenu *fsmenu, enum FSMenuCategory category, int i
 /** Removes the fsmenu entry at the given \a index. */
 void fsmenu_remove_entry(struct FSMenu *fsmenu, enum FSMenuCategory category, int idx);
 
-/** saves the 'bookmarks' to the specified file */
-void fsmenu_write_file(struct FSMenu *fsmenu, const char *filename);
+/**
+ * Saves the 'bookmarks' to the specified file.
+ * \return true on success.
+ */
+bool fsmenu_write_file(struct FSMenu *fsmenu, const char *filepath);
 
 /** reads the 'bookmarks' from the specified file */
-void fsmenu_read_bookmarks(struct FSMenu *fsmenu, const char *filename);
+void fsmenu_read_bookmarks(struct FSMenu *fsmenu, const char *filepath);
 
 /** adds system specific directories */
 void fsmenu_read_system(struct FSMenu *fsmenu, int read_bookmarks);
 
-/** Free's all the memory associated with the fsmenu */
+/** Frees all the memory associated with the `fsmenu`. */
 void fsmenu_free(void);
 
 /** Refresh system directory menu */

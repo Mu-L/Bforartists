@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -34,7 +22,7 @@
  * clustering issues. However, more linear steps can also make things slower when the initial hash
  * produces many collisions.
  *
- * Every probing strategy has to guarantee, that every possible uint64_t is returned eventually.
+ * Every probing strategy has to guarantee that every possible uint64_t is returned eventually.
  * This is necessary for correctness. If this is not the case, empty slots might not be found.
  *
  * The SLOT_PROBING_BEGIN and SLOT_PROBING_END macros can be used to implement a loop that iterates
@@ -53,6 +41,8 @@
  *   probing might work best.
  */
 
+#include <limits>
+
 #include "BLI_sys_types.h"
 
 namespace blender {
@@ -67,9 +57,7 @@ class LinearProbingStrategy {
   uint64_t hash_;
 
  public:
-  LinearProbingStrategy(const uint64_t hash) : hash_(hash)
-  {
-  }
+  LinearProbingStrategy(const uint64_t hash) : hash_(hash) {}
 
   void next()
   {
@@ -83,7 +71,7 @@ class LinearProbingStrategy {
 
   int64_t linear_steps() const
   {
-    return UINT32_MAX;
+    return std::numeric_limits<int64_t>::max();
   }
 };
 
@@ -102,13 +90,10 @@ class QuadraticProbingStrategy {
  private:
   uint64_t original_hash_;
   uint64_t current_hash_;
-  uint64_t iteration_;
+  uint64_t iteration_ = 1;
 
  public:
-  QuadraticProbingStrategy(const uint64_t hash)
-      : original_hash_(hash), current_hash_(hash), iteration_(1)
-  {
-  }
+  QuadraticProbingStrategy(const uint64_t hash) : original_hash_(hash), current_hash_(hash) {}
 
   void next()
   {
@@ -235,7 +220,7 @@ using DefaultProbingStrategy = PythonProbingStrategy<>;
     int64_t linear_offset = 0; \
     uint64_t current_hash = probing_strategy.get(); \
     do { \
-      int64_t R_SLOT_INDEX = static_cast<int64_t>((current_hash + static_cast<uint64_t>(linear_offset)) & MASK);
+      int64_t R_SLOT_INDEX = int64_t((current_hash + uint64_t(linear_offset)) & MASK);
 
 #define SLOT_PROBING_END() \
     } while (++linear_offset < probing_strategy.linear_steps()); \

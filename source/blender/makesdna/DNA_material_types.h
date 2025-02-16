@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2001-2002 NaN Holding BV. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
@@ -26,10 +11,6 @@
 #include "DNA_ID.h"
 #include "DNA_defs.h"
 #include "DNA_listBase.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 #ifndef MAX_MTEX
 #  define MAX_MTEX 18
@@ -43,17 +24,31 @@ struct bNodeTree;
 /* WATCH IT: change type? also make changes in ipo.h */
 
 typedef struct TexPaintSlot {
-  /** Image to be painted on. */
+  DNA_DEFINE_CXX_METHODS(TexPaintSlot)
+
+  /** Image to be painted on. Mutual exclusive with attribute_name. */
   struct Image *ima;
-  /** Custom-data index for uv layer, #MAX_NAME. */
+  struct ImageUser *image_user;
+
+  /**
+   * Custom-data index for uv layer, #MAX_NAME.
+   * May reference #NodeShaderUVMap::uv_name.
+   */
   char *uvname;
-  /** Do we have a valid image and UV map. */
+  /**
+   * Color attribute name when painting using color attributes. Mutual exclusive with ima.
+   * Points to the name of a CustomDataLayer.
+   */
+  char *attribute_name;
+  /** Do we have a valid image and UV map or attribute. */
   int valid;
   /** Copy of node interpolation setting. */
   int interp;
 } TexPaintSlot;
 
 typedef struct MaterialGPencilStyle {
+  DNA_DEFINE_CXX_METHODS(MaterialGPencilStyle)
+
   /** Texture image for strokes. */
   struct Image *sima;
   /** Texture image for filling. */
@@ -79,7 +74,7 @@ typedef struct MaterialGPencilStyle {
   /** Radius for radial gradients. */
   float gradient_radius DNA_DEPRECATED;
   char _pad2[4];
-  /** Uv coordinates scale. */
+  /** UV coordinates scale. */
   float gradient_scale[2] DNA_DEPRECATED;
   /** Factor to shift filling in 2d space. */
   float gradient_shift[2] DNA_DEPRECATED;
@@ -155,23 +150,28 @@ typedef struct MaterialLineArt {
   /** Maximum 255 levels of equivalent occlusion. */
   unsigned char mat_occlusion;
 
-  unsigned char _pad[2];
+  unsigned char intersection_priority;
+
+  char _pad;
 } MaterialLineArt;
 
 typedef enum eMaterialLineArtFlags {
   LRT_MATERIAL_MASK_ENABLED = (1 << 0),
-
-  /* Deprecated, kept for versioning code. */
   LRT_MATERIAL_CUSTOM_OCCLUSION_EFFECTIVENESS = (1 << 1),
+  LRT_MATERIAL_CUSTOM_INTERSECTION_PRIORITY = (1 << 2),
 } eMaterialLineArtFlags;
 
 typedef struct Material {
+  DNA_DEFINE_CXX_METHODS(Material)
+
   ID id;
   /** Animation data (must be immediately after id for utilities to use it). */
   struct AnimData *adt;
 
   short flag;
-  char _pad1[2];
+  /** Rendering modes for EEVEE. */
+  char surface_render_method;
+  char _pad1[1];
 
   /* Colors from Blender Internal that we are still using. */
   float r, g, b, a;
@@ -209,19 +209,31 @@ typedef struct Material {
   short paint_active_slot;
   short paint_clone_slot;
   short tot_slots;
-  char _pad2[2];
+
+  /* Displacement. */
+  char displacement_method;
+
+  /* Thickness. */
+  char thickness_mode;
 
   /* Transparency. */
   float alpha_threshold;
   float refract_depth;
-  char blend_method;
-  char blend_shadow;
+  char blend_method; /* TODO(fclem): Deprecate once we remove legacy EEVEE. */
+  char blend_shadow; /* TODO(fclem): Deprecate once we remove legacy EEVEE. */
   char blend_flag;
-  char _pad3[1];
+
+  /* Volume. */
+  char volume_intersection_method;
+
+  /* Displacement. */
+  float inflate_bounds;
+
+  char _pad3[4];
 
   /**
-   * Cached slots for texture painting, must be refreshed in
-   * refresh_texpaint_image_cache before using.
+   * Cached slots for texture painting, must be refreshed via
+   * BKE_texpaint_slot_refresh_cache before using.
    */
   struct TexPaintSlot *texpaintslot;
 
@@ -241,63 +253,73 @@ typedef struct Material {
  * -1 because for active material we store the index + 1 */
 #define MAXMAT (32767 - 1)
 
-/* flag */
-/* for render */
-/* #define MA_IS_USED      (1 << 0) */ /* UNUSED */
-                                       /* for dopesheet */
-#define MA_DS_EXPAND (1 << 1)
-/* for dopesheet (texture stack expander)
- * NOTE: this must have the same value as other texture stacks,
- * otherwise anim-editors will not read correctly
- */
-#define MA_DS_SHOW_TEXS (1 << 2)
+/** #Material::flag */
+enum {
+  /** For render. */
+  MA_IS_USED = 1 << 0, /* UNUSED */
+  /** For dope-sheet. */
+  MA_DS_EXPAND = 1 << 1,
+  /**
+   * For dope-sheet (texture stack expander)
+   * NOTE: this must have the same value as other texture stacks,
+   * otherwise anim-editors will not read correctly.
+   */
+  MA_DS_SHOW_TEXS = 1 << 2,
+};
 
 /* ramps */
-#define MA_RAMP_BLEND 0
-#define MA_RAMP_ADD 1
-#define MA_RAMP_MULT 2
-#define MA_RAMP_SUB 3
-#define MA_RAMP_SCREEN 4
-#define MA_RAMP_DIV 5
-#define MA_RAMP_DIFF 6
-#define MA_RAMP_DARK 7
-#define MA_RAMP_LIGHT 8
-#define MA_RAMP_OVERLAY 9
-#define MA_RAMP_DODGE 10
-#define MA_RAMP_BURN 11
-#define MA_RAMP_HUE 12
-#define MA_RAMP_SAT 13
-#define MA_RAMP_VAL 14
-#define MA_RAMP_COLOR 15
-#define MA_RAMP_SOFT 16
-#define MA_RAMP_LINEAR 17
+enum {
+  MA_RAMP_BLEND = 0,
+  MA_RAMP_ADD = 1,
+  MA_RAMP_MULT = 2,
+  MA_RAMP_SUB = 3,
+  MA_RAMP_SCREEN = 4,
+  MA_RAMP_DIV = 5,
+  MA_RAMP_DIFF = 6,
+  MA_RAMP_DARK = 7,
+  MA_RAMP_LIGHT = 8,
+  MA_RAMP_OVERLAY = 9,
+  MA_RAMP_DODGE = 10,
+  MA_RAMP_BURN = 11,
+  MA_RAMP_HUE = 12,
+  MA_RAMP_SAT = 13,
+  MA_RAMP_VAL = 14,
+  MA_RAMP_COLOR = 15,
+  MA_RAMP_SOFT = 16,
+  MA_RAMP_LINEAR = 17,
+  MA_RAMP_EXCLUSION = 18,
+};
 
-/* texco */
-#define TEXCO_ORCO (1 << 0)
-/* #define TEXCO_REFL      (1 << 1) */ /* deprecated */
-/* #define TEXCO_NORM      (1 << 2) */ /* deprecated */
-#define TEXCO_GLOB (1 << 3)
-#define TEXCO_UV (1 << 4)
-#define TEXCO_OBJECT (1 << 5)
-/* #define TEXCO_LAVECTOR  (1 << 6) */ /* deprecated */
-/* #define TEXCO_VIEW      (1 << 7) */ /* deprecated */
-/* #define TEXCO_STICKY   (1 << 8) */  /* deprecated */
-/* #define TEXCO_OSA       (1 << 9) */ /* deprecated */
-#define TEXCO_WINDOW (1 << 10)
-/* #define NEED_UV         (1 << 11) */ /* deprecated */
-/* #define TEXCO_TANGENT   (1 << 12) */ /* deprecated */
-/* still stored in vertex->accum, 1 D */
-#define TEXCO_STRAND (1 << 13)
-/** strand is used for normal materials, particle for halo materials */
-#define TEXCO_PARTICLE (1 << 13)
-/* #define TEXCO_STRESS    (1 << 14) */ /* deprecated */
-/* #define TEXCO_SPEED     (1 << 15) */ /* deprecated */
+/** #MTex::texco */
+enum {
+  TEXCO_ORCO = 1 << 0,
+  // TEXCO_REFL = 1 << 1, /* Deprecated. */
+  // TEXCO_NORM = 1 << 2, /* Deprecated. */
+  TEXCO_GLOB = 1 << 3,
+  TEXCO_UV = 1 << 4,
+  TEXCO_OBJECT = 1 << 5,
+  // TEXCO_LAVECTOR = 1 << 6, /* Deprecated. */
+  // TEXCO_VIEW = 1 << 7,     /* Deprecated. */
+  // TEXCO_STICKY = 1 << 8,   /* Deprecated. */
+  // TEXCO_OSA = 1 << 9,      /* Deprecated. */
+  TEXCO_WINDOW = 1 << 10,
+  // NEED_UV = 1 << 11,       /* Deprecated. */
+  // TEXCO_TANGENT = 1 << 12, /* Deprecated. */
+  /** still stored in `vertex->accum`, 1 D. */
+  TEXCO_STRAND = 1 << 13,
+  /** strand is used for normal materials, particle for halo materials */
+  TEXCO_PARTICLE = 1 << 13,
+  // TEXCO_STRESS = 1 << 14, /* Deprecated. */
+  // TEXCO_SPEED = 1 << 15,  /* Deprecated. */
+};
 
-/* mapto */
-#define MAP_COL (1 << 0)
-#define MAP_ALPHA (1 << 7)
+/** #MTex::mapto */
+enum {
+  MAP_COL = 1 << 0,
+  MAP_ALPHA = 1 << 7,
+};
 
-/* pr_type */
+/** #Material::pr_type */
 typedef enum ePreviewType {
   MA_FLAT = 0,
   MA_SPHERE = 1,
@@ -313,10 +335,24 @@ typedef enum ePreviewType {
   MA_FLUID = 13,
 } ePreviewType;
 
-/* pr_flag */
-#define MA_PREVIEW_WORLD (1 << 0)
+/** #Material::pr_flag */
+enum {
+  MA_PREVIEW_WORLD = 1 << 0,
+};
 
-/* blend_method */
+/** #Material::surface_render_method */
+enum {
+  MA_SURFACE_METHOD_DEFERRED = 0,
+  MA_SURFACE_METHOD_FORWARD = 1,
+};
+
+/** #Material::volume_intersection_method */
+enum {
+  MA_VOLUME_ISECT_FAST = 0,
+  MA_VOLUME_ISECT_ACCURATE = 1,
+};
+
+/** #Material::blend_method */
 enum {
   MA_BM_SOLID = 0,
   // MA_BM_ADD = 1, /* deprecated */
@@ -326,20 +362,37 @@ enum {
   MA_BM_BLEND = 5,
 };
 
-/* blend_flag */
+/** #Material::blend_flag */
 enum {
   MA_BL_HIDE_BACKFACE = (1 << 0),
   MA_BL_SS_REFRACTION = (1 << 1),
   MA_BL_CULL_BACKFACE = (1 << 2),
   MA_BL_TRANSLUCENCY = (1 << 3),
+  MA_BL_LIGHTPROBE_VOLUME_DOUBLE_SIDED = (1 << 4),
+  MA_BL_CULL_BACKFACE_SHADOW = (1 << 5),
+  MA_BL_TRANSPARENT_SHADOW = (1 << 6),
+  MA_BL_THICKNESS_FROM_SHADOW = (1 << 7),
 };
 
-/* blend_shadow */
+/** #Material::blend_shadow */
 enum {
   MA_BS_NONE = 0,
   MA_BS_SOLID = 1,
   MA_BS_CLIP = 2,
   MA_BS_HASHED = 3,
+};
+
+/** #Material::displacement_method */
+enum {
+  MA_DISPLACEMENT_BUMP = 0,
+  MA_DISPLACEMENT_DISPLACE = 1,
+  MA_DISPLACEMENT_BOTH = 2,
+};
+
+/** #Material::thickness_mode */
+enum {
+  MA_THICKNESS_SPHERE = 0,
+  MA_THICKNESS_SLAB = 1,
 };
 
 /* Grease Pencil Stroke styles */
@@ -368,7 +421,3 @@ enum {
   GP_MATERIAL_FOLLOW_OBJ = 1,
   GP_MATERIAL_FOLLOW_FIXED = 2,
 };
-
-#ifdef __cplusplus
-}
-#endif

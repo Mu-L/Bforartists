@@ -1,24 +1,13 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2006-2022 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
- * \ingroup memutil
+ * \ingroup intern_memutil
  */
 
 #include <cstddef>
+#include <list>
 
 #include "MEM_CacheLimiter.h"
 #include "MEM_CacheLimiterC-Api.h"
@@ -54,10 +43,10 @@ bool MEM_CacheLimiter_is_disabled(void)
 class MEM_CacheLimiterHandleCClass;
 class MEM_CacheLimiterCClass;
 
-typedef MEM_CacheLimiterHandle<MEM_CacheLimiterHandleCClass> handle_t;
-typedef MEM_CacheLimiter<MEM_CacheLimiterHandleCClass> cache_t;
-typedef std::list<MEM_CacheLimiterHandleCClass *, MEM_Allocator<MEM_CacheLimiterHandleCClass *>>
-    list_t;
+using handle_t = MEM_CacheLimiterHandle<MEM_CacheLimiterHandleCClass>;
+using cache_t = MEM_CacheLimiter<MEM_CacheLimiterHandleCClass>;
+using list_t =
+    std::list<MEM_CacheLimiterHandleCClass *, MEM_Allocator<MEM_CacheLimiterHandleCClass *>>;
 
 class MEM_CacheLimiterCClass {
  public:
@@ -142,7 +131,7 @@ MEM_CacheLimiterCClass::~MEM_CacheLimiterCClass()
 {
   // should not happen, but don't leak memory in this case...
   for (list_t::iterator it = cclass_list.begin(); it != cclass_list.end(); it++) {
-    (*it)->set_data(NULL);
+    (*it)->set_data(nullptr);
 
     delete *it;
   }

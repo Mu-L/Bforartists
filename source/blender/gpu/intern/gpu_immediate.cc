@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2016 by Mike Erwin. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2016 by Mike Erwin.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup gpu
@@ -24,18 +9,18 @@
  */
 
 #ifndef GPU_STANDALONE
-#  include "UI_resources.h"
+#  include "UI_resources.hh"
 #endif
 
-#include "GPU_immediate.h"
-#include "GPU_matrix.h"
-#include "GPU_texture.h"
+#include "GPU_immediate.hh"
+#include "GPU_matrix.hh"
+#include "GPU_texture.hh"
+#include "GPU_uniform_buffer.hh"
 
 #include "gpu_context_private.hh"
 #include "gpu_immediate_private.hh"
 #include "gpu_shader_private.hh"
-#include "gpu_vertex_buffer_private.hh"
-#include "gpu_vertex_format_private.h"
+#include "gpu_vertex_format_private.hh"
 
 using namespace blender::gpu;
 
@@ -62,7 +47,7 @@ void immBindShader(GPUShader *shader)
   BLI_assert(imm->shader == nullptr);
 
   imm->shader = shader;
-  imm->builtin_shader_bound = GPU_SHADER_TEXT; /* Default value. */
+  imm->builtin_shader_bound = std::nullopt;
 
   if (!imm->vertex_format.packed) {
     VertexFormat_pack(&imm->vertex_format);
@@ -71,7 +56,7 @@ void immBindShader(GPUShader *shader)
 
   GPU_shader_bind(shader);
   GPU_matrix_bind(shader);
-  GPU_shader_set_srgb_uniform(shader);
+  Shader::set_srgb_uniform(shader);
 }
 
 void immBindBuiltinProgram(eGPUBuiltinShader shader_id)
@@ -89,7 +74,6 @@ void immUnbindProgram()
   imm->shader = nullptr;
 }
 
-/* XXX do not use it. Special hack to use OCIO with batch API. */
 GPUShader *immGetShader()
 {
   return imm->shader;
@@ -143,21 +127,21 @@ static void wide_line_workaround_start(GPUPrimType prim_type)
     /* No need to change the shader. */
     return;
   }
+  if (!imm->builtin_shader_bound) {
+    return;
+  }
 
   eGPUBuiltinShader polyline_sh;
-  switch (imm->builtin_shader_bound) {
+  switch (*imm->builtin_shader_bound) {
     case GPU_SHADER_3D_CLIPPED_UNIFORM_COLOR:
       polyline_sh = GPU_SHADER_3D_POLYLINE_CLIPPED_UNIFORM_COLOR;
       break;
-    case GPU_SHADER_2D_UNIFORM_COLOR:
     case GPU_SHADER_3D_UNIFORM_COLOR:
       polyline_sh = GPU_SHADER_3D_POLYLINE_UNIFORM_COLOR;
       break;
-    case GPU_SHADER_2D_FLAT_COLOR:
     case GPU_SHADER_3D_FLAT_COLOR:
       polyline_sh = GPU_SHADER_3D_POLYLINE_FLAT_COLOR;
       break;
-    case GPU_SHADER_2D_SMOOTH_COLOR:
     case GPU_SHADER_3D_SMOOTH_COLOR:
       polyline_sh = GPU_SHADER_3D_POLYLINE_SMOOTH_COLOR;
       break;
@@ -181,13 +165,14 @@ static void wide_line_workaround_start(GPUPrimType prim_type)
   immUniform1f("lineWidth", line_width);
 
   if (GPU_blend_get() == GPU_BLEND_NONE) {
-    /* Disable line smoothing when blending is disabled (see T81827). */
+    /* Disable line smoothing when blending is disabled (see #81827). */
     immUniform1i("lineSmooth", 0);
   }
 
   if (ELEM(polyline_sh,
            GPU_SHADER_3D_POLYLINE_CLIPPED_UNIFORM_COLOR,
-           GPU_SHADER_3D_POLYLINE_UNIFORM_COLOR)) {
+           GPU_SHADER_3D_POLYLINE_UNIFORM_COLOR))
+  {
     immUniformColor4fv(imm->uniform_color);
   }
 }
@@ -201,8 +186,8 @@ static void wide_line_workaround_end()
     }
     immUnbindProgram();
 
-    immBindBuiltinProgram(imm->prev_builtin_shader);
-    imm->prev_builtin_shader = GPU_SHADER_TEXT;
+    immBindBuiltinProgram(*imm->prev_builtin_shader);
+    imm->prev_builtin_shader = std::nullopt;
   }
 }
 
@@ -230,7 +215,7 @@ void immBeginAtMost(GPUPrimType prim_type, uint vertex_len)
   immBegin(prim_type, vertex_len);
 }
 
-GPUBatch *immBeginBatch(GPUPrimType prim_type, uint vertex_len)
+blender::gpu::Batch *immBeginBatch(GPUPrimType prim_type, uint vertex_len)
 {
   BLI_assert(imm->prim_type == GPU_PRIM_NONE); /* Make sure we haven't already begun. */
   BLI_assert(vertex_count_makes_sense_for_primitive(vertex_len, prim_type));
@@ -240,10 +225,10 @@ GPUBatch *immBeginBatch(GPUPrimType prim_type, uint vertex_len)
   imm->vertex_idx = 0;
   imm->unassigned_attr_bits = imm->enabled_attr_bits;
 
-  GPUVertBuf *verts = GPU_vertbuf_create_with_format(&imm->vertex_format);
-  GPU_vertbuf_data_alloc(verts, vertex_len);
+  VertBuf *verts = GPU_vertbuf_create_with_format(imm->vertex_format);
+  GPU_vertbuf_data_alloc(*verts, vertex_len);
 
-  imm->vertex_data = (uchar *)GPU_vertbuf_get_data(verts);
+  imm->vertex_data = verts->data<uchar>().data();
 
   imm->batch = GPU_batch_create_ex(prim_type, verts, nullptr, GPU_BATCH_OWNS_VBO);
   imm->batch->flag |= GPU_BATCH_BUILDING;
@@ -251,7 +236,7 @@ GPUBatch *immBeginBatch(GPUPrimType prim_type, uint vertex_len)
   return imm->batch;
 }
 
-GPUBatch *immBeginBatchAtMost(GPUPrimType prim_type, uint vertex_len)
+blender::gpu::Batch *immBeginBatchAtMost(GPUPrimType prim_type, uint vertex_len)
 {
   BLI_assert(vertex_len > 0);
   imm->strict_vertex_len = false;
@@ -274,7 +259,7 @@ void immEnd()
 
   if (imm->batch) {
     if (imm->vertex_idx < imm->vertex_len) {
-      GPU_vertbuf_data_resize(imm->batch->verts[0], imm->vertex_idx);
+      GPU_vertbuf_data_resize(*imm->batch->verts[0], imm->vertex_idx);
       /* TODO: resize only if vertex count is much smaller */
     }
     GPU_batch_set_shader(imm->batch, imm->shader);
@@ -282,6 +267,7 @@ void immEnd()
     imm->batch = nullptr; /* don't free, batch belongs to caller */
   }
   else {
+    Context::get()->assert_framebuffer_shader_compatibility(unwrap(imm->shader));
     imm->end();
   }
 
@@ -291,6 +277,74 @@ void immEnd()
   imm->vertex_data = nullptr;
 
   wide_line_workaround_end();
+}
+
+void Immediate::polyline_draw_workaround(uint64_t offset)
+{
+  /* Check compatible input primitive. */
+  BLI_assert(ELEM(imm->prim_type, GPU_PRIM_LINES, GPU_PRIM_LINE_STRIP, GPU_PRIM_LINE_LOOP));
+
+  Batch *tri_batch = Context::get()->polyline_batch_get();
+  GPU_batch_set_shader(tri_batch, imm->shader);
+
+  BLI_assert(offset % 4 == 0);
+
+  /* Setup primitive and index buffer. */
+  int stride = (imm->prim_type == GPU_PRIM_LINES) ? 2 : 1;
+  int data[3] = {stride, int(imm->vertex_idx), int(offset / 4)};
+  GPU_shader_uniform_3iv(imm->shader, "gpu_vert_stride_count_offset", data);
+  GPU_shader_uniform_1b(imm->shader, "gpu_index_no_buffer", true);
+
+  {
+    /* Setup attributes metadata uniforms. */
+    const GPUVertFormat &format = imm->vertex_format;
+    /* Only support 4byte aligned formats. */
+    BLI_assert((format.stride % 4) == 0);
+    BLI_assert(format.attr_len > 0);
+
+    int pos_attr_id = -1;
+    int col_attr_id = -1;
+
+    for (uint a_idx = 0; a_idx < format.attr_len; a_idx++) {
+      const GPUVertAttr *a = &format.attrs[a_idx];
+      const char *name = GPU_vertformat_attr_name_get(&format, a, 0);
+      if (pos_attr_id == -1 && blender::StringRefNull(name) == "pos") {
+        int descriptor[2] = {int(format.stride) / 4, int(a->offset) / 4};
+        BLI_assert(ELEM(a->comp_type, GPU_COMP_F32, GPU_COMP_I32));
+        BLI_assert(ELEM(a->fetch_mode, GPU_FETCH_FLOAT, GPU_FETCH_INT_TO_FLOAT));
+        BLI_assert_msg((a->offset % 4) == 0, "Only support 4byte aligned attributes");
+        const bool fetch_int = a->fetch_mode == GPU_FETCH_INT_TO_FLOAT;
+        GPU_shader_uniform_2iv(imm->shader, "gpu_attr_0", descriptor);
+        GPU_shader_uniform_1i(imm->shader, "gpu_attr_0_len", a->comp_len);
+        GPU_shader_uniform_1b(imm->shader, "gpu_attr_0_fetch_int", fetch_int);
+        pos_attr_id = a_idx;
+      }
+      else if (col_attr_id == -1 && blender::StringRefNull(name) == "color") {
+        int descriptor[2] = {int(format.stride) / 4, int(a->offset) / 4};
+        /* Maybe we can relax this if needed. */
+        BLI_assert_msg((a->comp_type == GPU_COMP_F32) ||
+                           ((a->comp_type == GPU_COMP_U8) && (a->comp_len == 4)),
+                       "Only support float attributes or uchar4");
+        BLI_assert_msg((a->offset % 4) == 0, "Only support 4byte aligned attributes");
+        GPU_shader_uniform_2iv(imm->shader, "gpu_attr_1", descriptor);
+        GPU_shader_uniform_1i(imm->shader, "gpu_attr_1_len", a->comp_len);
+        GPU_shader_uniform_1i(imm->shader, "gpu_attr_1_fetch_unorm8", a->comp_type == GPU_COMP_U8);
+        col_attr_id = a_idx;
+      }
+      if (pos_attr_id != -1 && col_attr_id != -1) {
+        break;
+      }
+    }
+
+    BLI_assert(pos_attr_id != -1);
+    /* Could check for color attribute but we need to know which variant of the polyline shader is
+     * the one we are rendering with. */
+    // BLI_assert(pos_attr_id != -1);
+  }
+
+  blender::IndexRange range = GPU_batch_draw_expanded_parameter_get(
+      imm->prim_type, GPU_PRIM_TRIS, imm->vertex_idx, 0, 2);
+  GPU_batch_draw_advanced(tri_batch, range.start(), range.size(), 0, 0);
 }
 
 static void setAttrValueBit(uint attr_id)
@@ -313,7 +367,7 @@ void immAttr1f(uint attr_id, float x)
   setAttrValueBit(attr_id);
 
   float *data = (float *)(imm->vertex_data + attr->offset);
-  /*  printf("%s %td %p\n", __FUNCTION__, (GLubyte*)data - imm->buffer_data, data); */
+  // printf("%s %td %p\n", __FUNCTION__, (GLubyte*)data - imm->buffer_data, data);
 
   data[0] = x;
 }
@@ -329,7 +383,7 @@ void immAttr2f(uint attr_id, float x, float y)
   setAttrValueBit(attr_id);
 
   float *data = (float *)(imm->vertex_data + attr->offset);
-  /*  printf("%s %td %p\n", __FUNCTION__, (GLubyte*)data - imm->buffer_data, data); */
+  // printf("%s %td %p\n", __FUNCTION__, (GLubyte*)data - imm->buffer_data, data);
 
   data[0] = x;
   data[1] = y;
@@ -346,7 +400,7 @@ void immAttr3f(uint attr_id, float x, float y, float z)
   setAttrValueBit(attr_id);
 
   float *data = (float *)(imm->vertex_data + attr->offset);
-  /*  printf("%s %td %p\n", __FUNCTION__, (GLubyte*)data - imm->buffer_data, data); */
+  // printf("%s %td %p\n", __FUNCTION__, (GLubyte*)data - imm->buffer_data, data);
 
   data[0] = x;
   data[1] = y;
@@ -364,7 +418,7 @@ void immAttr4f(uint attr_id, float x, float y, float z, float w)
   setAttrValueBit(attr_id);
 
   float *data = (float *)(imm->vertex_data + attr->offset);
-  /*  printf("%s %td %p\n", __FUNCTION__, (GLubyte*)data - imm->buffer_data, data); */
+  // printf("%s %td %p\n", __FUNCTION__, (GLubyte*)data - imm->buffer_data, data);
 
   data[0] = x;
   data[1] = y;
@@ -445,7 +499,7 @@ void immAttr3ub(uint attr_id, uchar r, uchar g, uchar b)
   setAttrValueBit(attr_id);
 
   uchar *data = imm->vertex_data + attr->offset;
-  /*  printf("%s %td %p\n", __FUNCTION__, data - imm->buffer_data, data); */
+  // printf("%s %td %p\n", __FUNCTION__, data - imm->buffer_data, data);
 
   data[0] = r;
   data[1] = g;
@@ -463,7 +517,7 @@ void immAttr4ub(uint attr_id, uchar r, uchar g, uchar b, uchar a)
   setAttrValueBit(attr_id);
 
   uchar *data = imm->vertex_data + attr->offset;
-  /*  printf("%s %td %p\n", __FUNCTION__, data - imm->buffer_data, data); */
+  // printf("%s %td %p\n", __FUNCTION__, data - imm->buffer_data, data);
 
   data[0] = r;
   data[1] = g;
@@ -507,7 +561,7 @@ static void immEndVertex() /* and move on to the next vertex */
 #endif
 
         uchar *data = imm->vertex_data + a->offset;
-        memcpy(data, data - imm->vertex_format.stride, a->sz);
+        memcpy(data, data - imm->vertex_format.stride, a->size);
         /* TODO: consolidate copy of adjacent attributes */
       }
     }
@@ -603,7 +657,6 @@ void immUniform4fv(const char *name, const float data[4])
   GPU_shader_uniform_4fv(imm->shader, name, data);
 }
 
-/* Note array index is not supported for name (i.e: "array[0]"). */
 void immUniformArray4fv(const char *name, const float *data, int count)
 {
   GPU_shader_uniform_4fv_array(imm->shader, name, count, (const float(*)[4])data);
@@ -621,14 +674,20 @@ void immUniform1i(const char *name, int x)
 
 void immBindTexture(const char *name, GPUTexture *tex)
 {
-  int binding = GPU_shader_get_texture_binding(imm->shader, name);
+  int binding = GPU_shader_get_sampler_binding(imm->shader, name);
   GPU_texture_bind(tex, binding);
 }
 
-void immBindTextureSampler(const char *name, GPUTexture *tex, eGPUSamplerState state)
+void immBindTextureSampler(const char *name, GPUTexture *tex, GPUSamplerState state)
 {
-  int binding = GPU_shader_get_texture_binding(imm->shader, name);
-  GPU_texture_bind_ex(tex, state, binding, true);
+  int binding = GPU_shader_get_sampler_binding(imm->shader, name);
+  GPU_texture_bind_ex(tex, state, binding);
+}
+
+void immBindUniformBuf(const char *name, GPUUniformBuf *ubo)
+{
+  int binding = GPU_shader_get_ubo_binding(imm->shader, name);
+  GPU_uniformbuf_bind(ubo, binding);
 }
 
 /* --- convenience functions for setting "uniform vec4 color" --- */
@@ -638,7 +697,7 @@ void immUniformColor4f(float r, float g, float b, float a)
   int32_t uniform_loc = GPU_shader_get_builtin_uniform(imm->shader, GPU_UNIFORM_COLOR);
   BLI_assert(uniform_loc != -1);
   float data[4] = {r, g, b, a};
-  GPU_shader_uniform_vector(imm->shader, uniform_loc, 4, 1, data);
+  GPU_shader_uniform_float_ex(imm->shader, uniform_loc, 4, 1, data);
   /* For wide Line workaround. */
   copy_v4_v4(imm->uniform_color, data);
 }
@@ -749,4 +808,4 @@ void immThemeColorShadeAlpha(int colorid, int coloffset, int alphaoffset)
   immUniformColor4ub(col[0], col[1], col[2], col[3]);
 }
 
-#endif /* GPU_STANDALONE */
+#endif /* !GPU_STANDALONE */

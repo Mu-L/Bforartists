@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -38,28 +26,23 @@
 
 #include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
-#include "DNA_meshdata_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 
 #include "render_types.h"
 
-#include "BKE_customdata.h"
-#include "BKE_lib_id.h"
-#include "BKE_material.h"
+#include "BKE_lib_id.hh"
+#include "BKE_material.hh"
 #include "BKE_mesh.h"
-#include "BKE_scene.h"
+#include "BKE_scene.hh"
 
 #include "BLI_iterator.h"
 #include "BLI_listbase.h"
-#include "BLI_math.h"
 
-#include "DEG_depsgraph_query.h"
+#include "DEG_depsgraph_query.hh"
 
-#ifdef WITH_CXX_GUARDEDALLOC
-#  include "MEM_guardedalloc.h"
-#endif
+#include "MEM_guardedalloc.h"
 
 namespace Freestyle {
 
@@ -69,11 +52,11 @@ struct LoaderState {
   float *pv;
   float *pn;
   IndexedFaceSet::FaceEdgeMark *pm;
-  unsigned *pvi;
-  unsigned *pni;
-  unsigned *pmi;
-  unsigned currentIndex;
-  unsigned currentMIndex;
+  uint *pvi;
+  uint *pni;
+  uint *pmi;
+  uint currentIndex;
+  uint currentMIndex;
   float minBBox[3];
   float maxBBox[3];
 };
@@ -88,7 +71,7 @@ class BlenderFileLoader {
   NodeGroup *Load();
 
   /** Gets the number of read faces */
-  inline unsigned int numFacesRead()
+  inline uint numFacesRead()
   {
     return _numFacesRead;
   }
@@ -140,14 +123,14 @@ class BlenderFileLoader {
 
  protected:
   struct detri_t {
-    unsigned viA, viB, viP;  // 0 <= viA, viB, viP < viSize
+    uint viA, viB, viP;  // 0 <= viA, viB, viP < viSize
     Vec3r v;
-    unsigned n;
+    uint n;
   };
   Render *_re;
   Depsgraph *_depsgraph;
   NodeGroup *_Scene;
-  unsigned _numFacesRead;
+  uint _numFacesRead;
 #if 0
   real _minEdgeSize;
 #endif
@@ -157,9 +140,7 @@ class BlenderFileLoader {
 
   RenderMonitor *_pRenderMonitor;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:BlenderFileLoader")
-#endif
 };
 
 } /* namespace Freestyle */

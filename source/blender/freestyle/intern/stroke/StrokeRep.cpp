@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2008-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -27,7 +15,7 @@
 #include "StrokeRenderer.h"
 #include "StrokeRep.h"
 
-#include "BKE_global.h"
+#include "BKE_global.hh"
 
 using namespace std;
 
@@ -73,7 +61,8 @@ Strip::Strip(const Strip &iBrother)
     for (vertex_container::const_iterator v = iBrother._vertices.begin(),
                                           vend = iBrother._vertices.end();
          v != vend;
-         ++v) {
+         ++v)
+    {
       _vertices.push_back(new StrokeVertexRep(**v));
     }
   }
@@ -83,8 +72,8 @@ Strip::Strip(const Strip &iBrother)
 Strip::~Strip()
 {
   if (!_vertices.empty()) {
-    for (vertex_container::iterator v = _vertices.begin(), vend = _vertices.end(); v != vend;
-         ++v) {
+    for (vertex_container::iterator v = _vertices.begin(), vend = _vertices.end(); v != vend; ++v)
+    {
       delete (*v);
     }
     _vertices.clear();
@@ -124,8 +113,8 @@ void Strip::createStrip(const vector<StrokeVertex *> &iStrokeVertices)
   }
   _vertices.reserve(2 * iStrokeVertices.size());
   if (!_vertices.empty()) {
-    for (vertex_container::iterator v = _vertices.begin(), vend = _vertices.end(); v != vend;
-         ++v) {
+    for (vertex_container::iterator v = _vertices.begin(), vend = _vertices.end(); v != vend; ++v)
+    {
       delete (*v);
     }
     _vertices.clear();
@@ -289,14 +278,16 @@ void Strip::createStrip(const vector<StrokeVertex *> &iStrokeVertices)
     Vec2r vec_tmp(_vertices[i - 2]->point2d() - p);
     if ((vec_tmp.norm() > thickness[1] * MAX_RATIO_LENGTH_SINGU) || (dirNorm < ZERO) ||
         (dirPrevNorm < ZERO) || notValid(_vertices[i - 2]->point2d()) ||
-        (fabs(stripDir * dir) < EPS_SINGULARITY_RENDERER)) {
+        (fabs(stripDir * dir) < EPS_SINGULARITY_RENDERER))
+    {
       _vertices[i - 2]->setPoint2d(p + thickness[1] * stripDir);
     }
 
     vec_tmp = _vertices[i - 1]->point2d() - p;
     if ((vec_tmp.norm() > thickness[0] * MAX_RATIO_LENGTH_SINGU) || (dirNorm < ZERO) ||
         (dirPrevNorm < ZERO) || notValid(_vertices[i - 1]->point2d()) ||
-        (fabs(stripDir * dir) < EPS_SINGULARITY_RENDERER)) {
+        (fabs(stripDir * dir) < EPS_SINGULARITY_RENDERER))
+    {
       _vertices[i - 1]->setPoint2d(p - thickness[0] * stripDir);
     }
   }  // end of for
@@ -374,7 +365,7 @@ void Strip::createStrip(const vector<StrokeVertex *> &iStrokeVertices)
     }
   }
 
-  if (i != 2 * (int)iStrokeVertices.size()) {
+  if (i != 2 * int(iStrokeVertices.size())) {
     if (G.debug & G_DEBUG_FREESTYLE) {
       cout << "Warning: problem with stripe size\n";
     }
@@ -763,7 +754,7 @@ StrokeRep::StrokeRep()
     _textureId = ptm->getDefaultTextureId();
   }
 #if 0
-  _averageTextureAlpha = 0.5;  //default value
+  _averageTextureAlpha = 0.5;  // default value
   if (_strokeType == OIL_STROKE) {
     _averageTextureAlpha = 0.75;
   }
@@ -797,7 +788,7 @@ StrokeRep::StrokeRep(Stroke *iStroke)
   }
 
 #if 0
-  _averageTextureAlpha = 0.5;  //default value
+  _averageTextureAlpha = 0.5;  // default value
   if (_strokeType == OIL_STROKE) {
     _averageTextureAlpha = 0.75;
   }
@@ -827,7 +818,8 @@ StrokeRep::StrokeRep(const StrokeRep &iBrother)
   }
   for (vector<Strip *>::const_iterator s = iBrother._strips.begin(), send = iBrother._strips.end();
        s != send;
-       ++s) {
+       ++s)
+  {
     _strips.push_back(new Strip(**s));
   }
 }
@@ -851,11 +843,11 @@ void StrokeRep::create()
   bool first = true;
   bool end = false;
   while (v != vend) {
-    while ((v != vend) && (!(*v).attribute().isVisible())) {
+    while ((v != vend) && !(*v).attribute().isVisible()) {
       ++v;
       first = false;
     }
-    while ((v != vend) && ((*v).attribute().isVisible())) {
+    while ((v != vend) && (*v).attribute().isVisible()) {
       strip.push_back(&(*v));
       ++v;
     }
@@ -866,7 +858,7 @@ void StrokeRep::create()
     else {
       end = true;
     }
-    if ((!strip.empty()) && (strip.size() > 1)) {
+    if (!strip.empty() && (strip.size() > 1)) {
       _strips.push_back(new Strip(strip, _hasTex, first, end, _textureStep));
       strip.clear();
     }

@@ -1,31 +1,20 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup spoutliner
  */
 
 #include "DNA_layer_types.h"
+#include "DNA_scene_types.h"
+#include "DNA_space_types.h"
 
 #include "BLI_listbase_wrapper.hh"
 
-#include "BLT_translation.h"
+#include "BLT_translation.hh"
 
-#include "../outliner_intern.h"
-#include "tree_display.h"
+#include "../outliner_intern.hh"
 
 #include "tree_element_view_layer.hh"
 
@@ -38,14 +27,21 @@ TreeElementViewLayerBase::TreeElementViewLayerBase(TreeElement &legacy_te, Scene
   legacy_te_.name = IFACE_("View Layers");
 }
 
-void TreeElementViewLayerBase::expand(SpaceOutliner &space_outliner) const
+void TreeElementViewLayerBase::expand(SpaceOutliner & /*space_outliner*/) const
 {
   for (auto *view_layer : ListBaseWrapper<ViewLayer>(scene_.view_layers)) {
-    TreeElement *tenlay = outliner_add_element(
-        &space_outliner, &legacy_te_.subtree, &scene_, &legacy_te_, TSE_R_LAYER, 0);
-    tenlay->name = view_layer->name;
-    tenlay->directdata = view_layer;
+    add_element(&legacy_te_.subtree, &scene_.id, view_layer, &legacy_te_, TSE_R_LAYER, 0);
   }
+}
+
+TreeElementViewLayer::TreeElementViewLayer(TreeElement &legacy_te,
+                                           Scene & /*scene*/,
+                                           ViewLayer &view_layer)
+    : AbstractTreeElement(legacy_te), /* scene_(scene), */ view_layer_(view_layer)
+{
+  BLI_assert(legacy_te.store_elem->type == TSE_R_LAYER);
+  legacy_te.name = view_layer_.name;
+  legacy_te.directdata = &view_layer_;
 }
 
 }  // namespace blender::ed::outliner

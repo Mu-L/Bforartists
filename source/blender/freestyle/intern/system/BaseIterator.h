@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -23,9 +11,7 @@
 
 #include <iterator>
 
-#ifdef WITH_CXX_GUARDEDALLOC
-#  include "MEM_guardedalloc.h"
-#endif
+#include "MEM_guardedalloc.h"
 
 namespace Freestyle {
 
@@ -40,9 +26,7 @@ template<class Element> class Const_traits {
   typedef ptrdiff_t difference_type;
   typedef Nonconst_traits<Element> Non_const_traits;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:Const_traits")
-#endif
 };
 
 template<class Element> class Nonconst_traits {
@@ -53,34 +37,26 @@ template<class Element> class Nonconst_traits {
   typedef ptrdiff_t difference_type;
   typedef Nonconst_traits<Element> Non_const_traits;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:Nonconst_traits")
-#endif
 };
 
 class InputIteratorTag_Traits {
  public:
   typedef std::input_iterator_tag iterator_category;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:InputIteratorTag_Traits")
-#endif
 };
 
 class BidirectionalIteratorTag_Traits {
  public:
   typedef std::bidirectional_iterator_tag iterator_category;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:BidirectionalIteratorTag_Traits")
-#endif
 };
 
 template<class Traits, class IteratorTagTraits> class IteratorBase {
  public:
-  virtual ~IteratorBase()
-  {
-  }
+  virtual ~IteratorBase() {}
 
   virtual bool begin() const = 0;
   virtual bool end() const = 0;
@@ -92,13 +68,9 @@ template<class Traits, class IteratorTagTraits> class IteratorBase {
   typedef typename Traits::reference reference;
 
  protected:
-  IteratorBase()
-  {
-  }
+  IteratorBase() {}
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:IteratorBase")
-#endif
 };
 
 } /* namespace Freestyle */

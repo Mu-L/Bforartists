@@ -1,23 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2001-2002 NaN Holding BV. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- *
- * The Original Code is: some of this file.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -26,10 +9,7 @@
  */
 
 #include "BLI_math_inline.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "BLI_sys_types.h"
 
 /******************** Blending Modes **********************
  * - byte function assume straight alpha
@@ -109,7 +89,7 @@ MINLINE void blend_color_luminosity_byte(unsigned char dst[4],
 MINLINE void blend_color_interpolate_byte(unsigned char dst[4],
                                           const unsigned char src1[4],
                                           const unsigned char src2[4],
-                                          float t);
+                                          float ft);
 
 MINLINE void blend_color_mix_float(float dst[4], const float src1[4], const float src2[4]);
 MINLINE void blend_color_add_float(float dst[4], const float src1[4], const float src2[4]);
@@ -143,9 +123,5 @@ MINLINE void blend_color_interpolate_float(float dst[4],
                                            float t);
 
 #if BLI_MATH_DO_INLINE
-#  include "intern/math_color_blend_inline.c"
-#endif
-
-#ifdef __cplusplus
-}
+#  include "intern/math_color_blend_inline.cc"  // IWYU pragma: export
 #endif

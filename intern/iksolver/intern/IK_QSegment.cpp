@@ -1,24 +1,9 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2001-2002 NaN Holding BV. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
- * \ingroup iksolver
+ * \ingroup intern_iksolver
  */
 
 #include "IK_QSegment.h"
@@ -26,10 +11,10 @@
 // IK_QSegment
 
 IK_QSegment::IK_QSegment(int num_DoF, bool translational)
-    : m_parent(NULL),
-      m_child(NULL),
-      m_sibling(NULL),
-      m_composite(NULL),
+    : m_parent(nullptr),
+      m_child(nullptr),
+      m_sibling(nullptr),
+      m_composite(nullptr),
       m_num_DoF(num_DoF),
       m_translational(translational)
 {
@@ -55,8 +40,9 @@ void IK_QSegment::Reset()
   m_translation = m_orig_translation;
   SetBasis(m_basis);
 
-  for (IK_QSegment *seg = m_child; seg; seg = seg->m_sibling)
+  for (IK_QSegment *seg = m_child; seg; seg = seg->m_sibling) {
     seg->Reset();
+  }
 }
 
 void IK_QSegment::SetTransform(const Vector3d &start,
@@ -88,20 +74,24 @@ Vector3d IK_QSegment::TranslationChange() const
 
 IK_QSegment::~IK_QSegment()
 {
-  if (m_parent)
+  if (m_parent) {
     m_parent->RemoveChild(this);
+  }
 
-  for (IK_QSegment *seg = m_child; seg; seg = seg->m_sibling)
-    seg->m_parent = NULL;
+  for (IK_QSegment *seg = m_child; seg; seg = seg->m_sibling) {
+    seg->m_parent = nullptr;
+  }
 }
 
 void IK_QSegment::SetParent(IK_QSegment *parent)
 {
-  if (m_parent == parent)
+  if (m_parent == parent) {
     return;
+  }
 
-  if (m_parent)
+  if (m_parent) {
     m_parent->RemoveChild(this);
+  }
 
   if (parent) {
     m_sibling = parent->m_child;
@@ -118,18 +108,22 @@ void IK_QSegment::SetComposite(IK_QSegment *seg)
 
 void IK_QSegment::RemoveChild(IK_QSegment *child)
 {
-  if (m_child == NULL)
+  if (m_child == nullptr) {
     return;
-  else if (m_child == child)
+  }
+  if (m_child == child) {
     m_child = m_child->m_sibling;
+  }
   else {
     IK_QSegment *seg = m_child;
 
-    while (seg->m_sibling != child)
+    while (seg->m_sibling != child) {
       seg = seg->m_sibling;
+    }
 
-    if (child == seg->m_sibling)
+    if (child == seg->m_sibling) {
       seg->m_sibling = child->m_sibling;
+    }
   }
 }
 
@@ -143,8 +137,9 @@ void IK_QSegment::UpdateTransform(const Affine3d &global)
   m_global_transform.translate(m_translation);
 
   // update child transforms
-  for (IK_QSegment *seg = m_child; seg; seg = seg->m_sibling)
+  for (IK_QSegment *seg = m_child; seg; seg = seg->m_sibling) {
     seg->UpdateTransform(m_global_transform);
+  }
 }
 
 void IK_QSegment::PrependBasis(const Matrix3d &mat)
@@ -176,8 +171,9 @@ Vector3d IK_QSphericalSegment::Axis(int dof) const
 
 void IK_QSphericalSegment::SetLimit(int axis, double lmin, double lmax)
 {
-  if (lmin > lmax)
+  if (lmin > lmax) {
     return;
+  }
 
   if (axis == 1) {
     lmin = Clamp(lmin, -M_PI, M_PI);
@@ -216,8 +212,9 @@ void IK_QSphericalSegment::SetWeight(int axis, double weight)
 
 bool IK_QSphericalSegment::UpdateAngle(const IK_QJacobian &jacobian, Vector3d &delta, bool *clamp)
 {
-  if (m_locked[0] && m_locked[1] && m_locked[2])
+  if (m_locked[0] && m_locked[1] && m_locked[2]) {
     return false;
+  }
 
   Vector3d dq;
   dq.x() = jacobian.AngleUpdate(m_DoF_id);
@@ -259,20 +256,25 @@ bool IK_QSphericalSegment::UpdateAngle(const IK_QJacobian &jacobian, Vector3d &d
 
     m_new_basis = m_basis * M;
   }
-  else
+  else {
     m_new_basis = m_basis;
+  }
 
-  if (m_limit_y == false && m_limit_x == false && m_limit_z == false)
+  if (m_limit_y == false && m_limit_x == false && m_limit_z == false) {
     return false;
+  }
 
   Vector3d a = SphericalRangeParameters(m_new_basis);
 
-  if (m_locked[0])
+  if (m_locked[0]) {
     a.x() = m_locked_ax;
-  if (m_locked[1])
+  }
+  if (m_locked[1]) {
     a.y() = m_locked_ay;
-  if (m_locked[2])
+  }
+  if (m_locked[2]) {
     a.z() = m_locked_az;
+  }
 
   double ax = a.x(), ay = a.y(), az = a.z();
 
@@ -290,8 +292,9 @@ bool IK_QSphericalSegment::UpdateAngle(const IK_QJacobian &jacobian, Vector3d &d
   }
 
   if (m_limit_x && m_limit_z) {
-    if (EllipseClamp(ax, az, m_min, m_max))
+    if (EllipseClamp(ax, az, m_min, m_max)) {
       clamp[0] = clamp[2] = true;
+    }
   }
   else if (m_limit_x) {
     if (ax < m_min[0]) {
@@ -315,8 +318,9 @@ bool IK_QSphericalSegment::UpdateAngle(const IK_QJacobian &jacobian, Vector3d &d
   }
 
   if (clamp[0] == false && clamp[1] == false && clamp[2] == false) {
-    if (m_locked[0] || m_locked[1] || m_locked[2])
+    if (m_locked[0] || m_locked[1] || m_locked[2]) {
       m_new_basis = ComputeSwingMatrix(ax, az) * ComputeTwistMatrix(ay);
+    }
     return false;
   }
 
@@ -329,8 +333,9 @@ bool IK_QSphericalSegment::UpdateAngle(const IK_QJacobian &jacobian, Vector3d &d
     m_locked_az = az;
   }
 
-  if (!m_locked[1] && clamp[1])
+  if (!m_locked[1] && clamp[1]) {
     m_locked_ay = ay;
+  }
 
   return true;
 }
@@ -355,9 +360,7 @@ void IK_QSphericalSegment::UpdateAngleApply()
 
 // IK_QNullSegment
 
-IK_QNullSegment::IK_QNullSegment() : IK_QSegment(0, false)
-{
-}
+IK_QNullSegment::IK_QNullSegment() : IK_QSegment(0, false) {}
 
 // IK_QRevoluteSegment
 
@@ -378,29 +381,34 @@ void IK_QRevoluteSegment::SetBasis(const Matrix3d &basis)
   }
 }
 
-Vector3d IK_QRevoluteSegment::Axis(int) const
+Vector3d IK_QRevoluteSegment::Axis(int /*dof*/) const
 {
   return m_global_transform.linear().col(m_axis);
 }
 
 bool IK_QRevoluteSegment::UpdateAngle(const IK_QJacobian &jacobian, Vector3d &delta, bool *clamp)
 {
-  if (m_locked[0])
+  if (m_locked[0]) {
     return false;
+  }
 
   m_new_angle = m_angle + jacobian.AngleUpdate(m_DoF_id);
 
   clamp[0] = false;
 
-  if (m_limit == false)
+  if (m_limit == false) {
     return false;
+  }
 
-  if (m_new_angle > m_max)
+  if (m_new_angle > m_max) {
     delta[0] = m_max - m_angle;
-  else if (m_new_angle < m_min)
+  }
+  else if (m_new_angle < m_min) {
     delta[0] = m_min - m_angle;
-  else
+  }
+  else {
     return false;
+  }
 
   clamp[0] = true;
   m_new_angle = m_angle + delta[0];
@@ -408,7 +416,7 @@ bool IK_QRevoluteSegment::UpdateAngle(const IK_QJacobian &jacobian, Vector3d &de
   return true;
 }
 
-void IK_QRevoluteSegment::Lock(int, IK_QJacobian &jacobian, Vector3d &delta)
+void IK_QRevoluteSegment::Lock(int /*dof*/, IK_QJacobian &jacobian, Vector3d &delta)
 {
   m_locked[0] = true;
   jacobian.Lock(m_DoF_id, delta[0]);
@@ -422,8 +430,9 @@ void IK_QRevoluteSegment::UpdateAngleApply()
 
 void IK_QRevoluteSegment::SetLimit(int axis, double lmin, double lmax)
 {
-  if (lmin > lmax || m_axis != axis)
+  if (lmin > lmax || m_axis != axis) {
     return;
+  }
 
   // clamp and convert to axis angle parameters
   lmin = Clamp(lmin, -M_PI, M_PI);
@@ -437,15 +446,14 @@ void IK_QRevoluteSegment::SetLimit(int axis, double lmin, double lmax)
 
 void IK_QRevoluteSegment::SetWeight(int axis, double weight)
 {
-  if (axis == m_axis)
+  if (axis == m_axis) {
     m_weight[0] = weight;
+  }
 }
 
 // IK_QSwingSegment
 
-IK_QSwingSegment::IK_QSwingSegment() : IK_QSegment(2, false), m_limit_x(false), m_limit_z(false)
-{
-}
+IK_QSwingSegment::IK_QSwingSegment() : IK_QSegment(2, false), m_limit_x(false), m_limit_z(false) {}
 
 void IK_QSwingSegment::SetBasis(const Matrix3d &basis)
 {
@@ -460,8 +468,9 @@ Vector3d IK_QSwingSegment::Axis(int dof) const
 
 bool IK_QSwingSegment::UpdateAngle(const IK_QJacobian &jacobian, Vector3d &delta, bool *clamp)
 {
-  if (m_locked[0] && m_locked[1])
+  if (m_locked[0] && m_locked[1]) {
     return false;
+  }
 
   Vector3d dq;
   dq.x() = jacobian.AngleUpdate(m_DoF_id);
@@ -501,11 +510,13 @@ bool IK_QSwingSegment::UpdateAngle(const IK_QJacobian &jacobian, Vector3d &delta
 
     RemoveTwist(m_new_basis);
   }
-  else
+  else {
     m_new_basis = m_basis;
+  }
 
-  if (m_limit_x == false && m_limit_z == false)
+  if (m_limit_x == false && m_limit_z == false) {
     return false;
+  }
 
   Vector3d a = SphericalRangeParameters(m_new_basis);
   double ax = 0, az = 0;
@@ -516,8 +527,9 @@ bool IK_QSwingSegment::UpdateAngle(const IK_QJacobian &jacobian, Vector3d &delta
     ax = a.x();
     az = a.z();
 
-    if (EllipseClamp(ax, az, m_min, m_max))
+    if (EllipseClamp(ax, az, m_min, m_max)) {
       clamp[0] = clamp[1] = true;
+    }
   }
   else if (m_limit_x) {
     if (ax < m_min[0]) {
@@ -540,8 +552,9 @@ bool IK_QSwingSegment::UpdateAngle(const IK_QJacobian &jacobian, Vector3d &delta
     }
   }
 
-  if (clamp[0] == false && clamp[1] == false)
+  if (clamp[0] == false && clamp[1] == false) {
     return false;
+  }
 
   m_new_basis = ComputeSwingMatrix(ax, az);
 
@@ -552,7 +565,7 @@ bool IK_QSwingSegment::UpdateAngle(const IK_QJacobian &jacobian, Vector3d &delta
   return true;
 }
 
-void IK_QSwingSegment::Lock(int, IK_QJacobian &jacobian, Vector3d &delta)
+void IK_QSwingSegment::Lock(int /*dof*/, IK_QJacobian &jacobian, Vector3d &delta)
 {
   m_locked[0] = m_locked[1] = true;
   jacobian.Lock(m_DoF_id, delta[0]);
@@ -566,8 +579,9 @@ void IK_QSwingSegment::UpdateAngleApply()
 
 void IK_QSwingSegment::SetLimit(int axis, double lmin, double lmax)
 {
-  if (lmin > lmax)
+  if (lmin > lmax) {
     return;
+  }
 
   // clamp and convert to axis angle parameters
   lmin = Clamp(lmin, -M_PI, M_PI);
@@ -600,10 +614,12 @@ void IK_QSwingSegment::SetLimit(int axis, double lmin, double lmax)
 
 void IK_QSwingSegment::SetWeight(int axis, double weight)
 {
-  if (axis == 0)
+  if (axis == 0) {
     m_weight[0] = weight;
-  else if (axis == 2)
+  }
+  else if (axis == 2) {
     m_weight[1] = weight;
+  }
 }
 
 // IK_QElbowSegment
@@ -635,21 +651,23 @@ Vector3d IK_QElbowSegment::Axis(int dof) const
 {
   if (dof == 0) {
     Vector3d v;
-    if (m_axis == 0)
+    if (m_axis == 0) {
       v = Vector3d(m_cos_twist, 0, m_sin_twist);
-    else
+    }
+    else {
       v = Vector3d(-m_sin_twist, 0, m_cos_twist);
+    }
 
     return m_global_transform.linear() * v;
   }
-  else
-    return m_global_transform.linear().col(1);
+  return m_global_transform.linear().col(1);
 }
 
 bool IK_QElbowSegment::UpdateAngle(const IK_QJacobian &jacobian, Vector3d &delta, bool *clamp)
 {
-  if (m_locked[0] && m_locked[1])
+  if (m_locked[0] && m_locked[1]) {
     return false;
+  }
 
   clamp[0] = clamp[1] = false;
 
@@ -718,8 +736,9 @@ void IK_QElbowSegment::UpdateAngleApply()
 
 void IK_QElbowSegment::SetLimit(int axis, double lmin, double lmax)
 {
-  if (lmin > lmax)
+  if (lmin > lmax) {
     return;
+  }
 
   // clamp and convert to axis angle parameters
   lmin = Clamp(lmin, -M_PI, M_PI);
@@ -739,10 +758,12 @@ void IK_QElbowSegment::SetLimit(int axis, double lmin, double lmax)
 
 void IK_QElbowSegment::SetWeight(int axis, double weight)
 {
-  if (axis == m_axis)
+  if (axis == m_axis) {
     m_weight[0] = weight;
-  else if (axis == 1)
+  }
+  else if (axis == 1) {
     m_weight[1] = weight;
+  }
 }
 
 // IK_QTranslateSegment
@@ -838,15 +859,18 @@ void IK_QTranslateSegment::SetWeight(int axis, double weight)
 {
   int i;
 
-  for (i = 0; i < m_num_DoF; i++)
-    if (m_axis[i] == axis)
+  for (i = 0; i < m_num_DoF; i++) {
+    if (m_axis[i] == axis) {
       m_weight[i] = weight;
+    }
+  }
 }
 
 void IK_QTranslateSegment::SetLimit(int axis, double lmin, double lmax)
 {
-  if (lmax < lmin)
+  if (lmax < lmin) {
     return;
+  }
 
   m_min[axis] = lmin;
   m_max[axis] = lmax;

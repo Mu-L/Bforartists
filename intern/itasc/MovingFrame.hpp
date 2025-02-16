@@ -1,8 +1,9 @@
-/*
- * MovingFrame.h
+/* SPDX-FileCopyrightText: 2009 Benoit Bolsee
  *
- *  Created on: Feb 10, 2009
- *      Author: benoitbolsee
+ * SPDX-License-Identifier: LGPL-2.1-or-later */
+
+/** \file
+ * \ingroup intern_itasc
  */
 
 #ifndef MOVINGFRAME_HPP_

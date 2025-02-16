@@ -1,38 +1,26 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
 /** \file
  * \ingroup bli
- * \brief Strict compiler flags for areas of code we want
+ * Strict compiler flags for areas of code we want
  * to ensure don't do conversions without us knowing about it.
+ *
+ * \note Typically this include should be ordered as the last include in a C/C++ file
+ * otherwise it can cause warnings in any includes after it which aren't expected
+ * to use strict warnings.
  */
 
 #ifdef __GNUC__
-#  if (__GNUC__ * 100 + __GNUC_MINOR__) >= 406 /* gcc4.6+ only */
+/* NOTE(@ideasman42): CLANG behaves slightly differently to GCC,
+ * these can be enabled but do so carefully as they can introduce build-errors. */
+#  if !defined(__clang__)
 #    pragma GCC diagnostic error "-Wsign-compare"
-#  endif
-#  if __GNUC__ >= 6 /* gcc6+ only */
 #    pragma GCC diagnostic error "-Wconversion"
-#  endif
-#  if (__GNUC__ * 100 + __GNUC_MINOR__) >= 408
-/* gcc4.8+ only (behavior changed to ignore globals). */
 #    pragma GCC diagnostic error "-Wshadow"
-/* older gcc changed behavior with ternary */
 #    pragma GCC diagnostic error "-Wsign-conversion"
 #  endif
 /* pedantic gives too many issues, developers can define this for own use */

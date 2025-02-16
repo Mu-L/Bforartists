@@ -1,57 +1,40 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include <utility>
 
-#include "BKE_attribute_access.hh"
+#include "BKE_anonymous_attribute_id.hh"
 #include "BKE_attribute_math.hh"
-#include "BKE_customdata.h"
-#include "BKE_deform.h"
+#include "BKE_curves.hh"
+#include "BKE_customdata.hh"
 #include "BKE_geometry_set.hh"
-#include "BKE_mesh.h"
-#include "BKE_pointcloud.h"
+#include "BKE_type_conversions.hh"
 
+#include "DNA_ID.h"
+#include "DNA_grease_pencil_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meshdata_types.h"
 #include "DNA_pointcloud_types.h"
 
+#include "BLI_array_utils.hh"
 #include "BLI_color.hh"
-#include "BLI_float2.hh"
+#include "BLI_math_vector_types.hh"
 #include "BLI_span.hh"
 
-#include "CLG_log.h"
+#include "BLT_translation.hh"
 
-#include "NOD_type_conversions.hh"
+#include "FN_field.hh"
 
 #include "attribute_access_intern.hh"
 
-static CLG_LogRef LOG = {"bke.attribute_access"};
-
-using blender::float3;
-using blender::Set;
-using blender::StringRef;
-using blender::StringRefNull;
-using blender::fn::GMutableSpan;
-using blender::fn::GSpan;
-using blender::fn::GVArray_For_GSpan;
-using blender::fn::GVArray_For_SingleValue;
+#ifndef NDEBUG
+#  include <iostream>
+#endif
 
 namespace blender::bke {
 
-const blender::fn::CPPType *custom_data_type_to_cpp_type(const CustomDataType type)
+const blender::CPPType *custom_data_type_to_cpp_type(const eCustomDataType type)
 {
   switch (type) {
     case CD_PROP_FLOAT:
@@ -62,17 +45,30 @@ const blender::fn::CPPType *custom_data_type_to_cpp_type(const CustomDataType ty
       return &CPPType::get<float3>();
     case CD_PROP_INT32:
       return &CPPType::get<int>();
+    case CD_PROP_INT32_2D:
+      return &CPPType::get<int2>();
     case CD_PROP_COLOR:
       return &CPPType::get<ColorGeometry4f>();
     case CD_PROP_BOOL:
       return &CPPType::get<bool>();
+    case CD_PROP_INT8:
+      return &CPPType::get<int8_t>();
+    case CD_PROP_BYTE_COLOR:
+      return &CPPType::get<ColorGeometry4b>();
+    case CD_PROP_QUATERNION:
+      return &CPPType::get<math::Quaternion>();
+    case CD_PROP_FLOAT4X4:
+      return &CPPType::get<float4x4>();
+    case CD_PROP_INT16_2D:
+      return &CPPType::get<short2>();
+    case CD_PROP_STRING:
+      return &CPPType::get<MStringProperty>();
     default:
       return nullptr;
   }
-  return nullptr;
 }
 
-CustomDataType cpp_type_to_custom_data_type(const blender::fn::CPPType &type)
+eCustomDataType cpp_type_to_custom_data_type(const blender::CPPType &type)
 {
   if (type.is<float>()) {
     return CD_PROP_FLOAT;
@@ -86,35 +82,104 @@ CustomDataType cpp_type_to_custom_data_type(const blender::fn::CPPType &type)
   if (type.is<int>()) {
     return CD_PROP_INT32;
   }
+  if (type.is<int2>()) {
+    return CD_PROP_INT32_2D;
+  }
   if (type.is<ColorGeometry4f>()) {
     return CD_PROP_COLOR;
   }
   if (type.is<bool>()) {
     return CD_PROP_BOOL;
   }
-  return static_cast<CustomDataType>(-1);
+  if (type.is<int8_t>()) {
+    return CD_PROP_INT8;
+  }
+  if (type.is<ColorGeometry4b>()) {
+    return CD_PROP_BYTE_COLOR;
+  }
+  if (type.is<math::Quaternion>()) {
+    return CD_PROP_QUATERNION;
+  }
+  if (type.is<float4x4>()) {
+    return CD_PROP_FLOAT4X4;
+  }
+  if (type.is<short2>()) {
+    return CD_PROP_INT16_2D;
+  }
+  if (type.is<MStringProperty>()) {
+    return CD_PROP_STRING;
+  }
+  return static_cast<eCustomDataType>(-1);
 }
 
-static int attribute_data_type_complexity(const CustomDataType data_type)
+const char *no_procedural_access_message = N_(
+    "This attribute cannot be accessed in a procedural context");
+
+bool allow_procedural_attribute_access(StringRef attribute_name)
+{
+  if (attribute_name.startswith(".corner")) {
+    return false;
+  }
+  if (attribute_name.startswith(".edge")) {
+    return false;
+  }
+  if (attribute_name.startswith(".select")) {
+    return false;
+  }
+  if (attribute_name.startswith(".sculpt")) {
+    return false;
+  }
+  if (attribute_name.startswith(".hide")) {
+    return false;
+  }
+  if (attribute_name.startswith(".uv")) {
+    return false;
+  }
+  if (attribute_name == ".reference_index") {
+    return false;
+  }
+  if (attribute_name.startswith("." UV_VERTSEL_NAME ".")) {
+    return false;
+  }
+  if (attribute_name.startswith("." UV_EDGESEL_NAME ".")) {
+    return false;
+  }
+  if (attribute_name.startswith("." UV_PINNED_NAME ".")) {
+    return false;
+  }
+  return true;
+}
+
+static int attribute_data_type_complexity(const eCustomDataType data_type)
 {
   switch (data_type) {
     case CD_PROP_BOOL:
       return 0;
-    case CD_PROP_INT32:
+    case CD_PROP_INT8:
       return 1;
-    case CD_PROP_FLOAT:
+    case CD_PROP_INT32:
       return 2;
-    case CD_PROP_FLOAT2:
+    case CD_PROP_FLOAT:
       return 3;
-    case CD_PROP_FLOAT3:
+    case CD_PROP_INT16_2D:
       return 4;
-    case CD_PROP_COLOR:
+    case CD_PROP_INT32_2D:
       return 5;
-#if 0 /* These attribute types are not supported yet. */
-    case CD_MLOOPCOL:
-      return 3;
-    case CD_PROP_STRING:
+    case CD_PROP_FLOAT2:
       return 6;
+    case CD_PROP_FLOAT3:
+      return 7;
+    case CD_PROP_BYTE_COLOR:
+      return 8;
+    case CD_PROP_QUATERNION:
+      return 9;
+    case CD_PROP_COLOR:
+      return 10;
+    case CD_PROP_FLOAT4X4:
+      return 11;
+#if 0 /* These attribute types are not supported yet. */
+    case CD_PROP_STRING:
+      return 12;
 #endif
     default:
       /* Only accept "generic" custom data types used by the attribute system. */
@@ -123,12 +188,12 @@ static int attribute_data_type_complexity(const CustomDataType data_type)
   }
 }
 
-CustomDataType attribute_data_type_highest_complexity(Span<CustomDataType> data_types)
+eCustomDataType attribute_data_type_highest_complexity(Span<eCustomDataType> data_types)
 {
   int highest_complexity = INT_MIN;
-  CustomDataType most_complex_type = CD_PROP_COLOR;
+  eCustomDataType most_complex_type = CD_PROP_COLOR;
 
-  for (const CustomDataType data_type : data_types) {
+  for (const eCustomDataType data_type : data_types) {
     const int complexity = attribute_data_type_complexity(data_type);
     if (complexity > highest_complexity) {
       highest_complexity = complexity;
@@ -141,21 +206,25 @@ CustomDataType attribute_data_type_highest_complexity(Span<CustomDataType> data_
 
 /**
  * \note Generally the order should mirror the order of the domains
- * established in each component's ComponentAttributeProviders.
+ * established in each component's GeometryAttributeProviders.
  */
-static int attribute_domain_priority(const AttributeDomain domain)
+static int attribute_domain_priority(const AttrDomain domain)
 {
   switch (domain) {
-    case ATTR_DOMAIN_CURVE:
+    case AttrDomain::Instance:
       return 0;
-    case ATTR_DOMAIN_FACE:
+    case AttrDomain::Layer:
       return 1;
-    case ATTR_DOMAIN_EDGE:
+    case AttrDomain::Curve:
       return 2;
-    case ATTR_DOMAIN_POINT:
+    case AttrDomain::Face:
       return 3;
-    case ATTR_DOMAIN_CORNER:
+    case AttrDomain::Edge:
       return 4;
+    case AttrDomain::Point:
+      return 5;
+    case AttrDomain::Corner:
+      return 6;
     default:
       /* Domain not supported in nodes yet. */
       BLI_assert_unreachable();
@@ -163,16 +232,12 @@ static int attribute_domain_priority(const AttributeDomain domain)
   }
 }
 
-/**
- * Domains with a higher "information density" have a higher priority, in order
- * to choose a domain that will not lose data through domain conversion.
- */
-AttributeDomain attribute_domain_highest_priority(Span<AttributeDomain> domains)
+AttrDomain attribute_domain_highest_priority(Span<AttrDomain> domains)
 {
   int highest_priority = INT_MIN;
-  AttributeDomain highest_priority_domain = ATTR_DOMAIN_CORNER;
+  AttrDomain highest_priority_domain = AttrDomain::Corner;
 
-  for (const AttributeDomain domain : domains) {
+  for (const AttrDomain domain : domains) {
     const int priority = attribute_domain_priority(domain);
     if (priority > highest_priority) {
       highest_priority = priority;
@@ -183,287 +248,279 @@ AttributeDomain attribute_domain_highest_priority(Span<AttributeDomain> domains)
   return highest_priority_domain;
 }
 
-void OutputAttribute::save()
+static void *add_generic_custom_data_layer(CustomData &custom_data,
+                                           const eCustomDataType data_type,
+                                           const eCDAllocType alloctype,
+                                           const int domain_size,
+                                           const StringRef attribute_id)
 {
-  save_has_been_called_ = true;
-  if (optional_span_varray_.has_value()) {
-    optional_span_varray_->save();
-  }
-  if (save_) {
-    save_(*this);
-  }
+  return CustomData_add_layer_named(&custom_data, data_type, alloctype, domain_size, attribute_id);
 }
 
-OutputAttribute::~OutputAttribute()
+static const void *add_generic_custom_data_layer_with_existing_data(
+    CustomData &custom_data,
+    const eCustomDataType data_type,
+    const StringRef attribute_id,
+    const int domain_size,
+    void *layer_data,
+    const ImplicitSharingInfo *sharing_info)
 {
-  if (!save_has_been_called_) {
-    if (varray_) {
-      std::cout << "Warning: Call `save()` to make sure that changes persist in all cases.\n";
+  return CustomData_add_layer_named_with_data(
+      &custom_data, data_type, layer_data, domain_size, attribute_id, sharing_info);
+}
+
+static bool add_custom_data_layer_from_attribute_init(const StringRef attribute_id,
+                                                      CustomData &custom_data,
+                                                      const eCustomDataType data_type,
+                                                      const int domain_num,
+                                                      const AttributeInit &initializer,
+                                                      const GPointer custom_default_value_ptr)
+{
+  const int old_layer_num = custom_data.totlayer;
+  switch (initializer.type) {
+    case AttributeInit::Type::Construct: {
+      add_generic_custom_data_layer(
+          custom_data, data_type, CD_CONSTRUCT, domain_num, attribute_id);
+      break;
+    }
+    case AttributeInit::Type::DefaultValue: {
+      if (const void *default_value = custom_default_value_ptr.get()) {
+        const CPPType &type = *custom_default_value_ptr.type();
+        void *data = add_generic_custom_data_layer(
+            custom_data, data_type, CD_CONSTRUCT, domain_num, attribute_id);
+        type.fill_assign_n(default_value, data, domain_num);
+      }
+      else {
+        add_generic_custom_data_layer(
+            custom_data, data_type, CD_SET_DEFAULT, domain_num, attribute_id);
+      }
+      break;
+    }
+    case AttributeInit::Type::VArray: {
+      void *data = add_generic_custom_data_layer(
+          custom_data, data_type, CD_CONSTRUCT, domain_num, attribute_id);
+      if (data != nullptr) {
+        const GVArray &varray = static_cast<const AttributeInitVArray &>(initializer).varray;
+        varray.materialize_to_uninitialized(varray.index_range(), data);
+      }
+      break;
+    }
+    case AttributeInit::Type::MoveArray: {
+      void *data = static_cast<const AttributeInitMoveArray &>(initializer).data;
+      add_generic_custom_data_layer_with_existing_data(
+          custom_data, data_type, attribute_id, domain_num, data, nullptr);
+      break;
+    }
+    case AttributeInit::Type::Shared: {
+      const AttributeInitShared &init = static_cast<const AttributeInitShared &>(initializer);
+      add_generic_custom_data_layer_with_existing_data(custom_data,
+                                                       data_type,
+                                                       attribute_id,
+                                                       domain_num,
+                                                       const_cast<void *>(init.data),
+                                                       init.sharing_info);
+      break;
     }
   }
+  return old_layer_num < custom_data.totlayer;
 }
 
-GVArrayPtr BuiltinCustomDataLayerProvider::try_get_for_read(
-    const GeometryComponent &component) const
+bool BuiltinCustomDataLayerProvider::layer_exists(const CustomData &custom_data) const
 {
-  const CustomData *custom_data = custom_data_access_.get_const_custom_data(component);
+  return CustomData_get_named_layer_index(&custom_data, data_type_, name_) != -1;
+}
+
+GAttributeReader BuiltinCustomDataLayerProvider::try_get_for_read(const void *owner) const
+{
+  const CustomData *custom_data = custom_data_access_.get_const_custom_data(owner);
   if (custom_data == nullptr) {
     return {};
   }
 
-  const int domain_size = component.attribute_domain_size(domain_);
-  const void *data = CustomData_get_layer(custom_data, stored_type_);
-  if (data == nullptr) {
+  /* When the number of elements is zero, layers might have null data but still exist. */
+  const CPPType &type = *custom_data_type_to_cpp_type(data_type_);
+  const int element_num = custom_data_access_.get_element_num(owner);
+  if (element_num == 0) {
+    if (this->layer_exists(*custom_data)) {
+      return {GVArray::ForSpan({type, nullptr, 0}), domain_, nullptr};
+    }
     return {};
   }
-  return as_read_attribute_(data, domain_size);
+
+  const int index = CustomData_get_named_layer_index(custom_data, data_type_, name_);
+  if (index == -1) {
+    return {};
+  }
+  const CustomDataLayer &layer = custom_data->layers[index];
+  return {GVArray::ForSpan({type, layer.data, element_num}), domain_, layer.sharing_info};
 }
 
-GVMutableArrayPtr BuiltinCustomDataLayerProvider::try_get_for_write(
-    GeometryComponent &component) const
+GAttributeWriter BuiltinCustomDataLayerProvider::try_get_for_write(void *owner) const
 {
-  if (writable_ != Writable) {
-    return {};
-  }
-  CustomData *custom_data = custom_data_access_.get_custom_data(component);
+  CustomData *custom_data = custom_data_access_.get_custom_data(owner);
   if (custom_data == nullptr) {
     return {};
   }
-  const int domain_size = component.attribute_domain_size(domain_);
-  void *data = CustomData_get_layer(custom_data, stored_type_);
+
+  std::function<void()> tag_modified_fn;
+  if (update_on_change_ != nullptr) {
+    tag_modified_fn = [owner, update = update_on_change_]() { update(owner); };
+  }
+
+  /* When the number of elements is zero, layers might have null data but still exist. */
+  const CPPType &type = *custom_data_type_to_cpp_type(data_type_);
+  const int element_num = custom_data_access_.get_element_num(owner);
+  if (element_num == 0) {
+    if (this->layer_exists(*custom_data)) {
+      return {GVMutableArray::ForSpan({type, nullptr, 0}), domain_, std::move(tag_modified_fn)};
+    }
+    return {};
+  }
+
+  void *data = CustomData_get_layer_named_for_write(custom_data, data_type_, name_, element_num);
   if (data == nullptr) {
     return {};
   }
-  void *new_data = CustomData_duplicate_referenced_layer(custom_data, stored_type_, domain_size);
-  if (data != new_data) {
-    custom_data_access_.update_custom_data_pointers(component);
-    data = new_data;
-  }
-  if (update_on_write_ != nullptr) {
-    update_on_write_(component);
-  }
-  return as_write_attribute_(data, domain_size);
+  return {GVMutableArray::ForSpan({type, data, element_num}), domain_, std::move(tag_modified_fn)};
 }
 
-bool BuiltinCustomDataLayerProvider::try_delete(GeometryComponent &component) const
+bool BuiltinCustomDataLayerProvider::try_delete(void *owner) const
 {
   if (deletable_ != Deletable) {
     return false;
   }
-  CustomData *custom_data = custom_data_access_.get_custom_data(component);
+  CustomData *custom_data = custom_data_access_.get_custom_data(owner);
   if (custom_data == nullptr) {
     return {};
   }
 
-  const int domain_size = component.attribute_domain_size(domain_);
-  const int layer_index = CustomData_get_layer_index(custom_data, stored_type_);
-  const bool delete_success = CustomData_free_layer(
-      custom_data, stored_type_, domain_size, layer_index);
-  if (delete_success) {
-    custom_data_access_.update_custom_data_pointers(component);
+  const int element_num = custom_data_access_.get_element_num(owner);
+  if (CustomData_free_layer_named(custom_data, name_, element_num)) {
+    if (update_on_change_ != nullptr) {
+      update_on_change_(owner);
+    }
+    return true;
   }
-  return delete_success;
-}
-
-static bool add_custom_data_layer_from_attribute_init(CustomData &custom_data,
-                                                      const CustomDataType data_type,
-                                                      const int domain_size,
-                                                      const AttributeInit &initializer)
-{
-  switch (initializer.type) {
-    case AttributeInit::Type::Default: {
-      void *data = CustomData_add_layer(&custom_data, data_type, CD_DEFAULT, nullptr, domain_size);
-      return data != nullptr;
-    }
-    case AttributeInit::Type::VArray: {
-      void *data = CustomData_add_layer(&custom_data, data_type, CD_DEFAULT, nullptr, domain_size);
-      if (data == nullptr) {
-        return false;
-      }
-      const GVArray *varray = static_cast<const AttributeInitVArray &>(initializer).varray;
-      varray->materialize_to_uninitialized(IndexRange(varray->size()), data);
-      return true;
-    }
-    case AttributeInit::Type::MoveArray: {
-      void *source_data = static_cast<const AttributeInitMove &>(initializer).data;
-      void *data = CustomData_add_layer(
-          &custom_data, data_type, CD_ASSIGN, source_data, domain_size);
-      if (data == nullptr) {
-        MEM_freeN(source_data);
-        return false;
-      }
-      return true;
-    }
-  }
-
-  BLI_assert_unreachable();
   return false;
 }
 
-bool BuiltinCustomDataLayerProvider::try_create(GeometryComponent &component,
+bool BuiltinCustomDataLayerProvider::try_create(void *owner,
                                                 const AttributeInit &initializer) const
 {
-  if (createable_ != Creatable) {
-    return false;
-  }
-  CustomData *custom_data = custom_data_access_.get_custom_data(component);
+  CustomData *custom_data = custom_data_access_.get_custom_data(owner);
   if (custom_data == nullptr) {
     return false;
   }
-  if (CustomData_get_layer(custom_data, stored_type_) != nullptr) {
+
+  const int element_num = custom_data_access_.get_element_num(owner);
+  if (CustomData_has_layer_named(custom_data, data_type_, name_)) {
     /* Exists already. */
     return false;
   }
-
-  const int domain_size = component.attribute_domain_size(domain_);
-  const bool success = add_custom_data_layer_from_attribute_init(
-      *custom_data, stored_type_, domain_size, initializer);
-  if (success) {
-    custom_data_access_.update_custom_data_pointers(component);
+  if (add_custom_data_layer_from_attribute_init(
+          name_, *custom_data, data_type_, element_num, initializer, default_value_))
+  {
+    if (initializer.type != AttributeInit::Type::Construct) {
+      /* Avoid calling update function when values are not default-initialized. Without default
+       * initialization or otherwise meaningful initial values, they should be set elsewhere
+       * anyway, which will cause a separate update tag. */
+      if (update_on_change_ != nullptr) {
+        update_on_change_(owner);
+      }
+    }
+    return true;
   }
-  return success;
+  return false;
 }
 
-bool BuiltinCustomDataLayerProvider::exists(const GeometryComponent &component) const
+bool BuiltinCustomDataLayerProvider::exists(const void *owner) const
 {
-  const CustomData *custom_data = custom_data_access_.get_const_custom_data(component);
+  const CustomData *custom_data = custom_data_access_.get_const_custom_data(owner);
   if (custom_data == nullptr) {
     return false;
   }
-  const void *data = CustomData_get_layer(custom_data, stored_type_);
-  return data != nullptr;
+  return CustomData_has_layer_named(custom_data, data_type_, name_);
 }
 
-ReadAttributeLookup CustomDataAttributeProvider::try_get_for_read(
-    const GeometryComponent &component, const StringRef attribute_name) const
+GAttributeReader CustomDataAttributeProvider::try_get_for_read(const void *owner,
+                                                               const StringRef attribute_id) const
 {
-  const CustomData *custom_data = custom_data_access_.get_const_custom_data(component);
+  const CustomData *custom_data = custom_data_access_.get_const_custom_data(owner);
   if (custom_data == nullptr) {
     return {};
   }
-  const int domain_size = component.attribute_domain_size(domain_);
+  const int element_num = custom_data_access_.get_element_num(owner);
   for (const CustomDataLayer &layer : Span(custom_data->layers, custom_data->totlayer)) {
-    if (layer.name != attribute_name) {
+    if (layer.name != attribute_id) {
       continue;
     }
-    const CustomDataType data_type = (CustomDataType)layer.type;
-    switch (data_type) {
-      case CD_PROP_FLOAT:
-        return this->layer_to_read_attribute<float>(layer, domain_size);
-      case CD_PROP_FLOAT2:
-        return this->layer_to_read_attribute<float2>(layer, domain_size);
-      case CD_PROP_FLOAT3:
-        return this->layer_to_read_attribute<float3>(layer, domain_size);
-      case CD_PROP_INT32:
-        return this->layer_to_read_attribute<int>(layer, domain_size);
-      case CD_PROP_COLOR:
-        return this->layer_to_read_attribute<ColorGeometry4f>(layer, domain_size);
-      case CD_PROP_BOOL:
-        return this->layer_to_read_attribute<bool>(layer, domain_size);
-      default:
-        break;
+    const CPPType *type = custom_data_type_to_cpp_type(eCustomDataType(layer.type));
+    if (type == nullptr) {
+      continue;
     }
+    GSpan data{*type, layer.data, element_num};
+    return {GVArray::ForSpan(data), domain_, layer.sharing_info};
   }
   return {};
 }
 
-WriteAttributeLookup CustomDataAttributeProvider::try_get_for_write(
-    GeometryComponent &component, const StringRef attribute_name) const
+GAttributeWriter CustomDataAttributeProvider::try_get_for_write(void *owner,
+                                                                const StringRef attribute_id) const
 {
-  CustomData *custom_data = custom_data_access_.get_custom_data(component);
+  CustomData *custom_data = custom_data_access_.get_custom_data(owner);
   if (custom_data == nullptr) {
     return {};
   }
-  const int domain_size = component.attribute_domain_size(domain_);
+  const int element_num = custom_data_access_.get_element_num(owner);
   for (CustomDataLayer &layer : MutableSpan(custom_data->layers, custom_data->totlayer)) {
-    if (layer.name != attribute_name) {
+    if (layer.name != attribute_id) {
       continue;
     }
-    CustomData_duplicate_referenced_layer_named(custom_data, layer.type, layer.name, domain_size);
-    const CustomDataType data_type = (CustomDataType)layer.type;
-    switch (data_type) {
-      case CD_PROP_FLOAT:
-        return this->layer_to_write_attribute<float>(layer, domain_size);
-      case CD_PROP_FLOAT2:
-        return this->layer_to_write_attribute<float2>(layer, domain_size);
-      case CD_PROP_FLOAT3:
-        return this->layer_to_write_attribute<float3>(layer, domain_size);
-      case CD_PROP_INT32:
-        return this->layer_to_write_attribute<int>(layer, domain_size);
-      case CD_PROP_COLOR:
-        return this->layer_to_write_attribute<ColorGeometry4f>(layer, domain_size);
-      case CD_PROP_BOOL:
-        return this->layer_to_write_attribute<bool>(layer, domain_size);
-      default:
-        break;
+    CustomData_get_layer_named_for_write(
+        custom_data, eCustomDataType(layer.type), layer.name, element_num);
+
+    const CPPType *type = custom_data_type_to_cpp_type(eCustomDataType(layer.type));
+    if (type == nullptr) {
+      continue;
     }
+    std::function<void()> tag_modified_fn;
+    if (custom_data_access_.get_tag_modified_function != nullptr) {
+      tag_modified_fn = custom_data_access_.get_tag_modified_function(owner, attribute_id);
+    }
+    GMutableSpan data{*type, layer.data, element_num};
+    return {GVMutableArray::ForSpan(data), domain_, tag_modified_fn};
   }
   return {};
 }
 
-bool CustomDataAttributeProvider::try_delete(GeometryComponent &component,
-                                             const StringRef attribute_name) const
+bool CustomDataAttributeProvider::try_delete(void *owner, const StringRef attribute_id) const
 {
-  CustomData *custom_data = custom_data_access_.get_custom_data(component);
+  CustomData *custom_data = custom_data_access_.get_custom_data(owner);
   if (custom_data == nullptr) {
     return false;
   }
-  const int domain_size = component.attribute_domain_size(domain_);
+  const int element_num = custom_data_access_.get_element_num(owner);
   for (const int i : IndexRange(custom_data->totlayer)) {
     const CustomDataLayer &layer = custom_data->layers[i];
-    if (this->type_is_supported((CustomDataType)layer.type) && layer.name == attribute_name) {
-      CustomData_free_layer(custom_data, layer.type, domain_size, i);
+    if (this->type_is_supported(eCustomDataType(layer.type)) && layer.name == attribute_id) {
+      CustomData_free_layer(custom_data, eCustomDataType(layer.type), element_num, i);
+      if (custom_data_access_.get_tag_modified_function != nullptr) {
+        if (const std::function<void()> fn = custom_data_access_.get_tag_modified_function(
+                owner, attribute_id))
+        {
+          fn();
+        }
+      }
       return true;
     }
   }
   return false;
 }
 
-static bool add_named_custom_data_layer_from_attribute_init(const StringRef attribute_name,
-                                                            CustomData &custom_data,
-                                                            const CustomDataType data_type,
-                                                            const int domain_size,
-                                                            const AttributeInit &initializer)
-{
-  char attribute_name_c[MAX_NAME];
-  attribute_name.copy(attribute_name_c);
-
-  switch (initializer.type) {
-    case AttributeInit::Type::Default: {
-      void *data = CustomData_add_layer_named(
-          &custom_data, data_type, CD_DEFAULT, nullptr, domain_size, attribute_name_c);
-      return data != nullptr;
-    }
-    case AttributeInit::Type::VArray: {
-      void *data = CustomData_add_layer_named(
-          &custom_data, data_type, CD_DEFAULT, nullptr, domain_size, attribute_name_c);
-      if (data == nullptr) {
-        return false;
-      }
-      const GVArray *varray = static_cast<const AttributeInitVArray &>(initializer).varray;
-      varray->materialize_to_uninitialized(IndexRange(varray->size()), data);
-      return true;
-    }
-    case AttributeInit::Type::MoveArray: {
-      void *source_data = static_cast<const AttributeInitMove &>(initializer).data;
-      void *data = CustomData_add_layer_named(
-          &custom_data, data_type, CD_ASSIGN, source_data, domain_size, attribute_name_c);
-      if (data == nullptr) {
-        MEM_freeN(source_data);
-        return false;
-      }
-      return true;
-    }
-  }
-
-  BLI_assert_unreachable();
-  return false;
-}
-
-bool CustomDataAttributeProvider::try_create(GeometryComponent &component,
-                                             const StringRef attribute_name,
-                                             const AttributeDomain domain,
-                                             const CustomDataType data_type,
+bool CustomDataAttributeProvider::try_create(void *owner,
+                                             const StringRef attribute_id,
+                                             const AttrDomain domain,
+                                             const eCustomDataType data_type,
                                              const AttributeInit &initializer) const
 {
   if (domain_ != domain) {
@@ -472,33 +529,53 @@ bool CustomDataAttributeProvider::try_create(GeometryComponent &component,
   if (!this->type_is_supported(data_type)) {
     return false;
   }
-  CustomData *custom_data = custom_data_access_.get_custom_data(component);
+  CustomData *custom_data = custom_data_access_.get_custom_data(owner);
   if (custom_data == nullptr) {
     return false;
   }
   for (const CustomDataLayer &layer : Span(custom_data->layers, custom_data->totlayer)) {
-    if (layer.name == attribute_name) {
+    if (layer.name == attribute_id) {
       return false;
     }
   }
-  const int domain_size = component.attribute_domain_size(domain_);
-  add_named_custom_data_layer_from_attribute_init(
-      attribute_name, *custom_data, data_type, domain_size, initializer);
+  const int element_num = custom_data_access_.get_element_num(owner);
+  add_custom_data_layer_from_attribute_init(
+      attribute_id, *custom_data, data_type, element_num, initializer, {});
+  if (initializer.type != AttributeInit::Type::Construct) {
+    /* Avoid calling update function when values are not default-initialized. Without default
+     * initialization or otherwise meaningful initial values, they should be set elsewhere
+     * anyway, which will cause a separate update tag. */
+    if (custom_data_access_.get_tag_modified_function != nullptr) {
+      if (const std::function<void()> fn = custom_data_access_.get_tag_modified_function(
+              owner, attribute_id))
+      {
+        fn();
+      }
+    }
+  }
   return true;
 }
 
-bool CustomDataAttributeProvider::foreach_attribute(const GeometryComponent &component,
-                                                    const AttributeForeachCallback callback) const
+bool CustomDataAttributeProvider::foreach_attribute(
+    const void *owner, const FunctionRef<void(const AttributeIter &)> fn) const
 {
-  const CustomData *custom_data = custom_data_access_.get_const_custom_data(component);
+  const CustomData *custom_data = custom_data_access_.get_const_custom_data(owner);
   if (custom_data == nullptr) {
     return true;
   }
   for (const CustomDataLayer &layer : Span(custom_data->layers, custom_data->totlayer)) {
-    const CustomDataType data_type = (CustomDataType)layer.type;
+    const eCustomDataType data_type = eCustomDataType(layer.type);
     if (this->type_is_supported(data_type)) {
-      AttributeMetaData meta_data{domain_, data_type};
-      if (!callback(layer.name, meta_data)) {
+      const auto get_fn = [&]() {
+        const CPPType *type = custom_data_type_to_cpp_type(data_type);
+        BLI_assert(type);
+        GSpan data{*type, layer.data, custom_data_access_.get_element_num(owner)};
+        return GAttributeReader{GVArray::ForSpan(data), domain_, layer.sharing_info};
+      };
+
+      AttributeIter iter{layer.name, domain_, data_type, get_fn};
+      fn(iter);
+      if (iter.is_stopped()) {
         return false;
       }
     }
@@ -506,724 +583,499 @@ bool CustomDataAttributeProvider::foreach_attribute(const GeometryComponent &com
   return true;
 }
 
-ReadAttributeLookup NamedLegacyCustomDataProvider::try_get_for_read(
-    const GeometryComponent &component, const StringRef attribute_name) const
+/* -------------------------------------------------------------------- */
+/** \name Attribute API
+ * \{ */
+
+static GVArray try_adapt_data_type(GVArray varray, const CPPType &to_type)
 {
-  const CustomData *custom_data = custom_data_access_.get_const_custom_data(component);
-  if (custom_data == nullptr) {
+  const DataTypeConversions &conversions = get_implicit_type_conversions();
+  return conversions.try_convert(std::move(varray), to_type);
+}
+
+std::optional<AttributeAccessor> AttributeAccessor::from_id(const ID &id)
+{
+  switch (GS(id.name)) {
+    case ID_ME:
+      return reinterpret_cast<const Mesh &>(id).attributes();
+    case ID_PT:
+      return reinterpret_cast<const PointCloud &>(id).attributes();
+    case ID_CV:
+      return reinterpret_cast<const Curves &>(id).geometry.wrap().attributes();
+    case ID_GP:
+      return reinterpret_cast<const GreasePencil &>(id).attributes();
+    default:
+      return {};
+  }
+  return {};
+}
+
+static GAttributeReader adapt_domain_and_type_if_necessary(
+    GAttributeReader attribute,
+    const std::optional<AttrDomain> domain,
+    const std::optional<eCustomDataType> data_type,
+    const AttributeAccessor &accessor)
+{
+  if (!attribute) {
     return {};
   }
-  for (const CustomDataLayer &layer : Span(custom_data->layers, custom_data->totlayer)) {
-    if (layer.type == stored_type_) {
-      if (layer.name == attribute_name) {
-        const int domain_size = component.attribute_domain_size(domain_);
-        return {as_read_attribute_(layer.data, domain_size), domain_};
+  if (domain.has_value()) {
+    if (attribute.domain != domain) {
+      attribute.varray = accessor.adapt_domain(attribute.varray, attribute.domain, *domain);
+      attribute.domain = *domain;
+      attribute.sharing_info = nullptr;
+      if (!attribute.varray) {
+        return {};
       }
     }
   }
-  return {};
-}
-
-WriteAttributeLookup NamedLegacyCustomDataProvider::try_get_for_write(
-    GeometryComponent &component, const StringRef attribute_name) const
-{
-  CustomData *custom_data = custom_data_access_.get_custom_data(component);
-  if (custom_data == nullptr) {
-    return {};
-  }
-  for (CustomDataLayer &layer : MutableSpan(custom_data->layers, custom_data->totlayer)) {
-    if (layer.type == stored_type_) {
-      if (layer.name == attribute_name) {
-        const int domain_size = component.attribute_domain_size(domain_);
-        void *data_old = layer.data;
-        void *data_new = CustomData_duplicate_referenced_layer_named(
-            custom_data, stored_type_, layer.name, domain_size);
-        if (data_old != data_new) {
-          custom_data_access_.update_custom_data_pointers(component);
-        }
-        return {as_write_attribute_(layer.data, domain_size), domain_};
+  if (data_type.has_value()) {
+    const CPPType &type = *custom_data_type_to_cpp_type(*data_type);
+    if (attribute.varray.type() != type) {
+      attribute.varray = try_adapt_data_type(std::move(attribute.varray), type);
+      attribute.sharing_info = nullptr;
+      if (!attribute.varray) {
+        return {};
       }
     }
   }
-  return {};
+  return attribute;
 }
 
-bool NamedLegacyCustomDataProvider::try_delete(GeometryComponent &component,
-                                               const StringRef attribute_name) const
+GAttributeReader AttributeAccessor::lookup(const StringRef attribute_id,
+                                           const std::optional<AttrDomain> domain,
+                                           const std::optional<eCustomDataType> data_type) const
 {
-  CustomData *custom_data = custom_data_access_.get_custom_data(component);
-  if (custom_data == nullptr) {
-    return false;
+  return adapt_domain_and_type_if_necessary(this->lookup(attribute_id), domain, data_type, *this);
+}
+
+GAttributeReader AttributeIter::get(std::optional<AttrDomain> domain,
+                                    std::optional<eCustomDataType> data_type) const
+{
+  return adapt_domain_and_type_if_necessary(this->get(), domain, data_type, *accessor);
+}
+
+GAttributeReader AttributeAccessor::lookup_or_default(const StringRef attribute_id,
+                                                      const AttrDomain domain,
+                                                      const eCustomDataType data_type,
+                                                      const void *default_value) const
+{
+  GAttributeReader attribute = this->lookup(attribute_id, domain, data_type);
+  if (attribute) {
+    return attribute;
   }
-  for (const int i : IndexRange(custom_data->totlayer)) {
-    const CustomDataLayer &layer = custom_data->layers[i];
-    if (layer.type == stored_type_) {
-      if (layer.name == attribute_name) {
-        const int domain_size = component.attribute_domain_size(domain_);
-        CustomData_free_layer(custom_data, stored_type_, domain_size, i);
-        custom_data_access_.update_custom_data_pointers(component);
-        return true;
-      }
+  const CPPType &type = *custom_data_type_to_cpp_type(data_type);
+  const int64_t domain_size = this->domain_size(domain);
+  if (default_value == nullptr) {
+    return {GVArray::ForSingleRef(type, domain_size, type.default_value()), domain, nullptr};
+  }
+  return {GVArray::ForSingle(type, domain_size, default_value), domain, nullptr};
+}
+
+bool AttributeAccessor::contains(const StringRef attribute_id) const
+{
+  bool found = false;
+  this->foreach_attribute([&](const AttributeIter &iter) {
+    if (attribute_id == iter.name) {
+      found = true;
+      iter.stop();
+    }
+  });
+  return found;
+}
+
+std::optional<AttributeMetaData> AttributeAccessor::lookup_meta_data(
+    const StringRef attribute_id) const
+{
+  std::optional<AttributeMetaData> meta_data;
+  this->foreach_attribute([&](const AttributeIter &iter) {
+    if (attribute_id == iter.name) {
+      meta_data = AttributeMetaData{iter.domain, iter.data_type};
+      iter.stop();
+    }
+  });
+  return meta_data;
+}
+
+Set<StringRefNull> AttributeAccessor::all_ids() const
+{
+  Set<StringRefNull> ids;
+  this->foreach_attribute([&](const AttributeIter &iter) { ids.add(iter.name); });
+  return ids;
+}
+
+void MutableAttributeAccessor::remove_anonymous()
+{
+  Vector<std::string> anonymous_ids;
+  for (const StringRef id : this->all_ids()) {
+    if (attribute_name_is_anonymous(id)) {
+      anonymous_ids.append(id);
     }
   }
-  return false;
-}
 
-bool NamedLegacyCustomDataProvider::foreach_attribute(
-    const GeometryComponent &component, const AttributeForeachCallback callback) const
-{
-  const CustomData *custom_data = custom_data_access_.get_const_custom_data(component);
-  if (custom_data == nullptr) {
-    return true;
+  while (!anonymous_ids.is_empty()) {
+    this->remove(anonymous_ids.pop_last());
   }
-  for (const CustomDataLayer &layer : Span(custom_data->layers, custom_data->totlayer)) {
-    if (layer.type == stored_type_) {
-      AttributeMetaData meta_data{domain_, attribute_type_};
-      if (!callback(layer.name, meta_data)) {
-        return false;
-      }
-    }
-  }
-  return true;
-}
-
-void NamedLegacyCustomDataProvider::foreach_domain(
-    const FunctionRef<void(AttributeDomain)> callback) const
-{
-  callback(domain_);
-}
-
-CustomDataAttributes::CustomDataAttributes()
-{
-  CustomData_reset(&data);
-  size_ = 0;
-}
-
-CustomDataAttributes::~CustomDataAttributes()
-{
-  CustomData_free(&data, size_);
-}
-
-CustomDataAttributes::CustomDataAttributes(const CustomDataAttributes &other)
-{
-  size_ = other.size_;
-  CustomData_copy(&other.data, &data, CD_MASK_ALL, CD_DUPLICATE, size_);
-}
-
-CustomDataAttributes::CustomDataAttributes(CustomDataAttributes &&other)
-{
-  size_ = other.size_;
-  data = other.data;
-  CustomData_reset(&other.data);
-}
-
-CustomDataAttributes &CustomDataAttributes::operator=(const CustomDataAttributes &other)
-{
-  if (this != &other) {
-    CustomData_copy(&other.data, &data, CD_MASK_ALL, CD_DUPLICATE, other.size_);
-    size_ = other.size_;
-  }
-
-  return *this;
-}
-
-std::optional<GSpan> CustomDataAttributes::get_for_read(const StringRef name) const
-{
-  BLI_assert(size_ != 0);
-  for (const CustomDataLayer &layer : Span(data.layers, data.totlayer)) {
-    if (layer.name == name) {
-      const CPPType *cpp_type = custom_data_type_to_cpp_type((CustomDataType)layer.type);
-      BLI_assert(cpp_type != nullptr);
-      return GSpan(*cpp_type, layer.data, size_);
-    }
-  }
-  return {};
 }
 
 /**
- * Return a virtual array for a stored attribute, or a single value virtual array with the default
- * value if the attribute doesn't exist. If no default value is provided, the default value for the
- * type will be used.
+ * Debug utility that checks whether the #finish function of an #AttributeWriter has been called.
  */
-GVArrayPtr CustomDataAttributes::get_for_read(const StringRef name,
-                                              const CustomDataType data_type,
-                                              const void *default_value) const
+#ifndef NDEBUG
+struct FinishCallChecker {
+  std::string name;
+  bool finish_called = false;
+  std::function<void()> real_finish_fn;
+
+  ~FinishCallChecker()
+  {
+    if (!this->finish_called) {
+      std::cerr << "Forgot to call `finish()` for '" << this->name << "'.\n";
+    }
+  }
+};
+#endif
+
+GAttributeWriter MutableAttributeAccessor::lookup_for_write(const StringRef attribute_id)
 {
-  const CPPType *type = blender::bke::custom_data_type_to_cpp_type(data_type);
-
-  std::optional<GSpan> attribute = this->get_for_read(name);
-  if (!attribute) {
-    const int domain_size = this->size_;
-    return std::make_unique<GVArray_For_SingleValue>(
-        *type, domain_size, (default_value == nullptr) ? type->default_value() : default_value);
+  GAttributeWriter attribute = fn_->lookup_for_write(owner_, attribute_id);
+  /* Check that the #finish method is called in debug builds. */
+#ifndef NDEBUG
+  if (attribute) {
+    auto checker = std::make_shared<FinishCallChecker>();
+    checker->name = attribute_id;
+    checker->real_finish_fn = attribute.tag_modified_fn;
+    attribute.tag_modified_fn = [checker]() {
+      if (checker->real_finish_fn) {
+        checker->real_finish_fn();
+      }
+      checker->finish_called = true;
+    };
   }
-
-  if (attribute->type() == *type) {
-    return std::make_unique<GVArray_For_GSpan>(*attribute);
-  }
-  const blender::nodes::DataTypeConversions &conversions =
-      blender::nodes::get_implicit_type_conversions();
-  return conversions.try_convert(std::make_unique<GVArray_For_GSpan>(*attribute), *type);
+#endif
+  return attribute;
 }
 
-std::optional<GMutableSpan> CustomDataAttributes::get_for_write(const StringRef name)
+GSpanAttributeWriter MutableAttributeAccessor::lookup_for_write_span(const StringRef attribute_id)
 {
-  /* If this assert hits, it most likely means that #reallocate was not called at some point. */
-  BLI_assert(size_ != 0);
-  for (CustomDataLayer &layer : MutableSpan(data.layers, data.totlayer)) {
-    if (layer.name == name) {
-      const CPPType *cpp_type = custom_data_type_to_cpp_type((CustomDataType)layer.type);
-      BLI_assert(cpp_type != nullptr);
-      return GMutableSpan(*cpp_type, layer.data, size_);
-    }
+  GAttributeWriter attribute = this->lookup_for_write(attribute_id);
+  if (attribute) {
+    return GSpanAttributeWriter{std::move(attribute), true};
   }
   return {};
 }
 
-bool CustomDataAttributes::create(const StringRef name, const CustomDataType data_type)
+GAttributeWriter MutableAttributeAccessor::lookup_or_add_for_write(
+    const StringRef attribute_id,
+    const AttrDomain domain,
+    const eCustomDataType data_type,
+    const AttributeInit &initializer)
 {
-  char name_c[MAX_NAME];
-  name.copy(name_c);
-  void *result = CustomData_add_layer_named(&data, data_type, CD_DEFAULT, nullptr, size_, name_c);
-  return result != nullptr;
-}
-
-bool CustomDataAttributes::create_by_move(const blender::StringRef name,
-                                          const CustomDataType data_type,
-                                          void *buffer)
-{
-  char name_c[MAX_NAME];
-  name.copy(name_c);
-  void *result = CustomData_add_layer_named(&data, data_type, CD_ASSIGN, buffer, size_, name_c);
-  return result != nullptr;
-}
-
-bool CustomDataAttributes::remove(const blender::StringRef name)
-{
-  bool result = false;
-  for (const int i : IndexRange(data.totlayer)) {
-    const CustomDataLayer &layer = data.layers[i];
-    if (layer.name == name) {
-      CustomData_free_layer(&data, layer.type, size_, i);
-      result = true;
+  std::optional<AttributeMetaData> meta_data = this->lookup_meta_data(attribute_id);
+  if (meta_data.has_value()) {
+    if (meta_data->domain == domain && meta_data->data_type == data_type) {
+      return this->lookup_for_write(attribute_id);
     }
+    return {};
   }
-  return result;
+  if (this->add(attribute_id, domain, data_type, initializer)) {
+    return this->lookup_for_write(attribute_id);
+  }
+  return {};
 }
 
-void CustomDataAttributes::reallocate(const int size)
+GSpanAttributeWriter MutableAttributeAccessor::lookup_or_add_for_write_span(
+    const StringRef attribute_id,
+    const AttrDomain domain,
+    const eCustomDataType data_type,
+    const AttributeInit &initializer)
 {
-  size_ = size;
-  CustomData_realloc(&data, size);
+  GAttributeWriter attribute = this->lookup_or_add_for_write(
+      attribute_id, domain, data_type, initializer);
+  if (attribute) {
+    return GSpanAttributeWriter{std::move(attribute), true};
+  }
+  return {};
 }
 
-bool CustomDataAttributes::foreach_attribute(const AttributeForeachCallback callback,
-                                             const AttributeDomain domain) const
+GSpanAttributeWriter MutableAttributeAccessor::lookup_or_add_for_write_only_span(
+    const StringRef attribute_id, const AttrDomain domain, const eCustomDataType data_type)
 {
-  for (const CustomDataLayer &layer : Span(data.layers, data.totlayer)) {
-    AttributeMetaData meta_data{domain, (CustomDataType)layer.type};
-    if (!callback(layer.name, meta_data)) {
+  GAttributeWriter attribute = this->lookup_or_add_for_write(
+      attribute_id, domain, data_type, AttributeInitConstruct());
+  if (attribute) {
+    return GSpanAttributeWriter{std::move(attribute), false};
+  }
+  return {};
+}
+
+bool MutableAttributeAccessor::rename(const StringRef old_attribute_id,
+                                      const StringRef new_attribute_id)
+{
+  if (old_attribute_id == new_attribute_id) {
+    return true;
+  }
+  if (this->contains(new_attribute_id)) {
+    return false;
+  }
+  const GAttributeReader old_attribute = this->lookup(old_attribute_id);
+  if (!old_attribute) {
+    return false;
+  }
+  const eCustomDataType type = cpp_type_to_custom_data_type(old_attribute.varray.type());
+  if (old_attribute.sharing_info != nullptr && old_attribute.varray.is_span()) {
+    if (!this->add(new_attribute_id,
+                   old_attribute.domain,
+                   type,
+                   AttributeInitShared{old_attribute.varray.get_internal_span().data(),
+                                       *old_attribute.sharing_info}))
+    {
       return false;
     }
   }
+  else {
+    if (!this->add(new_attribute_id,
+                   old_attribute.domain,
+                   type,
+                   AttributeInitVArray{old_attribute.varray}))
+    {
+      return false;
+    }
+  }
+  this->remove(old_attribute_id);
   return true;
 }
 
-}  // namespace blender::bke
-
-/* -------------------------------------------------------------------- */
-/** \name Geometry Component
- * \{ */
-
-const blender::bke::ComponentAttributeProviders *GeometryComponent::get_attribute_providers() const
+fn::GField AttributeValidator::validate_field_if_necessary(const fn::GField &field) const
 {
-  return nullptr;
+  if (function) {
+    auto validate_op = fn::FieldOperation::Create(*function, {field});
+    return fn::GField(validate_op);
+  }
+  return field;
 }
 
-bool GeometryComponent::attribute_domain_supported(const AttributeDomain domain) const
+Vector<AttributeTransferData> retrieve_attributes_for_transfer(
+    const AttributeAccessor src_attributes,
+    MutableAttributeAccessor dst_attributes,
+    const AttrDomainMask domain_mask,
+    const bke::AttributeFilter &attribute_filter)
 {
-  using namespace blender::bke;
-  const ComponentAttributeProviders *providers = this->get_attribute_providers();
-  if (providers == nullptr) {
-    return false;
-  }
-  return providers->supported_domains().contains(domain);
-}
-
-int GeometryComponent::attribute_domain_size(const AttributeDomain UNUSED(domain)) const
-{
-  return 0;
-}
-
-bool GeometryComponent::attribute_is_builtin(const blender::StringRef attribute_name) const
-{
-  using namespace blender::bke;
-  const ComponentAttributeProviders *providers = this->get_attribute_providers();
-  if (providers == nullptr) {
-    return false;
-  }
-  return providers->builtin_attribute_providers().contains_as(attribute_name);
-}
-
-blender::bke::ReadAttributeLookup GeometryComponent::attribute_try_get_for_read(
-    const StringRef attribute_name) const
-{
-  using namespace blender::bke;
-  const ComponentAttributeProviders *providers = this->get_attribute_providers();
-  if (providers == nullptr) {
-    return {};
-  }
-  const BuiltinAttributeProvider *builtin_provider =
-      providers->builtin_attribute_providers().lookup_default_as(attribute_name, nullptr);
-  if (builtin_provider != nullptr) {
-    return {builtin_provider->try_get_for_read(*this), builtin_provider->domain()};
-  }
-  for (const DynamicAttributesProvider *dynamic_provider :
-       providers->dynamic_attribute_providers()) {
-    ReadAttributeLookup attribute = dynamic_provider->try_get_for_read(*this, attribute_name);
-    if (attribute) {
-      return attribute;
+  Vector<AttributeTransferData> attributes;
+  src_attributes.foreach_attribute([&](const AttributeIter &iter) {
+    if (!(ATTR_DOMAIN_AS_MASK(iter.domain) & domain_mask)) {
+      return;
     }
-  }
-  return {};
-}
-
-std::unique_ptr<blender::fn::GVArray> GeometryComponent::attribute_try_adapt_domain(
-    std::unique_ptr<blender::fn::GVArray> varray,
-    const AttributeDomain from_domain,
-    const AttributeDomain to_domain) const
-{
-  if (from_domain == to_domain) {
-    return varray;
-  }
-  return {};
-}
-
-blender::bke::WriteAttributeLookup GeometryComponent::attribute_try_get_for_write(
-    const StringRef attribute_name)
-{
-  using namespace blender::bke;
-  const ComponentAttributeProviders *providers = this->get_attribute_providers();
-  if (providers == nullptr) {
-    return {};
-  }
-  const BuiltinAttributeProvider *builtin_provider =
-      providers->builtin_attribute_providers().lookup_default_as(attribute_name, nullptr);
-  if (builtin_provider != nullptr) {
-    return {builtin_provider->try_get_for_write(*this), builtin_provider->domain()};
-  }
-  for (const DynamicAttributesProvider *dynamic_provider :
-       providers->dynamic_attribute_providers()) {
-    WriteAttributeLookup attribute = dynamic_provider->try_get_for_write(*this, attribute_name);
-    if (attribute) {
-      return attribute;
+    if (attribute_filter.allow_skip(iter.name)) {
+      return;
     }
-  }
-  return {};
-}
-
-bool GeometryComponent::attribute_try_delete(const StringRef attribute_name)
-{
-  using namespace blender::bke;
-  const ComponentAttributeProviders *providers = this->get_attribute_providers();
-  if (providers == nullptr) {
-    return {};
-  }
-  const BuiltinAttributeProvider *builtin_provider =
-      providers->builtin_attribute_providers().lookup_default_as(attribute_name, nullptr);
-  if (builtin_provider != nullptr) {
-    return builtin_provider->try_delete(*this);
-  }
-  bool success = false;
-  for (const DynamicAttributesProvider *dynamic_provider :
-       providers->dynamic_attribute_providers()) {
-    success = dynamic_provider->try_delete(*this, attribute_name) || success;
-  }
-  return success;
-}
-
-bool GeometryComponent::attribute_try_create(const StringRef attribute_name,
-                                             const AttributeDomain domain,
-                                             const CustomDataType data_type,
-                                             const AttributeInit &initializer)
-{
-  using namespace blender::bke;
-  if (attribute_name.is_empty()) {
-    return false;
-  }
-  const ComponentAttributeProviders *providers = this->get_attribute_providers();
-  if (providers == nullptr) {
-    return false;
-  }
-  const BuiltinAttributeProvider *builtin_provider =
-      providers->builtin_attribute_providers().lookup_default_as(attribute_name, nullptr);
-  if (builtin_provider != nullptr) {
-    if (builtin_provider->domain() != domain) {
-      return false;
-    }
-    if (builtin_provider->data_type() != data_type) {
-      return false;
-    }
-    return builtin_provider->try_create(*this, initializer);
-  }
-  for (const DynamicAttributesProvider *dynamic_provider :
-       providers->dynamic_attribute_providers()) {
-    if (dynamic_provider->try_create(*this, attribute_name, domain, data_type, initializer)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-bool GeometryComponent::attribute_try_create_builtin(const blender::StringRef attribute_name,
-                                                     const AttributeInit &initializer)
-{
-  using namespace blender::bke;
-  if (attribute_name.is_empty()) {
-    return false;
-  }
-  const ComponentAttributeProviders *providers = this->get_attribute_providers();
-  if (providers == nullptr) {
-    return false;
-  }
-  const BuiltinAttributeProvider *builtin_provider =
-      providers->builtin_attribute_providers().lookup_default_as(attribute_name, nullptr);
-  if (builtin_provider == nullptr) {
-    return false;
-  }
-  return builtin_provider->try_create(*this, initializer);
-}
-
-Set<std::string> GeometryComponent::attribute_names() const
-{
-  Set<std::string> attributes;
-  this->attribute_foreach([&](StringRefNull name, const AttributeMetaData &UNUSED(meta_data)) {
-    attributes.add(name);
-    return true;
+    GVArray src = *iter.get();
+    GSpanAttributeWriter dst = dst_attributes.lookup_or_add_for_write_only_span(
+        iter.name, iter.domain, iter.data_type);
+    attributes.append({std::move(src), iter.name, {iter.domain, iter.data_type}, std::move(dst)});
   });
   return attributes;
 }
 
-/**
- * \return False if the callback explicitly returned false at any point, otherwise true,
- * meaning the callback made it all the way through.
- */
-bool GeometryComponent::attribute_foreach(const AttributeForeachCallback callback) const
+/** \} */
+
+void gather_attributes(const AttributeAccessor src_attributes,
+                       const AttrDomain src_domain,
+                       const AttrDomain dst_domain,
+                       const AttributeFilter &attribute_filter,
+                       const IndexMask &selection,
+                       MutableAttributeAccessor dst_attributes)
 {
-  using namespace blender::bke;
-  const ComponentAttributeProviders *providers = this->get_attribute_providers();
-  if (providers == nullptr) {
-    return true;
-  }
-
-  /* Keep track handled attribute names to make sure that we do not return the same name twice. */
-  Set<std::string> handled_attribute_names;
-
-  for (const BuiltinAttributeProvider *provider :
-       providers->builtin_attribute_providers().values()) {
-    if (provider->exists(*this)) {
-      AttributeMetaData meta_data{provider->domain(), provider->data_type()};
-      if (!callback(provider->name(), meta_data)) {
-        return false;
+  const int src_size = src_attributes.domain_size(src_domain);
+  src_attributes.foreach_attribute([&](const AttributeIter &iter) {
+    if (iter.domain != src_domain) {
+      return;
+    }
+    if (iter.data_type == CD_PROP_STRING) {
+      return;
+    }
+    if (attribute_filter.allow_skip(iter.name)) {
+      return;
+    }
+    const GAttributeReader src = iter.get(src_domain);
+    if (selection.size() == src_size && src.sharing_info && src.varray.is_span()) {
+      const AttributeInitShared init(src.varray.get_internal_span().data(), *src.sharing_info);
+      if (dst_attributes.add(iter.name, dst_domain, iter.data_type, init)) {
+        return;
       }
-      handled_attribute_names.add_new(provider->name());
     }
-  }
-  for (const DynamicAttributesProvider *provider : providers->dynamic_attribute_providers()) {
-    const bool continue_loop = provider->foreach_attribute(
-        *this, [&](StringRefNull name, const AttributeMetaData &meta_data) {
-          if (handled_attribute_names.add(name)) {
-            return callback(name, meta_data);
-          }
-          return true;
-        });
-    if (!continue_loop) {
-      return false;
+    GSpanAttributeWriter dst = dst_attributes.lookup_or_add_for_write_only_span(
+        iter.name, dst_domain, iter.data_type);
+    if (!dst) {
+      return;
     }
-  }
-
-  return true;
-}
-
-bool GeometryComponent::attribute_exists(const blender::StringRef attribute_name) const
-{
-  blender::bke::ReadAttributeLookup attribute = this->attribute_try_get_for_read(attribute_name);
-  if (attribute) {
-    return true;
-  }
-  return false;
-}
-
-std::optional<AttributeMetaData> GeometryComponent::attribute_get_meta_data(
-    const StringRef attribute_name) const
-{
-  std::optional<AttributeMetaData> result{std::nullopt};
-  this->attribute_foreach([&](StringRefNull name, const AttributeMetaData &meta_data) {
-    if (attribute_name == name) {
-      result = meta_data;
-      return false;
-    }
-    return true;
+    array_utils::gather(src.varray, selection, dst.span);
+    dst.finish();
   });
-  return result;
 }
 
-static std::unique_ptr<blender::fn::GVArray> try_adapt_data_type(
-    std::unique_ptr<blender::fn::GVArray> varray, const blender::fn::CPPType &to_type)
+void gather_attributes(const AttributeAccessor src_attributes,
+                       const AttrDomain src_domain,
+                       const AttrDomain dst_domain,
+                       const AttributeFilter &attribute_filter,
+                       const Span<int> indices,
+                       MutableAttributeAccessor dst_attributes)
 {
-  const blender::nodes::DataTypeConversions &conversions =
-      blender::nodes::get_implicit_type_conversions();
-  return conversions.try_convert(std::move(varray), to_type);
-}
-
-std::unique_ptr<blender::fn::GVArray> GeometryComponent::attribute_try_get_for_read(
-    const StringRef attribute_name,
-    const AttributeDomain domain,
-    const CustomDataType data_type) const
-{
-  blender::bke::ReadAttributeLookup attribute = this->attribute_try_get_for_read(attribute_name);
-  if (!attribute) {
-    return {};
-  }
-
-  std::unique_ptr<blender::fn::GVArray> varray = std::move(attribute.varray);
-  if (domain != ATTR_DOMAIN_AUTO && attribute.domain != domain) {
-    varray = this->attribute_try_adapt_domain(std::move(varray), attribute.domain, domain);
-    if (!varray) {
-      return {};
-    }
-  }
-
-  const blender::fn::CPPType *cpp_type = blender::bke::custom_data_type_to_cpp_type(data_type);
-  BLI_assert(cpp_type != nullptr);
-  if (varray->type() != *cpp_type) {
-    varray = try_adapt_data_type(std::move(varray), *cpp_type);
-    if (!varray) {
-      return {};
-    }
-  }
-
-  return varray;
-}
-
-std::unique_ptr<blender::bke::GVArray> GeometryComponent::attribute_try_get_for_read(
-    const StringRef attribute_name, const AttributeDomain domain) const
-{
-  if (!this->attribute_domain_supported(domain)) {
-    return {};
-  }
-
-  blender::bke::ReadAttributeLookup attribute = this->attribute_try_get_for_read(attribute_name);
-  if (!attribute) {
-    return {};
-  }
-
-  if (attribute.domain != domain) {
-    return this->attribute_try_adapt_domain(std::move(attribute.varray), attribute.domain, domain);
-  }
-
-  return std::move(attribute.varray);
-}
-
-blender::bke::ReadAttributeLookup GeometryComponent::attribute_try_get_for_read(
-    const blender::StringRef attribute_name, const CustomDataType data_type) const
-{
-  blender::bke::ReadAttributeLookup attribute = this->attribute_try_get_for_read(attribute_name);
-  if (!attribute) {
-    return {};
-  }
-  const blender::fn::CPPType *type = blender::bke::custom_data_type_to_cpp_type(data_type);
-  BLI_assert(type != nullptr);
-  if (attribute.varray->type() == *type) {
-    return attribute;
-  }
-  const blender::nodes::DataTypeConversions &conversions =
-      blender::nodes::get_implicit_type_conversions();
-  return {conversions.try_convert(std::move(attribute.varray), *type), attribute.domain};
-}
-
-std::unique_ptr<blender::bke::GVArray> GeometryComponent::attribute_get_for_read(
-    const StringRef attribute_name,
-    const AttributeDomain domain,
-    const CustomDataType data_type,
-    const void *default_value) const
-{
-  std::unique_ptr<blender::bke::GVArray> varray = this->attribute_try_get_for_read(
-      attribute_name, domain, data_type);
-  if (varray) {
-    return varray;
-  }
-  const blender::fn::CPPType *type = blender::bke::custom_data_type_to_cpp_type(data_type);
-  if (default_value == nullptr) {
-    default_value = type->default_value();
-  }
-  const int domain_size = this->attribute_domain_size(domain);
-  return std::make_unique<blender::fn::GVArray_For_SingleValue>(*type, domain_size, default_value);
-}
-
-class GVMutableAttribute_For_OutputAttribute
-    : public blender::fn::GVMutableArray_For_GMutableSpan {
- public:
-  GeometryComponent *component;
-  std::string final_name;
-
-  GVMutableAttribute_For_OutputAttribute(GMutableSpan data,
-                                         GeometryComponent &component,
-                                         std::string final_name)
-      : blender::fn::GVMutableArray_For_GMutableSpan(data),
-        component(&component),
-        final_name(std::move(final_name))
+  if (array_utils::indices_are_range(indices, IndexRange(src_attributes.domain_size(src_domain))))
   {
-  }
-
-  ~GVMutableAttribute_For_OutputAttribute() override
-  {
-    type_->destruct_n(data_, size_);
-    MEM_freeN(data_);
-  }
-};
-
-static void save_output_attribute(blender::bke::OutputAttribute &output_attribute)
-{
-  using namespace blender;
-  using namespace blender::fn;
-  using namespace blender::bke;
-
-  GVMutableAttribute_For_OutputAttribute &varray =
-      dynamic_cast<GVMutableAttribute_For_OutputAttribute &>(output_attribute.varray());
-
-  GeometryComponent &component = *varray.component;
-  const StringRefNull name = varray.final_name;
-  const AttributeDomain domain = output_attribute.domain();
-  const CustomDataType data_type = output_attribute.custom_data_type();
-  const CPPType &cpp_type = output_attribute.cpp_type();
-
-  component.attribute_try_delete(name);
-  if (!component.attribute_try_create(
-          varray.final_name, domain, data_type, AttributeInitDefault())) {
-    CLOG_WARN(&LOG,
-              "Could not create the '%s' attribute with type '%s'.",
-              name.c_str(),
-              cpp_type.name().c_str());
-    return;
-  }
-  WriteAttributeLookup write_attribute = component.attribute_try_get_for_write(name);
-  BUFFER_FOR_CPP_TYPE_VALUE(varray.type(), buffer);
-  for (const int i : IndexRange(varray.size())) {
-    varray.get(i, buffer);
-    write_attribute.varray->set_by_relocate(i, buffer);
-  }
-}
-
-static blender::bke::OutputAttribute create_output_attribute(
-    GeometryComponent &component,
-    const blender::StringRef attribute_name,
-    const AttributeDomain domain,
-    const CustomDataType data_type,
-    const bool ignore_old_values,
-    const void *default_value)
-{
-  using namespace blender;
-  using namespace blender::fn;
-  using namespace blender::bke;
-
-  if (attribute_name.is_empty()) {
-    return {};
-  }
-
-  const CPPType *cpp_type = custom_data_type_to_cpp_type(data_type);
-  BLI_assert(cpp_type != nullptr);
-  const nodes::DataTypeConversions &conversions = nodes::get_implicit_type_conversions();
-
-  if (component.attribute_is_builtin(attribute_name)) {
-    WriteAttributeLookup attribute = component.attribute_try_get_for_write(attribute_name);
-    if (!attribute) {
-      if (default_value) {
-        const int64_t domain_size = component.attribute_domain_size(domain);
-        const GVArray_For_SingleValueRef default_varray{*cpp_type, domain_size, default_value};
-        component.attribute_try_create_builtin(attribute_name,
-                                               AttributeInitVArray(&default_varray));
-      }
-      else {
-        component.attribute_try_create_builtin(attribute_name, AttributeInitDefault());
-      }
-      attribute = component.attribute_try_get_for_write(attribute_name);
-      if (!attribute) {
-        /* Builtin attribute does not exist and can't be created. */
-        return {};
-      }
-    }
-    if (attribute.domain != domain) {
-      /* Builtin attribute is on different domain. */
-      return {};
-    }
-    GVMutableArrayPtr varray = std::move(attribute.varray);
-    if (varray->type() == *cpp_type) {
-      /* Builtin attribute matches exactly. */
-      return OutputAttribute(std::move(varray), domain, {}, ignore_old_values);
-    }
-    /* Builtin attribute is on the same domain but has a different data type. */
-    varray = conversions.try_convert(std::move(varray), *cpp_type);
-    return OutputAttribute(std::move(varray), domain, {}, ignore_old_values);
-  }
-
-  const int domain_size = component.attribute_domain_size(domain);
-
-  WriteAttributeLookup attribute = component.attribute_try_get_for_write(attribute_name);
-  if (!attribute) {
-    if (default_value) {
-      const GVArray_For_SingleValueRef default_varray{*cpp_type, domain_size, default_value};
-      component.attribute_try_create(
-          attribute_name, domain, data_type, AttributeInitVArray(&default_varray));
-    }
-    else {
-      component.attribute_try_create(attribute_name, domain, data_type, AttributeInitDefault());
-    }
-
-    attribute = component.attribute_try_get_for_write(attribute_name);
-    if (!attribute) {
-      /* Can't create the attribute. */
-      return {};
-    }
-  }
-  if (attribute.domain == domain && attribute.varray->type() == *cpp_type) {
-    /* Existing generic attribute matches exactly. */
-    return OutputAttribute(std::move(attribute.varray), domain, {}, ignore_old_values);
-  }
-
-  /* Allocate a new array that lives next to the existing attribute. It will overwrite the existing
-   * attribute after processing is done. */
-  void *data = MEM_mallocN_aligned(
-      cpp_type->size() * domain_size, cpp_type->alignment(), __func__);
-  if (ignore_old_values) {
-    /* This does nothing for trivially constructible types, but is necessary for correctness. */
-    cpp_type->default_construct_n(data, domain);
+    copy_attributes(src_attributes, src_domain, dst_domain, attribute_filter, dst_attributes);
   }
   else {
-    /* Fill the temporary array with values from the existing attribute. */
-    GVArrayPtr old_varray = component.attribute_get_for_read(
-        attribute_name, domain, data_type, default_value);
-    old_varray->materialize_to_uninitialized(IndexRange(domain_size), data);
+    src_attributes.foreach_attribute([&](const AttributeIter &iter) {
+      if (iter.domain != src_domain) {
+        return;
+      }
+      if (iter.data_type == CD_PROP_STRING) {
+        return;
+      }
+      if (attribute_filter.allow_skip(iter.name)) {
+        return;
+      }
+      const GAttributeReader src = iter.get(src_domain);
+      GSpanAttributeWriter dst = dst_attributes.lookup_or_add_for_write_only_span(
+          iter.name, dst_domain, iter.data_type);
+      if (!dst) {
+        return;
+      }
+      attribute_math::gather(src.varray, indices, dst.span);
+      dst.finish();
+    });
   }
-  GVMutableArrayPtr varray = std::make_unique<GVMutableAttribute_For_OutputAttribute>(
-      GMutableSpan{*cpp_type, data, domain_size}, component, attribute_name);
-
-  return OutputAttribute(std::move(varray), domain, save_output_attribute, true);
 }
 
-blender::bke::OutputAttribute GeometryComponent::attribute_try_get_for_output(
-    const StringRef attribute_name,
-    const AttributeDomain domain,
-    const CustomDataType data_type,
-    const void *default_value)
+void gather_attributes_group_to_group(const AttributeAccessor src_attributes,
+                                      const AttrDomain src_domain,
+                                      const AttrDomain dst_domain,
+                                      const AttributeFilter &attribute_filter,
+                                      const OffsetIndices<int> src_offsets,
+                                      const OffsetIndices<int> dst_offsets,
+                                      const IndexMask &selection,
+                                      MutableAttributeAccessor dst_attributes)
 {
-  return create_output_attribute(*this, attribute_name, domain, data_type, false, default_value);
+  src_attributes.foreach_attribute([&](const AttributeIter &iter) {
+    if (iter.domain != src_domain) {
+      return;
+    }
+    if (iter.data_type == CD_PROP_STRING) {
+      return;
+    }
+    if (attribute_filter.allow_skip(iter.name)) {
+      return;
+    }
+    const GVArraySpan src = *iter.get(src_domain);
+    GSpanAttributeWriter dst = dst_attributes.lookup_or_add_for_write_only_span(
+        iter.name, dst_domain, iter.data_type);
+    if (!dst) {
+      return;
+    }
+    attribute_math::gather_group_to_group(src_offsets, dst_offsets, selection, src, dst.span);
+    dst.finish();
+  });
 }
 
-blender::bke::OutputAttribute GeometryComponent::attribute_try_get_for_output_only(
-    const blender::StringRef attribute_name,
-    const AttributeDomain domain,
-    const CustomDataType data_type)
+void gather_attributes_to_groups(const AttributeAccessor src_attributes,
+                                 const AttrDomain src_domain,
+                                 const AttrDomain dst_domain,
+                                 const AttributeFilter &attribute_filter,
+                                 const OffsetIndices<int> dst_offsets,
+                                 const IndexMask &src_selection,
+                                 MutableAttributeAccessor dst_attributes)
 {
-  return create_output_attribute(*this, attribute_name, domain, data_type, true, nullptr);
+  src_attributes.foreach_attribute([&](const AttributeIter &iter) {
+    if (iter.domain != src_domain) {
+      return;
+    }
+    if (iter.data_type == CD_PROP_STRING) {
+      return;
+    }
+    if (attribute_filter.allow_skip(iter.name)) {
+      return;
+    }
+    const GVArraySpan src = *iter.get(src_domain);
+    GSpanAttributeWriter dst = dst_attributes.lookup_or_add_for_write_only_span(
+        iter.name, dst_domain, iter.data_type);
+    if (!dst) {
+      return;
+    }
+    attribute_math::gather_to_groups(dst_offsets, src_selection, src, dst.span);
+    dst.finish();
+  });
 }
+
+void copy_attributes(const AttributeAccessor src_attributes,
+                     const AttrDomain src_domain,
+                     const AttrDomain dst_domain,
+                     const AttributeFilter &attribute_filter,
+                     MutableAttributeAccessor dst_attributes)
+{
+  BLI_assert(src_attributes.domain_size(src_domain) == dst_attributes.domain_size(dst_domain));
+  gather_attributes(src_attributes,
+                    src_domain,
+                    dst_domain,
+                    attribute_filter,
+                    IndexMask(src_attributes.domain_size(src_domain)),
+                    dst_attributes);
+}
+
+void copy_attributes_group_to_group(const AttributeAccessor src_attributes,
+                                    const AttrDomain src_domain,
+                                    const AttrDomain dst_domain,
+                                    const AttributeFilter &attribute_filter,
+                                    const OffsetIndices<int> src_offsets,
+                                    const OffsetIndices<int> dst_offsets,
+                                    const IndexMask &selection,
+                                    MutableAttributeAccessor dst_attributes)
+{
+  if (selection.is_empty()) {
+    return;
+  }
+  src_attributes.foreach_attribute([&](const AttributeIter &iter) {
+    if (iter.domain != src_domain) {
+      return;
+    }
+    if (iter.data_type == CD_PROP_STRING) {
+      return;
+    }
+    if (attribute_filter.allow_skip(iter.name)) {
+      return;
+    }
+    const GVArraySpan src = *iter.get(src_domain);
+    GSpanAttributeWriter dst = dst_attributes.lookup_or_add_for_write_only_span(
+        iter.name, dst_domain, iter.data_type);
+    if (!dst) {
+      return;
+    }
+    array_utils::copy_group_to_group(src_offsets, dst_offsets, selection, src, dst.span);
+    dst.finish();
+  });
+}
+
+void fill_attribute_range_default(MutableAttributeAccessor attributes,
+                                  const AttrDomain domain,
+                                  const AttributeFilter &attribute_filter,
+                                  const IndexRange range)
+{
+  attributes.foreach_attribute([&](const AttributeIter &iter) {
+    if (iter.domain != domain) {
+      return;
+    }
+    if (attribute_filter.allow_skip(iter.name)) {
+      return;
+    }
+    if (iter.data_type == CD_PROP_STRING) {
+      return;
+    }
+    GSpanAttributeWriter attribute = attributes.lookup_for_write_span(iter.name);
+    const CPPType &type = attribute.span.type();
+    GMutableSpan data = attribute.span.slice(range);
+    type.fill_assign_n(type.default_value(), data.data(), data.size());
+    attribute.finish();
+  });
+}
+
+}  // namespace blender::bke

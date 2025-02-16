@@ -1,27 +1,17 @@
-/*
- * Adapted from code copyright 2009-2010 NVIDIA Corporation
- * Modifications Copyright 2011, Blender Foundation.
+/* SPDX-FileCopyrightText: 2009-2010 NVIDIA Corporation
+ * SPDX-FileCopyrightText: 2011-2022 Blender Foundation
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * SPDX-License-Identifier: Apache-2.0
  *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+ * Adapted code from NVIDIA Corporation. */
 
-#ifndef __BVH_H__
-#define __BVH_H__
+#pragma once
 
-#include "bvh/bvh_params.h"
-#include "util/util_array.h"
-#include "util/util_types.h"
-#include "util/util_vector.h"
+#include "bvh/params.h"
+#include "util/array.h"
+#include "util/types.h"
+#include "util/unique_ptr.h"
+#include "util/vector.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -36,8 +26,9 @@ class Object;
 class Progress;
 class Stats;
 
-#define BVH_ALIGN 4096
-#define TRI_NODE_SIZE 3
+#define BVH_ALIGN 4096   // NOLINT
+#define TRI_NODE_SIZE 3  // NOLINT
+
 /* Packed BVH
  *
  * BVH stored as it will be used for traversal on the rendering device. */
@@ -50,13 +41,9 @@ struct PackedBVH {
   array<int4> leaf_nodes;
   /* object index to BVH node index mapping for instances */
   array<int> object_node;
-  /* Mapping from primitive index to index in triangle array. */
-  array<uint> prim_tri_index;
-  /* Continuous storage of triangle vertices. */
-  array<float4> prim_tri_verts;
   /* primitive type - triangle or strand */
   array<int> prim_type;
-  /* visibility visibilitys for primitives */
+  /* Visibility visibilities for primitives. */
   array<uint> prim_visibility;
   /* mapping from BVH primitive index to true primitive index, as primitives
    * may be duplicated due to spatial splits. -1 for instances. */
@@ -83,12 +70,17 @@ class BVH {
   vector<Geometry *> geometry;
   vector<Object *> objects;
 
-  static BVH *create(const BVHParams &params,
-                     const vector<Geometry *> &geometry,
-                     const vector<Object *> &objects,
-                     Device *device);
-  virtual ~BVH()
+  static unique_ptr<BVH> create(const BVHParams &params,
+                                const vector<Geometry *> &geometry,
+                                const vector<Object *> &objects,
+                                Device *device);
+  virtual ~BVH() = default;
+
+  virtual void replace_geometry(const vector<Geometry *> &geometry,
+                                const vector<Object *> &objects)
   {
+    this->geometry = geometry;
+    this->objects = objects;
   }
 
  protected:
@@ -98,5 +90,3 @@ class BVH {
 };
 
 CCL_NAMESPACE_END
-
-#endif /* __BVH_H__ */

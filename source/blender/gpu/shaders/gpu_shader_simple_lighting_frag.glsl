@@ -1,18 +1,13 @@
+/* SPDX-FileCopyrightText: 2016-2022 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#ifndef USE_INSTANCE_COLOR
-uniform vec4 color;
-#endif
-uniform vec3 light;
+#include "infos/gpu_shader_simple_lighting_info.hh"
 
-in vec3 normal;
-#ifdef USE_INSTANCE_COLOR
-flat in vec4 finalColor;
-#  define color finalColor
-#endif
-out vec4 fragColor;
+FRAGMENT_SHADER_CREATE_INFO(gpu_shader_simple_lighting)
 
 void main()
 {
-  fragColor = color;
-  fragColor.xyz *= clamp(dot(normalize(normal), light), 0.0, 1.0);
+  fragColor = simple_lighting_data.l_color;
+  fragColor.xyz *= clamp(dot(normalize(normal), simple_lighting_data.light), 0.0, 1.0);
 }

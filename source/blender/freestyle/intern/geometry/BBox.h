@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -26,9 +14,7 @@
 
 #include "BLI_utildefines.h"
 
-#ifdef WITH_CXX_GUARDEDALLOC
-#  include "MEM_guardedalloc.h"
-#endif
+#include "MEM_guardedalloc.h"
 
 namespace Freestyle {
 
@@ -57,7 +43,7 @@ template<class Point> class BBox {
       _empty = false;
       return;
     }
-    for (unsigned int i = 0; i < Point::dim(); i++) {
+    for (uint i = 0; i < Point::dim(); i++) {
       if (p[i] < _min[i]) {
         _min[i] = p[i];
       }
@@ -106,7 +92,7 @@ template<class Point> class BBox {
       _empty = false;
     }
     else {
-      for (unsigned int i = 0; i < Point::dim(); i++) {
+      for (uint i = 0; i < Point::dim(); i++) {
         if (b.getMin()[i] < _min[i]) {
           _min[i] = b.getMin()[i];
         }
@@ -123,7 +109,7 @@ template<class Point> class BBox {
     if (empty()) {
       return false;
     }
-    for (unsigned int i = 0; i < Point::dim(); i++) {
+    for (uint i = 0; i < Point::dim(); i++) {
       if ((_min[i] > p[i]) || (_max[i] < p[i])) {
         return false;
       }
@@ -136,9 +122,7 @@ template<class Point> class BBox {
   Point _max;
   bool _empty;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:BBox")
-#endif
 };
 
 template<class Point> BBox<Point> &operator+(const BBox<Point> &b1, const BBox<Point> &b2)
@@ -146,7 +130,7 @@ template<class Point> BBox<Point> &operator+(const BBox<Point> &b1, const BBox<P
   Point new_min;
   Point new_max;
 
-  for (unsigned int i = 0; i < Point::dim(); i++) {
+  for (uint i = 0; i < Point::dim(); i++) {
     new_min[i] = b1.getMin()[i] < b2.getMin()[i] ? b1.getMin()[i] : b2.getMin()[i];
     new_max[i] = b1.getMax()[i] > b2.getMax()[i] ? b1.getMax()[i] : b2.getMax()[i];
   }

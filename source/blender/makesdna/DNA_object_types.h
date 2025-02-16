@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2001-2002 NaN Holding BV. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
@@ -23,6 +8,8 @@
  */
 
 #pragma once
+
+#include "BLI_utildefines.h"
 
 #include "DNA_object_enums.h"
 
@@ -38,17 +25,26 @@
 #include "DNA_listBase.h"
 
 #ifdef __cplusplus
-extern "C" {
+#  include "BLI_math_matrix_types.hh"
+#endif
+
+#ifdef __cplusplus
+namespace blender::bke {
+struct ObjectRuntime;
+}
+using ObjectRuntimeHandle = blender::bke::ObjectRuntime;
+#else
+typedef struct ObjectRuntimeHandle ObjectRuntimeHandle;
 #endif
 
 struct AnimData;
 struct BoundBox;
+struct Collection;
 struct Curve;
 struct FluidsimSettings;
-struct GeometrySet;
 struct Ipo;
+struct LightgroupMembership;
 struct Material;
-struct Mesh;
 struct Object;
 struct PartDeflect;
 struct Path;
@@ -57,7 +53,7 @@ struct SculptSession;
 struct SoftBody;
 struct bGPdata;
 
-/* Vertex Groups - Name Info */
+/** Vertex Groups - Name Info */
 typedef struct bDeformGroup {
   struct bDeformGroup *next, *prev;
   /** MAX_VGROUP_NAME. */
@@ -66,7 +62,7 @@ typedef struct bDeformGroup {
   char flag, _pad0[7];
 } bDeformGroup;
 
-/* Face Maps. */
+#ifdef DNA_DEPRECATED_ALLOW
 typedef struct bFaceMap {
   struct bFaceMap *next, *prev;
   /** MAX_VGROUP_NAME. */
@@ -74,11 +70,14 @@ typedef struct bFaceMap {
   char flag;
   char _pad0[7];
 } bFaceMap;
+#endif
 
 #define MAX_VGROUP_NAME 64
 
-/* bDeformGroup->flag */
-#define DG_LOCK_WEIGHT 1
+/** #bDeformGroup::flag */
+enum {
+  DG_LOCK_WEIGHT = 1,
+};
 
 /**
  * The following illustrates the orientation of the
@@ -103,110 +102,7 @@ typedef struct bFaceMap {
  */
 typedef struct BoundBox {
   float vec[8][3];
-  int flag;
-  char _pad0[4];
 } BoundBox;
-
-/* boundbox flag */
-enum {
-  BOUNDBOX_DISABLED = (1 << 0),
-  BOUNDBOX_DIRTY = (1 << 1),
-};
-
-struct CustomData_MeshMasks;
-
-/* Not saved in file! */
-typedef struct Object_Runtime {
-  /**
-   * The custom data layer mask that was last used
-   * to calculate data_eval and mesh_deform_eval.
-   */
-  CustomData_MeshMasks last_data_mask;
-
-  /** Did last modifier stack generation need mapping support? */
-  char last_need_mapping;
-
-  char _pad0[3];
-
-  /** Only used for drawing the parent/child help-line. */
-  float parent_display_origin[3];
-
-  /**
-   * Selection id of this object. It might differ between an evaluated and its original object,
-   * when the object is being instanced.
-   */
-  int select_id;
-  char _pad1[3];
-
-  /**
-   * Denotes whether the evaluated data is owned by this object or is referenced and owned by
-   * somebody else.
-   */
-  char is_data_eval_owned;
-
-  /** Start time of the mode transfer overlay animation. */
-  double overlay_mode_transfer_start_time;
-
-  /** Axis aligned boundbox (in localspace). */
-  struct BoundBox *bb;
-
-  /**
-   * Original data pointer, before object->data was changed to point
-   * to data_eval.
-   * Is assigned by dependency graph's copy-on-write evaluation.
-   */
-  struct ID *data_orig;
-  /**
-   * Object data structure created during object evaluation. It has all modifiers applied.
-   * The type is determined by the type of the original object. For example, for mesh and curve
-   * objects, this is a mesh. For a volume object, this is a volume.
-   */
-  struct ID *data_eval;
-
-  /**
-   * Objects can evaluate to a geometry set instead of a single ID. In those cases, the evaluated
-   * geometry set will be stored here. An ID of the correct type is still stored in #data_eval.
-   * #geometry_set_eval might reference the ID pointed to by #data_eval as well, but does not own
-   * the data.
-   */
-  struct GeometrySet *geometry_set_eval;
-
-  /**
-   * Mesh structure created during object evaluation.
-   * It has deformation only modifiers applied on it.
-   */
-  struct Mesh *mesh_deform_eval;
-
-  /**
-   * Original grease pencil bGPdata pointer, before object->data was changed to point
-   * to gpd_eval.
-   * Is assigned by dependency graph's copy-on-write evaluation.
-   */
-  struct bGPdata *gpd_orig;
-  /**
-   * bGPdata structure created during object evaluation.
-   * It has all modifiers applied.
-   */
-  struct bGPdata *gpd_eval;
-
-  /**
-   * This is a mesh representation of corresponding object.
-   * It created when Python calls `object.to_mesh()`.
-   */
-  struct Mesh *object_as_temp_mesh;
-
-  /**
-   * This is a curve representation of corresponding object.
-   * It created when Python calls `object.to_curve()`.
-   */
-  struct Curve *object_as_temp_curve;
-
-  /** Runtime evaluated curve-specific data, not stored in the file. */
-  struct CurveCache *curve_cache;
-
-  unsigned short local_collections_bits;
-  short _pad2[3];
-} Object_Runtime;
 
 typedef struct ObjectLineArt {
   short usage;
@@ -214,6 +110,10 @@ typedef struct ObjectLineArt {
 
   /** if OBJECT_LRT_OWN_CREASE is set */
   float crease_threshold;
+
+  unsigned char intersection_priority;
+
+  char _pad[7];
 } ObjectLineArt;
 
 /**
@@ -226,35 +126,100 @@ enum eObjectLineArt_Usage {
   OBJECT_LRT_EXCLUDE = (1 << 2),
   OBJECT_LRT_INTERSECTION_ONLY = (1 << 3),
   OBJECT_LRT_NO_INTERSECTION = (1 << 4),
+  OBJECT_LRT_FORCE_INTERSECTION = (1 << 5),
 };
+ENUM_OPERATORS(eObjectLineArt_Usage, OBJECT_LRT_FORCE_INTERSECTION);
 
 enum eObjectLineArt_Flags {
   OBJECT_LRT_OWN_CREASE = (1 << 0),
+  OBJECT_LRT_OWN_INTERSECTION_PRIORITY = (1 << 1),
 };
 
+/* Evaluated light linking state needed for the render engines integration. */
+typedef struct LightLinkingRuntime {
+
+  /* For objects that emit light: a bitmask of light sets this emitter is part of for the light
+   * linking.
+   * A light set is a combination of emitters used by one or more receiver objects.
+   *
+   * If there is no light linking in the scene or if the emitter does not specify light linking all
+   * bits are set.
+   *
+   * NOTE: There can only be 64 light sets in a scene. */
+  uint64_t light_set_membership;
+
+  /* For objects that emit light: a bitmask of light sets this emitter is part of for the shadow
+   * linking.
+   * A light set is a combination of emitters from which a blocked object does not cast a shadow.
+   *
+   * If there is no shadow linking in the scene or if the emitter does not specify shadow linking
+   * all bits are set.
+   *
+   * NOTE: There can only be 64 light sets in a scene. */
+  uint64_t shadow_set_membership;
+
+  /* For receiver objects: the index of the light set from which this object receives light.
+   *
+   * If there is no light linking in the scene or the receiver is not linked to any light this is
+   * assigned zero. */
+  uint8_t receiver_light_set;
+
+  /* For blocker objects: the index of the light set from which this object casts shadow from.
+   *
+   * If there is no shadow in the scene or the blocker is not linked to any emitter this is
+   * assigned zero. */
+  uint8_t blocker_shadow_set;
+
+  uint8_t _pad[6];
+} LightLinkingRuntime;
+
+typedef struct LightLinking {
+  /* Collections which contains objects (possibly via nested collection indirection) which defines
+   * the light linking relation: such as whether objects are included or excluded from being lit by
+   * this emitter (receiver_collection), or whether they block light from this emitter
+   * (blocker_collection).
+   *
+   * If the collection is a null pointer then all objects from the current scene are receiving
+   * light from this emitter, and nothing is excluded from receiving the light and shadows.
+   *
+   * The emitter in this context is assumed to be either object of lamp type, or objects with
+   * surface which has emissive shader. */
+  struct Collection *receiver_collection;
+  struct Collection *blocker_collection;
+
+  LightLinkingRuntime runtime;
+} LightLinking;
+
 typedef struct Object {
+  DNA_DEFINE_CXX_METHODS(Object)
+
   ID id;
   /** Animation data (must be immediately after id for utilities to use it). */
   struct AnimData *adt;
-  /** Runtime (must be immediately after id for utilities to use it). */
+  /**
+   * Engines draw data, must be immediately after AnimData. See IdDdtTemplate and
+   * DRW_drawdatalist_from_id to understand this requirement.
+   */
   struct DrawDataList drawdata;
 
   struct SculptSession *sculpt;
 
-  short type, partype;
-  /** Can be vertexnrs. */
+  short type; /* #ObjectType */
+  short partype;
+  /** Can be vertex indices. */
   int par1, par2, par3;
-  /** String describing subobject info, MAX_ID_NAME-2. */
+  /** String describing sub-object info, `MAX_ID_NAME - 2`. */
   char parsubstr[64];
   struct Object *parent, *track;
-  /* if ob->proxy (or proxy_group), this object is proxy for object ob->proxy */
-  /* proxy_from is set in target back to the proxy. */
-  struct Object *proxy, *proxy_group, *proxy_from;
+  /* Proxy pointer are deprecated, only kept for conversion to liboverrides. */
+  struct Object *proxy DNA_DEPRECATED;
+  struct Object *proxy_group DNA_DEPRECATED;
+  struct Object *proxy_from DNA_DEPRECATED;
   /** Old animation system, deprecated for 2.5. */
   struct Ipo *ipo DNA_DEPRECATED;
-  /* struct Path *path; */
-  struct bAction *action DNA_DEPRECATED; /* XXX deprecated... old animation system */
-  struct bAction *poselib;
+  // struct Path *path;
+  struct bAction *action DNA_DEPRECATED;  /* XXX deprecated... old animation system */
+  struct bAction *poselib DNA_DEPRECATED; /* Pre-Blender 3.0 pose library, deprecated in 3.5. */
   /** Pose data, armature objects only. */
   struct bPose *pose;
   /** Pointer to objects data - an 'ID' or NULL. */
@@ -273,12 +238,11 @@ typedef struct Object {
   ListBase constraintChannels DNA_DEPRECATED; /* XXX deprecated... old animation system */
   ListBase effect DNA_DEPRECATED;             /* XXX deprecated... keep for readfile */
   ListBase defbase DNA_DEPRECATED;            /* Only for versioning, moved to object data. */
+  ListBase fmaps DNA_DEPRECATED;              /* For versioning, moved to generic attributes. */
   /** List of ModifierData structures. */
   ListBase modifiers;
   /** List of GpencilModifierData structures. */
   ListBase greasepencil_modifiers;
-  /** List of facemaps. */
-  ListBase fmaps;
   /** List of viewport effects. Actually only used by grease pencil. */
   ListBase shader_fx;
 
@@ -312,21 +276,11 @@ typedef struct Object {
   float rotAxis[3], drotAxis[3];
   /** Axis angle rotation - angle part. */
   float rotAngle, drotAngle;
-  /** Final worldspace matrix with constraints & animsys applied. */
-  float obmat[4][4];
   /** Inverse result of parent, so that object doesn't 'stick' to parent. */
   float parentinv[4][4];
   /** Inverse result of constraints.
    * doesn't include effect of parent or object local transform. */
   float constinv[4][4];
-  /**
-   * Inverse matrix of 'obmat' for any other use than rendering!
-   *
-   * \note this isn't assured to be valid as with 'obmat',
-   * before using this value you should do...
-   * invert_m4_m4(ob->imat, ob->obmat);
-   */
-  float imat[4][4];
 
   /** Copy of Base's layer in the scene. */
   unsigned int lay DNA_DEPRECATED;
@@ -371,13 +325,12 @@ typedef struct Object {
   /** Dupliface scale. */
   float instance_faces_scale;
 
-  /** Custom index, for renderpasses. */
+  /** Custom index, for render-passes. */
   short index;
   /** Current deformation group, NOTE: index starts at 1. */
   unsigned short actdef DNA_DEPRECATED;
   /** Current face map, NOTE: index starts at 1. */
-  unsigned short actfmap;
-  char _pad2[2];
+  char _pad2[4];
   /** Object color (in most cases the material color is used for drawing). */
   float color[4];
 
@@ -385,14 +338,14 @@ typedef struct Object {
   short softflag;
 
   /** For restricting view, select, render etc. accessible in outliner. */
-  char restrictflag;
+  short visibility_flag;
 
-  /** Flag for pinning. */
-  char shapeflag;
   /** Current shape key for menu or pinned. */
   short shapenr;
+  /** Flag for pinning. */
+  char shapeflag;
 
-  char _pad3[2];
+  char _pad3[1];
 
   /** Object constraints. */
   ListBase constraints;
@@ -426,17 +379,33 @@ typedef struct Object {
   char empty_image_visibility_flag;
   char empty_image_depth;
   char empty_image_flag;
-  char _pad8[5];
+
+  /** ObjectModifierFlag */
+  uint8_t modifier_flag;
+  char _pad8[4];
 
   struct PreviewImage *preview;
 
   ObjectLineArt lineart;
 
-  /** Runtime evaluation data (keep last). */
-  Object_Runtime runtime;
+  /** Light-group membership information. */
+  struct LightgroupMembership *lightgroup;
+
+  /** Light linking information. */
+  LightLinking *light_linking;
+
+  /** Irradiance caches baked for this object (light-probes only). */
+  struct LightProbeObjectCache *lightprobe_cache;
+
+  ObjectRuntimeHandle *runtime;
+
+#ifdef __cplusplus
+  const blender::float4x4 &object_to_world() const;
+  const blender::float4x4 &world_to_object() const;
+#endif
 } Object;
 
-/* Warning, this is not used anymore because hooks are now modifiers */
+/** DEPRECATED: this is not used anymore because hooks are now modifiers. */
 typedef struct ObHook {
   struct ObHook *next, *prev;
 
@@ -463,16 +432,21 @@ typedef struct ObHook {
 
 /* **************** OBJECT ********************* */
 
-/* used many places, should be specialized. */
+/**
+ * This is used as a flag for many kinds of data that use selections, examples include:
+ * - #BezTriple.f1, #BezTriple.f2, #BezTriple.f3
+ * - #bNode.flag
+ * - #MovieTrackingTrack.flag
+ * And more, ideally this would have a generic location.
+ */
 #define SELECT 1
 
-#define OBJECT_ACTIVE_MODIFIER_NONE -1
-
-/* type */
-enum {
+/** #Object.type */
+typedef enum ObjectType {
   OB_EMPTY = 0,
   OB_MESH = 1,
-  OB_CURVE = 2,
+  /** Curve object is still used but replaced by "Curves" for the future (see #95355). */
+  OB_CURVES_LEGACY = 2,
   OB_SURF = 3,
   OB_FONT = 4,
   OB_MBALL = 5,
@@ -487,63 +461,96 @@ enum {
 
   OB_ARMATURE = 25,
 
-  /** Grease Pencil object used in 3D view but not used for annotation in 2D. */
-  OB_GPENCIL = 26,
+  OB_GPENCIL_LEGACY = 26,
 
-  OB_HAIR = 27,
+  OB_CURVES = 27,
 
   OB_POINTCLOUD = 28,
 
   OB_VOLUME = 29,
 
+  OB_GREASE_PENCIL = 30,
+
   /* Keep last. */
   OB_TYPE_MAX,
-};
+} ObjectType;
 
 /* check if the object type supports materials */
 #define OB_TYPE_SUPPORT_MATERIAL(_type) \
-  (((_type) >= OB_MESH && (_type) <= OB_MBALL) || ((_type) >= OB_GPENCIL && (_type) <= OB_VOLUME))
-#define OB_TYPE_SUPPORT_VGROUP(_type) (ELEM(_type, OB_MESH, OB_LATTICE, OB_GPENCIL))
+  (((_type) >= OB_MESH && (_type) <= OB_MBALL) || \
+   ((_type) >= OB_GPENCIL_LEGACY && (_type) <= OB_GREASE_PENCIL))
+/**
+ * Does the object have some render-able geometry (unlike empties, cameras, etc.). True for
+ * #OB_CURVES_LEGACY, since these often evaluate to objects with geometry.
+ */
+#define OB_TYPE_IS_GEOMETRY(_type) \
+  (ELEM(_type, \
+        OB_MESH, \
+        OB_SURF, \
+        OB_FONT, \
+        OB_MBALL, \
+        OB_GPENCIL_LEGACY, \
+        OB_CURVES_LEGACY, \
+        OB_CURVES, \
+        OB_POINTCLOUD, \
+        OB_VOLUME, \
+        OB_GREASE_PENCIL))
+#define OB_TYPE_SUPPORT_VGROUP(_type) \
+  (ELEM(_type, OB_MESH, OB_LATTICE, OB_GPENCIL_LEGACY, OB_GREASE_PENCIL))
 #define OB_TYPE_SUPPORT_EDITMODE(_type) \
-  (ELEM(_type, OB_MESH, OB_FONT, OB_CURVE, OB_SURF, OB_MBALL, OB_LATTICE, OB_ARMATURE))
-#define OB_TYPE_SUPPORT_PARVERT(_type) (ELEM(_type, OB_MESH, OB_SURF, OB_CURVE, OB_LATTICE))
+  (ELEM(_type, \
+        OB_MESH, \
+        OB_FONT, \
+        OB_CURVES_LEGACY, \
+        OB_SURF, \
+        OB_MBALL, \
+        OB_LATTICE, \
+        OB_ARMATURE, \
+        OB_CURVES, \
+        OB_POINTCLOUD, \
+        OB_GREASE_PENCIL))
+#define OB_TYPE_SUPPORT_PARVERT(_type) \
+  (ELEM(_type, OB_MESH, OB_SURF, OB_CURVES_LEGACY, OB_LATTICE))
 
 /** Matches #OB_TYPE_SUPPORT_EDITMODE. */
-#define OB_DATA_SUPPORT_EDITMODE(_type) (ELEM(_type, ID_ME, ID_CU, ID_MB, ID_LT, ID_AR))
+#define OB_DATA_SUPPORT_EDITMODE(_type) \
+  (ELEM(_type, ID_ME, ID_CU_LEGACY, ID_MB, ID_LT, ID_AR, ID_CV, ID_GP))
 
 /* is this ID type used as object data */
 #define OB_DATA_SUPPORT_ID(_id_type) \
   (ELEM(_id_type, \
         ID_ME, \
-        ID_CU, \
+        ID_CU_LEGACY, \
         ID_MB, \
         ID_LA, \
         ID_SPK, \
         ID_LP, \
         ID_CA, \
         ID_LT, \
-        ID_GD, \
+        ID_GD_LEGACY, \
         ID_AR, \
-        ID_HA, \
+        ID_CV, \
         ID_PT, \
-        ID_VO))
+        ID_VO, \
+        ID_GP))
 
 #define OB_DATA_SUPPORT_ID_CASE \
   ID_ME: \
-  case ID_CU: \
+  case ID_CU_LEGACY: \
   case ID_MB: \
   case ID_LA: \
   case ID_SPK: \
   case ID_LP: \
   case ID_CA: \
   case ID_LT: \
-  case ID_GD: \
+  case ID_GD_LEGACY: \
   case ID_AR: \
-  case ID_HA: \
+  case ID_CV: \
   case ID_PT: \
-  case ID_VO
+  case ID_VO: \
+  case ID_GP
 
-/* partype: first 4 bits: type */
+/** #Object.partype: first 4 bits: type. */
 enum {
   PARTYPE = (1 << 4) - 1,
   PAROBJECT = 0,
@@ -554,7 +561,7 @@ enum {
 
 };
 
-/* (short) transflag */
+/** #Object.transflag (short) */
 enum {
   OB_TRANSFORM_ADJUST_ROOT_PARENT_FOR_VIEW_LOCK = 1 << 0,
   OB_TRANSFLAG_UNUSED_1 = 1 << 1, /* cleared */
@@ -576,7 +583,7 @@ enum {
   OB_DUPLI = OB_DUPLIVERTS | OB_DUPLICOLLECTION | OB_DUPLIFACES | OB_DUPLIPARTS,
 };
 
-/* (short) trackflag / upflag */
+/** #Object.trackflag / #Object.upflag (short) */
 enum {
   OB_POSX = 0,
   OB_POSY = 1,
@@ -586,7 +593,7 @@ enum {
   OB_NEGZ = 5,
 };
 
-/* dtx: flags (short) */
+/** #Object.dtx draw type extra flags (short) */
 enum {
   OB_DRAWBOUNDOX = 1 << 0,
   OB_AXIS = 1 << 1,
@@ -605,7 +612,7 @@ enum {
   OB_USE_GPENCIL_LIGHTS = 1 << 10,
 };
 
-/* empty_drawtype: no flags */
+/** #Object.empty_drawtype: no flags */
 enum {
   OB_ARROWS = 1,
   OB_PLAINAXES = 2,
@@ -617,17 +624,20 @@ enum {
   OB_EMPTY_IMAGE = 8,
 };
 
-/* gpencil add types */
+/**
+ * Grease-pencil add types.
+ * TODO: doesn't need to be DNA, local to `OBJECT_OT_gpencil_add`.
+ */
 enum {
   GP_EMPTY = 0,
   GP_STROKE = 1,
   GP_MONKEY = 2,
-  GP_LRT_SCENE = 3,
-  GP_LRT_OBJECT = 4,
-  GP_LRT_COLLECTION = 5,
+  GREASE_PENCIL_LINEART_SCENE = 3,
+  GREASE_PENCIL_LINEART_OBJECT = 4,
+  GREASE_PENCIL_LINEART_COLLECTION = 5,
 };
 
-/* boundtype */
+/** #Object.boundtype */
 enum {
   OB_BOUND_BOX = 0,
   OB_BOUND_SPHERE = 1,
@@ -641,43 +651,56 @@ enum {
 
 /* **************** BASE ********************* */
 
-/* base->flag_legacy */
+/** #Base::flag_legacy (also used for #Object::flag). */
 enum {
   BA_WAS_SEL = (1 << 1),
-  /* NOTE: BA_HAS_RECALC_DATA can be re-used later if freed in readfile.c. */
-  // BA_HAS_RECALC_OB = (1 << 2),  /* DEPRECATED */
-  // BA_HAS_RECALC_DATA =  (1 << 3),  /* DEPRECATED */
+  /* NOTE: BA_HAS_RECALC_DATA can be re-used later if freed in `readfile.cc`. */
+  // BA_HAS_RECALC_OB = 1 << 2, /* DEPRECATED */
+  // BA_HAS_RECALC_DATA = 1 << 3, /* DEPRECATED */
   /** DEPRECATED, was runtime only, but was reusing an older flag. */
   BA_SNAP_FIX_DEPS_FIASCO = (1 << 2),
-};
 
-/* NOTE: this was used as a proper setting in past, so nullify before using */
-#define BA_TEMP_TAG (1 << 5)
+  /** NOTE: this was used as a proper setting in past, so nullify before using */
+  BA_TEMP_TAG = 1 << 5,
+  /**
+   * Even if this is tagged for transform, this flag means it's being locked in place.
+   * Use for #SCE_XFORM_SKIP_CHILDREN.
+   */
+  BA_TRANSFORM_LOCKED_IN_PLACE = 1 << 7,
 
-/**
- * Even if this is tagged for transform, this flag means it's being locked in place.
- * Use for #SCE_XFORM_SKIP_CHILDREN.
- */
-#define BA_TRANSFORM_LOCKED_IN_PLACE (1 << 7)
+  /** Child of a transformed object. */
+  BA_TRANSFORM_CHILD = 1 << 8,
+  /** Parent of a transformed object. */
+  BA_TRANSFORM_PARENT = 1 << 13,
 
-#define BA_TRANSFORM_CHILD (1 << 8)   /* child of a transformed object */
-#define BA_TRANSFORM_PARENT (1 << 13) /* parent of a transformed object */
-
-#define OB_FROMDUPLI (1 << 9)
-#define OB_DONE (1 << 10) /* unknown state, clear before use */
+  OB_FROMDUPLI = 1 << 9,
+  /** Unknown state, clear before use. */
+  OB_DONE = 1 << 10,
+  OB_FLAG_USE_SIMULATION_CACHE = 1 << 11,
 #ifdef DNA_DEPRECATED_ALLOW
-#  define OB_FLAG_UNUSED_11 (1 << 11) /* cleared */
-#  define OB_FLAG_UNUSED_12 (1 << 12) /* cleared */
+  OB_FLAG_UNUSED_12 = 1 << 12, /* cleared */
 #endif
-
-/* ob->restrictflag */
-enum {
-  OB_RESTRICT_VIEWPORT = 1 << 0,
-  OB_RESTRICT_SELECT = 1 << 1,
-  OB_RESTRICT_RENDER = 1 << 2,
 };
 
-/* ob->shapeflag */
+/** #Object.visibility_flag */
+enum {
+  OB_HIDE_VIEWPORT = 1 << 0,
+  OB_HIDE_SELECT = 1 << 1,
+  OB_HIDE_RENDER = 1 << 2,
+  OB_HIDE_CAMERA = 1 << 3,
+  OB_HIDE_DIFFUSE = 1 << 4,
+  OB_HIDE_GLOSSY = 1 << 5,
+  OB_HIDE_TRANSMISSION = 1 << 6,
+  OB_HIDE_VOLUME_SCATTER = 1 << 7,
+  OB_HIDE_SHADOW = 1 << 8,
+  OB_HOLDOUT = 1 << 9,
+  OB_SHADOW_CATCHER = 1 << 10,
+  OB_HIDE_PROBE_VOLUME = 1 << 11,
+  OB_HIDE_PROBE_CUBEMAP = 1 << 12,
+  OB_HIDE_PROBE_PLANAR = 1 << 13,
+};
+
+/** #Object.shapeflag */
 enum {
   OB_SHAPE_LOCK = 1 << 0,
 #ifdef DNA_DEPRECATED_ALLOW
@@ -686,7 +709,7 @@ enum {
   OB_SHAPE_EDIT_MODE = 1 << 2,
 };
 
-/* ob->nlaflag */
+/** #Object.nlaflag */
 enum {
   OB_ADS_UNUSED_1 = 1 << 0, /* cleared */
   OB_ADS_UNUSED_2 = 1 << 1, /* cleared */
@@ -702,7 +725,7 @@ enum {
   /* OB_ADS_SHOWPARTS = 1 << 14, */ /* UNUSED */
 };
 
-/* ob->protectflag */
+/** #Object.protectflag */
 enum {
   OB_LOCK_LOCX = 1 << 0,
   OB_LOCK_LOCY = 1 << 1,
@@ -720,16 +743,18 @@ enum {
   OB_LOCK_ROT4D = 1 << 10,
 };
 
-/* ob->duplicator_visibility_flag */
+/** #Object.duplicator_visibility_flag */
 enum {
   OB_DUPLI_FLAG_VIEWPORT = 1 << 0,
   OB_DUPLI_FLAG_RENDER = 1 << 1,
 };
 
-/* ob->empty_image_depth */
-#define OB_EMPTY_IMAGE_DEPTH_DEFAULT 0
-#define OB_EMPTY_IMAGE_DEPTH_FRONT 1
-#define OB_EMPTY_IMAGE_DEPTH_BACK 2
+/** #Object.empty_image_depth */
+enum {
+  OB_EMPTY_IMAGE_DEPTH_DEFAULT = 0,
+  OB_EMPTY_IMAGE_DEPTH_FRONT = 1,
+  OB_EMPTY_IMAGE_DEPTH_BACK = 2,
+};
 
 /** #Object.empty_image_visibility_flag */
 enum {
@@ -745,8 +770,6 @@ enum {
   OB_EMPTY_IMAGE_USE_ALPHA_BLEND = 1 << 0,
 };
 
-#define MAX_DUPLI_RECUR 8
-
-#ifdef __cplusplus
-}
-#endif
+typedef enum ObjectModifierFlag {
+  OB_MODIFIER_FLAG_ADD_REST_POSITION = 1 << 0,
+} ObjectModifierFlag;

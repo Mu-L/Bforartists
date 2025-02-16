@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2001-2002 NaN Holding BV. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup bli
@@ -33,15 +18,11 @@
 
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #if defined(__linux__) || defined(__GNU__) || defined(__NetBSD__) || defined(__OpenBSD__) || \
     defined(__FreeBSD_kernel__) || defined(__HAIKU__)
 
 /* Linux-i386, Linux-Alpha, Linux-PPC */
-#  include <stdint.h>
+#  include <stdint.h>  // IWYU pragma: export
 
 /* XXX */
 #  ifndef UINT64_MAX
@@ -54,29 +35,29 @@ typedef uint64_t u_int64_t;
 
 #elif defined(__APPLE__)
 
-#  include <inttypes.h>
+#  include <inttypes.h>  // IWYU pragma: export
 
 /* MSVC >= 2010 */
 #elif defined(_MSC_VER)
-#  include <stdint.h>
+#  include <stdint.h>  // IWYU pragma: export
 
 #else
 
 /* FreeBSD, Solaris */
-#  include <stdint.h>
-#  include <sys/types.h>
+#  include <stdint.h>     // IWYU pragma: export
+#  include <sys/types.h>  // IWYU pragma: export
 
 #endif /* ifdef platform for types */
 
-#include <stdbool.h>
-#include <stddef.h> /* size_t define */
+#include <stdbool.h>  // IWYU pragma: export
+#include <stddef.h>   // IWYU pragma: export
 
 #ifndef __cplusplus
-#  if defined(__APPLE__) || defined(__NetBSD__)
-/* The <uchar.h> standard header is missing on macOS. */
+/* The <uchar.h> standard header is missing on some systems. */
+#  if defined(__APPLE__) || defined(__NetBSD__) || defined(__OpenBSD__)
 typedef unsigned int char32_t;
 #  else
-#    include <uchar.h>
+#    include <uchar.h>  // IWYU pragma: export
 #  endif
 #endif
 
@@ -84,7 +65,3 @@ typedef unsigned int uint;
 typedef unsigned short ushort;
 typedef unsigned long ulong;
 typedef unsigned char uchar;
-
-#ifdef __cplusplus
-}
-#endif

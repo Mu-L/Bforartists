@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup bli
@@ -34,7 +22,7 @@
  * - `SORT_IMPL_LINKTYPE`:
  *   Struct type for sorting.
  * - `SORT_IMPL_LINKTYPE_DATA`:
- *   Data pointer or leave undefined to pass the link its self.
+ *   Data pointer or leave undefined to pass the link itself.
  * - `SORT_IMPL_FUNC`:
  *   Function name of the sort function.
  *
@@ -45,6 +33,9 @@
 
 /* -------------------------------------------------------------------- */
 /* Handle External Defines */
+
+#include "BLI_compiler_compat.h"
+#include "BLI_utildefines.h"
 
 /* check we're not building directly */
 #if !defined(SORT_IMPL_LINKTYPE) || !defined(SORT_IMPL_FUNC)
@@ -61,24 +52,25 @@
 #endif
 
 #ifdef SORT_IMPL_USE_THUNK
-#  define THUNK_APPEND1(a, thunk) a, thunk
-#  define THUNK_PREPEND2(thunk, a, b) thunk, a, b
+#  define BLI_LIST_THUNK_APPEND1(a, thunk) a, thunk
+#  define BLI_LIST_THUNK_PREPEND2(thunk, a, b) thunk, a, b
 #else
-#  define THUNK_APPEND1(a, thunk) a
-#  define THUNK_PREPEND2(thunk, a, b) a, b
+#  define BLI_LIST_THUNK_APPEND1(a, thunk) a
+#  define BLI_LIST_THUNK_PREPEND2(thunk, a, b) a, b
 #endif
 
-#define _CONCAT_AUX(MACRO_ARG1, MACRO_ARG2) MACRO_ARG1##MACRO_ARG2
-#define _CONCAT(MACRO_ARG1, MACRO_ARG2) _CONCAT_AUX(MACRO_ARG1, MACRO_ARG2)
-#define _SORT_PREFIX(id) _CONCAT(SORT_IMPL_FUNC, _##id)
+#define _BLI_LIST_SORT_CONCAT_AUX(MACRO_ARG1, MACRO_ARG2) MACRO_ARG1##MACRO_ARG2
+#define _BLI_LIST_SORT_CONCAT(MACRO_ARG1, MACRO_ARG2) \
+  _BLI_LIST_SORT_CONCAT_AUX(MACRO_ARG1, MACRO_ARG2)
+#define _BLI_LIST_SORT_PREFIX(id) _BLI_LIST_SORT_CONCAT(SORT_IMPL_FUNC, _##id)
 
 /* local identifiers */
-#define SortInfo _SORT_PREFIX(SortInfo)
-#define CompareFn _SORT_PREFIX(CompareFn)
-#define init_sort_info _SORT_PREFIX(init_sort_info)
-#define merge_lists _SORT_PREFIX(merge_lists)
-#define sweep_up _SORT_PREFIX(sweep_up)
-#define insert_list _SORT_PREFIX(insert_list)
+#define SortInfo _BLI_LIST_SORT_PREFIX(SortInfo)
+#define CompareFn _BLI_LIST_SORT_PREFIX(CompareFn)
+#define init_sort_info _BLI_LIST_SORT_PREFIX(init_sort_info)
+#define merge_lists _BLI_LIST_SORT_PREFIX(merge_lists)
+#define sweep_up _BLI_LIST_SORT_PREFIX(sweep_up)
+#define insert_list _BLI_LIST_SORT_PREFIX(insert_list)
 
 typedef int (*CompareFn)(
 #ifdef SORT_IMPL_USE_THUNK
@@ -135,18 +127,16 @@ struct SortInfo {
   void *thunk;
 #endif
 
-  /**
-   * Invariant: `ranks[i] == NULL || length(ranks[i]) >= 2**(i+1)`.
-   *
-   * ~ 128 bytes on 32bit, ~ 512 bytes on 64bit */
+  /* Invariant: `ranks[i] == NULL || length(ranks[i]) >= 2**(i+1)`.
+   * ~ 128 bytes on 32bit, ~ 512 bytes on 64bit. */
   list_node *ranks[MAX_RANKS];
 };
 
-BLI_INLINE void init_sort_info(struct SortInfo *si,
-                               CompareFn func
+inline void init_sort_info(struct SortInfo *si,
+                           CompareFn func
 #ifdef SORT_IMPL_USE_THUNK
-                               ,
-                               void *thunk
+                           ,
+                           void *thunk
 #endif
 )
 {
@@ -160,12 +150,12 @@ BLI_INLINE void init_sort_info(struct SortInfo *si,
 #endif
 }
 
-BLI_INLINE list_node *merge_lists(list_node *first,
-                                  list_node *second,
-                                  CompareFn func
+inline list_node *merge_lists(list_node *first,
+                              list_node *second,
+                              CompareFn func
 #ifdef SORT_IMPL_USE_THUNK
-                                  ,
-                                  void *thunk
+                              ,
+                              void *thunk
 #endif
 )
 {
@@ -173,7 +163,7 @@ BLI_INLINE list_node *merge_lists(list_node *first,
   list_node *list = NULL;
   list_node **pos = &list;
   while (first && second) {
-    if (func(THUNK_PREPEND2(thunk, SORT_ARG(first), SORT_ARG(second))) > 0) {
+    if (func(BLI_LIST_THUNK_PREPEND2(thunk, SORT_ARG(first), SORT_ARG(second))) > 0) {
       *pos = second;
       second = second->next;
     }
@@ -195,14 +185,14 @@ BLI_INLINE list_node *sweep_up(struct SortInfo *si, list_node *list, unsigned in
 {
   unsigned int i;
   for (i = si->min_rank; i < upto; i++) {
-    list = merge_lists(si->ranks[i], list, THUNK_APPEND1(si->func, si->thunk));
+    list = merge_lists(si->ranks[i], list, BLI_LIST_THUNK_APPEND1(si->func, si->thunk));
     si->ranks[i] = NULL;
   }
   return list;
 }
 
 /**
- * The 'ranks' array essentially captures the recursion stack of a mergesort.
+ * The 'ranks' array essentially captures the recursion stack of a merge-sort.
  * The merge tree is built in a bottom-up manner.  The control loop for
  * updating the 'ranks' array is analogous to incrementing a binary integer,
  * and the `O(n)` time for counting `upto` n translates to `O(n)` merges when
@@ -239,17 +229,19 @@ BLI_INLINE void insert_list(struct SortInfo *si, list_node *list, unsigned int r
       // printf("Rank '%d' should not exceed " STRINGIFY(MAX_RANKS), rank);
       rank = MAX_RANKS;
     }
-    list = merge_lists(sweep_up(si, NULL, si->n_ranks), list, THUNK_APPEND1(si->func, si->thunk));
+    list = merge_lists(
+        sweep_up(si, NULL, si->n_ranks), list, BLI_LIST_THUNK_APPEND1(si->func, si->thunk));
     for (i = si->n_ranks; i < rank; i++) {
       si->ranks[i] = NULL;
     }
   }
   else {
     if (rank) {
-      list = merge_lists(sweep_up(si, NULL, rank), list, THUNK_APPEND1(si->func, si->thunk));
+      list = merge_lists(
+          sweep_up(si, NULL, rank), list, BLI_LIST_THUNK_APPEND1(si->func, si->thunk));
     }
     for (i = rank; i < si->n_ranks && si->ranks[i]; i++) {
-      list = merge_lists(si->ranks[i], list, THUNK_APPEND1(si->func, si->thunk));
+      list = merge_lists(si->ranks[i], list, BLI_LIST_THUNK_APPEND1(si->func, si->thunk));
       si->ranks[i] = NULL;
     }
   }
@@ -295,7 +287,7 @@ BLI_INLINE list_node *list_sort_do(list_node *list,
     list_node *next = list->next;
     list_node *tail = next->next;
 
-    if (func(THUNK_PREPEND2(thunk, SORT_ARG(list), SORT_ARG(next))) > 0) {
+    if (func(BLI_LIST_THUNK_PREPEND2(thunk, SORT_ARG(list), SORT_ARG(next))) > 0) {
       next->next = list;
       next = list;
       list = list->next;
@@ -310,8 +302,8 @@ BLI_INLINE list_node *list_sort_do(list_node *list,
   return sweep_up(&si, list, si.n_ranks);
 }
 
-#undef _CONCAT_AUX
-#undef _CONCAT
+#undef _BLI_LIST_SORT_CONCAT_AUX
+#undef _BLI_LIST_SORT_CONCAT
 #undef _SORT_PREFIX
 
 #undef SortInfo
@@ -324,6 +316,6 @@ BLI_INLINE list_node *list_sort_do(list_node *list,
 #undef list_node
 #undef list_sort_do
 
-#undef THUNK_APPEND1
-#undef THUNK_PREPEND2
+#undef BLI_LIST_THUNK_APPEND1
+#undef BLI_LIST_THUNK_PREPEND2
 #undef SORT_ARG

@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2004-2022 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -24,10 +12,6 @@
 #include "BPy_Convert.h"
 #include "Interface1D/BPy_FEdge.h"
 #include "Interface1D/BPy_ViewEdge.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 using namespace Freestyle;
 
@@ -43,20 +27,21 @@ int ViewMap_Init(PyObject *module)
   if (PyType_Ready(&ViewMap_Type) < 0) {
     return -1;
   }
-  Py_INCREF(&ViewMap_Type);
-  PyModule_AddObject(module, "ViewMap", (PyObject *)&ViewMap_Type);
+  PyModule_AddObjectRef(module, "ViewMap", (PyObject *)&ViewMap_Type);
 
   return 0;
 }
 
 /*----------------------ViewMap methods----------------------------*/
 
-PyDoc_STRVAR(ViewMap_doc,
-             "Class defining the ViewMap.\n"
-             "\n"
-             ".. method:: __init__()\n"
-             "\n"
-             "   Default constructor.");
+PyDoc_STRVAR(
+    /* Wrap. */
+    ViewMap_doc,
+    "Class defining the ViewMap.\n"
+    "\n"
+    ".. method:: __init__()\n"
+    "\n"
+    "   Default constructor.");
 
 static int ViewMap_init(BPy_ViewMap *self, PyObject *args, PyObject *kwds)
 {
@@ -80,17 +65,19 @@ static PyObject *ViewMap_repr(BPy_ViewMap *self)
   return PyUnicode_FromFormat("ViewMap - address: %p", self->vm);
 }
 
-PyDoc_STRVAR(ViewMap_get_closest_viewedge_doc,
-             ".. method:: get_closest_viewedge(x, y)\n"
-             "\n"
-             "   Gets the ViewEdge nearest to the 2D point specified as arguments.\n"
-             "\n"
-             "   :arg x: X coordinate of a 2D point.\n"
-             "   :type x: float\n"
-             "   :arg y: Y coordinate of a 2D point.\n"
-             "   :type y: float\n"
-             "   :return: The ViewEdge nearest to the specified 2D point.\n"
-             "   :rtype: :class:`ViewEdge`");
+PyDoc_STRVAR(
+    /* Wrap. */
+    ViewMap_get_closest_viewedge_doc,
+    ".. method:: get_closest_viewedge(x, y)\n"
+    "\n"
+    "   Gets the ViewEdge nearest to the 2D point specified as arguments.\n"
+    "\n"
+    "   :arg x: X coordinate of a 2D point.\n"
+    "   :type x: float\n"
+    "   :arg y: Y coordinate of a 2D point.\n"
+    "   :type y: float\n"
+    "   :return: The ViewEdge nearest to the specified 2D point.\n"
+    "   :rtype: :class:`ViewEdge`");
 
 static PyObject *ViewMap_get_closest_viewedge(BPy_ViewMap *self, PyObject *args, PyObject *kwds)
 {
@@ -107,17 +94,19 @@ static PyObject *ViewMap_get_closest_viewedge(BPy_ViewMap *self, PyObject *args,
   Py_RETURN_NONE;
 }
 
-PyDoc_STRVAR(ViewMap_get_closest_fedge_doc,
-             ".. method:: get_closest_fedge(x, y)\n"
-             "\n"
-             "   Gets the FEdge nearest to the 2D point specified as arguments.\n"
-             "\n"
-             "   :arg x: X coordinate of a 2D point.\n"
-             "   :type x: float\n"
-             "   :arg y: Y coordinate of a 2D point.\n"
-             "   :type y: float\n"
-             "   :return: The FEdge nearest to the specified 2D point.\n"
-             "   :rtype: :class:`FEdge`");
+PyDoc_STRVAR(
+    /* Wrap. */
+    ViewMap_get_closest_fedge_doc,
+    ".. method:: get_closest_fedge(x, y)\n"
+    "\n"
+    "   Gets the FEdge nearest to the 2D point specified as arguments.\n"
+    "\n"
+    "   :arg x: X coordinate of a 2D point.\n"
+    "   :type x: float\n"
+    "   :arg y: Y coordinate of a 2D point.\n"
+    "   :type y: float\n"
+    "   :return: The FEdge nearest to the specified 2D point.\n"
+    "   :rtype: :class:`FEdge`");
 
 static PyObject *ViewMap_get_closest_fedge(BPy_ViewMap *self, PyObject *args, PyObject *kwds)
 {
@@ -150,17 +139,19 @@ static PyMethodDef BPy_ViewMap_methods[] = {
 
 /*----------------------ViewMap get/setters ----------------------------*/
 
-PyDoc_STRVAR(ViewMap_scene_bbox_doc,
-             "The 3D bounding box of the scene.\n"
-             "\n"
-             ":type: :class:`BBox`");
+PyDoc_STRVAR(
+    /* Wrap. */
+    ViewMap_scene_bbox_doc,
+    "The 3D bounding box of the scene.\n"
+    "\n"
+    ":type: :class:`BBox`");
 
-static PyObject *ViewMap_scene_bbox_get(BPy_ViewMap *self, void *UNUSED(closure))
+static PyObject *ViewMap_scene_bbox_get(BPy_ViewMap *self, void * /*closure*/)
 {
   return BPy_BBox_from_BBox(self->vm->getScene3dBBox());
 }
 
-static int ViewMap_scene_bbox_set(BPy_ViewMap *self, PyObject *value, void *UNUSED(closure))
+static int ViewMap_scene_bbox_set(BPy_ViewMap *self, PyObject *value, void * /*closure*/)
 {
   if (!BPy_BBox_Check(value)) {
     PyErr_SetString(PyExc_TypeError, "value must be a BBox");
@@ -182,47 +173,44 @@ static PyGetSetDef BPy_ViewMap_getseters[] = {
 /*-----------------------BPy_ViewMap type definition ------------------------------*/
 
 PyTypeObject ViewMap_Type = {
-    PyVarObject_HEAD_INIT(nullptr, 0) "ViewMap", /* tp_name */
-    sizeof(BPy_ViewMap),                         /* tp_basicsize */
-    0,                                           /* tp_itemsize */
-    (destructor)ViewMap_dealloc,                 /* tp_dealloc */
-    0,                                           /* tp_vectorcall_offset */
-    nullptr,                                     /* tp_getattr */
-    nullptr,                                     /* tp_setattr */
-    nullptr,                                     /* tp_reserved */
-    (reprfunc)ViewMap_repr,                      /* tp_repr */
-    nullptr,                                     /* tp_as_number */
-    nullptr,                                     /* tp_as_sequence */
-    nullptr,                                     /* tp_as_mapping */
-    nullptr,                                     /* tp_hash */
-    nullptr,                                     /* tp_call */
-    nullptr,                                     /* tp_str */
-    nullptr,                                     /* tp_getattro */
-    nullptr,                                     /* tp_setattro */
-    nullptr,                                     /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,    /* tp_flags */
-    ViewMap_doc,                                 /* tp_doc */
-    nullptr,                                     /* tp_traverse */
-    nullptr,                                     /* tp_clear */
-    nullptr,                                     /* tp_richcompare */
-    0,                                           /* tp_weaklistoffset */
-    nullptr,                                     /* tp_iter */
-    nullptr,                                     /* tp_iternext */
-    BPy_ViewMap_methods,                         /* tp_methods */
-    nullptr,                                     /* tp_members */
-    BPy_ViewMap_getseters,                       /* tp_getset */
-    nullptr,                                     /* tp_base */
-    nullptr,                                     /* tp_dict */
-    nullptr,                                     /* tp_descr_get */
-    nullptr,                                     /* tp_descr_set */
-    0,                                           /* tp_dictoffset */
-    (initproc)ViewMap_init,                      /* tp_init */
-    nullptr,                                     /* tp_alloc */
-    PyType_GenericNew,                           /* tp_new */
+    /*ob_base*/ PyVarObject_HEAD_INIT(nullptr, 0)
+    /*tp_name*/ "ViewMap",
+    /*tp_basicsize*/ sizeof(BPy_ViewMap),
+    /*tp_itemsize*/ 0,
+    /*tp_dealloc*/ (destructor)ViewMap_dealloc,
+    /*tp_vectorcall_offset*/ 0,
+    /*tp_getattr*/ nullptr,
+    /*tp_setattr*/ nullptr,
+    /*tp_as_async*/ nullptr,
+    /*tp_repr*/ (reprfunc)ViewMap_repr,
+    /*tp_as_number*/ nullptr,
+    /*tp_as_sequence*/ nullptr,
+    /*tp_as_mapping*/ nullptr,
+    /*tp_hash*/ nullptr,
+    /*tp_call*/ nullptr,
+    /*tp_str*/ nullptr,
+    /*tp_getattro*/ nullptr,
+    /*tp_setattro*/ nullptr,
+    /*tp_as_buffer*/ nullptr,
+    /*tp_flags*/ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    /*tp_doc*/ ViewMap_doc,
+    /*tp_traverse*/ nullptr,
+    /*tp_clear*/ nullptr,
+    /*tp_richcompare*/ nullptr,
+    /*tp_weaklistoffset*/ 0,
+    /*tp_iter*/ nullptr,
+    /*tp_iternext*/ nullptr,
+    /*tp_methods*/ BPy_ViewMap_methods,
+    /*tp_members*/ nullptr,
+    /*tp_getset*/ BPy_ViewMap_getseters,
+    /*tp_base*/ nullptr,
+    /*tp_dict*/ nullptr,
+    /*tp_descr_get*/ nullptr,
+    /*tp_descr_set*/ nullptr,
+    /*tp_dictoffset*/ 0,
+    /*tp_init*/ (initproc)ViewMap_init,
+    /*tp_alloc*/ nullptr,
+    /*tp_new*/ PyType_GenericNew,
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////
-
-#ifdef __cplusplus
-}
-#endif

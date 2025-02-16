@@ -1,30 +1,11 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 1999 Stephane Popinet
+ * SPDX-FileCopyrightText: 2000-2003 `Bruno Levy <levy@loria.fr>`
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ * SPDX-License-Identifier: GPL-2.0-or-later
  *
  * The Original Code is:
- *     GTS - Library for the manipulation of triangulated surfaces
- *     Copyright (C) 1999 Stephane Popinet
- * and:
- *     OGF/Graphite: Geometry and Graphics Programming Library + Utilities
- *     Copyright (C) 2000-2003 Bruno Levy
- *     Contact: Bruno Levy <levy@loria.fr>
- *         ISA Project
- *         LORIA, INRIA Lorraine,
- *         Campus Scientifique, BP 239
- *         54506 VANDOEUVRE LES NANCY CEDEX
- *         FRANCE
+ * - GTS - Library for the manipulation of triangulated surfaces.
+ * - OGF/Graphite: Geometry and Graphics Programming Library + Utilities.
  */
 
 /** \file
@@ -41,9 +22,9 @@
 #include "Curvature.h"
 #include "WEdge.h"
 
-#include "../geometry/normal_cycle.h"
+#include "BLI_math_base.h"
 
-#include "BLI_math.h"
+#include "../geometry/normal_cycle.h"
 
 namespace Freestyle {
 
@@ -59,7 +40,7 @@ static bool angle_obtuse(WVertex *v, WFace *f)
 
 // FIXME
 // WVvertex is useless but kept for history reasons
-static bool triangle_obtuse(WVertex *UNUSED(v), WFace *f)
+static bool triangle_obtuse(WVertex * /*v*/, WFace *f)
 {
   bool b = false;
   for (int i = 0; i < 3; i++) {
@@ -101,30 +82,9 @@ static real angle_from_cotan(WVertex *vo, WVertex *v1, WVertex *v2)
   /* NOTE(Ray Jones): I assume this is what they mean by using #atan2. */
 
   /* tan = denom/udotv = y/x (see man page for atan2) */
-  return (fabs(atan2(denom, udotv)));
+  return fabs(atan2(denom, udotv));
 }
 
-/** gts_vertex_mean_curvature_normal:
- *  \param v: a #WVertex.
- *  \param s: a #GtsSurface.
- *  \param Kh: the Mean Curvature Normal at \a v.
- *
- *  Computes the Discrete Mean Curvature Normal approximation at \a v.
- *  The mean curvature at \a v is half the magnitude of the vector \a Kh.
- *
- *  NOTE: the normal computed is not unit length, and may point either into or out of the surface,
- * depending on the curvature at \a v. It is the responsibility of the caller of the function to
- * use the mean curvature normal appropriately.
- *
- *  This approximation is from the paper:
- *      Discrete Differential-Geometry Operators for Triangulated 2-Manifolds
- *      Mark Meyer, Mathieu Desbrun, Peter Schroder, Alan H. Barr
- *      VisMath '02, Berlin (Germany)
- *      http://www-grail.usc.edu/pubs.html
- *
- *  Returns: %true if the operator could be evaluated, %false if the evaluation failed for some
- * reason (@v is boundary or is the endpoint of a non-manifold edge.)
- */
 bool gts_vertex_mean_curvature_normal(WVertex *v, Vec3r &Kh)
 {
   real area = 0.0;
@@ -175,22 +135,6 @@ bool gts_vertex_mean_curvature_normal(WVertex *v, Vec3r &Kh)
   return true;
 }
 
-/** gts_vertex_gaussian_curvature:
- *  \param v: a #WVertex.
- *  \param s: a #GtsSurface.
- *  \param Kg: the Discrete Gaussian Curvature approximation at \a v.
- *
- *  Computes the Discrete Gaussian Curvature approximation at \a v.
- *
- *  This approximation is from the paper:
- *      Discrete Differential-Geometry Operators for Triangulated 2-Manifolds
- *      Mark Meyer, Mathieu Desbrun, Peter Schroder, Alan H. Barr
- *      VisMath '02, Berlin (Germany)
- *      http://www-grail.usc.edu/pubs.html
- *
- *  Returns: %true if the operator could be evaluated, %false if the evaluation failed for some
- * reason (@v is boundary or is the endpoint of a non-manifold edge.)
- */
 bool gts_vertex_gaussian_curvature(WVertex *v, real *Kg)
 {
   real area = 0.0;
@@ -226,20 +170,6 @@ bool gts_vertex_gaussian_curvature(WVertex *v, real *Kg)
   return true;
 }
 
-/** gts_vertex_principal_curvatures:
- *  @Kh: mean curvature.
- *  @Kg: Gaussian curvature.
- *  @K1: first principal curvature.
- *  @K2: second principal curvature.
- *
- *  Computes the principal curvatures at a point given the mean and Gaussian curvatures at that
- * point.
- *
- *  The mean curvature can be computed as one-half the magnitude of the vector computed by
- *  gts_vertex_mean_curvature_normal().
- *
- *  The Gaussian curvature can be computed with gts_vertex_gaussian_curvature().
- */
 void gts_vertex_principal_curvatures(real Kh, real Kg, real *K1, real *K2)
 {
   real temp = Kh * Kh - Kg;
@@ -279,21 +209,6 @@ static void eigenvector(real a, real b, real c, Vec3r e)
   e[2] = 0.0;
 }
 
-/** gts_vertex_principal_directions:
- *  \param v: a #WVertex.
- *  \param s: a #GtsSurface.
- *  \param Kh: mean curvature normal (a #Vec3r).
- *  \param Kg: Gaussian curvature (a real).
- *  \param e1: first principal curvature direction (direction of largest curvature).
- *  \param e2: second principal curvature direction.
- *
- *  Computes the principal curvature directions at a point given \a Kh and \a Kg,
- *  the mean curvature normal and Gaussian curvatures at that point, computed with
- *  gts_vertex_mean_curvature_normal() and gts_vertex_gaussian_curvature(), respectively.
- *
- *  Note that this computation is very approximate and tends to be unstable. Smoothing of the
- * surface or the principal directions may be necessary to achieve reasonable results.
- */
 void gts_vertex_principal_directions(WVertex *v, Vec3r Kh, real Kg, Vec3r &e1, Vec3r &e2)
 {
   Vec3r N;
@@ -372,7 +287,7 @@ void gts_vertex_principal_directions(WVertex *v, Vec3r Kh, real Kg, Vec3r &e1, V
     e = *itE;
 
     /* Since this vertex passed the tests in gts_vertex_mean_curvature_normal(),
-       this should be true. */
+     * this should be true. */
     // g_assert(gts_edge_face_number (e, s) == 2);
 
     /* Identify the two triangles bordering e in s. */
@@ -478,7 +393,8 @@ void gts_vertex_principal_directions(WVertex *v, Vec3r Kh, real Kg, Vec3r &e1, V
 
   /* check for solvability of the linear system */
   if (((aterm_da * bterm_db - aterm_db * bterm_da) != 0.0) &&
-      ((const_da != 0.0) || (const_db != 0.0))) {
+      ((const_da != 0.0) || (const_db != 0.0)))
+  {
     linsolve(aterm_da, bterm_da, -const_da, aterm_db, bterm_db, -const_db, &a, &b);
 
     c = normKh - a;
@@ -561,10 +477,10 @@ inline static real angle(WOEdge *h)
   const Vec3r v = h->GetVec();
   real sine = (n1 ^ n2) * v / v.norm();
   if (sine >= 1.0) {
-    return M_PI / 2.0;
+    return M_PI_2;
   }
   if (sine <= -1.0) {
-    return -M_PI / 2.0;
+    return -M_PI_2;
   }
   return ::asin(sine);
 }
@@ -600,8 +516,8 @@ static bool sphere_clip_vector(const Vec3r &O, real r, const Vec3r &P, Vec3r &V)
   return true;
 }
 
-// TODO: check optimizations:
-// use marking ? (measure *timings* ...)
+/* TODO: check optimizations:
+ * use marking ? (measure *timings* ...). */
 void compute_curvature_tensor(WVertex *start, real radius, NormalCycle &nc)
 {
   // in case we have a non-manifold vertex, skip it...

@@ -1,36 +1,17 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2013 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2013 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup depsgraph
  */
 
-#include "intern/node/deg_node_operation.h"
+#include "intern/node/deg_node_operation.hh"
 
-#include "MEM_guardedalloc.h"
-
-#include "BLI_utildefines.h"
-
-#include "intern/depsgraph.h"
-#include "intern/node/deg_node_component.h"
-#include "intern/node/deg_node_factory.h"
-#include "intern/node/deg_node_id.h"
+#include "intern/depsgraph.hh"
+#include "intern/node/deg_node_component.hh"
+#include "intern/node/deg_node_factory.hh"
+#include "intern/node/deg_node_id.hh"
 
 namespace blender::deg {
 
@@ -48,6 +29,11 @@ const char *operationCodeAsString(OperationCode opcode)
       return "PARAMETERS_EVAL";
     case OperationCode::PARAMETERS_EXIT:
       return "PARAMETERS_EXIT";
+    case OperationCode::VISIBILITY:
+      return "VISIBILITY";
+    /* Hierarchy. */
+    case OperationCode::HIERARCHY:
+      return "HIERARCHY";
     /* Animation, Drivers, etc. */
     case OperationCode::ANIMATION_ENTRY:
       return "ANIMATION_ENTRY";
@@ -98,6 +84,8 @@ const char *operationCodeAsString(OperationCode opcode)
     /* Geometry. */
     case OperationCode::GEOMETRY_EVAL_INIT:
       return "GEOMETRY_EVAL_INIT";
+    case OperationCode::MODIFIER:
+      return "MODIFIER";
     case OperationCode::GEOMETRY_EVAL:
       return "GEOMETRY_EVAL";
     case OperationCode::GEOMETRY_EVAL_DONE:
@@ -170,23 +158,31 @@ const char *operationCodeAsString(OperationCode opcode)
     /* Collections. */
     case OperationCode::VIEW_LAYER_EVAL:
       return "VIEW_LAYER_EVAL";
-    /* Copy on write. */
-    case OperationCode::COPY_ON_WRITE:
-      return "COPY_ON_WRITE";
+    /* Copy on eval. */
+    case OperationCode::COPY_ON_EVAL:
+      return "COPY_ON_EVAL";
     /* Shading. */
     case OperationCode::SHADING:
       return "SHADING";
+    case OperationCode::SHADING_DONE:
+      return "SHADING_DONE";
     case OperationCode::MATERIAL_UPDATE:
       return "MATERIAL_UPDATE";
     case OperationCode::LIGHT_UPDATE:
       return "LIGHT_UPDATE";
     case OperationCode::WORLD_UPDATE:
       return "WORLD_UPDATE";
+    /* Light linking. */
+    case OperationCode::LIGHT_LINKING_UPDATE:
+      return "LIGHT_LINKING_UPDATE";
+    /* Node Tree. */
+    case OperationCode::NTREE_OUTPUT:
+      return "NTREE_OUTPUT";
+    case OperationCode::NTREE_GEOMETRY_PREPROCESS:
+      return "NTREE_GEOMETRY_PREPROCESS";
     /* Movie clip. */
     case OperationCode::MOVIECLIP_EVAL:
       return "MOVIECLIP_EVAL";
-    case OperationCode::MOVIECLIP_SELECT_UPDATE:
-      return "MOVIECLIP_SELECT_UPDATE";
     /* Image. */
     case OperationCode::IMAGE_ANIMATION:
       return "IMAGE_ANIMATION";
@@ -199,30 +195,28 @@ const char *operationCodeAsString(OperationCode opcode)
     /* Sequencer. */
     case OperationCode::SEQUENCES_EVAL:
       return "SEQUENCES_EVAL";
-    /* instancing/duplication. */
-    case OperationCode::DUPLI:
-      return "DUPLI";
-    case OperationCode::SIMULATION_EVAL:
-      return "SIMULATION_EVAL";
+    /* instancing. */
+    case OperationCode::INSTANCER:
+      return "INSTANCER";
+    case OperationCode::INSTANCE:
+      return "INSTANCE";
+    case OperationCode::INSTANCE_GEOMETRY:
+      return "INSTANCE_GEOMETRY";
   }
   BLI_assert_msg(0, "Unhandled operation code, should never happen.");
   return "UNKNOWN";
 }
 
-OperationNode::OperationNode() : name_tag(-1), flag(0)
+OperationNode::OperationNode() : name_tag(-1), flag(0) {}
+
+std::string OperationNode::identifier() const
 {
+  return std::string(operationCodeAsString(opcode)) + "(" + name + ")";
 }
 
-string OperationNode::identifier() const
+std::string OperationNode::full_identifier() const
 {
-  return string(operationCodeAsString(opcode)) + "(" + name + ")";
-}
-
-/* Full node identifier, including owner name.
- * used for logging and debug prints. */
-string OperationNode::full_identifier() const
-{
-  string owner_str = owner->owner->name;
+  std::string owner_str = owner->owner->name;
   if (owner->type == NodeType::BONE || !owner->name.empty()) {
     owner_str += "/" + owner->name;
   }
@@ -231,15 +225,30 @@ string OperationNode::full_identifier() const
 
 void OperationNode::tag_update(Depsgraph *graph, eUpdateSource source)
 {
-  if ((flag & DEPSOP_FLAG_NEEDS_UPDATE) == 0) {
-    graph->add_entry_tag(this);
+  /* Ensure that there is an entry tag for this update.
+   *
+   * Note that the node might already be tagged for an update due invisible state of the node
+   * during previous dependency evaluation. Here the node gets re-tagged, so we need to give
+   * the evaluated clues that evaluation needs to happen again. */
+  graph->add_entry_tag(this);
+
+  /* Enforce dynamic visibility code-path update.
+   * This ensures visibility flags are consistently propagated throughout the dependency graph when
+   * there is no animated visibility in the graph.
+   *
+   * For example this ensures that graph is updated properly when manually toggling non-animated
+   * modifier visibility. */
+  if (opcode == OperationCode::VISIBILITY) {
+    graph->need_update_nodes_visibility = true;
   }
+
   /* Tag for update, but also note that this was the source of an update. */
   flag |= (DEPSOP_FLAG_NEEDS_UPDATE | DEPSOP_FLAG_DIRECTLY_MODIFIED);
   switch (source) {
     case DEG_UPDATE_SOURCE_TIME:
     case DEG_UPDATE_SOURCE_RELATIONS:
     case DEG_UPDATE_SOURCE_VISIBILITY:
+    case DEG_UPDATE_SOURCE_SIDE_EFFECT_REQUEST:
       /* Currently nothing. */
       break;
     case DEG_UPDATE_SOURCE_USER_EDIT:

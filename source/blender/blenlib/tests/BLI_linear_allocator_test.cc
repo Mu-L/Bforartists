@@ -1,15 +1,19 @@
-/* Apache License, Version 2.0 */
+/* SPDX-FileCopyrightText: 2023 Blender Authors
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
+
+#include "testing/testing.h"
 
 #include "BLI_linear_allocator.hh"
 #include "BLI_rand.hh"
-#include "BLI_strict_flags.h"
-#include "testing/testing.h"
+
+#include "BLI_strict_flags.h" /* IWYU pragma: keep. Keep last. */
 
 namespace blender::tests {
 
 static bool is_aligned(void *ptr, uint alignment)
 {
-  BLI_assert(is_power_of_2_i(static_cast<int>(alignment)));
+  BLI_assert(is_power_of_2(int(alignment)));
   return (POINTER_AS_UINT(ptr) & (alignment - 1)) == 0;
 }
 
@@ -36,13 +40,13 @@ TEST(linear_allocator, PackedAllocation)
   blender::AlignedBuffer<256, 32> buffer;
   allocator.provide_buffer(buffer);
 
-  uintptr_t ptr1 = (uintptr_t)allocator.allocate(10, 4); /*  0 - 10 */
-  uintptr_t ptr2 = (uintptr_t)allocator.allocate(10, 4); /* 12 - 22 */
-  uintptr_t ptr3 = (uintptr_t)allocator.allocate(8, 32); /* 32 - 40 */
-  uintptr_t ptr4 = (uintptr_t)allocator.allocate(16, 8); /* 40 - 56 */
-  uintptr_t ptr5 = (uintptr_t)allocator.allocate(1, 8);  /* 56 - 57 */
-  uintptr_t ptr6 = (uintptr_t)allocator.allocate(1, 4);  /* 60 - 61 */
-  uintptr_t ptr7 = (uintptr_t)allocator.allocate(1, 1);  /* 61 - 62 */
+  uintptr_t ptr1 = uintptr_t(allocator.allocate(10, 4)); /*  0 - 10 */
+  uintptr_t ptr2 = uintptr_t(allocator.allocate(10, 4)); /* 12 - 22 */
+  uintptr_t ptr3 = uintptr_t(allocator.allocate(8, 32)); /* 32 - 40 */
+  uintptr_t ptr4 = uintptr_t(allocator.allocate(16, 8)); /* 40 - 56 */
+  uintptr_t ptr5 = uintptr_t(allocator.allocate(1, 8));  /* 56 - 57 */
+  uintptr_t ptr6 = uintptr_t(allocator.allocate(1, 4));  /* 60 - 61 */
+  uintptr_t ptr7 = uintptr_t(allocator.allocate(1, 1));  /* 61 - 62 */
 
   EXPECT_EQ(ptr2 - ptr1, 12); /* 12 -  0 = 12 */
   EXPECT_EQ(ptr3 - ptr2, 20); /* 32 - 12 = 20 */
@@ -130,7 +134,7 @@ TEST(linear_allocator, ManyAllocations)
   RandomNumberGenerator rng;
   for (int i = 0; i < 1000; i++) {
     int size = rng.get_int32(10000);
-    int alignment = 1 << (rng.get_int32(7));
+    int alignment = 1 << rng.get_int32(7);
     void *buffer = allocator.allocate(size, alignment);
     EXPECT_NE(buffer, nullptr);
   }
@@ -147,6 +151,25 @@ TEST(linear_allocator, ConstructArray)
   for (std::string &string : strings) {
     string.~basic_string();
   }
+}
+
+TEST(linear_allocator, TransferOwnership)
+{
+  LinearAllocator<> main_allocator;
+  MutableSpan<int> values;
+
+  /* Allocate a large buffer that is likely to be given back to the system when freed. This test
+   * essentially only fails by crashing with a segfault. */
+  const int size = 1'000'000;
+  const int value = 42;
+  const int index = 500'000;
+  {
+    LinearAllocator<> nested_allocator;
+    values = nested_allocator.allocate_array<int>(size);
+    values[index] = value;
+    main_allocator.transfer_ownership_from(nested_allocator);
+  }
+  EXPECT_EQ(values[index], value);
 }
 
 }  // namespace blender::tests

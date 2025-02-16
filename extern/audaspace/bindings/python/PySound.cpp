@@ -89,10 +89,11 @@ Sound_new(PyTypeObject* type, PyObject* args, PyObject* kwds)
 	self = (Sound*)type->tp_alloc(type, 0);
 	if(self != nullptr)
 	{
-		static const char* kwlist[] = {"filename", nullptr};
+		static const char* kwlist[] = {"filename", "stream", nullptr};
 		const char* filename = nullptr;
+		int stream = 0;
 
-		if(!PyArg_ParseTupleAndKeywords(args, kwds, "s:Sound", const_cast<char**>(kwlist), &filename))
+		if(!PyArg_ParseTupleAndKeywords(args, kwds, "s|i:Sound", const_cast<char**>(kwlist), &filename, &stream))
 		{
 			Py_DECREF(self);
 			return nullptr;
@@ -100,7 +101,7 @@ Sound_new(PyTypeObject* type, PyObject* args, PyObject* kwds)
 
 		try
 		{
-			self->sound = new std::shared_ptr<ISound>(new File(filename));
+			self->sound = new std::shared_ptr<ISound>(new File(filename, stream));
 		}
 		catch(Exception& e)
 		{
@@ -114,7 +115,7 @@ Sound_new(PyTypeObject* type, PyObject* args, PyObject* kwds)
 }
 
 PyDoc_STRVAR(M_aud_Sound_data_doc,
-			 ".. classmethod:: data()\n\n"
+			 ".. method:: data()\n\n"
 			 "   Retrieves the data of the sound as numpy array.\n\n"
 			 "   :return: A two dimensional numpy float array.\n"
 			 "   :rtype: :class:`numpy.ndarray`\n\n"
@@ -145,7 +146,7 @@ Sound_data(Sound* self)
 }
 
 PyDoc_STRVAR(M_aud_Sound_write_doc,
-			 ".. classmethod:: write(filename, rate, channels, format, container, codec, bitrate, buffersize)\n\n"
+			 ".. method:: write(filename, rate, channels, format, container, codec, bitrate, buffersize)\n\n"
 			 "   Writes the sound to a file.\n\n"
 			 "   :arg filename: The path to write to.\n"
 			 "   :type filename: string\n"
@@ -232,6 +233,8 @@ Sound_write(Sound* self, PyObject* args, PyObject* kwds)
 				container = CONTAINER_OGG;
 			else if(extension == ".wav")
 				container = CONTAINER_WAV;
+			else if(extension == ".aac")
+				container = CONTAINER_AAC;
 			else
 			{
 				PyErr_SetString(AUDError, invalid_container_error);
@@ -264,6 +267,9 @@ Sound_write(Sound* self, PyObject* args, PyObject* kwds)
 			case CONTAINER_WAV:
 				codec = CODEC_PCM;
 				break;
+			case CONTAINER_AAC:
+				codec = CODEC_AAC;
+				break;
 			default:
 				PyErr_SetString(AUDError, "Unknown container, cannot select default codec.");
 				return nullptr;
@@ -289,7 +295,7 @@ PyDoc_STRVAR(M_aud_Sound_buffer_doc,
 			 ".. classmethod:: buffer(data, rate)\n\n"
 			 "   Creates a sound from a data buffer.\n\n"
 			 "   :arg data: The data as two dimensional numpy array.\n"
-			 "   :type data: numpy.ndarray\n"
+			 "   :type data: :class:`numpy.ndarray`\n"
 			 "   :arg rate: The sample rate.\n"
 			 "   :type rate: double\n"
 			 "   :return: The created :class:`Sound` object.\n"
@@ -356,7 +362,7 @@ Sound_buffer(PyTypeObject* type, PyObject* args)
 }
 
 PyDoc_STRVAR(M_aud_Sound_cache_doc,
-			 ".. classmethod:: cache()\n\n"
+			 ".. method:: cache()\n\n"
 			 "   Caches a sound into RAM.\n\n"
 			 "   This saves CPU usage needed for decoding and file access if the\n"
 			 "   underlying sound reads from a file on the harddisk,\n"
@@ -407,8 +413,9 @@ static PyObject *
 Sound_file(PyTypeObject* type, PyObject* args)
 {
 	const char* filename = nullptr;
+	int stream = 0;
 
-	if(!PyArg_ParseTuple(args, "s:file", &filename))
+	if(!PyArg_ParseTuple(args, "s|i:file", &filename, &stream))
 		return nullptr;
 
 	Sound* self;
@@ -418,7 +425,7 @@ Sound_file(PyTypeObject* type, PyObject* args)
 	{
 		try
 		{
-			self->sound = new std::shared_ptr<ISound>(new File(filename));
+			self->sound = new std::shared_ptr<ISound>(new File(filename, stream));
 		}
 		catch(Exception& e)
 		{
@@ -629,7 +636,7 @@ Sound_triangle(PyTypeObject* type, PyObject* args)
 }
 
 PyDoc_STRVAR(M_aud_Sound_accumulate_doc,
-			 ".. classmethod:: accumulate(additive=False)\n\n"
+			 ".. method:: accumulate(additive=False)\n\n"
 			 "   Accumulates a sound by summing over positive input\n"
 			 "   differences thus generating a monotonic sigal.\n"
 			 "   If additivity is set to true negative input differences get added too,\n"
@@ -681,7 +688,7 @@ Sound_accumulate(Sound* self, PyObject* args)
 }
 
 PyDoc_STRVAR(M_aud_Sound_ADSR_doc,
-			 ".. classmethod:: ADSR(attack, decay, sustain, release)\n\n"
+			 ".. method:: ADSR(attack, decay, sustain, release)\n\n"
 			 "   Attack-Decay-Sustain-Release envelopes the volume of a sound.\n"
 			 "   Note: there is currently no way to trigger the release with this API.\n\n"
 			 "   :arg attack: The attack time in seconds.\n"
@@ -724,7 +731,7 @@ Sound_ADSR(Sound* self, PyObject* args)
 }
 
 PyDoc_STRVAR(M_aud_Sound_delay_doc,
-			 ".. classmethod:: delay(time)\n\n"
+			 ".. method:: delay(time)\n\n"
 			 "   Delays by playing adding silence in front of the other sound's data.\n\n"
 			 "   :arg time: How many seconds of silence should be added before the sound.\n"
 			 "   :type time: float\n"
@@ -760,7 +767,7 @@ Sound_delay(Sound* self, PyObject* args)
 }
 
 PyDoc_STRVAR(M_aud_Sound_envelope_doc,
-			 ".. classmethod:: envelope(attack, release, threshold, arthreshold)\n\n"
+			 ".. method:: envelope(attack, release, threshold, arthreshold)\n\n"
 			 "   Delays by playing adding silence in front of the other sound's data.\n\n"
 			 "   :arg attack: The attack factor.\n"
 			 "   :type attack: float\n"
@@ -802,7 +809,7 @@ Sound_envelope(Sound* self, PyObject* args)
 }
 
 PyDoc_STRVAR(M_aud_Sound_fadein_doc,
-			 ".. classmethod:: fadein(start, length)\n\n"
+			 ".. method:: fadein(start, length)\n\n"
 			 "   Fades a sound in by raising the volume linearly in the given\n"
 			 "   time interval.\n\n"
 			 "   :arg start: Time in seconds when the fading should start.\n"
@@ -842,7 +849,7 @@ Sound_fadein(Sound* self, PyObject* args)
 }
 
 PyDoc_STRVAR(M_aud_Sound_fadeout_doc,
-			 ".. classmethod:: fadeout(start, length)\n\n"
+			 ".. method:: fadeout(start, length)\n\n"
 			 "   Fades a sound in by lowering the volume linearly in the given\n"
 			 "   time interval.\n\n"
 			 "   :arg start: Time in seconds when the fading should start.\n"
@@ -884,7 +891,7 @@ Sound_fadeout(Sound* self, PyObject* args)
 }
 
 PyDoc_STRVAR(M_aud_Sound_filter_doc,
-			 ".. classmethod:: filter(b, a = (1))\n\n"
+			 ".. method:: filter(b, a = (1,))\n\n"
 			 "   Filters a sound with the supplied IIR filter coefficients.\n"
 			 "   Without the second parameter you'll get a FIR filter.\n\n"
 			 "   If the first value of the a sequence is 0,\n"
@@ -984,7 +991,7 @@ Sound_filter(Sound* self, PyObject* args)
 }
 
 PyDoc_STRVAR(M_aud_Sound_highpass_doc,
-			 ".. classmethod:: highpass(frequency, Q=0.5)\n\n"
+			 ".. method:: highpass(frequency, Q=0.5)\n\n"
 			 "   Creates a second order highpass filter based on the transfer\n"
 			 "   function :math:`H(s) = s^2 / (s^2 + s/Q + 1)`\n\n"
 			 "   :arg frequency: The cut off trequency of the highpass.\n"
@@ -1024,7 +1031,7 @@ Sound_highpass(Sound* self, PyObject* args)
 }
 
 PyDoc_STRVAR(M_aud_Sound_limit_doc,
-			 ".. classmethod:: limit(start, end)\n\n"
+			 ".. method:: limit(start, end)\n\n"
 			 "   Limits a sound within a specific start and end time.\n\n"
 			 "   :arg start: Start time in seconds.\n"
 			 "   :type start: float\n"
@@ -1062,7 +1069,7 @@ Sound_limit(Sound* self, PyObject* args)
 }
 
 PyDoc_STRVAR(M_aud_Sound_loop_doc,
-			 ".. classmethod:: loop(count)\n\n"
+			 ".. method:: loop(count)\n\n"
 			 "   Loops a sound.\n\n"
 			 "   :arg count: How often the sound should be looped.\n"
 			 "      Negative values mean endlessly.\n"
@@ -1102,7 +1109,7 @@ Sound_loop(Sound* self, PyObject* args)
 }
 
 PyDoc_STRVAR(M_aud_Sound_lowpass_doc,
-			 ".. classmethod:: lowpass(frequency, Q=0.5)\n\n"
+			 ".. method:: lowpass(frequency, Q=0.5)\n\n"
 			 "   Creates a second order lowpass filter based on the transfer "
 			 "   function :math:`H(s) = 1 / (s^2 + s/Q + 1)`\n\n"
 			 "   :arg frequency: The cut off trequency of the lowpass.\n"
@@ -1142,7 +1149,7 @@ Sound_lowpass(Sound* self, PyObject* args)
 }
 
 PyDoc_STRVAR(M_aud_Sound_modulate_doc,
-			 ".. classmethod:: modulate(sound)\n\n"
+			 ".. method:: modulate(sound)\n\n"
 			 "   Modulates two factories.\n\n"
 			 "   :arg sound: The sound to modulate over the other.\n"
 			 "   :type sound: :class:`Sound`\n"
@@ -1184,7 +1191,7 @@ Sound_modulate(Sound* self, PyObject* object)
 }
 
 PyDoc_STRVAR(M_aud_Sound_pitch_doc,
-			 ".. classmethod:: pitch(factor)\n\n"
+			 ".. method:: pitch(factor)\n\n"
 			 "   Changes the pitch of a sound with a specific factor.\n\n"
 			 "   :arg factor: The factor to change the pitch with.\n"
 			 "   :type factor: float\n"
@@ -1227,7 +1234,7 @@ Sound_pitch(Sound* self, PyObject* args)
 }
 
 PyDoc_STRVAR(M_aud_Sound_rechannel_doc,
-			 ".. classmethod:: rechannel(channels)\n\n"
+			 ".. method:: rechannel(channels)\n\n"
 			 "   Rechannels the sound.\n\n"
 			 "   :arg channels: The new channel configuration.\n"
 			 "   :type channels: int\n"
@@ -1267,12 +1274,12 @@ Sound_rechannel(Sound* self, PyObject* args)
 }
 
 PyDoc_STRVAR(M_aud_Sound_resample_doc,
-			 ".. classmethod:: resample(rate, high_quality)\n\n"
+			 ".. method:: resample(rate, quality)\n\n"
 			 "   Resamples the sound.\n\n"
 			 "   :arg rate: The new sample rate.\n"
 			 "   :type rate: double\n"
-			 "   :arg high_quality: When true use a higher quality but slower resampler.\n"
-			 "   :type high_quality: bool\n"
+			 "   :arg quality: Resampler performance vs quality choice (0=fastest, 3=slowest).\n"
+			 "   :type quality: int\n"
 			 "   :return: The created :class:`Sound` object.\n"
 			 "   :rtype: :class:`Sound`");
 
@@ -1280,19 +1287,10 @@ static PyObject *
 Sound_resample(Sound* self, PyObject* args)
 {
 	double rate;
-	PyObject* high_qualityo;
-	bool high_quality = false;
+	int quality = 0;
 
-	if(!PyArg_ParseTuple(args, "d|O:resample", &rate, &high_qualityo))
+	if(!PyArg_ParseTuple(args, "d|i:resample", &rate, &quality))
 		return nullptr;
-
-	if(!PyBool_Check(high_qualityo))
-	{
-		PyErr_SetString(PyExc_TypeError, "high_quality is not a boolean!");
-		return nullptr;
-	}
-
-	high_quality = high_qualityo == Py_True;
 
 	PyTypeObject* type = Py_TYPE(self);
 	Sound* parent = (Sound*)type->tp_alloc(type, 0);
@@ -1305,10 +1303,10 @@ Sound_resample(Sound* self, PyObject* args)
 			specs.channels = CHANNELS_INVALID;
 			specs.rate = rate;
 			specs.format = FORMAT_INVALID;
-			if(high_quality)
-				parent->sound = new std::shared_ptr<ISound>(new JOSResample(*reinterpret_cast<std::shared_ptr<ISound>*>(self->sound), specs));
-			else
+			if (quality == int(ResampleQuality::FASTEST))
 				parent->sound = new std::shared_ptr<ISound>(new LinearResample(*reinterpret_cast<std::shared_ptr<ISound>*>(self->sound), specs));
+			else
+				parent->sound = new std::shared_ptr<ISound>(new JOSResample(*reinterpret_cast<std::shared_ptr<ISound>*>(self->sound), specs, static_cast<ResampleQuality>(quality)));
 		}
 		catch(Exception& e)
 		{
@@ -1322,7 +1320,7 @@ Sound_resample(Sound* self, PyObject* args)
 }
 
 PyDoc_STRVAR(M_aud_Sound_reverse_doc,
-			 ".. classmethod:: reverse()\n\n"
+			 ".. method:: reverse()\n\n"
 			 "   Plays a sound reversed.\n\n"
 			 "   :return: The created :class:`Sound` object.\n"
 			 "   :rtype: :class:`Sound`\n\n"
@@ -1360,7 +1358,7 @@ Sound_reverse(Sound* self)
 }
 
 PyDoc_STRVAR(M_aud_Sound_sum_doc,
-			 ".. classmethod:: sum()\n\n"
+			 ".. method:: sum()\n\n"
 			 "   Sums the samples of a sound.\n\n"
 			 "   :return: The created :class:`Sound` object.\n"
 			 "   :rtype: :class:`Sound`");
@@ -1389,7 +1387,7 @@ Sound_sum(Sound* self)
 }
 
 PyDoc_STRVAR(M_aud_Sound_threshold_doc,
-			 ".. classmethod:: threshold(threshold = 0)\n\n"
+			 ".. method:: threshold(threshold = 0)\n\n"
 			 "   Makes a threshold wave out of an audio wave by setting all samples\n"
 			 "   with a amplitude >= threshold to 1, all <= -threshold to -1 and\n"
 			 "   all between to 0.\n\n"
@@ -1428,7 +1426,7 @@ Sound_threshold(Sound* self, PyObject* args)
 }
 
 PyDoc_STRVAR(M_aud_Sound_volume_doc,
-			 ".. classmethod:: volume(volume)\n\n"
+			 ".. method:: volume(volume)\n\n"
 			 "   Changes the volume of a sound.\n\n"
 			 "   :arg volume: The new volume..\n"
 			 "   :type volume: float\n"
@@ -1469,7 +1467,7 @@ Sound_volume(Sound* self, PyObject* args)
 }
 
 PyDoc_STRVAR(M_aud_Sound_join_doc,
-			 ".. classmethod:: join(sound)\n\n"
+			 ".. method:: join(sound)\n\n"
 			 "   Plays two factories in sequence.\n\n"
 			 "   :arg sound: The sound to play second.\n"
 			 "   :type sound: :class:`Sound`\n"
@@ -1512,7 +1510,7 @@ Sound_join(Sound* self, PyObject* object)
 }
 
 PyDoc_STRVAR(M_aud_Sound_mix_doc,
-			 ".. classmethod:: mix(sound)\n\n"
+			 ".. method:: mix(sound)\n\n"
 			 "   Mixes two factories.\n\n"
 			 "   :arg sound: The sound to mix over the other.\n"
 			 "   :type sound: :class:`Sound`\n"
@@ -1554,7 +1552,7 @@ Sound_mix(Sound* self, PyObject* object)
 }
 
 PyDoc_STRVAR(M_aud_Sound_pingpong_doc,
-			 ".. classmethod:: pingpong()\n\n"
+			 ".. method:: pingpong()\n\n"
 			 "   Plays a sound forward and then backward.\n"
 			 "   This is like joining a sound with its reverse.\n\n"
 			 "   :return: The created :class:`Sound` object.\n"
@@ -1620,7 +1618,7 @@ Sound_list(PyTypeObject* type, PyObject* args)
 }
 
 PyDoc_STRVAR(M_aud_Sound_mutable_doc,
-	".. classmethod:: mutable()\n\n"
+	".. method:: mutable()\n\n"
 	"   Creates a sound that will be restarted when sought backwards.\n"
 	"   If the original sound is a sound list, the playing sound can change.\n\n"
 	"   :return: The created :class:`Sound` object.\n"
@@ -1650,7 +1648,7 @@ Sound_mutable(Sound* self)
 }
 
 PyDoc_STRVAR(M_aud_Sound_list_addSound_doc,
-	".. classmethod:: addSound(sound)\n\n"
+	".. method:: addSound(sound)\n\n"
 	"   Adds a new sound to a sound list.\n\n"
 	"   :arg sound: The sound that will be added to the list.\n"
 	"   :type sound: :class:`Sound`\n\n"
@@ -1683,7 +1681,7 @@ Sound_list_addSound(Sound* self, PyObject* object)
 #ifdef WITH_CONVOLUTION
 
 PyDoc_STRVAR(M_aud_Sound_convolver_doc,
-	".. classmethod:: convolver()\n\n"
+	".. method:: convolver()\n\n"
 	"   Creates a sound that will apply convolution to another sound.\n\n"
 	"   :arg impulseResponse: The filter with which convolve the sound.\n"
 	"   :type impulseResponse: :class:`ImpulseResponse`\n"
@@ -1732,7 +1730,7 @@ Sound_convolver(Sound* self, PyObject* args)
 }
 
 PyDoc_STRVAR(M_aud_Sound_binaural_doc,
-	".. classmethod:: convolver()\n\n"
+	".. method:: binaural()\n\n"
 	"   Creates a binaural sound using another sound as source. The original sound must be mono\n\n"
 	"   :arg hrtfs: An HRTF set.\n"
 	"   :type hrtf: :class:`HRTF`\n"

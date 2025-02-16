@@ -1,24 +1,13 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#include "UI_interface.h"
-#include "UI_resources.h"
-#include "UI_view2d.h"
+#include "UI_interface.hh"
+#include "UI_resources.hh"
+#include "UI_view2d.hh"
 
-#include "GPU_immediate.h"
+#include "GPU_immediate.hh"
+#include "GPU_state.hh"
 
 #include "DNA_screen_types.h"
 #include "DNA_userdef_types.h"
@@ -26,6 +15,8 @@
 #include "BLI_rect.h"
 
 #include "spreadsheet_draw.hh"
+
+#define CELL_RIGHT_PADDING (2.0f * UI_SCALE_FAC)
 
 namespace blender::ed::spreadsheet {
 
@@ -38,23 +29,23 @@ SpreadsheetDrawer::SpreadsheetDrawer()
 
 SpreadsheetDrawer::~SpreadsheetDrawer() = default;
 
-void SpreadsheetDrawer::draw_top_row_cell(int UNUSED(column_index),
-                                          const CellDrawParams &UNUSED(params)) const
+void SpreadsheetDrawer::draw_top_row_cell(int /*column_index*/,
+                                          const CellDrawParams & /*params*/) const
 {
 }
 
-void SpreadsheetDrawer::draw_left_column_cell(int UNUSED(row_index),
-                                              const CellDrawParams &UNUSED(params)) const
+void SpreadsheetDrawer::draw_left_column_cell(int /*row_index*/,
+                                              const CellDrawParams & /*params*/) const
 {
 }
 
-void SpreadsheetDrawer::draw_content_cell(int UNUSED(row_index),
-                                          int UNUSED(column_index),
-                                          const CellDrawParams &UNUSED(params)) const
+void SpreadsheetDrawer::draw_content_cell(int /*row_index*/,
+                                          int /*column_index*/,
+                                          const CellDrawParams & /*params*/) const
 {
 }
 
-int SpreadsheetDrawer::column_width(int UNUSED(column_index)) const
+int SpreadsheetDrawer::column_width(int /*column_index*/) const
 {
   return 5 * UI_UNIT_X;
 }
@@ -159,7 +150,7 @@ static void draw_left_column_content(const int scroll_offset_y,
     params.xmin = 0;
     params.ymin = region->winy - drawer.top_row_height - (row_index + 1) * drawer.row_height -
                   scroll_offset_y;
-    params.width = drawer.left_column_width;
+    params.width = drawer.left_column_width - CELL_RIGHT_PADDING;
     params.height = drawer.row_height;
     drawer.draw_left_column_cell(row_index, params);
   }
@@ -194,7 +185,7 @@ static void draw_top_row_content(const bContext *C,
     params.block = first_row_block;
     params.xmin = left_x;
     params.ymin = region->winy - drawer.top_row_height;
-    params.width = column_width;
+    params.width = column_width - CELL_RIGHT_PADDING;
     params.height = drawer.top_row_height;
     drawer.draw_top_row_cell(column_index, params);
 
@@ -242,7 +233,7 @@ static void draw_cell_contents(const bContext *C,
         params.xmin = left_x;
         params.ymin = region->winy - drawer.top_row_height - (row_index + 1) * drawer.row_height -
                       scroll_offset_y;
-        params.width = column_width;
+        params.width = column_width - CELL_RIGHT_PADDING;
         params.height = drawer.row_height;
         drawer.draw_content_cell(row_index, column_index, params);
       }
@@ -285,7 +276,7 @@ void draw_spreadsheet_in_region(const bContext *C,
 
   GPUVertFormat *format = immVertexFormat();
   uint pos = GPU_vertformat_attr_add(format, "pos", GPU_COMP_I32, 2, GPU_FETCH_INT_TO_FLOAT);
-  immBindBuiltinProgram(GPU_SHADER_2D_UNIFORM_COLOR);
+  immBindBuiltinProgram(GPU_SHADER_3D_UNIFORM_COLOR);
 
   draw_index_column_background(pos, region, drawer);
   draw_alternating_row_overlay(pos, scroll_offset_y, region, drawer);

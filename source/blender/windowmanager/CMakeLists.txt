@@ -1,146 +1,143 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2006 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# The Original Code is Copyright (C) 2006, Blender Foundation
-# All rights reserved.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(INC
-  .
+  PUBLIC .
   gizmo
   gizmo/intern
-  ../blenfont
-  ../blenkernel
-  ../blenlib
-  ../blenloader
-  ../blentranslation
   ../compositor
-  ../depsgraph
   ../editors/include
-  ../draw
-  ../gpu
-  ../imbuf
-  ../makesdna
   ../makesrna
-  ../nodes
-  ../render
-  ../sequencer
-  ../../../intern/clog
-  ../../../intern/ghost
-  ../../../intern/glew-mx
-  ../../../intern/guardedalloc
   ../../../intern/memutil
 
-  # for writefile.c: dna_type_offsets.h
-  ${CMAKE_BINARY_DIR}/source/blender/makesdna/intern
+  # RNA_prototypes.hh
+  ${CMAKE_BINARY_DIR}/source/blender/makesrna
 )
-
 set(INC_SYS
-  ${ZLIB_INCLUDE_DIRS}
 )
 
 set(SRC
-  intern/wm.c
-  intern/wm_cursors.c
-  intern/wm_dragdrop.c
-  intern/wm_draw.c
-  intern/wm_event_query.c
-  intern/wm_event_system.c
-  intern/wm_files.c
-  intern/wm_files_link.c
-  intern/wm_gesture.c
-  intern/wm_gesture_ops.c
-  intern/wm_init_exit.c
-  intern/wm_jobs.c
-  intern/wm_keymap.c
-  intern/wm_keymap_utils.c
-  intern/wm_menu_type.c
-  intern/wm_operator_props.c
-  intern/wm_operator_type.c
-  intern/wm_operator_utils.c
-  intern/wm_operators.c
-  intern/wm_panel_type.c
-  intern/wm_platform_support.c
-  intern/wm_playanim.c
-  intern/wm_splash_screen.c
-  intern/wm_stereo.c
-  intern/wm_subwindow.c
-  intern/wm_surface.c
-  intern/wm_toolsystem.c
-  intern/wm_tooltip.c
-  intern/wm_uilist_type.c
-  intern/wm_utils.c
-  intern/wm_window.c
-  gizmo/intern/wm_gizmo.c
-  gizmo/intern/wm_gizmo_group.c
-  gizmo/intern/wm_gizmo_group_type.c
-  gizmo/intern/wm_gizmo_map.c
-  gizmo/intern/wm_gizmo_target_props.c
-  gizmo/intern/wm_gizmo_type.c
-  message_bus/intern/wm_message_bus.c
-  message_bus/intern/wm_message_bus_rna.c
-  message_bus/intern/wm_message_bus_static.c
+  intern/wm.cc
+  intern/wm_cursors.cc
+  intern/wm_dragdrop.cc
+  intern/wm_draw.cc
+  intern/wm_event_query.cc
+  intern/wm_event_system.cc
+  intern/wm_files.cc
+  intern/wm_files_link.cc
+  intern/wm_gesture.cc
+  intern/wm_gesture_ops.cc
+  intern/wm_init_exit.cc
+  intern/wm_jobs.cc
+  intern/wm_keymap.cc
+  intern/wm_keymap_utils.cc
+  intern/wm_menu_type.cc
+  intern/wm_operator_props.cc
+  intern/wm_operator_type.cc
+  intern/wm_operator_utils.cc
+  intern/wm_operators.cc
+  intern/wm_panel_type.cc
+  intern/wm_platform.cc
+  intern/wm_platform_support.cc
+  intern/wm_playanim.cc
+  intern/wm_splash_screen.cc
+  intern/wm_stereo.cc
+  intern/wm_subwindow.cc
+  intern/wm_surface.cc
+  intern/wm_toolsystem.cc
+  intern/wm_tooltip.cc
+  intern/wm_uilist_type.cc
+  intern/wm_utils.cc
+  intern/wm_window.cc
+  gizmo/intern/wm_gizmo.cc
+  gizmo/intern/wm_gizmo_group.cc
+  gizmo/intern/wm_gizmo_group_type.cc
+  gizmo/intern/wm_gizmo_map.cc
+  gizmo/intern/wm_gizmo_target_props.cc
+  gizmo/intern/wm_gizmo_type.cc
+  message_bus/intern/wm_message_bus.cc
+  message_bus/intern/wm_message_bus_rna.cc
+  message_bus/intern/wm_message_bus_static.cc
 
-  WM_api.h
-  WM_keymap.h
-  WM_message.h
-  WM_toolsystem.h
-  WM_types.h
-  wm.h
-  wm_cursors.h
-  wm_draw.h
-  wm_event_system.h
-  wm_event_types.h
-  wm_files.h
-  wm_surface.h
-  wm_window.h
-  intern/wm_platform_support.h
-  intern/wm_window_private.h
-  gizmo/WM_gizmo_api.h
-  gizmo/WM_gizmo_types.h
-  gizmo/wm_gizmo_fn.h
-  gizmo/wm_gizmo_wmapi.h
-  gizmo/intern/wm_gizmo_intern.h
-  message_bus/intern/wm_message_bus_intern.h
-  message_bus/wm_message_bus.h
+  WM_api.hh
+  WM_keymap.hh
+  WM_message.hh
+  WM_toolsystem.hh
+  WM_types.hh
+  wm.hh
+  wm_cursors.hh
+  wm_draw.hh
+  wm_event_system.hh
+  wm_event_types.hh
+  wm_files.hh
+  wm_surface.hh
+  wm_window.hh
+  intern/wm_platform_support.hh
+  intern/wm_window_private.hh
+  gizmo/WM_gizmo_api.hh
+  gizmo/WM_gizmo_types.hh
+  gizmo/wm_gizmo_fn.hh
+  gizmo/wm_gizmo_wmapi.hh
+  gizmo/intern/wm_gizmo_intern.hh
+  message_bus/intern/wm_message_bus_intern.hh
+  message_bus/wm_message_bus.hh
 )
 
 set(LIB
+  PRIVATE bf::asset_system
+  PRIVATE bf::blenfont
+  PRIVATE bf::blenkernel
+  PRIVATE bf::blenlib
+  PRIVATE bf::blenloader
+  PRIVATE bf::blentranslation
+  PRIVATE bf::bmesh
+  PRIVATE bf::depsgraph
+  PRIVATE bf::dna
+  PRIVATE bf::draw
   bf_editor_screen
-  bf_sequencer
+  bf_editor_undo
+  PRIVATE bf::extern::fmtlib
+  PRIVATE bf::gpu
+  PRIVATE bf::imbuf
+  PRIVATE bf::imbuf::movie
+  PRIVATE bf::intern::clog
+  PRIVATE bf::intern::guardedalloc
+  PRIVATE bf::animrig
+  PRIVATE bf::nodes
+  PRIVATE bf::render
+  PRIVATE bf::sequencer
+  bf_intern_ghost
+  bf_compositor
 )
 
-if(WITH_AUDASPACE)
-  add_definitions(-DWITH_AUDASPACE)
+if(WIN32)
+  add_definitions(-DNOMINMAX)
+endif()
 
+if(WITH_AUDASPACE)
   list(APPEND INC_SYS
     ${AUDASPACE_C_INCLUDE_DIRS}
   )
-  list(APPEND LIB
-    ${AUDASPACE_C_LIBRARIES}
-    ${AUDASPACE_PY_LIBRARIES}
-  )
+  if(WITH_SYSTEM_AUDASPACE)
+    list(APPEND LIB
+      ${AUDASPACE_C_LIBRARIES}
+      ${AUDASPACE_PY_LIBRARIES}
+    )
+  endif()
+  add_definitions(-DWITH_AUDASPACE)
 endif()
 
 if(WITH_CYCLES)
   add_definitions(-DWITH_CYCLES)
 endif()
 
-if(WITH_INTERNATIONAL)
-  add_definitions(-DWITH_INTERNATIONAL)
+if(WITH_OPENGL_BACKEND)
+  add_definitions(-DWITH_OPENGL_BACKEND)
+endif()
+
+if(WITH_VULKAN_BACKEND)
+  add_definitions(-DWITH_VULKAN_BACKEND)
 endif()
 
 if(WITH_OPENCOLLADA)
@@ -181,17 +178,8 @@ if(WITH_INPUT_NDOF)
   add_definitions(-DWITH_INPUT_NDOF)
 endif()
 
-if(WIN32 OR APPLE)
-  if(WITH_INPUT_IME)
-    add_definitions(-DWITH_INPUT_IME)
-  endif()
-endif()
-
-if(WITH_COMPOSITOR)
-  list(APPEND LIB
-    bf_compositor
-  )
-  add_definitions(-DWITH_COMPOSITOR)
+if(WITH_INPUT_IME)
+  add_definitions(-DWITH_INPUT_IME)
 endif()
 
 if(WITH_XR_OPENXR)
@@ -202,17 +190,29 @@ if(WITH_XR_OPENXR)
   )
 
   list(APPEND SRC
-    xr/intern/wm_xr.c
-    xr/intern/wm_xr_actions.c
-    xr/intern/wm_xr_draw.c
-    xr/intern/wm_xr_session.c
+    xr/intern/wm_xr.cc
+    xr/intern/wm_xr_action.cc
+    xr/intern/wm_xr_actionmap.cc
+    xr/intern/wm_xr_draw.cc
+    xr/intern/wm_xr_operators.cc
+    xr/intern/wm_xr_session.cc
 
-    xr/wm_xr.h
-    xr/intern/wm_xr_intern.h
+    xr/wm_xr.hh
+    xr/intern/wm_xr_intern.hh
   )
 endif()
 
 blender_add_lib_nolist(bf_windowmanager "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+add_library(bf::windowmanager ALIAS bf_windowmanager)
 
-# Needed so we can use dna_type_offsets.h for defaults initialization.
-add_dependencies(bf_windowmanager bf_dna)
+# RNA_prototypes.hh
+add_dependencies(bf_windowmanager bf_rna)
+
+if(WITH_GTESTS)
+  set(TEST_INC
+  )
+  set(TEST_SRC
+    intern/wm_dragdrop_test.cc
+  )
+  blender_add_test_suite_lib(windowmanager "${TEST_SRC}" "${INC};${TEST_INC}" "${INC_SYS}" "${LIB}")
+endif()

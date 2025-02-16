@@ -1,30 +1,13 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2016 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2016 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
- * \ingroup mantaflow
+ * \ingroup intern_mantaflow
  */
 
-#include <cmath>
-
-#include "MANTA_main.h"
 #include "manta_fluid_API.h"
+#include "MANTA_main.h"
 
 /* Fluid functions */
 MANTA *manta_init(int *res, struct FluidModifierData *fmd)
@@ -34,7 +17,6 @@ MANTA *manta_init(int *res, struct FluidModifierData *fmd)
 void manta_free(MANTA *fluid)
 {
   delete fluid;
-  fluid = nullptr;
 }
 
 bool manta_ensure_obstacle(MANTA *fluid, struct FluidModifierData *fmd)
@@ -319,8 +301,13 @@ bool manta_smoke_export_script(MANTA *smoke, FluidModifierData *fmd)
   return smoke->exportSmokeScript(fmd);
 }
 
-static void get_rgba(
-    float *r, float *g, float *b, float *a, int total_cells, float *data, int sequential)
+static void get_rgba(const float *r,
+                     const float *g,
+                     const float *b,
+                     const float *a,
+                     int total_cells,
+                     float *data,
+                     int sequential)
 {
   int i;
   /* Use offsets to map RGB grids to correct location in data grid. */
@@ -363,7 +350,10 @@ void manta_noise_get_rgba(MANTA *smoke, float *data, int sequential)
            sequential);
 }
 
-static void get_rgba_fixed_color(float color[3], int total_cells, float *data, int sequential)
+static void get_rgba_fixed_color(const float color[3],
+                                 int total_cells,
+                                 float *data,
+                                 int sequential)
 {
   int i;
   int m = 4, i_g = 1, i_b = 2, i_a = 3;

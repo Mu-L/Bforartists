@@ -1,27 +1,13 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2020 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2020 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #include "pipeline.h"
 
-#include "PIL_time.h"
+#include "BLI_listbase.h"
+#include "BLI_time.h"
 
-#include "BKE_global.h"
+#include "BKE_global.hh"
 
 #include "DNA_scene_types.h"
 
@@ -44,7 +30,7 @@ void AbstractBuilderPipeline::build()
 {
   double start_time = 0.0;
   if (G.debug & (G_DEBUG_DEPSGRAPH_BUILD | G_DEBUG_DEPSGRAPH_TIME)) {
-    start_time = PIL_check_seconds_timer();
+    start_time = BLI_time_now_seconds();
   }
 
   build_step_sanity_check();
@@ -53,7 +39,7 @@ void AbstractBuilderPipeline::build()
   build_step_finalize();
 
   if (G.debug & (G_DEBUG_DEPSGRAPH_BUILD | G_DEBUG_DEPSGRAPH_TIME)) {
-    printf("Depsgraph built in %f seconds.\n", PIL_check_seconds_timer() - start_time);
+    printf("Depsgraph built in %f seconds.\n", BLI_time_now_seconds() - start_time);
   }
 }
 
@@ -67,7 +53,7 @@ void AbstractBuilderPipeline::build_step_sanity_check()
 void AbstractBuilderPipeline::build_step_nodes()
 {
   /* Generate all the nodes in the graph first */
-  unique_ptr<DepsgraphNodeBuilder> node_builder = construct_node_builder();
+  std::unique_ptr<DepsgraphNodeBuilder> node_builder = construct_node_builder();
   node_builder->begin_build();
   build_nodes(*node_builder);
   node_builder->end_build();
@@ -76,7 +62,7 @@ void AbstractBuilderPipeline::build_step_nodes()
 void AbstractBuilderPipeline::build_step_relations()
 {
   /* Hook up relationships between operations - to determine evaluation order. */
-  unique_ptr<DepsgraphRelationBuilder> relation_builder = construct_relation_builder();
+  std::unique_ptr<DepsgraphRelationBuilder> relation_builder = construct_relation_builder();
   relation_builder->begin_build();
   build_relations(*relation_builder);
   relation_builder->build_copy_on_write_relations();
@@ -106,15 +92,15 @@ void AbstractBuilderPipeline::build_step_finalize()
   }
 #endif
   /* Relations are up to date. */
-  deg_graph_->need_update = false;
+  deg_graph_->need_update_relations = false;
 }
 
-unique_ptr<DepsgraphNodeBuilder> AbstractBuilderPipeline::construct_node_builder()
+std::unique_ptr<DepsgraphNodeBuilder> AbstractBuilderPipeline::construct_node_builder()
 {
   return std::make_unique<DepsgraphNodeBuilder>(bmain_, deg_graph_, &builder_cache_);
 }
 
-unique_ptr<DepsgraphRelationBuilder> AbstractBuilderPipeline::construct_relation_builder()
+std::unique_ptr<DepsgraphRelationBuilder> AbstractBuilderPipeline::construct_relation_builder()
 {
   return std::make_unique<DepsgraphRelationBuilder>(bmain_, deg_graph_, &builder_cache_);
 }

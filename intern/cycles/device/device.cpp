@@ -1,370 +1,53 @@
-/*
- * Copyright 2011-2013 Blender Foundation
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+ * SPDX-License-Identifier: Apache-2.0 */
 
-#include <stdlib.h>
-#include <string.h>
+#include <cstdlib>
+#include <cstring>
 
 #include "bvh/bvh2.h"
 
 #include "device/device.h"
-#include "device/device_intern.h"
+#include "device/queue.h"
 
-#include "util/util_foreach.h"
-#include "util/util_half.h"
-#include "util/util_logging.h"
-#include "util/util_math.h"
-#include "util/util_opengl.h"
-#include "util/util_string.h"
-#include "util/util_system.h"
-#include "util/util_time.h"
-#include "util/util_types.h"
-#include "util/util_vector.h"
+#include "device/cpu/device.h"
+#include "device/cpu/kernel.h"
+#include "device/cuda/device.h"
+#include "device/dummy/device.h"
+#include "device/hip/device.h"
+#include "device/metal/device.h"
+#include "device/multi/device.h"
+#include "device/oneapi/device.h"
+#include "device/optix/device.h"
+
+#ifdef WITH_HIPRT
+#  include <hiprtew.h>
+#endif
+
+#include "util/log.h"
+#include "util/math.h"
+#include "util/string.h"
+#include "util/system.h"
+#include "util/task.h"
+#include "util/types.h"
+#include "util/vector.h"
 
 CCL_NAMESPACE_BEGIN
 
 bool Device::need_types_update = true;
 bool Device::need_devices_update = true;
 thread_mutex Device::device_mutex;
-vector<DeviceInfo> Device::opencl_devices;
 vector<DeviceInfo> Device::cuda_devices;
 vector<DeviceInfo> Device::optix_devices;
 vector<DeviceInfo> Device::cpu_devices;
-vector<DeviceInfo> Device::network_devices;
+vector<DeviceInfo> Device::hip_devices;
+vector<DeviceInfo> Device::metal_devices;
+vector<DeviceInfo> Device::oneapi_devices;
 uint Device::devices_initialized_mask = 0;
-
-/* Device Requested Features */
-
-std::ostream &operator<<(std::ostream &os, const DeviceRequestedFeatures &requested_features)
-{
-  os << "Experimental features: " << (requested_features.experimental ? "On" : "Off") << std::endl;
-  os << "Max nodes group: " << requested_features.max_nodes_group << std::endl;
-  /* TODO(sergey): Decode bitflag into list of names. */
-  os << "Nodes features: " << requested_features.nodes_features << std::endl;
-  os << "Use Hair: " << string_from_bool(requested_features.use_hair) << std::endl;
-  os << "Use Object Motion: " << string_from_bool(requested_features.use_object_motion)
-     << std::endl;
-  os << "Use Camera Motion: " << string_from_bool(requested_features.use_camera_motion)
-     << std::endl;
-  os << "Use Baking: " << string_from_bool(requested_features.use_baking) << std::endl;
-  os << "Use Subsurface: " << string_from_bool(requested_features.use_subsurface) << std::endl;
-  os << "Use Volume: " << string_from_bool(requested_features.use_volume) << std::endl;
-  os << "Use Branched Integrator: " << string_from_bool(requested_features.use_integrator_branched)
-     << std::endl;
-  os << "Use Patch Evaluation: " << string_from_bool(requested_features.use_patch_evaluation)
-     << std::endl;
-  os << "Use Transparent Shadows: " << string_from_bool(requested_features.use_transparent)
-     << std::endl;
-  os << "Use Principled BSDF: " << string_from_bool(requested_features.use_principled)
-     << std::endl;
-  os << "Use Denoising: " << string_from_bool(requested_features.use_denoising) << std::endl;
-  os << "Use Displacement: " << string_from_bool(requested_features.use_true_displacement)
-     << std::endl;
-  os << "Use Background Light: " << string_from_bool(requested_features.use_background_light)
-     << std::endl;
-  return os;
-}
 
 /* Device */
 
-Device::~Device() noexcept(false)
-{
-  if (!background) {
-    if (vertex_buffer != 0) {
-      glDeleteBuffers(1, &vertex_buffer);
-    }
-    if (fallback_shader_program != 0) {
-      glDeleteProgram(fallback_shader_program);
-    }
-  }
-}
-
-/* TODO move shaders to standalone .glsl file. */
-const char *FALLBACK_VERTEX_SHADER =
-    "#version 330\n"
-    "uniform vec2 fullscreen;\n"
-    "in vec2 texCoord;\n"
-    "in vec2 pos;\n"
-    "out vec2 texCoord_interp;\n"
-    "\n"
-    "vec2 normalize_coordinates()\n"
-    "{\n"
-    "   return (vec2(2.0) * (pos / fullscreen)) - vec2(1.0);\n"
-    "}\n"
-    "\n"
-    "void main()\n"
-    "{\n"
-    "   gl_Position = vec4(normalize_coordinates(), 0.0, 1.0);\n"
-    "   texCoord_interp = texCoord;\n"
-    "}\n\0";
-
-const char *FALLBACK_FRAGMENT_SHADER =
-    "#version 330\n"
-    "uniform sampler2D image_texture;\n"
-    "in vec2 texCoord_interp;\n"
-    "out vec4 fragColor;\n"
-    "\n"
-    "void main()\n"
-    "{\n"
-    "   fragColor = texture(image_texture, texCoord_interp);\n"
-    "}\n\0";
-
-static void shader_print_errors(const char *task, const char *log, const char *code)
-{
-  LOG(ERROR) << "Shader: " << task << " error:";
-  LOG(ERROR) << "===== shader string ====";
-
-  stringstream stream(code);
-  string partial;
-
-  int line = 1;
-  while (getline(stream, partial, '\n')) {
-    if (line < 10) {
-      LOG(ERROR) << " " << line << " " << partial;
-    }
-    else {
-      LOG(ERROR) << line << " " << partial;
-    }
-    line++;
-  }
-  LOG(ERROR) << log;
-}
-
-static int bind_fallback_shader(void)
-{
-  GLint status;
-  GLchar log[5000];
-  GLsizei length = 0;
-  GLuint program = 0;
-
-  struct Shader {
-    const char *source;
-    GLenum type;
-  } shaders[2] = {{FALLBACK_VERTEX_SHADER, GL_VERTEX_SHADER},
-                  {FALLBACK_FRAGMENT_SHADER, GL_FRAGMENT_SHADER}};
-
-  program = glCreateProgram();
-
-  for (int i = 0; i < 2; i++) {
-    GLuint shader = glCreateShader(shaders[i].type);
-
-    string source_str = shaders[i].source;
-    const char *c_str = source_str.c_str();
-
-    glShaderSource(shader, 1, &c_str, NULL);
-    glCompileShader(shader);
-
-    glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
-
-    if (!status) {
-      glGetShaderInfoLog(shader, sizeof(log), &length, log);
-      shader_print_errors("compile", log, c_str);
-      return 0;
-    }
-
-    glAttachShader(program, shader);
-  }
-
-  /* Link output. */
-  glBindFragDataLocation(program, 0, "fragColor");
-
-  /* Link and error check. */
-  glLinkProgram(program);
-
-  glGetProgramiv(program, GL_LINK_STATUS, &status);
-  if (!status) {
-    glGetShaderInfoLog(program, sizeof(log), &length, log);
-    shader_print_errors("linking", log, FALLBACK_VERTEX_SHADER);
-    shader_print_errors("linking", log, FALLBACK_FRAGMENT_SHADER);
-    return 0;
-  }
-
-  return program;
-}
-
-bool Device::bind_fallback_display_space_shader(const float width, const float height)
-{
-  if (fallback_status == FALLBACK_SHADER_STATUS_ERROR) {
-    return false;
-  }
-
-  if (fallback_status == FALLBACK_SHADER_STATUS_NONE) {
-    fallback_shader_program = bind_fallback_shader();
-    fallback_status = FALLBACK_SHADER_STATUS_ERROR;
-
-    if (fallback_shader_program == 0) {
-      return false;
-    }
-
-    glUseProgram(fallback_shader_program);
-    image_texture_location = glGetUniformLocation(fallback_shader_program, "image_texture");
-    if (image_texture_location < 0) {
-      LOG(ERROR) << "Shader doesn't contain the 'image_texture' uniform.";
-      return false;
-    }
-
-    fullscreen_location = glGetUniformLocation(fallback_shader_program, "fullscreen");
-    if (fullscreen_location < 0) {
-      LOG(ERROR) << "Shader doesn't contain the 'fullscreen' uniform.";
-      return false;
-    }
-
-    fallback_status = FALLBACK_SHADER_STATUS_SUCCESS;
-  }
-
-  /* Run this every time. */
-  glUseProgram(fallback_shader_program);
-  glUniform1i(image_texture_location, 0);
-  glUniform2f(fullscreen_location, width, height);
-  return true;
-}
-
-void Device::draw_pixels(device_memory &rgba,
-                         int y,
-                         int w,
-                         int h,
-                         int width,
-                         int height,
-                         int dx,
-                         int dy,
-                         int dw,
-                         int dh,
-                         bool transparent,
-                         const DeviceDrawParams &draw_params)
-{
-  const bool use_fallback_shader = (draw_params.bind_display_space_shader_cb == NULL);
-
-  assert(rgba.type == MEM_PIXELS);
-  mem_copy_from(rgba, y, w, h, rgba.memory_elements_size(1));
-
-  GLuint texid;
-  glActiveTexture(GL_TEXTURE0);
-  glGenTextures(1, &texid);
-  glBindTexture(GL_TEXTURE_2D, texid);
-
-  if (rgba.data_type == TYPE_HALF) {
-    GLhalf *data_pointer = (GLhalf *)rgba.host_pointer;
-    data_pointer += 4 * y * w;
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_HALF_FLOAT, data_pointer);
-  }
-  else {
-    uint8_t *data_pointer = (uint8_t *)rgba.host_pointer;
-    data_pointer += 4 * y * w;
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, data_pointer);
-  }
-
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-  if (transparent) {
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-  }
-
-  GLint shader_program;
-  if (use_fallback_shader) {
-    if (!bind_fallback_display_space_shader(dw, dh)) {
-      return;
-    }
-    shader_program = fallback_shader_program;
-  }
-  else {
-    draw_params.bind_display_space_shader_cb();
-    glGetIntegerv(GL_CURRENT_PROGRAM, &shader_program);
-  }
-
-  if (!vertex_buffer) {
-    glGenBuffers(1, &vertex_buffer);
-  }
-
-  glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-  /* invalidate old contents - avoids stalling if buffer is still waiting in queue to be rendered
-   */
-  glBufferData(GL_ARRAY_BUFFER, 16 * sizeof(float), NULL, GL_STREAM_DRAW);
-
-  float *vpointer = (float *)glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
-
-  if (vpointer) {
-    /* texture coordinate - vertex pair */
-    vpointer[0] = 0.0f;
-    vpointer[1] = 0.0f;
-    vpointer[2] = dx;
-    vpointer[3] = dy;
-
-    vpointer[4] = 1.0f;
-    vpointer[5] = 0.0f;
-    vpointer[6] = (float)width + dx;
-    vpointer[7] = dy;
-
-    vpointer[8] = 1.0f;
-    vpointer[9] = 1.0f;
-    vpointer[10] = (float)width + dx;
-    vpointer[11] = (float)height + dy;
-
-    vpointer[12] = 0.0f;
-    vpointer[13] = 1.0f;
-    vpointer[14] = dx;
-    vpointer[15] = (float)height + dy;
-
-    if (vertex_buffer) {
-      glUnmapBuffer(GL_ARRAY_BUFFER);
-    }
-  }
-
-  GLuint vertex_array_object;
-  GLuint position_attribute, texcoord_attribute;
-
-  glGenVertexArrays(1, &vertex_array_object);
-  glBindVertexArray(vertex_array_object);
-
-  texcoord_attribute = glGetAttribLocation(shader_program, "texCoord");
-  position_attribute = glGetAttribLocation(shader_program, "pos");
-
-  glEnableVertexAttribArray(texcoord_attribute);
-  glEnableVertexAttribArray(position_attribute);
-
-  glVertexAttribPointer(
-      texcoord_attribute, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (const GLvoid *)0);
-  glVertexAttribPointer(position_attribute,
-                        2,
-                        GL_FLOAT,
-                        GL_FALSE,
-                        4 * sizeof(float),
-                        (const GLvoid *)(sizeof(float) * 2));
-
-  glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-
-  if (vertex_buffer) {
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-  }
-
-  if (use_fallback_shader) {
-    glUseProgram(0);
-  }
-  else {
-    draw_params.unbind_display_space_shader_cb();
-  }
-
-  glDeleteVertexArrays(1, &vertex_array_object);
-  glBindTexture(GL_TEXTURE_2D, 0);
-  glDeleteTextures(1, &texid);
-
-  if (transparent) {
-    glDisable(GL_BLEND);
-  }
-}
+Device::~Device() noexcept(false) = default;
 
 void Device::build_bvh(BVH *bvh, Progress &progress, bool refit)
 {
@@ -379,52 +62,67 @@ void Device::build_bvh(BVH *bvh, Progress &progress, bool refit)
   }
 }
 
-Device *Device::create(DeviceInfo &info, Stats &stats, Profiler &profiler, bool background)
+unique_ptr<Device> Device::create(const DeviceInfo &info,
+                                  Stats &stats,
+                                  Profiler &profiler,
+                                  bool headless)
 {
-#ifdef WITH_MULTI
   if (!info.multi_devices.empty()) {
     /* Always create a multi device when info contains multiple devices.
      * This is done so that the type can still be e.g. DEVICE_CPU to indicate
      * that it is a homogeneous collection of devices, which simplifies checks. */
-    return device_multi_create(info, stats, profiler, background);
+    return device_multi_create(info, stats, profiler, headless);
   }
-#endif
 
-  Device *device = NULL;
+  unique_ptr<Device> device;
 
   switch (info.type) {
     case DEVICE_CPU:
-      device = device_cpu_create(info, stats, profiler, background);
+      device = device_cpu_create(info, stats, profiler, headless);
       break;
 #ifdef WITH_CUDA
     case DEVICE_CUDA:
-      if (device_cuda_init())
-        device = device_cuda_create(info, stats, profiler, background);
+      if (device_cuda_init()) {
+        device = device_cuda_create(info, stats, profiler, headless);
+      }
       break;
 #endif
 #ifdef WITH_OPTIX
     case DEVICE_OPTIX:
-      if (device_optix_init())
-        device = device_optix_create(info, stats, profiler, background);
+      if (device_optix_init()) {
+        device = device_optix_create(info, stats, profiler, headless);
+      }
       break;
 #endif
-#ifdef WITH_NETWORK
-    case DEVICE_NETWORK:
-      device = device_network_create(info, stats, profiler, "127.0.0.1");
+
+#ifdef WITH_HIP
+    case DEVICE_HIP:
+      if (device_hip_init()) {
+        device = device_hip_create(info, stats, profiler, headless);
+      }
       break;
 #endif
-#ifdef WITH_OPENCL
-    case DEVICE_OPENCL:
-      if (device_opencl_init())
-        device = device_opencl_create(info, stats, profiler, background);
+
+#ifdef WITH_METAL
+    case DEVICE_METAL:
+      if (device_metal_init()) {
+        device = device_metal_create(info, stats, profiler, headless);
+      }
       break;
 #endif
+
+#ifdef WITH_ONEAPI
+    case DEVICE_ONEAPI:
+      device = device_oneapi_create(info, stats, profiler, headless);
+      break;
+#endif
+
     default:
       break;
   }
 
-  if (device == NULL) {
-    device = device_dummy_create(info, stats, profiler, background);
+  if (device == nullptr) {
+    device = device_dummy_create(info, stats, profiler, headless);
   }
 
   return device;
@@ -432,36 +130,60 @@ Device *Device::create(DeviceInfo &info, Stats &stats, Profiler &profiler, bool 
 
 DeviceType Device::type_from_string(const char *name)
 {
-  if (strcmp(name, "CPU") == 0)
+  if (strcmp(name, "CPU") == 0) {
     return DEVICE_CPU;
-  else if (strcmp(name, "CUDA") == 0)
+  }
+  if (strcmp(name, "CUDA") == 0) {
     return DEVICE_CUDA;
-  else if (strcmp(name, "OPTIX") == 0)
+  }
+  if (strcmp(name, "OPTIX") == 0) {
     return DEVICE_OPTIX;
-  else if (strcmp(name, "OPENCL") == 0)
-    return DEVICE_OPENCL;
-  else if (strcmp(name, "NETWORK") == 0)
-    return DEVICE_NETWORK;
-  else if (strcmp(name, "MULTI") == 0)
+  }
+  if (strcmp(name, "MULTI") == 0) {
     return DEVICE_MULTI;
+  }
+  if (strcmp(name, "HIP") == 0) {
+    return DEVICE_HIP;
+  }
+  if (strcmp(name, "METAL") == 0) {
+    return DEVICE_METAL;
+  }
+  if (strcmp(name, "ONEAPI") == 0) {
+    return DEVICE_ONEAPI;
+  }
+  if (strcmp(name, "HIPRT") == 0) {
+    return DEVICE_HIPRT;
+  }
 
   return DEVICE_NONE;
 }
 
 string Device::string_from_type(DeviceType type)
 {
-  if (type == DEVICE_CPU)
+  if (type == DEVICE_CPU) {
     return "CPU";
-  else if (type == DEVICE_CUDA)
+  }
+  if (type == DEVICE_CUDA) {
     return "CUDA";
-  else if (type == DEVICE_OPTIX)
+  }
+  if (type == DEVICE_OPTIX) {
     return "OPTIX";
-  else if (type == DEVICE_OPENCL)
-    return "OPENCL";
-  else if (type == DEVICE_NETWORK)
-    return "NETWORK";
-  else if (type == DEVICE_MULTI)
+  }
+  if (type == DEVICE_MULTI) {
     return "MULTI";
+  }
+  if (type == DEVICE_HIP) {
+    return "HIP";
+  }
+  if (type == DEVICE_METAL) {
+    return "METAL";
+  }
+  if (type == DEVICE_ONEAPI) {
+    return "ONEAPI";
+  }
+  if (type == DEVICE_HIPRT) {
+    return "HIPRT";
+  }
 
   return "";
 }
@@ -476,36 +198,30 @@ vector<DeviceType> Device::available_types()
 #ifdef WITH_OPTIX
   types.push_back(DEVICE_OPTIX);
 #endif
-#ifdef WITH_OPENCL
-  types.push_back(DEVICE_OPENCL);
+#ifdef WITH_HIP
+  types.push_back(DEVICE_HIP);
 #endif
-#ifdef WITH_NETWORK
-  types.push_back(DEVICE_NETWORK);
+#ifdef WITH_METAL
+  types.push_back(DEVICE_METAL);
+#endif
+#ifdef WITH_ONEAPI
+  types.push_back(DEVICE_ONEAPI);
+#endif
+#ifdef WITH_HIPRT
+  if (hiprtewInit()) {
+    types.push_back(DEVICE_HIPRT);
+  }
 #endif
   return types;
 }
 
-vector<DeviceInfo> Device::available_devices(uint mask)
+vector<DeviceInfo> Device::available_devices(const uint mask)
 {
   /* Lazy initialize devices. On some platforms OpenCL or CUDA drivers can
    * be broken and cause crashes when only trying to get device info, so
    * we don't want to do any initialization until the user chooses to. */
-  thread_scoped_lock lock(device_mutex);
+  const thread_scoped_lock lock(device_mutex);
   vector<DeviceInfo> devices;
-
-#ifdef WITH_OPENCL
-  if (mask & DEVICE_MASK_OPENCL) {
-    if (!(devices_initialized_mask & DEVICE_MASK_OPENCL)) {
-      if (device_opencl_init()) {
-        device_opencl_info(opencl_devices);
-      }
-      devices_initialized_mask |= DEVICE_MASK_OPENCL;
-    }
-    foreach (DeviceInfo &info, opencl_devices) {
-      devices.push_back(info);
-    }
-  }
-#endif
 
 #if defined(WITH_CUDA) || defined(WITH_OPTIX)
   if (mask & (DEVICE_MASK_CUDA | DEVICE_MASK_OPTIX)) {
@@ -516,7 +232,7 @@ vector<DeviceInfo> Device::available_devices(uint mask)
       devices_initialized_mask |= DEVICE_MASK_CUDA;
     }
     if (mask & DEVICE_MASK_CUDA) {
-      foreach (DeviceInfo &info, cuda_devices) {
+      for (DeviceInfo &info : cuda_devices) {
         devices.push_back(info);
       }
     }
@@ -531,7 +247,35 @@ vector<DeviceInfo> Device::available_devices(uint mask)
       }
       devices_initialized_mask |= DEVICE_MASK_OPTIX;
     }
-    foreach (DeviceInfo &info, optix_devices) {
+    for (DeviceInfo &info : optix_devices) {
+      devices.push_back(info);
+    }
+  }
+#endif
+
+#ifdef WITH_HIP
+  if (mask & DEVICE_MASK_HIP) {
+    if (!(devices_initialized_mask & DEVICE_MASK_HIP)) {
+      if (device_hip_init()) {
+        device_hip_info(hip_devices);
+      }
+      devices_initialized_mask |= DEVICE_MASK_HIP;
+    }
+    for (DeviceInfo &info : hip_devices) {
+      devices.push_back(info);
+    }
+  }
+#endif
+
+#ifdef WITH_ONEAPI
+  if (mask & DEVICE_MASK_ONEAPI) {
+    if (!(devices_initialized_mask & DEVICE_MASK_ONEAPI)) {
+      if (device_oneapi_init()) {
+        device_oneapi_info(oneapi_devices);
+      }
+      devices_initialized_mask |= DEVICE_MASK_ONEAPI;
+    }
+    for (DeviceInfo &info : oneapi_devices) {
       devices.push_back(info);
     }
   }
@@ -542,18 +286,20 @@ vector<DeviceInfo> Device::available_devices(uint mask)
       device_cpu_info(cpu_devices);
       devices_initialized_mask |= DEVICE_MASK_CPU;
     }
-    foreach (DeviceInfo &info, cpu_devices) {
+    for (const DeviceInfo &info : cpu_devices) {
       devices.push_back(info);
     }
   }
 
-#ifdef WITH_NETWORK
-  if (mask & DEVICE_MASK_NETWORK) {
-    if (!(devices_initialized_mask & DEVICE_MASK_NETWORK)) {
-      device_network_info(network_devices);
-      devices_initialized_mask |= DEVICE_MASK_NETWORK;
+#ifdef WITH_METAL
+  if (mask & DEVICE_MASK_METAL) {
+    if (!(devices_initialized_mask & DEVICE_MASK_METAL)) {
+      if (device_metal_init()) {
+        device_metal_info(metal_devices);
+      }
+      devices_initialized_mask |= DEVICE_MASK_METAL;
     }
-    foreach (DeviceInfo &info, network_devices) {
+    for (const DeviceInfo &info : metal_devices) {
       devices.push_back(info);
     }
   }
@@ -570,30 +316,60 @@ DeviceInfo Device::dummy_device(const string &error_msg)
   return info;
 }
 
-string Device::device_capabilities(uint mask)
+string Device::device_capabilities(const uint mask)
 {
-  thread_scoped_lock lock(device_mutex);
-  string capabilities = "";
+  const thread_scoped_lock lock(device_mutex);
+  string capabilities;
 
   if (mask & DEVICE_MASK_CPU) {
     capabilities += "\nCPU device capabilities: ";
     capabilities += device_cpu_capabilities() + "\n";
   }
 
-#ifdef WITH_OPENCL
-  if (mask & DEVICE_MASK_OPENCL) {
-    if (device_opencl_init()) {
-      capabilities += "\nOpenCL device capabilities:\n";
-      capabilities += device_opencl_capabilities();
+#ifdef WITH_CUDA
+  if (mask & DEVICE_MASK_CUDA) {
+    if (device_cuda_init()) {
+      const string device_capabilities = device_cuda_capabilities();
+      if (!device_capabilities.empty()) {
+        capabilities += "\nCUDA device capabilities:\n";
+        capabilities += device_capabilities;
+      }
     }
   }
 #endif
 
-#ifdef WITH_CUDA
-  if (mask & DEVICE_MASK_CUDA) {
-    if (device_cuda_init()) {
-      capabilities += "\nCUDA device capabilities:\n";
-      capabilities += device_cuda_capabilities();
+#ifdef WITH_HIP
+  if (mask & DEVICE_MASK_HIP) {
+    if (device_hip_init()) {
+      const string device_capabilities = device_hip_capabilities();
+      if (!device_capabilities.empty()) {
+        capabilities += "\nHIP device capabilities:\n";
+        capabilities += device_capabilities;
+      }
+    }
+  }
+#endif
+
+#ifdef WITH_ONEAPI
+  if (mask & DEVICE_MASK_ONEAPI) {
+    if (device_oneapi_init()) {
+      const string device_capabilities = device_oneapi_capabilities();
+      if (!device_capabilities.empty()) {
+        capabilities += "\noneAPI device capabilities:\n";
+        capabilities += device_capabilities;
+      }
+    }
+  }
+#endif
+
+#ifdef WITH_METAL
+  if (mask & DEVICE_MASK_METAL) {
+    if (device_metal_init()) {
+      const string device_capabilities = device_metal_capabilities();
+      if (!device_capabilities.empty()) {
+        capabilities += "\nMetal device capabilities:\n";
+        capabilities += device_capabilities;
+      }
     }
   }
 #endif
@@ -602,10 +378,10 @@ string Device::device_capabilities(uint mask)
 }
 
 DeviceInfo Device::get_multi_device(const vector<DeviceInfo> &subdevices,
-                                    int threads,
+                                    const int threads,
                                     bool background)
 {
-  assert(subdevices.size() > 0);
+  assert(!subdevices.empty());
 
   if (subdevices.size() == 1) {
     /* No multi device needed. */
@@ -613,30 +389,29 @@ DeviceInfo Device::get_multi_device(const vector<DeviceInfo> &subdevices,
   }
 
   DeviceInfo info;
-  info.type = subdevices.front().type;
+  info.type = DEVICE_NONE;
   info.id = "MULTI";
   info.description = "Multi Device";
   info.num = 0;
 
-  info.has_half_images = true;
   info.has_nanovdb = true;
-  info.has_volume_decoupled = true;
-  info.has_branched_path = true;
-  info.has_adaptive_stop_per_sample = true;
+  info.has_mnee = true;
   info.has_osl = true;
+  info.has_guiding = true;
   info.has_profiling = true;
   info.has_peer_memory = false;
+  info.use_hardware_raytracing = false;
   info.denoisers = DENOISER_ALL;
 
-  foreach (const DeviceInfo &device, subdevices) {
+  for (const DeviceInfo &device : subdevices) {
     /* Ensure CPU device does not slow down GPU. */
     if (device.type == DEVICE_CPU && subdevices.size() > 1) {
       if (background) {
-        int orig_cpu_threads = (threads) ? threads : system_cpu_thread_count();
-        int cpu_threads = max(orig_cpu_threads - (subdevices.size() - 1), 0);
+        const int orig_cpu_threads = (threads) ? threads : TaskScheduler::max_concurrency();
+        const int cpu_threads = max(orig_cpu_threads - (subdevices.size() - 1), size_t(0));
 
-        VLOG(1) << "CPU render threads reduced from " << orig_cpu_threads << " to " << cpu_threads
-                << ", to dedicate to GPU.";
+        VLOG_INFO << "CPU render threads reduced from " << orig_cpu_threads << " to "
+                  << cpu_threads << ", to dedicate to GPU.";
 
         if (cpu_threads >= 1) {
           DeviceInfo cpu_device = device;
@@ -648,7 +423,7 @@ DeviceInfo Device::get_multi_device(const vector<DeviceInfo> &subdevices,
         }
       }
       else {
-        VLOG(1) << "CPU render threads disabled for interactive render.";
+        VLOG_INFO << "CPU render threads disabled for interactive render.";
         continue;
       }
     }
@@ -660,19 +435,21 @@ DeviceInfo Device::get_multi_device(const vector<DeviceInfo> &subdevices,
     info.id += device.id;
 
     /* Set device type to MULTI if subdevices are not of a common type. */
-    if (device.type != info.type) {
+    if (info.type == DEVICE_NONE) {
+      info.type = device.type;
+    }
+    else if (device.type != info.type) {
       info.type = DEVICE_MULTI;
     }
 
     /* Accumulate device info. */
-    info.has_half_images &= device.has_half_images;
     info.has_nanovdb &= device.has_nanovdb;
-    info.has_volume_decoupled &= device.has_volume_decoupled;
-    info.has_branched_path &= device.has_branched_path;
-    info.has_adaptive_stop_per_sample &= device.has_adaptive_stop_per_sample;
+    info.has_mnee &= device.has_mnee;
     info.has_osl &= device.has_osl;
+    info.has_guiding &= device.has_guiding;
     info.has_profiling &= device.has_profiling;
     info.has_peer_memory |= device.has_peer_memory;
+    info.use_hardware_raytracing |= device.use_hardware_raytracing;
     info.denoisers &= device.denoisers;
   }
 
@@ -689,60 +466,354 @@ void Device::free_memory()
   devices_initialized_mask = 0;
   cuda_devices.free_memory();
   optix_devices.free_memory();
-  opencl_devices.free_memory();
+  hip_devices.free_memory();
+  oneapi_devices.free_memory();
   cpu_devices.free_memory();
-  network_devices.free_memory();
+  metal_devices.free_memory();
+}
+
+unique_ptr<DeviceQueue> Device::gpu_queue_create()
+{
+  LOG(FATAL) << "Device does not support queues.";
+  return nullptr;
+}
+
+const CPUKernels &Device::get_cpu_kernels()
+{
+  /* Initialize CPU kernels once and reuse. */
+  static const CPUKernels kernels;
+  return kernels;
+}
+
+void Device::get_cpu_kernel_thread_globals(
+    vector<ThreadKernelGlobalsCPU> & /*kernel_thread_globals*/)
+{
+  LOG(FATAL) << "Device does not support CPU kernels.";
+}
+
+OSLGlobals *Device::get_cpu_osl_memory()
+{
+  return nullptr;
+}
+
+void *Device::host_alloc(const MemoryType /*type*/, const size_t size)
+{
+  return util_aligned_malloc(size, MIN_ALIGNMENT_CPU_DATA_TYPES);
+}
+
+void Device::host_free(const MemoryType /*type*/, void *host_pointer, const size_t size)
+{
+  util_aligned_free(host_pointer, size);
+}
+
+GPUDevice::~GPUDevice() noexcept(false) = default;
+
+bool GPUDevice::load_texture_info()
+{
+  /* Note texture_info is never host mapped, and load_texture_info() should only
+   * be called right before kernel enqueue when all memory operations have completed. */
+  if (need_texture_info) {
+    texture_info.copy_to_device();
+    need_texture_info = false;
+    return true;
+  }
+  return false;
+}
+
+void GPUDevice::init_host_memory(const size_t preferred_texture_headroom,
+                                 const size_t preferred_working_headroom)
+{
+  /* Limit amount of host mapped memory, because allocating too much can
+   * cause system instability. Leave at least half or 4 GB of system
+   * memory free, whichever is smaller. */
+  const size_t default_limit = 4 * 1024 * 1024 * 1024LL;
+  const size_t system_ram = system_physical_ram();
+
+  if (system_ram > 0) {
+    if (system_ram / 2 > default_limit) {
+      map_host_limit = system_ram - default_limit;
+    }
+    else {
+      map_host_limit = system_ram / 2;
+    }
+  }
+  else {
+    VLOG_WARNING << "Mapped host memory disabled, failed to get system RAM";
+    map_host_limit = 0;
+  }
+
+  /* Amount of device memory to keep free after texture memory
+   * and working memory allocations respectively. We set the working
+   * memory limit headroom lower than the working one so there
+   * is space left for it. */
+  device_working_headroom = preferred_working_headroom > 0 ? preferred_working_headroom :
+                                                             32 * 1024 * 1024LL;  // 32MB
+  device_texture_headroom = preferred_texture_headroom > 0 ? preferred_texture_headroom :
+                                                             128 * 1024 * 1024LL;  // 128MB
+
+  VLOG_INFO << "Mapped host memory limit set to " << string_human_readable_number(map_host_limit)
+            << " bytes. (" << string_human_readable_size(map_host_limit) << ")";
+}
+
+void GPUDevice::move_textures_to_host(size_t size, const size_t headroom, const bool for_texture)
+{
+  static thread_mutex move_mutex;
+  const thread_scoped_lock lock(move_mutex);
+
+  /* Check if there is enough space. Within mutex locks so that multiple threads
+   * calling take into account memory freed by another thread. */
+  size_t total = 0;
+  size_t free = 0;
+  get_device_memory_info(total, free);
+  if (size + headroom < free) {
+    return;
+  }
+
+  while (size > 0) {
+    /* Find suitable memory allocation to move. */
+    device_memory *max_mem = nullptr;
+    size_t max_size = 0;
+    bool max_is_image = false;
+
+    thread_scoped_lock lock(device_mem_map_mutex);
+    for (MemMap::value_type &pair : device_mem_map) {
+      device_memory &mem = *pair.first;
+      Mem *cmem = &pair.second;
+
+      /* Can only move textures allocated on this device (and not those from peer devices).
+       * And need to ignore memory that is already on the host. */
+      if (!mem.is_resident(this) || mem.is_shared(this)) {
+        continue;
+      }
+
+      const bool is_texture = (mem.type == MEM_TEXTURE || mem.type == MEM_GLOBAL) &&
+                              (&mem != &texture_info);
+      const bool is_image = is_texture && (mem.data_height > 1);
+
+      /* Can't move this type of memory. */
+      if (!is_texture || cmem->array) {
+        continue;
+      }
+
+      /* For other textures, only move image textures. */
+      if (for_texture && !is_image) {
+        continue;
+      }
+
+      /* Try to move largest allocation, prefer moving images. */
+      if (is_image > max_is_image || (is_image == max_is_image && mem.device_size > max_size)) {
+        max_is_image = is_image;
+        max_size = mem.device_size;
+        max_mem = &mem;
+      }
+    }
+    lock.unlock();
+
+    /* Move to host memory. This part is mutex protected since
+     * multiple backend devices could be moving the memory. The
+     * first one will do it, and the rest will adopt the pointer. */
+    if (max_mem) {
+      VLOG_WORK << "Move memory from device to host: " << max_mem->name;
+
+      /* Potentially need to call back into multi device, so pointer mapping
+       * and peer devices are updated. This is also necessary since the device
+       * pointer may just be a key here, so cannot be accessed and freed directly.
+       * Unfortunately it does mean that memory is reallocated on all other
+       * devices as well, which is potentially dangerous when still in use (since
+       * a thread rendering on another devices would only be caught in this mutex
+       * if it so happens to do an allocation at the same time as well. */
+      max_mem->move_to_host = true;
+      max_mem->device_move_to_host();
+      max_mem->move_to_host = false;
+      size = (max_size >= size) ? 0 : size - max_size;
+
+      /* Tag texture info update for new pointers. */
+      need_texture_info = true;
+    }
+    else {
+      break;
+    }
+  }
+}
+
+GPUDevice::Mem *GPUDevice::generic_alloc(device_memory &mem, const size_t pitch_padding)
+{
+  void *device_pointer = nullptr;
+  const size_t size = mem.memory_size() + pitch_padding;
+
+  bool mem_alloc_result = false;
+  const char *status = "";
+
+  /* First try allocating in device memory, respecting headroom. We make
+   * an exception for texture info. It is small and frequently accessed,
+   * so treat it as working memory.
+   *
+   * If there is not enough room for working memory, we will try to move
+   * textures to host memory, assuming the performance impact would have
+   * been worse for working memory. */
+  const bool is_texture = (mem.type == MEM_TEXTURE || mem.type == MEM_GLOBAL) &&
+                          (&mem != &texture_info);
+  const bool is_image = is_texture && (mem.data_height > 1);
+
+  const size_t headroom = (is_texture) ? device_texture_headroom : device_working_headroom;
+
+  /* Move textures to host memory if needed. */
+  if (!mem.move_to_host && !is_image && can_map_host) {
+    move_textures_to_host(size, headroom, is_texture);
+  }
+
+  size_t total = 0;
+  size_t free = 0;
+  get_device_memory_info(total, free);
+
+  /* Allocate in device memory. */
+  if ((!mem.move_to_host && (size + headroom) < free) || (mem.type == MEM_DEVICE_ONLY)) {
+    mem_alloc_result = alloc_device(device_pointer, size);
+    if (mem_alloc_result) {
+      device_mem_in_use += size;
+      status = " in device memory";
+    }
+  }
+
+  /* Fall back to mapped host memory if needed and possible. */
+
+  void *shared_pointer = nullptr;
+
+  if (!mem_alloc_result && can_map_host && mem.type != MEM_DEVICE_ONLY) {
+    if (mem.shared_pointer) {
+      /* Another device already allocated host memory. */
+      mem_alloc_result = true;
+      shared_pointer = mem.shared_pointer;
+    }
+    else if (map_host_used + size < map_host_limit) {
+      /* Allocate host memory ourselves. */
+      mem_alloc_result = shared_alloc(shared_pointer, size);
+
+      assert((mem_alloc_result && shared_pointer != nullptr) ||
+             (!mem_alloc_result && shared_pointer == nullptr));
+    }
+
+    if (mem_alloc_result) {
+      device_pointer = shared_to_device_pointer(shared_pointer);
+      map_host_used += size;
+      status = " in host memory";
+    }
+  }
+
+  if (!mem_alloc_result) {
+    if (mem.type == MEM_DEVICE_ONLY) {
+      status = " failed, out of device memory";
+      set_error("System is out of GPU memory");
+    }
+    else {
+      status = " failed, out of device and host memory";
+      set_error("System is out of GPU and shared host memory");
+    }
+  }
+
+  if (mem.name) {
+    VLOG_WORK << "Buffer allocate: " << mem.name << ", "
+              << string_human_readable_number(mem.memory_size()) << " bytes. ("
+              << string_human_readable_size(mem.memory_size()) << ")" << status;
+  }
+
+  mem.device_pointer = (device_ptr)device_pointer;
+  mem.device_size = size;
+  stats.mem_alloc(size);
+
+  if (!mem.device_pointer) {
+    return nullptr;
+  }
+
+  /* Insert into map of allocations. */
+  const thread_scoped_lock lock(device_mem_map_mutex);
+  Mem *cmem = &device_mem_map[&mem];
+  if (shared_pointer != nullptr) {
+    /* Replace host pointer with our host allocation. Only works if
+     * memory layout is the same and has no pitch padding. Also
+     * does not work if we move textures to host during a render,
+     * since other devices might be using the memory. */
+
+    if (!mem.move_to_host && pitch_padding == 0 && mem.host_pointer &&
+        mem.host_pointer != shared_pointer)
+    {
+      memcpy(shared_pointer, mem.host_pointer, size);
+      host_free(mem.type, mem.host_pointer, mem.memory_size());
+      mem.host_pointer = shared_pointer;
+    }
+    mem.shared_pointer = shared_pointer;
+    mem.shared_counter++;
+  }
+
+  return cmem;
+}
+
+void GPUDevice::generic_free(device_memory &mem)
+{
+  if (!(mem.device_pointer && mem.is_resident(this))) {
+    return;
+  }
+
+  /* Host pointer should already have been freed at this point. If not we might
+   * end up freeing shared memory and can't recover original host memory. */
+  assert(mem.host_pointer == nullptr || mem.move_to_host);
+
+  const thread_scoped_lock lock(device_mem_map_mutex);
+  DCHECK(device_mem_map.find(&mem) != device_mem_map.end());
+
+  /* For host mapped memory, reference counting is used to safely free it. */
+  if (mem.is_shared(this)) {
+    assert(mem.shared_counter > 0);
+    if (--mem.shared_counter == 0) {
+      if (mem.host_pointer == mem.shared_pointer) {
+        /* Safely move the device-side data back to the host before it is freed.
+         * We should actually never reach this code as it is inefficient, but
+         * better than to crash if there is a bug. */
+        assert(!"GPU device should not copy memory back to host");
+        const size_t size = mem.memory_size();
+        mem.host_pointer = mem.host_alloc(size);
+        memcpy(mem.host_pointer, mem.shared_pointer, size);
+      }
+      shared_free(mem.shared_pointer);
+      mem.shared_pointer = nullptr;
+    }
+    map_host_used -= mem.device_size;
+  }
+  else {
+    /* Free device memory. */
+    free_device((void *)mem.device_pointer);
+    device_mem_in_use -= mem.device_size;
+  }
+
+  stats.mem_free(mem.device_size);
+  mem.device_pointer = 0;
+  mem.device_size = 0;
+
+  device_mem_map.erase(device_mem_map.find(&mem));
+}
+
+void GPUDevice::generic_copy_to(device_memory &mem)
+{
+  if (!mem.host_pointer || !mem.device_pointer) {
+    return;
+  }
+
+  /* If not host mapped, the current device only uses device memory allocated by backend
+   * device allocation regardless of mem.host_pointer and mem.shared_pointer, and should
+   * copy data from mem.host_pointer. */
+  if (!(mem.is_shared(this) && mem.host_pointer == mem.shared_pointer)) {
+    copy_host_to_device((void *)mem.device_pointer, mem.host_pointer, mem.memory_size());
+  }
+}
+
+bool GPUDevice::is_shared(const void *shared_pointer,
+                          const device_ptr device_pointer,
+                          Device * /*sub_device*/)
+{
+  return (shared_pointer && device_pointer &&
+          (device_ptr)shared_to_device_pointer(shared_pointer) == device_pointer);
 }
 
 /* DeviceInfo */
-
-void DeviceInfo::add_denoising_devices(DenoiserType denoiser_type)
-{
-  assert(denoising_devices.empty());
-
-  if (denoiser_type == DENOISER_OPTIX && type != DEVICE_OPTIX) {
-    vector<DeviceInfo> optix_devices = Device::available_devices(DEVICE_MASK_OPTIX);
-    if (!optix_devices.empty()) {
-      /* Convert to a special multi device with separate denoising devices. */
-      if (multi_devices.empty()) {
-        multi_devices.push_back(*this);
-      }
-
-      /* Try to use the same physical devices for denoising. */
-      for (const DeviceInfo &cuda_device : multi_devices) {
-        if (cuda_device.type == DEVICE_CUDA) {
-          for (const DeviceInfo &optix_device : optix_devices) {
-            if (cuda_device.num == optix_device.num) {
-              id += optix_device.id;
-              denoising_devices.push_back(optix_device);
-              break;
-            }
-          }
-        }
-      }
-
-      if (denoising_devices.empty()) {
-        /* Simply use the first available OptiX device. */
-        const DeviceInfo optix_device = optix_devices.front();
-        id += optix_device.id; /* Uniquely identify this special multi device. */
-        denoising_devices.push_back(optix_device);
-      }
-
-      denoisers = denoiser_type;
-    }
-  }
-  else if (denoiser_type == DENOISER_OPENIMAGEDENOISE && type != DEVICE_CPU) {
-    /* Convert to a special multi device with separate denoising devices. */
-    if (multi_devices.empty()) {
-      multi_devices.push_back(*this);
-    }
-
-    /* Add CPU denoising devices. */
-    DeviceInfo cpu_device = Device::available_devices(DEVICE_MASK_CPU).front();
-    denoising_devices.push_back(cpu_device);
-
-    denoisers = denoiser_type;
-  }
-}
 
 CCL_NAMESPACE_END

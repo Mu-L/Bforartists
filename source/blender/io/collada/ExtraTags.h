@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup collada
@@ -50,6 +38,9 @@ class ExtraTags {
   bool setData(std::string tag, char *data);
   std::string setData(std::string tag, std::string &data);
 
+  /** Get a string from the data, and split it by newlines. */
+  std::vector<std::string> dataSplitString(const std::string &tag);
+
   /** Return true if the extra tags is for specified profile. */
   bool isProfile(std::string profile);
 
@@ -66,9 +57,9 @@ class ExtraTags {
   std::map<std::string, std::string> tags;
 
   /** Get text data for tag as an int. */
-  int asInt(std::string tag, bool *ok);
+  int asInt(std::string tag, bool *r_ok);
   /** Get text data for tag as a float. */
-  float asFloat(std::string tag, bool *ok);
+  float asFloat(std::string tag, bool *r_ok);
   /** Get text data for tag as a string. */
-  std::string asString(std::string tag, bool *ok);
+  std::string asString(std::string tag, bool *r_ok);
 };

@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -23,9 +11,7 @@
 
 #include "../view_map/Functions0D.h"
 
-#ifdef WITH_CXX_GUARDEDALLOC
-#  include "MEM_guardedalloc.h"
-#endif
+#include "MEM_guardedalloc.h"
 
 namespace Freestyle {
 
@@ -52,9 +38,7 @@ class UnaryPredicate0D {
   }
 
   /** Destructor. */
-  virtual ~UnaryPredicate0D()
-  {
-  }
+  virtual ~UnaryPredicate0D() {}
 
   /** Returns the string of the name of the UnaryPredicate0D. */
   virtual string getName() const
@@ -69,9 +53,7 @@ class UnaryPredicate0D {
    */
   virtual int operator()(Interface0DIterator &it);
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:UnaryPredicate0D")
-#endif
 };
 
 //
@@ -96,9 +78,7 @@ class BinaryPredicate0D {
   }
 
   /** Destructor. */
-  virtual ~BinaryPredicate0D()
-  {
-  }
+  virtual ~BinaryPredicate0D() {}
 
   /** Returns the string of the name of the binary predicate. */
   virtual string getName() const
@@ -116,9 +96,7 @@ class BinaryPredicate0D {
    */
   virtual int operator()(Interface0D &inter1, Interface0D &inter2);
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:BinaryPredicate0D")
-#endif
 };
 
 //
@@ -133,9 +111,7 @@ namespace Predicates0D {
 class TrueUP0D : public UnaryPredicate0D {
  public:
   /** Default constructor. */
-  TrueUP0D()
-  {
-  }
+  TrueUP0D() {}
 
   /** Returns the string "TrueUP0D". */
   string getName() const
@@ -156,9 +132,7 @@ class TrueUP0D : public UnaryPredicate0D {
 class FalseUP0D : public UnaryPredicate0D {
  public:
   /** Default constructor. */
-  FalseUP0D()
-  {
-  }
+  FalseUP0D() {}
 
   /** Returns the string "FalseUP0D". */
   string getName() const

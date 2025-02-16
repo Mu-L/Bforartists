@@ -1,97 +1,60 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#include "DNA_modifier_types.h"
+#include "DNA_mesh_types.h"
+
+#include "GEO_mesh_split_edges.hh"
 
 #include "node_geometry_util.hh"
 
-extern "C" {
-Mesh *doEdgeSplit(const Mesh *mesh, EdgeSplitModifierData *emd);
-}
+namespace blender::nodes::node_geo_edge_split_cc {
 
-static bNodeSocketTemplate geo_node_edge_split_in[] = {
-    {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_BOOLEAN, N_("Edge Angle"), true},
-    {SOCK_FLOAT,
-     N_("Angle"),
-     DEG2RADF(30.0f),
-     0.0f,
-     0.0f,
-     0.0f,
-     0.0f,
-     DEG2RADF(180.0f),
-     PROP_ANGLE},
-    {SOCK_BOOLEAN, N_("Sharp Edges")},
-    {-1, ""},
-};
-
-static bNodeSocketTemplate geo_node_edge_split_out[] = {
-    {SOCK_GEOMETRY, N_("Geometry")},
-    {-1, ""},
-};
-
-namespace blender::nodes {
-
-static void geo_node_edge_split_exec(GeoNodeExecParams params)
+static void node_declare(NodeDeclarationBuilder &b)
 {
-  GeometrySet geometry_set = params.extract_input<GeometrySet>("Geometry");
-
-  geometry_set = geometry_set_realize_instances(geometry_set);
-
-  if (!geometry_set.has_mesh()) {
-    params.set_output("Geometry", std::move(geometry_set));
-    return;
-  }
-
-  const bool use_sharp_flag = params.extract_input<bool>("Sharp Edges");
-  const bool use_edge_angle = params.extract_input<bool>("Edge Angle");
-
-  if (!use_edge_angle && !use_sharp_flag) {
-    params.set_output("Geometry", std::move(geometry_set));
-    return;
-  }
-
-  const float split_angle = params.extract_input<float>("Angle");
-  const Mesh *mesh_in = geometry_set.get_mesh_for_read();
-
-  /* Use modifier struct to pass arguments to the modifier code. */
-  EdgeSplitModifierData emd;
-  memset(&emd, 0, sizeof(EdgeSplitModifierData));
-  emd.split_angle = split_angle;
-  if (use_edge_angle) {
-    emd.flags = MOD_EDGESPLIT_FROMANGLE;
-  }
-  if (use_sharp_flag) {
-    emd.flags |= MOD_EDGESPLIT_FROMFLAG;
-  }
-
-  Mesh *mesh_out = doEdgeSplit(mesh_in, &emd);
-  geometry_set.replace_mesh(mesh_out);
-
-  params.set_output("Geometry", std::move(geometry_set));
+  b.add_input<decl::Geometry>("Mesh").supported_type(GeometryComponent::Type::Mesh);
+  b.add_input<decl::Bool>("Selection").default_value(true).hide_value().field_on_all();
+  b.add_output<decl::Geometry>("Mesh").propagate_all();
 }
 
-}  // namespace blender::nodes
-
-void register_node_type_geo_edge_split()
+static void node_geo_exec(GeoNodeExecParams params)
 {
-  static bNodeType ntype;
+  GeometrySet geometry_set = params.extract_input<GeometrySet>("Mesh");
 
-  geo_node_type_base(&ntype, GEO_NODE_EDGE_SPLIT, "Edge Split", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(&ntype, geo_node_edge_split_in, geo_node_edge_split_out);
-  ntype.geometry_node_execute = blender::nodes::geo_node_edge_split_exec;
-  nodeRegisterType(&ntype);
+  const Field<bool> selection_field = params.extract_input<Field<bool>>("Selection");
+
+  geometry_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
+    if (const Mesh *mesh = geometry_set.get_mesh()) {
+      const bke::MeshFieldContext field_context{*mesh, AttrDomain::Edge};
+      fn::FieldEvaluator selection_evaluator{field_context, mesh->edges_num};
+      selection_evaluator.set_selection(selection_field);
+      selection_evaluator.evaluate();
+      const IndexMask mask = selection_evaluator.get_evaluated_selection_as_mask();
+      if (mask.is_empty()) {
+        return;
+      }
+
+      geometry::split_edges(
+          *geometry_set.get_mesh_for_write(), mask, params.get_attribute_filter("Mesh"));
+    }
+  });
+
+  params.set_output("Mesh", std::move(geometry_set));
 }
+
+static void node_register()
+{
+  static blender::bke::bNodeType ntype;
+
+  geo_node_type_base(&ntype, "GeometryNodeSplitEdges", GEO_NODE_SPLIT_EDGES);
+  ntype.ui_name = "Split Edges";
+  ntype.ui_description = "Duplicate mesh edges and break connections with the surrounding faces";
+  ntype.enum_name_legacy = "SPLIT_EDGES";
+  ntype.nclass = NODE_CLASS_GEOMETRY;
+  ntype.geometry_node_execute = node_geo_exec;
+  ntype.declare = node_declare;
+  blender::bke::node_register_type(&ntype);
+}
+NOD_REGISTER_NODE(node_register)
+
+}  // namespace blender::nodes::node_geo_edge_split_cc

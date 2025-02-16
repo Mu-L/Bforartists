@@ -26,7 +26,11 @@
  * The PulseAudioDevice class.
  */
 
-#include "devices/ThreadedDevice.h"
+#include "devices/SoftwareDevice.h"
+#include "util/RingBuffer.h"
+
+#include <condition_variable>
+#include <thread>
 
 #include <pulse/pulseaudio.h>
 
@@ -35,16 +39,72 @@ AUD_NAMESPACE_BEGIN
 /**
  * This device plays back through PulseAudio, the simple direct media layer.
  */
-class AUD_PLUGIN_API PulseAudioDevice : public ThreadedDevice
+class AUD_PLUGIN_API PulseAudioDevice : public SoftwareDevice
 {
 private:
-	pa_mainloop* m_mainloop;
+	class PulseAudioSynchronizer : public DefaultSynchronizer
+	{
+		PulseAudioDevice* m_device;
+		bool m_playing = false;
+		pa_usec_t m_time_start = 0;
+		double m_seek_pos = 0.0f;
+
+	public:
+		PulseAudioSynchronizer(PulseAudioDevice* device);
+
+		virtual void play();
+		virtual void stop();
+		virtual void seek(std::shared_ptr<IHandle> handle, double time);
+		virtual double getPosition(std::shared_ptr<IHandle> handle);
+	};
+
+	/// Synchronizer.
+	PulseAudioSynchronizer m_synchronizer;
+
+	/**
+	 * Whether there is currently playback.
+	 */
+	volatile bool m_playback;
+
+	bool m_corked;
+
+	pa_threaded_mainloop* m_mainloop;
 	pa_context* m_context;
 	pa_stream* m_stream;
 	pa_context_state_t m_state;
 
+	/**
+	 * The mixing ring buffer.
+	 */
+	RingBuffer m_ring_buffer;
+
+	/**
+	 * Whether the device is valid.
+	 */
+	bool m_valid;
+
 	int m_buffersize;
 	uint32_t m_underflows;
+
+	/**
+	 * The mixing thread.
+	 */
+	std::thread m_mixingThread;
+
+	/**
+	 * Mutex for mixing.
+	 */
+	std::mutex m_mixingLock;
+
+	/**
+	 * Condition for mixing.
+	 */
+	std::condition_variable m_mixingCondition;
+
+	/**
+	 * Updates the ring buffer.
+	 */
+	AUD_LOCAL void updateRingBuffer();
 
 	/**
 	 * Reports the state of the PulseAudio server connection.
@@ -59,24 +119,14 @@ private:
 	 * \param num_bytes The length in bytes to be supplied.
 	 * \param data The PulseAudio device.
 	 */
-	AUD_LOCAL static void PulseAudio_request(pa_stream* stream, size_t num_bytes, void* data);
-
-	/**
-	 * Reports an underflow from the PulseAudio server.
-	 * Automatically adjusts the latency if this happens too often.
-	 * @param stream The PulseAudio stream.
-	 * \param data The PulseAudio device.
-	 */
-	AUD_LOCAL static void PulseAudio_underflow(pa_stream* stream, void* data);
-
-	/**
-	 * Streaming thread main function.
-	 */
-	AUD_LOCAL void runMixingThread();
+	AUD_LOCAL static void PulseAudio_request(pa_stream* stream, size_t total_bytes, void* data);
 
 	// delete copy constructor and operator=
 	PulseAudioDevice(const PulseAudioDevice&) = delete;
 	PulseAudioDevice& operator=(const PulseAudioDevice&) = delete;
+
+protected:
+	virtual void playing(bool playing);
 
 public:
 	/**
@@ -86,12 +136,14 @@ public:
 	 * \note The specification really used for opening the device may differ.
 	 * \exception Exception Thrown if the audio device cannot be opened.
 	 */
-	PulseAudioDevice(std::string name, DeviceSpecs specs, int buffersize = AUD_DEFAULT_BUFFER_SIZE);
+	PulseAudioDevice(const std::string &name, DeviceSpecs specs, int buffersize = AUD_DEFAULT_BUFFER_SIZE);
 
 	/**
 	 * Closes the PulseAudio audio device.
 	 */
 	virtual ~PulseAudioDevice();
+
+	virtual ISynchronizer* getSynchronizer();
 
 	/**
 	 * Registers this plugin.

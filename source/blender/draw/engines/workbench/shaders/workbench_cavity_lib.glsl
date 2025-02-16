@@ -1,20 +1,30 @@
+/* SPDX-FileCopyrightText: 2017-2023 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#pragma BLENDER_REQUIRE(common_view_lib.glsl)
-#pragma BLENDER_REQUIRE(workbench_data_lib.glsl)
-#pragma BLENDER_REQUIRE(workbench_common_lib.glsl)
+#pragma once
+#include "infos/workbench_composite_info.hh"
 
-layout(std140) uniform samples_block
-{
-  vec4 samples_coords[512];
-};
+#include "draw_view_lib.glsl"
+#include "workbench_common_lib.glsl"
 
-uniform sampler2D cavityJitter;
+SHADER_LIBRARY_CREATE_INFO(draw_view)
+SHADER_LIBRARY_CREATE_INFO(workbench_composite)
+SHADER_LIBRARY_CREATE_INFO(workbench_resolve_cavity)
 
 /*  From The Alchemy screen-space ambient obscurance algorithm
  * http://graphics.cs.williams.edu/papers/AlchemyHPG11/VV11AlchemyAO.pdf */
 
+#ifdef WORKBENCH_CAVITY
+#  define USE_CAVITY
+#  define cavityJitter jitter_tx
+#  define samples_coords cavity_samples
+#endif
+
+#ifdef USE_CAVITY
+
 void cavity_compute(vec2 screenco,
-                    sampler2D depthBuffer,
+                    depth2D depthBuffer,
                     sampler2D normalBuffer,
                     out float cavities,
                     out float edges)
@@ -28,7 +38,7 @@ void cavity_compute(vec2 screenco,
     return;
   }
 
-  vec3 position = get_view_space_from_depth(screenco, depth);
+  vec3 position = drw_point_screen_to_view(vec3(screenco, depth));
   vec3 normal = workbench_normal_decode(texture(normalBuffer, screenco));
 
   vec2 jitter_co = (screenco * world_data.viewport_size.xy) * world_data.cavity_jitter_scale;
@@ -37,9 +47,9 @@ void cavity_compute(vec2 screenco,
   /* find the offset in screen space by multiplying a point
    * in camera space at the depth of the point by the projection matrix. */
   vec2 offset;
-  float homcoord = ProjectionMatrix[2][3] * position.z + ProjectionMatrix[3][3];
-  offset.x = ProjectionMatrix[0][0] * world_data.cavity_distance / homcoord;
-  offset.y = ProjectionMatrix[1][1] * world_data.cavity_distance / homcoord;
+  float homcoord = drw_view.winmat[2][3] * position.z + drw_view.winmat[3][3];
+  offset.x = drw_view.winmat[0][0] * world_data.cavity_distance / homcoord;
+  offset.y = drw_view.winmat[1][1] * world_data.cavity_distance / homcoord;
   /* convert from -1.0...1.0 range to 0.0..1.0 for easy use with texture coordinates */
   offset *= 0.5;
 
@@ -68,7 +78,7 @@ void cavity_compute(vec2 screenco,
     bool is_background = (s_depth == 1.0);
     /* This trick provide good edge effect even if no neighbor is found. */
     s_depth = (is_background) ? depth : s_depth;
-    vec3 s_pos = get_view_space_from_depth(uvcoords, s_depth);
+    vec3 s_pos = drw_point_screen_to_view(vec3(uvcoords, s_depth));
 
     if (is_background) {
       s_pos.z -= world_data.cavity_distance;
@@ -98,3 +108,5 @@ void cavity_compute(vec2 screenco,
   cavities = clamp(cavities * world_data.cavity_valley_factor, 0.0, 1.0);
   edges = edges * world_data.cavity_ridge_factor;
 }
+
+#endif /* USE_CAVITY */

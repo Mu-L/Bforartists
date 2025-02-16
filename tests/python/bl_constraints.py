@@ -1,23 +1,9 @@
-# ##### BEGIN GPL LICENSE BLOCK #####
+# SPDX-FileCopyrightText: 2020-2023 Blender Authors
 #
-#  This program is free software; you can redistribute it and/or
-#  modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; either version 2
-#  of the License, or (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software Foundation,
-#  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# ##### END GPL LICENSE BLOCK #####
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 """
-./blender.bin --background -noaudio --factory-startup --python tests/python/bl_constraints.py -- --testdir /path/to/lib/tests/constraints
+./blender.bin --background --factory-startup --python tests/python/bl_constraints.py -- --testdir /path/to/tests/data/constraints
 """
 
 import pathlib
@@ -25,6 +11,7 @@ import sys
 import unittest
 
 import bpy
+from bpy.types import Constraint
 from mathutils import Matrix
 
 
@@ -138,8 +125,9 @@ class ChildOfTest(AbstractConstraintTests):
         ))
         self.matrix_test('Child Of.object.owner', initial_matrix)
 
-        context = self.constraint_context('Child Of', owner_name='Child Of.object.owner')
-        bpy.ops.constraint.childof_set_inverse(context, constraint='Child Of')
+        context_override = self.constraint_context('Child Of', owner_name='Child Of.object.owner')
+        with bpy.context.temp_override(**context_override):
+            bpy.ops.constraint.childof_set_inverse(constraint='Child Of')
         self.matrix_test('Child Of.object.owner', Matrix((
             (0.9992385506629944, 0.019844001159071922, -0.03359175845980644, 0.10000011324882507),
             (-0.01744179055094719, 0.997369647026062, 0.07035345584154129, 0.1999998837709427),
@@ -147,7 +135,8 @@ class ChildOfTest(AbstractConstraintTests):
             (0.0, 0.0, 0.0, 1.0),
         )))
 
-        bpy.ops.constraint.childof_clear_inverse(context, constraint='Child Of')
+        with bpy.context.temp_override(**context_override):
+            bpy.ops.constraint.childof_clear_inverse(constraint='Child Of')
         self.matrix_test('Child Of.object.owner', initial_matrix)
 
     def test_object_rotation_only(self):
@@ -165,8 +154,9 @@ class ChildOfTest(AbstractConstraintTests):
         ))
         self.matrix_test('Child Of.object.owner', initial_matrix)
 
-        context = self.constraint_context('Child Of', owner_name='Child Of.object.owner')
-        bpy.ops.constraint.childof_set_inverse(context, constraint='Child Of')
+        context_override = self.constraint_context('Child Of', owner_name='Child Of.object.owner')
+        with bpy.context.temp_override(**context_override):
+            bpy.ops.constraint.childof_set_inverse(constraint='Child Of')
         self.matrix_test('Child Of.object.owner', Matrix((
             (0.9992386102676392, 0.019843975082039833, -0.033591702580451965, 0.10000000149011612),
             (-0.017441781237721443, 0.9973695874214172, 0.0703534483909607, 0.20000000298023224),
@@ -174,7 +164,8 @@ class ChildOfTest(AbstractConstraintTests):
             (0.0, 0.0, 0.0, 1.0),
         )))
 
-        bpy.ops.constraint.childof_clear_inverse(context, constraint='Child Of')
+        with bpy.context.temp_override(**context_override):
+            bpy.ops.constraint.childof_clear_inverse(constraint='Child Of')
         self.matrix_test('Child Of.object.owner', initial_matrix)
 
     def test_object_no_x_axis(self):
@@ -193,8 +184,9 @@ class ChildOfTest(AbstractConstraintTests):
         ))
         self.matrix_test('Child Of.object.owner', initial_matrix)
 
-        context = self.constraint_context('Child Of', owner_name='Child Of.object.owner',)
-        bpy.ops.constraint.childof_set_inverse(context, constraint='Child Of')
+        context_override = self.constraint_context('Child Of', owner_name='Child Of.object.owner',)
+        with bpy.context.temp_override(**context_override):
+            bpy.ops.constraint.childof_set_inverse(constraint='Child Of')
         self.matrix_test('Child Of.object.owner', Matrix((
             (0.9992386102676392, 0.019843991845846176, -0.03359176218509674, 0.10000000149011612),
             (-0.017441775649785995, 0.997369647026062, 0.0703534483909607, 0.2000001221895218),
@@ -202,7 +194,8 @@ class ChildOfTest(AbstractConstraintTests):
             (0.0, 0.0, 0.0, 1.0),
         )))
 
-        bpy.ops.constraint.childof_clear_inverse(context, constraint='Child Of')
+        with bpy.context.temp_override(**context_override):
+            bpy.ops.constraint.childof_clear_inverse(constraint='Child Of')
         self.matrix_test('Child Of.object.owner', initial_matrix)
 
     def test_bone_simple_parent(self):
@@ -215,8 +208,9 @@ class ChildOfTest(AbstractConstraintTests):
         ))
         self.matrix_test('Child Of.armature.owner', initial_matrix)
 
-        context = self.constraint_context('Child Of', owner_name='Child Of.armature.owner')
-        bpy.ops.constraint.childof_set_inverse(context, constraint='Child Of')
+        context_override = self.constraint_context('Child Of', owner_name='Child Of.armature.owner')
+        with bpy.context.temp_override(**context_override):
+            bpy.ops.constraint.childof_set_inverse(constraint='Child Of')
 
         self.matrix_test('Child Of.armature.owner', Matrix((
             (0.9992386102676392, 0.019843988120555878, -0.03359176218509674, 0.8358089923858643),
@@ -225,7 +219,8 @@ class ChildOfTest(AbstractConstraintTests):
             (0.0, 0.0, 0.0, 1.0),
         )))
 
-        bpy.ops.constraint.childof_clear_inverse(context, constraint='Child Of')
+        with bpy.context.temp_override(**context_override):
+            bpy.ops.constraint.childof_clear_inverse(constraint='Child Of')
         self.matrix_test('Child Of.armature.owner', initial_matrix)
 
     def test_bone_owner(self):
@@ -238,8 +233,9 @@ class ChildOfTest(AbstractConstraintTests):
         ))
         self.bone_matrix_test('Child Of.bone.owner', 'Child Of.bone', initial_matrix)
 
-        context = self.bone_constraint_context('Child Of', owner_name='Child Of.bone.owner')
-        bpy.ops.constraint.childof_set_inverse(context, constraint='Child Of', owner='BONE')
+        context_override = self.bone_constraint_context('Child Of', owner_name='Child Of.bone.owner')
+        with bpy.context.temp_override(**context_override):
+            bpy.ops.constraint.childof_set_inverse(constraint='Child Of', owner='BONE')
 
         self.bone_matrix_test('Child Of.bone.owner', 'Child Of.bone', Matrix((
             (0.9659260511398315, 0.2588191032409668, 4.656613428188905e-10, -2.999999761581421),
@@ -248,7 +244,8 @@ class ChildOfTest(AbstractConstraintTests):
             (0.0, 0.0, 0.0, 1.0),
         )))
 
-        bpy.ops.constraint.childof_clear_inverse(context, constraint='Child Of', owner='BONE')
+        with bpy.context.temp_override(**context_override):
+            bpy.ops.constraint.childof_clear_inverse(constraint='Child Of', owner='BONE')
         self.bone_matrix_test('Child Of.bone.owner', 'Child Of.bone', initial_matrix)
 
     def test_vertexgroup_simple_parent(self):
@@ -261,8 +258,9 @@ class ChildOfTest(AbstractConstraintTests):
         ))
         self.matrix_test('Child Of.vertexgroup.owner', initial_matrix)
 
-        context = self.constraint_context('Child Of', owner_name='Child Of.vertexgroup.owner')
-        bpy.ops.constraint.childof_set_inverse(context, constraint='Child Of')
+        context_override = self.constraint_context('Child Of', owner_name='Child Of.vertexgroup.owner')
+        with bpy.context.temp_override(**context_override):
+            bpy.ops.constraint.childof_set_inverse(constraint='Child Of')
 
         self.matrix_test('Child Of.vertexgroup.owner', Matrix((
             (0.9992386102676392, 0.019843988120555878, -0.03359176218509674, 0.10000000149011612),
@@ -271,7 +269,8 @@ class ChildOfTest(AbstractConstraintTests):
             (0.0, 0.0, 0.0, 1.0),
         )))
 
-        bpy.ops.constraint.childof_clear_inverse(context, constraint='Child Of')
+        with bpy.context.temp_override(**context_override):
+            bpy.ops.constraint.childof_clear_inverse(constraint='Child Of')
         self.matrix_test('Child Of.vertexgroup.owner', initial_matrix)
 
 
@@ -288,8 +287,9 @@ class ObjectSolverTest(AbstractConstraintTests):
         ))
         self.matrix_test('Object Solver.owner', initial_matrix)
 
-        context = self.constraint_context('Object Solver')
-        bpy.ops.constraint.objectsolver_set_inverse(context, constraint='Object Solver')
+        context_override = self.constraint_context('Object Solver')
+        with bpy.context.temp_override(**context_override):
+            bpy.ops.constraint.objectsolver_set_inverse(constraint='Object Solver')
         self.matrix_test('Object Solver.owner', Matrix((
             (0.9992387294769287, 0.019843989983201027, -0.03359176591038704, 0.10000025480985641),
             (-0.017441747710108757, 0.9973697662353516, 0.07035345584154129, 0.1999993920326233),
@@ -297,7 +297,8 @@ class ObjectSolverTest(AbstractConstraintTests):
             (0.0, 0.0, 0.0, 1.0),
         )))
 
-        bpy.ops.constraint.objectsolver_clear_inverse(context, constraint='Object Solver')
+        with bpy.context.temp_override(**context_override):
+            bpy.ops.constraint.objectsolver_clear_inverse(constraint='Object Solver')
         self.matrix_test('Object Solver.owner', initial_matrix)
 
 
@@ -437,6 +438,27 @@ class CopyTransformsTest(AbstractConstraintTests):
             (0.38079890608787537, -0.7963172793388367, 1.0880682468414307, 0.1584688276052475),
             (0.0, 0.0, 0.0, 1.0)
         )))
+
+
+class ActionConstraintTest(AbstractConstraintTests):
+    layer_collection = "Action"
+
+    def constraint(self) -> Constraint:
+        owner = bpy.context.scene.objects["Action.owner"]
+        constraint = owner.constraints["Action"]
+        return constraint
+
+    def test_assign_action_slot_virgin(self):
+        action = bpy.data.actions.new("Slotted")
+        slot = action.slots.new('OBJECT', "Slot")
+
+        con = self.constraint()
+        con.action = action
+
+        self.assertEqual(
+            slot,
+            con.action_slot,
+            "Assigning an Action with a virgin slot should automatically select that slot")
 
 
 def main():

@@ -1,16 +1,20 @@
-/* Apache License, Version 2.0 */
+/* SPDX-FileCopyrightText: 2023 Blender Authors
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include <set>
 #include <unordered_set>
+
+#include "testing/testing.h"
 
 #include "BLI_exception_safety_test_utils.hh"
 #include "BLI_ghash.h"
 #include "BLI_rand.h"
 #include "BLI_set.hh"
-#include "BLI_strict_flags.h"
 #include "BLI_timeit.hh"
 #include "BLI_vector.hh"
-#include "testing/testing.h"
+
+#include "BLI_strict_flags.h" /* IWYU pragma: keep. Keep last. */
 
 namespace blender {
 namespace tests {
@@ -393,7 +397,7 @@ TEST(set, IntrusiveIntKey)
       2,
       DefaultProbingStrategy,
       DefaultHash<int>,
-      DefaultEquality,
+      DefaultEquality<int>,
       IntegerSetSlot<int, 100, 200>>
       set;
   EXPECT_TRUE(set.add(4));
@@ -532,8 +536,14 @@ TEST(set, ForwardIterator)
   Set<int>::iterator iter1 = set.begin();
   int value1 = *iter1;
   Set<int>::iterator iter2 = iter1++;
-  EXPECT_EQ(*iter1, value1);
-  EXPECT_EQ(*iter2, *(++iter1));
+  EXPECT_EQ(*iter2, value1);
+  EXPECT_EQ(*(++iter2), *iter1);
+  /* Interesting find: On GCC & MSVC this will succeed, as the 2nd argument is evaluated before the
+   * 1st. On Apple Clang it's the other way around, and the test fails. */
+  // EXPECT_EQ(*iter1, *(++iter1));
+  Set<int>::iterator iter3 = ++iter1;
+  /* Check that #iter1 itself changed. */
+  EXPECT_EQ(*iter3, *iter1);
 }
 
 TEST(set, GenericAlgorithms)
@@ -542,6 +552,78 @@ TEST(set, GenericAlgorithms)
   EXPECT_FALSE(std::any_of(set.begin(), set.end(), [](int v) { return v == 5; }));
   EXPECT_TRUE(std::any_of(set.begin(), set.end(), [](int v) { return v == 30; }));
   EXPECT_EQ(std::count(set.begin(), set.end(), 20), 1);
+}
+
+TEST(set, RemoveDuringIteration)
+{
+  Set<int> set;
+  set.add(6);
+  set.add(5);
+  set.add(2);
+  set.add(3);
+
+  EXPECT_EQ(set.size(), 4);
+
+  using Iter = Set<int>::Iterator;
+  Iter begin = set.begin();
+  Iter end = set.end();
+  for (Iter iter = begin; iter != end; ++iter) {
+    int item = *iter;
+    if (item == 2) {
+      set.remove(iter);
+    }
+  }
+
+  EXPECT_EQ(set.size(), 3);
+  EXPECT_TRUE(set.contains(5));
+  EXPECT_TRUE(set.contains(6));
+  EXPECT_TRUE(set.contains(3));
+}
+
+TEST(set, RemoveIf)
+{
+  Set<int64_t> set;
+  for (const int64_t i : IndexRange(100)) {
+    set.add(i * i);
+  }
+  const int64_t removed = set.remove_if([](const int64_t key) { return key > 100; });
+  EXPECT_EQ(set.size() + removed, 100);
+  for (const int64_t i : IndexRange(100)) {
+    EXPECT_EQ(set.contains(i * i), i <= 10);
+  }
+}
+
+TEST(set, RemoveUniquePtrWithRaw)
+{
+  Set<std::unique_ptr<int>> set;
+  std::unique_ptr<int> a = std::make_unique<int>(5);
+  int *a_ptr = a.get();
+  set.add(std::move(a));
+  EXPECT_EQ(set.size(), 1);
+  set.remove_as(a_ptr);
+  EXPECT_TRUE(set.is_empty());
+}
+
+TEST(set, Equality)
+{
+  const Set<int> a = {1, 2, 3, 4, 5};
+  const Set<int> b = {5, 2, 3, 1, 4};
+  const Set<int> c = {1, 2, 3};
+  const Set<int> d = {1, 2, 3, 4, 5, 6};
+  const Set<int> e = {};
+  const Set<int> f = {10, 11, 12, 13, 14};
+
+  EXPECT_EQ(a, a);
+  EXPECT_EQ(a, b);
+  EXPECT_EQ(b, a);
+  EXPECT_NE(a, c);
+  EXPECT_NE(a, d);
+  EXPECT_NE(a, e);
+  EXPECT_NE(a, f);
+  EXPECT_NE(c, a);
+  EXPECT_NE(d, a);
+  EXPECT_NE(e, a);
+  EXPECT_NE(f, a);
 }
 
 /**
@@ -559,6 +641,7 @@ BLI_NOINLINE void benchmark_random_ints(StringRef name, int amount, int factor)
   BLI_rng_free(rng);
 
   SetT set;
+  // set.reserve(amount);
   {
     SCOPED_TIMER(name + " Add");
     for (int value : values) {
@@ -583,71 +666,154 @@ BLI_NOINLINE void benchmark_random_ints(StringRef name, int amount, int factor)
   std::cout << "Count: " << count << "\n";
 }
 
+/**
+ * A wrapper for std::unordered_set with the API of blender::Set. This can be used for
+ * benchmarking.
+ */
+template<typename Key> class StdUnorderedSetWrapper {
+ private:
+  using SetType = std::unordered_set<Key, blender::DefaultHash<Key>>;
+  SetType set_;
+
+ public:
+  int64_t size() const
+  {
+    return int64_t(set_.size());
+  }
+
+  bool is_empty() const
+  {
+    return set_.empty();
+  }
+
+  void reserve(int64_t n)
+  {
+    set_.reserve(size_t(n));
+  }
+
+  void add_new(const Key &key)
+  {
+    set_.insert(key);
+  }
+  void add_new(Key &&key)
+  {
+    set_.insert(std::move(key));
+  }
+
+  bool add(const Key &key)
+  {
+    return set_.insert(key).second;
+  }
+  bool add(Key &&key)
+  {
+    return set_.insert(std::move(key)).second;
+  }
+
+  void add_multiple(Span<Key> keys)
+  {
+    for (const Key &key : keys) {
+      set_.insert(key);
+    }
+  }
+
+  bool contains(const Key &key) const
+  {
+    return set_.find(key) != set_.end();
+  }
+
+  bool remove(const Key &key)
+  {
+    return bool(set_.erase(key));
+  }
+
+  void remove_contained(const Key &key)
+  {
+    return set_.erase(key);
+  }
+
+  void clear()
+  {
+    set_.clear();
+  }
+
+  typename SetType::iterator begin() const
+  {
+    return set_.begin();
+  }
+
+  typename SetType::iterator end() const
+  {
+    return set_.end();
+  }
+};
+
 TEST(set, Benchmark)
 {
   for (int i = 0; i < 3; i++) {
-    benchmark_random_ints<blender::Set<int>>("blender::Set      ", 100000, 1);
-    benchmark_random_ints<blender::StdUnorderedSetWrapper<int>>("std::unordered_set", 100000, 1);
+    benchmark_random_ints<Set<int>>("blender::Set      ", 100000, 1);
+    benchmark_random_ints<StdUnorderedSetWrapper<int>>("std::unordered_set", 100000, 1);
   }
   std::cout << "\n";
   for (int i = 0; i < 3; i++) {
     uint32_t factor = (3 << 10);
-    benchmark_random_ints<blender::Set<int>>("blender::Set      ", 100000, factor);
-    benchmark_random_ints<blender::StdUnorderedSetWrapper<int>>("std::unordered_set", 100000, factor);
+    benchmark_random_ints<Set<int>>("blender::Set      ", 100000, int(factor));
+    benchmark_random_ints<StdUnorderedSetWrapper<int>>("std::unordered_set", 100000, int(factor));
   }
 }
 
 /**
- * Output of the rudimentary benchmark above on my hardware.
+ * Output of the rudimentary benchmark above on an AMD Ryzen 9 3900X using gcc 12.3.1.
+ * The difference is more pronounced when `reserve` is used.
+ * When using clang 15.0.7 the numbers fairly similar.
  *
- * Timer 'blender::Set       Add' took 5.5573 ms
- * Timer 'blender::Set       Contains' took 0.807384 ms
- * Timer 'blender::Set       Remove' took 0.953436 ms
+ * Timer 'blender::Set       Add' took 2.9 ms
+ * Timer 'blender::Set       Contains' took 0.4 ms
+ * Timer 'blender::Set       Remove' took 0.5 ms
  * Count: 199998
- * Timer 'std::unordered_set Add' took 12.551 ms
- * Timer 'std::unordered_set Contains' took 2.3323 ms
- * Timer 'std::unordered_set Remove' took 5.07082 ms
+ * Timer 'std::unordered_set Add' took 6.4 ms
+ * Timer 'std::unordered_set Contains' took 1.2 ms
+ * Timer 'std::unordered_set Remove' took 4.0 ms
  * Count: 199998
- * Timer 'blender::Set       Add' took 2.62526 ms
- * Timer 'blender::Set       Contains' took 0.407499 ms
- * Timer 'blender::Set       Remove' took 0.472981 ms
+ * Timer 'blender::Set       Add' took 2.1 ms
+ * Timer 'blender::Set       Contains' took 0.4 ms
+ * Timer 'blender::Set       Remove' took 0.4 ms
  * Count: 199998
- * Timer 'std::unordered_set Add' took 6.26945 ms
- * Timer 'std::unordered_set Contains' took 1.17236 ms
- * Timer 'std::unordered_set Remove' took 3.77402 ms
+ * Timer 'std::unordered_set Add' took 5.5 ms
+ * Timer 'std::unordered_set Contains' took 1.2 ms
+ * Timer 'std::unordered_set Remove' took 4.0 ms
  * Count: 199998
- * Timer 'blender::Set       Add' took 2.59152 ms
- * Timer 'blender::Set       Contains' took 0.415254 ms
- * Timer 'blender::Set       Remove' took 0.477559 ms
+ * Timer 'blender::Set       Add' took 2.0 ms
+ * Timer 'blender::Set       Contains' took 0.4 ms
+ * Timer 'blender::Set       Remove' took 0.5 ms
  * Count: 199998
- * Timer 'std::unordered_set Add' took 6.28129 ms
- * Timer 'std::unordered_set Contains' took 1.17562 ms
- * Timer 'std::unordered_set Remove' took 3.77811 ms
+ * Timer 'std::unordered_set Add' took 5.6 ms
+ * Timer 'std::unordered_set Contains' took 1.2 ms
+ * Timer 'std::unordered_set Remove' took 4.0 ms
  * Count: 199998
  *
- * Timer 'blender::Set       Add' took 3.16514 ms
- * Timer 'blender::Set       Contains' took 0.732895 ms
- * Timer 'blender::Set       Remove' took 1.08171 ms
+ * Timer 'blender::Set       Add' took 2.7 ms
+ * Timer 'blender::Set       Contains' took 0.8 ms
+ * Timer 'blender::Set       Remove' took 1.1 ms
  * Count: 198790
- * Timer 'std::unordered_set Add' took 6.57377 ms
- * Timer 'std::unordered_set Contains' took 1.17008 ms
- * Timer 'std::unordered_set Remove' took 3.7946 ms
+ * Timer 'std::unordered_set Add' took 6.3 ms
+ * Timer 'std::unordered_set Contains' took 1.5 ms
+ * Timer 'std::unordered_set Remove' took 4.4 ms
  * Count: 198790
- * Timer 'blender::Set       Add' took 3.11439 ms
- * Timer 'blender::Set       Contains' took 0.740159 ms
- * Timer 'blender::Set       Remove' took 1.06749 ms
+ * Timer 'blender::Set       Add' took 2.6 ms
+ * Timer 'blender::Set       Contains' took 0.8 ms
+ * Timer 'blender::Set       Remove' took 1.1 ms
  * Count: 198790
- * Timer 'std::unordered_set Add' took 6.35597 ms
- * Timer 'std::unordered_set Contains' took 1.17713 ms
- * Timer 'std::unordered_set Remove' took 3.77826 ms
+ * Timer 'std::unordered_set Add' took 6.4 ms
+ * Timer 'std::unordered_set Contains' took 1.5 ms
+ * Timer 'std::unordered_set Remove' took 4.4 ms
  * Count: 198790
- * Timer 'blender::Set       Add' took 3.09876 ms
- * Timer 'blender::Set       Contains' took 0.742072 ms
- * Timer 'blender::Set       Remove' took 1.06622 ms
+ * Timer 'blender::Set       Add' took 2.7 ms
+ * Timer 'blender::Set       Contains' took 0.8 ms
+ * Timer 'blender::Set       Remove' took 1.1 ms
  * Count: 198790
- * Timer 'std::unordered_set Add' took 6.4469 ms
- * Timer 'std::unordered_set Contains' took 1.16515 ms
- * Timer 'std::unordered_set Remove' took 3.80639 ms
+ * Timer 'std::unordered_set Add' took 6.3 ms
+ * Timer 'std::unordered_set Contains' took 1.5 ms
+ * Timer 'std::unordered_set Remove' took 4.3 ms
  * Count: 198790
  */
 

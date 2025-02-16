@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2013 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2013 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -41,7 +26,7 @@
 #endif
 
 /* never returns NULL */
-#if (__GNUC__ * 100 + __GNUC_MINOR__) >= 409 /* gcc4.9+ only */
+#ifdef __GNUC__
 #  define ATTR_RETURNS_NONNULL __attribute__((returns_nonnull))
 #else
 #  define ATTR_RETURNS_NONNULL
@@ -55,14 +40,14 @@
 #endif
 
 /* hint to treat any non-null function return value cannot alias any other pointer */
-#if (defined(__GNUC__) && ((__GNUC__ * 100 + __GNUC_MINOR__) >= 403))
+#ifdef __GNUC__
 #  define ATTR_MALLOC __attribute__((malloc))
 #else
 #  define ATTR_MALLOC
 #endif
 
 /* the function return value points to memory (2 args for 'size * tot') */
-#if (defined(__GNUC__) && ((__GNUC__ * 100 + __GNUC_MINOR__) >= 403))
+#if defined(__GNUC__) && !defined(__clang__)
 #  define ATTR_ALLOC_SIZE(args...) __attribute__((alloc_size(args)))
 #else
 #  define ATTR_ALLOC_SIZE(...)
@@ -85,7 +70,7 @@
 
 /* Use to suppress '-Wimplicit-fallthrough' (in place of 'break'). */
 #ifndef ATTR_FALLTHROUGH
-#  if defined(__GNUC__) && (__GNUC__ >= 7) /* gcc7.0+ only */
+#  ifdef __GNUC__
 #    define ATTR_FALLTHROUGH __attribute__((fallthrough))
 #  else
 #    define ATTR_FALLTHROUGH ((void)0)
@@ -101,7 +86,7 @@
 
 /* Alignment directive */
 #ifdef _WIN64
-#  define ALIGN_STRUCT __declspec(align(64))
+#  define BLI_ALIGN_STRUCT __declspec(align(64))
 #else
-#  define ALIGN_STRUCT
+#  define BLI_ALIGN_STRUCT
 #endif

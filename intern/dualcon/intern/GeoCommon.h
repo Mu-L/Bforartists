@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2002-2022 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #ifndef __GEOCOMMON_H__
 #define __GEOCOMMON_H__
@@ -29,28 +17,28 @@
  */
 
 // 3d point with integer coordinates
-typedef struct {
+struct Point3i {
   int x, y, z;
-} Point3i;
+};
 
-typedef struct {
+struct BoundingBox {
   Point3i begin;
   Point3i end;
-} BoundingBox;
+};
 
 // triangle that points to three vertices
-typedef struct {
+struct Triangle {
   float vt[3][3];
-} Triangle;
+};
 
 // 3d point with float coordinates
-typedef struct {
+struct Point3f {
   float x, y, z;
-} Point3f;
+};
 
-typedef struct {
+struct BoundingBoxf {
   Point3f begin;
   Point3f end;
-} BoundingBoxf;
+};
 
 #endif /* __GEOCOMMON_H__ */

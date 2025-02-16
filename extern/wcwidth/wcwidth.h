@@ -13,7 +13,7 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * The Original Code is Copyright (C) 2013 Blender Foundation.
+ * The Original Code is Copyright (C) 2013 Blender Foundation
  * All rights reserved.
  */
 
@@ -21,7 +21,7 @@
 #define __WCWIDTH_H__
 
 #ifndef __cplusplus
-#  if defined(__APPLE__) || defined(__NetBSD__)
+#  if defined(__APPLE__) || defined(__NetBSD__) || defined(__OpenBSD__)
 /* The <uchar.h> standard header is missing on macOS. */
 #include <stddef.h>
 typedef unsigned int char32_t;
@@ -30,9 +30,17 @@ typedef unsigned int char32_t;
 #  endif
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int mk_wcwidth(char32_t ucs);
 int mk_wcswidth(const char32_t *pwcs, size_t n);
 int mk_wcwidth_cjk(char32_t ucs);
 int mk_wcswidth_cjk(const char32_t *pwcs, size_t n);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

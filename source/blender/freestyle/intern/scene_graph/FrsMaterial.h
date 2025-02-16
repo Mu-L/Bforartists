@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -23,9 +11,7 @@
 
 #include "../system/FreestyleConfig.h"
 
-#ifdef WITH_CXX_GUARDEDALLOC
-#  include "MEM_guardedalloc.h"
-#endif
+#include "MEM_guardedalloc.h"
 
 namespace Freestyle {
 
@@ -57,16 +43,14 @@ class FrsMaterial {
                      const float *iAmbiant,
                      const float *iSpecular,
                      const float *iEmission,
-                     const float iShininess,
-                     const int iPriority);
+                     float iShininess,
+                     int iPriority);
 
   /** Copy constructor */
   inline FrsMaterial(const FrsMaterial &m);
 
   /** Destructor */
-  virtual ~FrsMaterial()
-  {
-  }
+  virtual ~FrsMaterial() {}
 
   /** Returns the line color as a 4 float array */
   inline const float *line() const
@@ -240,7 +224,7 @@ class FrsMaterial {
    *    \param a:
    *      Alpha component
    */
-  inline void setLine(const float r, const float g, const float b, const float a);
+  inline void setLine(float r, float g, float b, float a);
 
   /** Sets the diffuse color.
    *    \param r:
@@ -252,7 +236,7 @@ class FrsMaterial {
    *    \param a:
    *      Alpha component
    */
-  inline void setDiffuse(const float r, const float g, const float b, const float a);
+  inline void setDiffuse(float r, float g, float b, float a);
 
   /** Sets the specular color.
    *    \param r:
@@ -264,7 +248,7 @@ class FrsMaterial {
    *    \param a:
    *      Alpha component
    */
-  inline void setSpecular(const float r, const float g, const float b, const float a);
+  inline void setSpecular(float r, float g, float b, float a);
 
   /** Sets the ambient color.
    *    \param r:
@@ -276,7 +260,7 @@ class FrsMaterial {
    *    \param a:
    *      Alpha component
    */
-  inline void setAmbient(const float r, const float g, const float b, const float a);
+  inline void setAmbient(float r, float g, float b, float a);
 
   /** Sets the emissive color.
    *    \param r:
@@ -288,19 +272,19 @@ class FrsMaterial {
    *    \param a:
    *      Alpha component
    */
-  inline void setEmission(const float r, const float g, const float b, const float a);
+  inline void setEmission(float r, float g, float b, float a);
 
   /** Sets the shininess.
    *    \param s:
    *      Shininess
    */
-  inline void setShininess(const float s);
+  inline void setShininess(float s);
 
   /** Sets the line color priority.
    *    \param priority:
    *      Priority
    */
-  inline void setPriority(const int priority);
+  inline void setPriority(int priority);
 
   /* operators */
   inline FrsMaterial &operator=(const FrsMaterial &m);
@@ -317,9 +301,7 @@ class FrsMaterial {
   float Shininess;
   int Priority;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:FrsMaterial")
-#endif
 };
 
 FrsMaterial::FrsMaterial()

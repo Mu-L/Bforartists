@@ -1,166 +1,127 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2010 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2010 Blender Foundation.
- * All rights reserved.
- *
- *
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
+#import <AppKit/NSDocumentController.h>
 #import <Foundation/Foundation.h>
 
-#include "GHOST_Debug.h"
-#include "GHOST_SystemPathsCocoa.h"
+#include "GHOST_Debug.hh"
+#include "GHOST_SystemPathsCocoa.hh"
 
-#pragma mark initialization/finalization
+/* --------------------------------------------------------------------
+ * Base directories retrieval.
+ */
 
-GHOST_SystemPathsCocoa::GHOST_SystemPathsCocoa()
+static const char *GetApplicationSupportDir(const char *versionstr,
+                                            const NSSearchPathDomainMask mask,
+                                            char *tempPath,
+                                            const std::size_t len_tempPath)
 {
-}
+  @autoreleasepool {
+    NSArray *paths = NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, mask, YES);
 
-GHOST_SystemPathsCocoa::~GHOST_SystemPathsCocoa()
-{
-}
+    if (paths.count == 0) {
+      return nullptr;
+    }
+    NSString *basePath = [paths objectAtIndex:0];
 
-#pragma mark Base directories retrieval
-
-const char *GHOST_SystemPathsCocoa::getSystemDir(int, const char *versionstr) const
-{
-  static char tempPath[512] = "";
-  NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-  NSString *basePath;
-  NSArray *paths;
-
-  paths = NSSearchPathForDirectoriesInDomains(
-      NSApplicationSupportDirectory, NSLocalDomainMask, YES);
-
-  if ([paths count] > 0)
-    basePath = [paths objectAtIndex:0];
-  else {
-    [pool drain];
-    return NULL;
+    snprintf(tempPath,
+             len_tempPath,
+             "%s/Bforartists/%s",
+             [basePath cStringUsingEncoding:NSASCIIStringEncoding],
+             versionstr);
   }
-
-  snprintf(tempPath,
-           sizeof(tempPath),
-           "%s/Bforartists/%s",
-           [basePath cStringUsingEncoding:NSASCIIStringEncoding],
-           versionstr);
-
-  [pool drain];
   return tempPath;
 }
 
-const char *GHOST_SystemPathsCocoa::getUserDir(int, const char *versionstr) const
+const char *GHOST_SystemPathsCocoa::getSystemDir(int /* version */, const char *versionstr) const
 {
   static char tempPath[512] = "";
-  NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-  NSString *basePath;
-  NSArray *paths;
+  return GetApplicationSupportDir(versionstr, NSLocalDomainMask, tempPath, sizeof(tempPath));
+}
 
-  paths = NSSearchPathForDirectoriesInDomains(
-      NSApplicationSupportDirectory, NSUserDomainMask, YES);
-
-  if ([paths count] > 0)
-    basePath = [paths objectAtIndex:0];
-  else {
-    [pool drain];
-    return NULL;
-  }
-
-  snprintf(tempPath,
-           sizeof(tempPath),
-           "%s/Bforartists/%s",
-           [basePath cStringUsingEncoding:NSASCIIStringEncoding],
-           versionstr);
-
-  [pool drain];
-  return tempPath;
+const char *GHOST_SystemPathsCocoa::getUserDir(int /* version */, const char *versionstr) const
+{
+  static char tempPath[512] = "";
+  return GetApplicationSupportDir(versionstr, NSUserDomainMask, tempPath, sizeof(tempPath));
 }
 
 const char *GHOST_SystemPathsCocoa::getUserSpecialDir(GHOST_TUserSpecialDirTypes type) const
 {
   static char tempPath[512] = "";
-  NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-  NSString *basePath;
-  NSArray *paths;
-  NSSearchPathDirectory ns_directory;
+  @autoreleasepool {
+    NSSearchPathDirectory ns_directory;
 
-  switch (type) {
-    case GHOST_kUserSpecialDirDesktop:
-      ns_directory = NSDesktopDirectory;
-      break;
-    case GHOST_kUserSpecialDirDocuments:
-      ns_directory = NSDocumentDirectory;
-      break;
-    case GHOST_kUserSpecialDirDownloads:
-      ns_directory = NSDownloadsDirectory;
-      break;
-    case GHOST_kUserSpecialDirMusic:
-      ns_directory = NSMusicDirectory;
-      break;
-    case GHOST_kUserSpecialDirPictures:
-      ns_directory = NSPicturesDirectory;
-      break;
-    case GHOST_kUserSpecialDirVideos:
-      ns_directory = NSMoviesDirectory;
-      break;
-    default:
-      GHOST_ASSERT(
-          false,
-          "GHOST_SystemPathsCocoa::getUserSpecialDir(): Invalid enum value for type parameter");
-      [pool drain];
-      return NULL;
+    switch (type) {
+      case GHOST_kUserSpecialDirDesktop:
+        ns_directory = NSDesktopDirectory;
+        break;
+      case GHOST_kUserSpecialDirDocuments:
+        ns_directory = NSDocumentDirectory;
+        break;
+      case GHOST_kUserSpecialDirDownloads:
+        ns_directory = NSDownloadsDirectory;
+        break;
+      case GHOST_kUserSpecialDirMusic:
+        ns_directory = NSMusicDirectory;
+        break;
+      case GHOST_kUserSpecialDirPictures:
+        ns_directory = NSPicturesDirectory;
+        break;
+      case GHOST_kUserSpecialDirVideos:
+        ns_directory = NSMoviesDirectory;
+        break;
+      case GHOST_kUserSpecialDirCaches:
+        ns_directory = NSCachesDirectory;
+        break;
+      default:
+        GHOST_ASSERT(
+            false,
+            "GHOST_SystemPathsCocoa::getUserSpecialDir(): Invalid enum value for type parameter");
+        return nullptr;
+    }
+
+    NSArray *paths = NSSearchPathForDirectoriesInDomains(ns_directory, NSUserDomainMask, YES);
+    if (paths.count == 0) {
+      return nullptr;
+    }
+    NSString *basePath = [paths objectAtIndex:0];
+
+    const char *basePath_cstr = [basePath cStringUsingEncoding:NSASCIIStringEncoding];
+    int basePath_len = strlen(basePath_cstr);
+
+    basePath_len = MIN(basePath_len, sizeof(tempPath) - 1);
+    memcpy(tempPath, basePath_cstr, basePath_len);
+    tempPath[basePath_len] = '\0';
   }
-
-  paths = NSSearchPathForDirectoriesInDomains(ns_directory, NSUserDomainMask, YES);
-
-  if ([paths count] > 0)
-    basePath = [paths objectAtIndex:0];
-  else {
-    [pool drain];
-    return NULL;
-  }
-
-  strncpy(
-      (char *)tempPath, [basePath cStringUsingEncoding:NSASCIIStringEncoding], sizeof(tempPath));
-
-  [pool drain];
   return tempPath;
 }
 
 const char *GHOST_SystemPathsCocoa::getBinaryDir() const
 {
   static char tempPath[512] = "";
-  NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
-  NSString *basePath;
 
-  basePath = [[NSBundle mainBundle] bundlePath];
+  @autoreleasepool {
+    NSString *basePath = [[NSBundle mainBundle] bundlePath];
 
-  if (basePath == nil) {
-    [pool drain];
-    return NULL;
+    if (basePath == nil) {
+      return nullptr;
+    }
+
+    const char *basePath_cstr = [basePath cStringUsingEncoding:NSASCIIStringEncoding];
+    int basePath_len = strlen(basePath_cstr);
+
+    basePath_len = MIN(basePath_len, sizeof(tempPath) - 1);
+    memcpy(tempPath, basePath_cstr, basePath_len);
+    tempPath[basePath_len] = '\0';
   }
-
-  strcpy((char *)tempPath, [basePath cStringUsingEncoding:NSASCIIStringEncoding]);
-
-  [pool drain];
   return tempPath;
 }
 
-void GHOST_SystemPathsCocoa::addToSystemRecentFiles(const char *filename) const
+void GHOST_SystemPathsCocoa::addToSystemRecentFiles(const char *filepath) const
 {
-  /* TODO: implement for macOS */
+  @autoreleasepool {
+    NSURL *file_url = [NSURL fileURLWithPath:[NSString stringWithUTF8String:filepath]];
+    [[NSDocumentController sharedDocumentController] noteNewRecentDocumentURL:file_url];
+  }
 }

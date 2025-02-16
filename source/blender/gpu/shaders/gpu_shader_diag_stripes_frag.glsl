@@ -1,14 +1,14 @@
+/* SPDX-FileCopyrightText: 2017-2022 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-uniform vec4 color1;
-uniform vec4 color2;
-uniform int size1;
-uniform int size2;
+#include "infos/gpu_shader_2D_diag_stripes_info.hh"
 
-out vec4 fragColor;
+FRAGMENT_SHADER_CREATE_INFO(gpu_shader_2D_diag_stripes)
 
 void main()
 {
-  float phase = mod((gl_FragCoord.x + gl_FragCoord.y), (size1 + size2));
+  float phase = mod((gl_FragCoord.x + gl_FragCoord.y), float(size1 + size2));
 
   if (phase < size1) {
     fragColor = color1;

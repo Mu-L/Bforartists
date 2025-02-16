@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2001-2002 NaN Holding BV. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
@@ -28,10 +13,6 @@
 #include "DNA_gpu_types.h"
 #include "DNA_image_types.h"
 #include "DNA_movieclip_types.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 struct AnimData;
 struct Ipo;
@@ -70,6 +51,7 @@ typedef struct CameraBGImage {
 typedef struct CameraDOFSettings {
   /** Focal distance for depth of field. */
   struct Object *focus_object;
+  char focus_subtarget[64];
   float focus_distance;
   float aperture_fstop;
   float aperture_rotation;
@@ -105,6 +87,29 @@ typedef struct Camera {
   float shiftx, shifty;
   float dof_distance DNA_DEPRECATED;
 
+  char sensor_fit;
+  char panorama_type;
+  char _pad[2];
+
+  /* Fish-eye properties. */
+  float fisheye_fov;
+  float fisheye_lens;
+  float latitude_min, latitude_max;
+  float longitude_min, longitude_max;
+  float fisheye_polynomial_k0;
+  float fisheye_polynomial_k1;
+  float fisheye_polynomial_k2;
+  float fisheye_polynomial_k3;
+  float fisheye_polynomial_k4;
+
+  /* Central cylindrical range properties. */
+  float central_cylindrical_range_u_min;
+  float central_cylindrical_range_u_max;
+  float central_cylindrical_range_v_min;
+  float central_cylindrical_range_v_max;
+  float central_cylindrical_radius;
+  float _pad2;
+
   /** Old animation system, deprecated for 2.5. */
   struct Ipo *ipo DNA_DEPRECATED;
 
@@ -114,9 +119,6 @@ typedef struct Camera {
 
   /* CameraBGImage reference images */
   struct ListBase bg_images;
-
-  char sensor_fit;
-  char _pad[7];
 
   /* Stereo settings */
   struct CameraStereoSettings stereo;
@@ -132,6 +134,17 @@ enum {
   CAM_PERSP = 0,
   CAM_ORTHO = 1,
   CAM_PANO = 2,
+};
+
+/* panorama_type */
+enum {
+  CAM_PANORAMA_EQUIRECTANGULAR = 0,
+  CAM_PANORAMA_FISHEYE_EQUIDISTANT = 1,
+  CAM_PANORAMA_FISHEYE_EQUISOLID = 2,
+  CAM_PANORAMA_MIRRORBALL = 3,
+  CAM_PANORAMA_FISHEYE_LENS_POLYNOMIAL = 4,
+  CAM_PANORAMA_EQUIANGULAR_CUBEMAP_FACE = 5,
+  CAM_PANORAMA_CENTRAL_CYLINDRICAL = 6,
 };
 
 /* dtx */
@@ -210,6 +223,9 @@ enum {
   /* Axis flip options */
   CAM_BGIMG_FLAG_FLIP_X = (1 << 7),
   CAM_BGIMG_FLAG_FLIP_Y = (1 << 8),
+
+  /* That background image has been inserted in local override (i.e. it can be fully edited!). */
+  CAM_BGIMG_FLAG_OVERRIDE_LIBRARY_LOCAL = (1 << 9),
 };
 
 /* CameraBGImage->source */
@@ -223,7 +239,3 @@ enum {
 enum {
   CAM_DOF_ENABLED = (1 << 0),
 };
-
-#ifdef __cplusplus
-}
-#endif

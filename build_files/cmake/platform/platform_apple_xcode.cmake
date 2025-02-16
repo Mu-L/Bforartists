@@ -1,22 +1,6 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2016 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# The Original Code is Copyright (C) 2016, Blender Foundation
-# All rights reserved.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 # Xcode and system configuration for Apple.
 
@@ -32,8 +16,9 @@ endif()
 # Detect developer directory. Depending on configuration this may be either
 # an Xcode or Command Line Tools installation.
 execute_process(
-    COMMAND xcode-select --print-path
-    OUTPUT_VARIABLE XCODE_DEVELOPER_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+  COMMAND xcode-select --print-path
+  OUTPUT_VARIABLE XCODE_DEVELOPER_DIR OUTPUT_STRIP_TRAILING_WHITESPACE
+)
 
 # Detect Xcode version. It is provided by the Xcode generator but not
 # Unix Makefiles or Ninja.
@@ -71,9 +56,10 @@ if(XCODE_VERSION)
   # Detect SDK version to use
   if(NOT DEFINED OSX_SYSTEM)
     execute_process(
-        COMMAND xcodebuild -version -sdk macosx SDKVersion
-        OUTPUT_VARIABLE OSX_SYSTEM
-        OUTPUT_STRIP_TRAILING_WHITESPACE)
+      COMMAND xcodebuild -version -sdk macosx SDKVersion
+      OUTPUT_VARIABLE OSX_SYSTEM
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
   endif()
 
   message(STATUS "Detected OS X ${OSX_SYSTEM} and Xcode ${XCODE_VERSION} at ${XCODE_DEVELOPER_DIR}")
@@ -81,11 +67,12 @@ if(XCODE_VERSION)
 else()
   # If no Xcode version found, try detecting command line tools.
   execute_process(
-      COMMAND pkgutil --pkg-info=com.apple.pkg.CLTools_Executables
-      OUTPUT_VARIABLE _cltools_pkg_info
-      OUTPUT_STRIP_TRAILING_WHITESPACE
-      RESULT_VARIABLE _cltools_pkg_info_result
-      ERROR_QUIET)
+    COMMAND pkgutil --pkg-info=com.apple.pkg.CLTools_Executables
+    OUTPUT_VARIABLE _cltools_pkg_info
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    RESULT_VARIABLE _cltools_pkg_info_result
+    ERROR_QUIET
+  )
 
   if(_cltools_pkg_info_result EQUAL 0)
     # Extract version.
@@ -96,9 +83,10 @@ else()
     # Detect SDK version to use.
     if(NOT DEFINED OSX_SYSTEM)
       execute_process(
-          COMMAND xcrun --show-sdk-version
-          OUTPUT_VARIABLE OSX_SYSTEM
-          OUTPUT_STRIP_TRAILING_WHITESPACE)
+        COMMAND xcrun --sdk macosx --show-sdk-version
+        OUTPUT_VARIABLE OSX_SYSTEM
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+      )
     endif()
 
     message(STATUS "Detected OS X ${OSX_SYSTEM} and Command Line Tools ${XCODE_VERSION} at ${XCODE_DEVELOPER_DIR}")
@@ -107,7 +95,7 @@ else()
     message(FATAL_ERROR "No Xcode or Command Line Tools detected")
   endif()
 
-  unset( _cltools_pkg_info)
+  unset(_cltools_pkg_info)
   unset(__cltools_pkg_info_result)
 endif()
 
@@ -168,13 +156,9 @@ endif()
 unset(OSX_SDKROOT)
 
 
-if("${CMAKE_OSX_ARCHITECTURES}" STREQUAL "arm64")
-  # M1 chips run Big Sur onwards.
-  set(OSX_MIN_DEPLOYMENT_TARGET 11.00)
-else()
-  # 10.13 is our min. target, if you use higher sdk, weak linking happens
-  set(OSX_MIN_DEPLOYMENT_TARGET 10.13)
-endif()
+# This is our minimum target, if you use higher sdk, weak linking happens
+# Mainly required because of Metal drivers.
+set(OSX_MIN_DEPLOYMENT_TARGET 11.2)
 
 set(CMAKE_OSX_DEPLOYMENT_TARGET "${OSX_MIN_DEPLOYMENT_TARGET}" CACHE STRING "" FORCE)
 
@@ -188,6 +172,7 @@ endif()
 if(WITH_COMPILER_CCACHE)
   if(CMAKE_GENERATOR STREQUAL "Xcode")
     find_program(CCACHE_PROGRAM ccache)
+    mark_as_advanced(CCACHE_PROGRAM)
     if(CCACHE_PROGRAM)
       get_filename_component(ccompiler "${CMAKE_C_COMPILER}" NAME)
       get_filename_component(cxxcompiler "${CMAKE_CXX_COMPILER}" NAME)

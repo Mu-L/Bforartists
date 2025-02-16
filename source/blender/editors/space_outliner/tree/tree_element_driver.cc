@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup spoutliner
@@ -24,11 +12,11 @@
 
 #include "DNA_anim_types.h"
 #include "DNA_listBase.h"
+#include "DNA_space_types.h"
 
-#include "BLT_translation.h"
+#include "BLT_translation.hh"
 
-#include "../outliner_intern.h"
-#include "tree_display.h"
+#include "../outliner_intern.hh"
 
 #include "tree_element_driver.hh"
 
@@ -41,7 +29,7 @@ TreeElementDriverBase::TreeElementDriverBase(TreeElement &legacy_te, AnimData &a
   legacy_te.name = IFACE_("Drivers");
 }
 
-void TreeElementDriverBase::expand(SpaceOutliner &space_outliner) const
+void TreeElementDriverBase::expand(SpaceOutliner & /*space_outliner*/) const
 {
   ID *lastadded = nullptr;
 
@@ -54,8 +42,7 @@ void TreeElementDriverBase::expand(SpaceOutliner &space_outliner) const
         DRIVER_TARGETS_USED_LOOPER_BEGIN (dvar) {
           if (lastadded != dtar->id) {
             /* XXX this lastadded check is rather lame, and also fails quite badly... */
-            outliner_add_element(
-                &space_outliner, &legacy_te_.subtree, dtar->id, &legacy_te_, TSE_LINKED_OB, 0);
+            add_element(&legacy_te_.subtree, dtar->id, nullptr, &legacy_te_, TSE_LINKED_OB, 0);
             lastadded = dtar->id;
           }
         }

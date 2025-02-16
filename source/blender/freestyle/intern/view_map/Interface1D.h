@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -32,40 +20,53 @@
 
 #include "../winged_edge/Nature.h"
 
-#ifdef WITH_CXX_GUARDEDALLOC
-#  include "MEM_guardedalloc.h"
-#endif
+#include "MEM_guardedalloc.h"
 
 using namespace std;
 
 namespace Freestyle {
 
 // Integration method
-/** The different integration methods that can be invoked to integrate into a single value the set
+/**
+ * The different integration methods that can be invoked to integrate into a single value the set
  * of values obtained from each 0D element of a 1D element.
  */
 typedef enum {
-  MEAN, /**< The value computed for the 1D element is the mean of the values obtained for the 0D
-           elements. */
-  MIN,  /**< The value computed for the 1D element is the minimum of the values obtained for the 0D
-           elements. */
-  MAX,  /**< The value computed for the 1D element is the maximum of the values obtained for the 0D
-           elements. */
-  FIRST, /**< The value computed for the 1D element is the first of the values obtained for the 0D
-            elements. */
-  LAST,  /**< The value computed for the 1D element is the last of the values obtained for the 0D
-            elements. */
+  /**
+   * The value computed for the 1D element is the mean of the values obtained for the 0D elements.
+   */
+  MEAN,
+  /**
+   * The value computed for the 1D element is the minimum of the values obtained for the 0D
+   * elements.
+   */
+  MIN,
+  /**
+   * The value computed for the 1D element is the maximum of the values obtained for the 0D
+   * elements.
+   */
+  MAX,
+  /**
+   * The value computed for the 1D element is the first of the values obtained for the 0D
+   *  elements.
+   */
+  FIRST,
+  /**
+   * The value computed for the 1D element is the last of the values obtained for the 0D
+   * elements.
+   */
+  LAST,
 } IntegrationType;
 
-/** Returns a single value from a set of values evaluated at each 0D element of this 1D element.
- * \param fun:
- *    The UnaryFunction0D used to compute a value at each Interface0D.
- * \param it:
- *    The Interface0DIterator used to iterate over the 0D elements of this 1D element. The
- * integration will occur over the 0D elements starting from the one pointed by it. \param it_end:
- *    The Interface0DIterator pointing the end of the 0D elements of the 1D element.
- * \param integration_type:
- *    The integration method used to compute a single value from a set of values.
+/**
+ * Returns a single value from a set of values evaluated at each 0D element of this 1D element.
+ *
+ * \param fun: The UnaryFunction0D used to compute a value at each Interface0D.
+ * \param it: The Interface0DIterator used to iterate over the 0D elements of this 1D element.
+ * The integration will occur over the 0D elements starting from the one pointed by it.
+ * \param it_end: The Interface0DIterator pointing the end of the 0D elements of the 1D element.
+ * \param integration_type: The integration method used to compute a single value from a set of
+ * values.
  * \return the single value obtained for the 1D element.
  */
 template<class T>
@@ -75,7 +76,7 @@ T integrate(UnaryFunction0D<T> &fun,
             IntegrationType integration_type = MEAN)
 {
   T res;
-  unsigned size;
+  uint size;
   switch (integration_type) {
     case MIN:
       fun(it);
@@ -182,23 +183,21 @@ class Interface1D {
   virtual Nature::EdgeNature getNature() const;
 
   /** Returns the time stamp of the 1D element. Mainly used for selection. */
-  virtual unsigned getTimeStamp() const
+  virtual uint getTimeStamp() const
   {
     return _timeStamp;
   }
 
   /** Sets the time stamp for the 1D element. */
-  inline void setTimeStamp(unsigned iTimeStamp)
+  inline void setTimeStamp(uint iTimeStamp)
   {
     _timeStamp = iTimeStamp;
   }
 
  protected:
-  unsigned _timeStamp;
+  uint _timeStamp;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:Interface1D")
-#endif
 };
 
 } /* namespace Freestyle */

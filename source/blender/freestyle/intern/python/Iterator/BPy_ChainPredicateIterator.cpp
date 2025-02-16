@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2004-2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup freestyle
@@ -25,10 +13,6 @@
 #include "../BPy_UnaryPredicate1D.h"
 #include "../Interface1D/BPy_ViewEdge.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 using namespace Freestyle;
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -36,6 +20,7 @@ using namespace Freestyle;
 //------------------------INSTANCE METHODS ----------------------------------
 
 PyDoc_STRVAR(
+    /* Wrap. */
     ChainPredicateIterator_doc,
 
     "Class hierarchy: :class:`freestyle.types.Iterator` >\n"
@@ -43,14 +28,14 @@ PyDoc_STRVAR(
     ":class:`freestyle.types.ChainingIterator` >\n"
     ":class:`ChainPredicateIterator`\n"
     "\n"
-    "A \"generic\" user-controlled ViewEdge iterator.  This iterator is in\n"
+    "A \"generic\" user-controlled ViewEdge iterator. This iterator is in\n"
     "particular built from a unary predicate and a binary predicate.\n"
     "First, the unary predicate is evaluated for all potential next\n"
     "ViewEdges in order to only keep the ones respecting a certain\n"
-    "constraint.  Then, the binary predicate is evaluated on the current\n"
-    "ViewEdge together with each ViewEdge of the previous selection.  The\n"
+    "constraint. Then, the binary predicate is evaluated on the current\n"
+    "ViewEdge together with each ViewEdge of the previous selection. The\n"
     "first ViewEdge respecting both the unary predicate and the binary\n"
-    "predicate is kept as the next one.  If none of the potential next\n"
+    "predicate is kept as the next one. If none of the potential next\n"
     "ViewEdge respects these two predicates, None is returned.\n"
     "\n"
     ".. method:: __init__(upred, bpred, restrict_to_selection=True, "
@@ -73,9 +58,9 @@ PyDoc_STRVAR(
     "      already been chained must be ignored ot not.\n"
     "   :type restrict_to_unvisited: bool\n"
     "   :arg begin: The ViewEdge from where to start the iteration.\n"
-    "   :type begin: :class:`freestyle.types.ViewEdge` or None\n"
+    "   :type begin: :class:`freestyle.types.ViewEdge` | None\n"
     "   :arg orientation: If true, we'll look for the next ViewEdge among\n"
-    "      the ViewEdges that surround the ending ViewVertex of begin.  If\n"
+    "      the ViewEdges that surround the ending ViewVertex of begin. If\n"
     "      false, we'll search over the ViewEdges surrounding the ending\n"
     "      ViewVertex of begin.\n"
     "   :type orientation: bool\n"
@@ -107,7 +92,8 @@ static int ChainPredicateIterator_init(BPy_ChainPredicateIterator *self,
            *obj6 = nullptr;
 
   if (PyArg_ParseTupleAndKeywords(
-          args, kwds, "O!", (char **)kwlist_1, &ChainPredicateIterator_Type, &obj1)) {
+          args, kwds, "O!", (char **)kwlist_1, &ChainPredicateIterator_Type, &obj1))
+  {
     self->cp_it = new ChainPredicateIterator(*(((BPy_ChainPredicateIterator *)obj1)->cp_it));
     self->upred = ((BPy_ChainPredicateIterator *)obj1)->upred;
     self->bpred = ((BPy_ChainPredicateIterator *)obj1)->bpred;
@@ -131,7 +117,8 @@ static int ChainPredicateIterator_init(BPy_ChainPredicateIterator *self,
                                        check_begin,
                                        &obj5,
                                        &PyBool_Type,
-                                       &obj6)) {
+                                       &obj6))
+  {
     UnaryPredicate1D *up1D = ((BPy_UnaryPredicate1D *)obj1)->up1D;
     BinaryPredicate1D *bp1D = ((BPy_BinaryPredicate1D *)obj2)->bp1D;
     bool restrict_to_selection = (!obj3) ? true : bool_from_PyBool(obj3);
@@ -165,47 +152,44 @@ static void ChainPredicateIterator_dealloc(BPy_ChainPredicateIterator *self)
 /*-----------------------BPy_ChainPredicateIterator type definition ----------------------------*/
 
 PyTypeObject ChainPredicateIterator_Type = {
-    PyVarObject_HEAD_INIT(nullptr, 0) "ChainPredicateIterator", /* tp_name */
-    sizeof(BPy_ChainPredicateIterator),                         /* tp_basicsize */
-    0,                                                          /* tp_itemsize */
-    (destructor)ChainPredicateIterator_dealloc,                 /* tp_dealloc */
-    0,                                                          /* tp_vectorcall_offset */
-    nullptr,                                                    /* tp_getattr */
-    nullptr,                                                    /* tp_setattr */
-    nullptr,                                                    /* tp_reserved */
-    nullptr,                                                    /* tp_repr */
-    nullptr,                                                    /* tp_as_number */
-    nullptr,                                                    /* tp_as_sequence */
-    nullptr,                                                    /* tp_as_mapping */
-    nullptr,                                                    /* tp_hash */
-    nullptr,                                                    /* tp_call */
-    nullptr,                                                    /* tp_str */
-    nullptr,                                                    /* tp_getattro */
-    nullptr,                                                    /* tp_setattro */
-    nullptr,                                                    /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,                   /* tp_flags */
-    ChainPredicateIterator_doc,                                 /* tp_doc */
-    nullptr,                                                    /* tp_traverse */
-    nullptr,                                                    /* tp_clear */
-    nullptr,                                                    /* tp_richcompare */
-    0,                                                          /* tp_weaklistoffset */
-    nullptr,                                                    /* tp_iter */
-    nullptr,                                                    /* tp_iternext */
-    nullptr,                                                    /* tp_methods */
-    nullptr,                                                    /* tp_members */
-    nullptr,                                                    /* tp_getset */
-    &ChainingIterator_Type,                                     /* tp_base */
-    nullptr,                                                    /* tp_dict */
-    nullptr,                                                    /* tp_descr_get */
-    nullptr,                                                    /* tp_descr_set */
-    0,                                                          /* tp_dictoffset */
-    (initproc)ChainPredicateIterator_init,                      /* tp_init */
-    nullptr,                                                    /* tp_alloc */
-    nullptr,                                                    /* tp_new */
+    /*ob_base*/ PyVarObject_HEAD_INIT(nullptr, 0)
+    /*tp_name*/ "ChainPredicateIterator",
+    /*tp_basicsize*/ sizeof(BPy_ChainPredicateIterator),
+    /*tp_itemsize*/ 0,
+    /*tp_dealloc*/ (destructor)ChainPredicateIterator_dealloc,
+    /*tp_vectorcall_offset*/ 0,
+    /*tp_getattr*/ nullptr,
+    /*tp_setattr*/ nullptr,
+    /*tp_as_async*/ nullptr,
+    /*tp_repr*/ nullptr,
+    /*tp_as_number*/ nullptr,
+    /*tp_as_sequence*/ nullptr,
+    /*tp_as_mapping*/ nullptr,
+    /*tp_hash*/ nullptr,
+    /*tp_call*/ nullptr,
+    /*tp_str*/ nullptr,
+    /*tp_getattro*/ nullptr,
+    /*tp_setattro*/ nullptr,
+    /*tp_as_buffer*/ nullptr,
+    /*tp_flags*/ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    /*tp_doc*/ ChainPredicateIterator_doc,
+    /*tp_traverse*/ nullptr,
+    /*tp_clear*/ nullptr,
+    /*tp_richcompare*/ nullptr,
+    /*tp_weaklistoffset*/ 0,
+    /*tp_iter*/ nullptr,
+    /*tp_iternext*/ nullptr,
+    /*tp_methods*/ nullptr,
+    /*tp_members*/ nullptr,
+    /*tp_getset*/ nullptr,
+    /*tp_base*/ &ChainingIterator_Type,
+    /*tp_dict*/ nullptr,
+    /*tp_descr_get*/ nullptr,
+    /*tp_descr_set*/ nullptr,
+    /*tp_dictoffset*/ 0,
+    /*tp_init*/ (initproc)ChainPredicateIterator_init,
+    /*tp_alloc*/ nullptr,
+    /*tp_new*/ nullptr,
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////
-
-#ifdef __cplusplus
-}
-#endif

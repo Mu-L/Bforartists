@@ -1,74 +1,79 @@
-# Copyright 2011-2020 Blender Foundation
+# SPDX-FileCopyrightText: 2011-2022 Blender Foundation
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# SPDX-License-Identifier: Apache-2.0
 
 set(INC
   ..
-  ../../glew-mx
-  ../../guardedalloc
   ../../mikktspace
-  ../../../source/blender/makesdna
   ../../../source/blender/makesrna
-  ../../../source/blender/blenlib
   ${CMAKE_BINARY_DIR}/source/blender/makesrna/intern
 )
 
 set(INC_SYS
+  ${Epoxy_INCLUDE_DIRS}
   ${PYTHON_INCLUDE_DIRS}
-  ${GLEW_INCLUDE_DIR}
 )
 
 set(SRC
-  blender_camera.cpp
-  blender_device.cpp
-  blender_image.cpp
-  blender_geometry.cpp
-  blender_light.cpp
-  blender_mesh.cpp
-  blender_object.cpp
-  blender_object_cull.cpp
-  blender_particles.cpp
-  blender_curves.cpp
-  blender_logging.cpp
-  blender_python.cpp
-  blender_session.cpp
-  blender_shader.cpp
-  blender_sync.cpp
-  blender_texture.cpp
-  blender_viewport.cpp
-  blender_volume.cpp
+  camera.cpp
+  device.cpp
+  display_driver.cpp
+  image.cpp
+  geometry.cpp
+  light.cpp
+  light_linking.cpp
+  mesh.cpp
+  object.cpp
+  object_cull.cpp
+  output_driver.cpp
+  particles.cpp
+  pointcloud.cpp
+  curves.cpp
+  logging.cpp
+  python.cpp
+  session.cpp
+  shader.cpp
+  sync.cpp
+  texture.cpp
+  viewport.cpp
+  volume.cpp
 
+  attribute_convert.h
   CCL_api.h
-  blender_device.h
-  blender_id_map.h
-  blender_image.h
-  blender_object_cull.h
-  blender_sync.h
-  blender_session.h
-  blender_texture.h
-  blender_util.h
-  blender_viewport.h
+  device.h
+  display_driver.h
+  id_map.h
+  image.h
+  light_linking.h
+  object_cull.h
+  output_driver.h
+  sync.h
+  session.h
+  texture.h
+  util.h
+  viewport.h
 )
 
 set(LIB
+  PRIVATE bf::blenkernel
+  PRIVATE bf::blenlib
+  PRIVATE bf::dna
+  PRIVATE bf::imbuf
+  PRIVATE bf::gpu
+  PRIVATE bf::intern::guardedalloc
+  PRIVATE bf::render
   cycles_bvh
   cycles_device
   cycles_graph
   cycles_kernel
-  cycles_render
+  cycles_scene
+  cycles_session
   cycles_subd
   cycles_util
 
+  bf_intern_mikktspace
+
+  ${Epoxy_LIBRARIES}
   ${PYTHON_LINKFLAGS}
   ${PYTHON_LIBRARIES}
 )
@@ -82,6 +87,7 @@ endif()
 
 set(ADDON_FILES
   addon/__init__.py
+  addon/camera.py
   addon/engine.py
   addon/operators.py
   addon/osl.py
@@ -91,27 +97,42 @@ set(ADDON_FILES
   addon/version_update.py
 )
 
-add_definitions(${GL_DEFINITIONS})
-
-if(WITH_CYCLES_DEVICE_OPENCL)
-  add_definitions(-DWITH_OPENCL)
+if(WITH_CYCLES_DEVICE_HIP)
+  add_definitions(-DWITH_HIP)
 endif()
 
-if(WITH_CYCLES_NETWORK)
-  add_definitions(-DWITH_NETWORK)
+if(WITH_CYCLES_DEVICE_METAL)
+  add_definitions(-DWITH_METAL)
 endif()
 
 if(WITH_MOD_FLUID)
   add_definitions(-DWITH_FLUID)
 endif()
 
+if(WITH_TBB)
+  add_definitions(-DWITH_TBB)
+endif()
+
 if(WITH_OPENVDB)
   add_definitions(-DWITH_OPENVDB ${OPENVDB_DEFINITIONS})
+  list(APPEND INC
+    ../../openvdb
+  )
   list(APPEND INC_SYS
     ${OPENVDB_INCLUDE_DIRS}
   )
   list(APPEND LIB
     ${OPENVDB_LIBRARIES}
+  )
+endif()
+
+if(WITH_ALEMBIC)
+  add_definitions(-DWITH_ALEMBIC)
+  list(APPEND INC_SYS
+    ${ALEMBIC_INCLUDE_DIRS}
+  )
+  list(APPEND LIB
+    ${ALEMBIC_LIBRARIES}
   )
 endif()
 
@@ -122,16 +143,13 @@ if(WITH_OPENIMAGEDENOISE)
   )
 endif()
 
-if(WITH_EXPERIMENTAL_FEATURES)
-  add_definitions(-DWITH_HAIR_NODES)
+if(WITH_CYCLES_OSL)
+  list(APPEND LIB
+    ${OSL_LIBRARIES}
+  )
 endif()
 
 blender_add_lib(bf_intern_cycles "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
-
-# avoid link failure with clang 3.4 debug
-if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND NOT ${CMAKE_C_COMPILER_VERSION} VERSION_LESS '3.4')
-  string(APPEND CMAKE_CXX_FLAGS_DEBUG " -gline-tables-only")
-endif()
 
 add_dependencies(bf_intern_cycles bf_rna)
 

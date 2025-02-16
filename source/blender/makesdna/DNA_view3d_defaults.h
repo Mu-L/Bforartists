@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
@@ -20,7 +8,6 @@
 
 #pragma once
 
-/* Struct members on own line. */
 /* clang-format off */
 
 /* -------------------------------------------------------------------- */
@@ -50,10 +37,15 @@
 
 #define _DNA_DEFAULT_View3DOverlay \
   { \
+    .flag = V3D_OVERLAY_VIEWER_ATTRIBUTE | V3D_OVERLAY_SCULPT_SHOW_MASK | V3D_OVERLAY_SCULPT_SHOW_FACE_SETS, \
     .wireframe_threshold = 1.0f, \
     .wireframe_opacity = 1.0f, \
+    .retopology_offset = 0.2f, \
+    .viewer_attribute_opacity = 1.0f, \
     .xray_alpha_bone = 0.5f, \
+    .bone_wire_alpha = 1.0f, \
     .fade_alpha = 0.40f, \
+    .normals_length = 0.1f, \
     .texture_paint_mode_opacity = 1.0f, \
     .weight_paint_mode_opacity = 1.0f, \
     .vertex_paint_mode_opacity = 1.0f, \
@@ -64,13 +56,18 @@
  \
     .edit_flag = V3D_OVERLAY_EDIT_FACES | V3D_OVERLAY_EDIT_SEAMS | \
                              V3D_OVERLAY_EDIT_SHARP | V3D_OVERLAY_EDIT_FREESTYLE_EDGE | \
-                             V3D_OVERLAY_EDIT_FREESTYLE_FACE | V3D_OVERLAY_EDIT_EDGES | \
-                             V3D_OVERLAY_EDIT_CREASES | V3D_OVERLAY_EDIT_BWEIGHTS, \
+                             V3D_OVERLAY_EDIT_FREESTYLE_FACE | V3D_OVERLAY_EDIT_CREASES | \
+                             V3D_OVERLAY_EDIT_BWEIGHTS, \
     .handle_display = CURVE_HANDLE_SELECTED, \
  \
     .gpencil_paper_opacity = 0.5f, \
     .gpencil_grid_opacity = 0.9f, \
+    .gpencil_grid_color = {0.5f, 0.5f, 0.5f}, \
+    .gpencil_grid_scale = {1.0f, 1.0f}, \
+    .gpencil_grid_offset = {0.0f, 0.0f}, \
+    .gpencil_grid_subdivisions = 4, \
     .gpencil_vertex_paint_opacity = 1.0f, \
+    .normals_constant_screen_size = 7.0f, \
   }
 
 #define _DNA_DEFAULT_View3DCursor \
@@ -93,7 +90,7 @@
     .gridflag = V3D_SHOW_X | V3D_SHOW_Y | V3D_SHOW_FLOOR | V3D_SHOW_ORTHO_GRID, \
  \
     .flag = V3D_SELECT_OUTLINE, \
-    .flag2 = V3D_SHOW_RECONSTRUCTION | V3D_SHOW_ANNOTATION, \
+    .flag2 = V3D_SHOW_RECONSTRUCTION | V3D_SHOW_ANNOTATION | V3D_SHOW_VIEWER | V3D_SHOW_CAMERA_GUIDES | V3D_SHOW_CAMERA_PASSEPARTOUT, \
  \
     .lens = 50.0f, \
     .clip_start = 0.01f, \

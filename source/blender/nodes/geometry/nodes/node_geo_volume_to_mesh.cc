@@ -1,20 +1,7 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#include "DEG_depsgraph_query.h"
 #ifdef WITH_OPENVDB
 #  include <openvdb/tools/GridTransformer.h>
 #  include <openvdb/tools/VolumeToMesh.h>
@@ -22,152 +9,257 @@
 
 #include "node_geometry_util.hh"
 
-#include "BKE_lib_id.h"
-#include "BKE_material.h"
-#include "BKE_mesh.h"
-#include "BKE_mesh_runtime.h"
-#include "BKE_volume.h"
+#include "BKE_material.hh"
+#include "BKE_mesh.hh"
+#include "BKE_volume.hh"
+#include "BKE_volume_grid.hh"
 #include "BKE_volume_to_mesh.hh"
 
-#include "DNA_mesh_types.h"
-#include "DNA_meshdata_types.h"
+#include "NOD_rna_define.hh"
 
-#include "UI_interface.h"
-#include "UI_resources.h"
+#include "UI_interface.hh"
+#include "UI_resources.hh"
 
-static bNodeSocketTemplate geo_node_volume_to_mesh_in[] = {
-    {SOCK_GEOMETRY, N_("Geometry")},
-    {SOCK_STRING, N_("Density")},
-    {SOCK_FLOAT, N_("Voxel Size"), 0.3f, 0.0f, 0.0f, 0.0f, 0.01f, FLT_MAX, PROP_DISTANCE},
-    {SOCK_FLOAT, N_("Voxel Amount"), 64.0f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX},
-    {SOCK_FLOAT, N_("Threshold"), 0.1f, 0.0f, 0.0f, 0.0f, 0.0f, FLT_MAX},
-    {SOCK_FLOAT, N_("Adaptivity"), 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, PROP_FACTOR},
-    {-1, ""},
-};
+#include "GEO_randomize.hh"
 
-static bNodeSocketTemplate geo_node_volume_to_mesh_out[] = {
-    {SOCK_GEOMETRY, N_("Geometry")},
-    {-1, ""},
-};
+namespace blender::nodes::node_geo_volume_to_mesh_cc {
 
-static void geo_node_volume_to_mesh_layout(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+NODE_STORAGE_FUNCS(NodeGeometryVolumeToMesh)
+
+static void node_declare(NodeDeclarationBuilder &b)
+{
+  b.add_input<decl::Geometry>("Volume")
+      .supported_type(GeometryComponent::Type::Volume)
+      .translation_context(BLT_I18NCONTEXT_ID_ID);
+  auto &voxel_size = b.add_input<decl::Float>("Voxel Size")
+                         .default_value(0.3f)
+                         .min(0.01f)
+                         .subtype(PROP_DISTANCE)
+                         .make_available([](bNode &node) {
+                           node_storage(node).resolution_mode =
+                               VOLUME_TO_MESH_RESOLUTION_MODE_VOXEL_SIZE;
+                         });
+  auto &voxel_amount = b.add_input<decl::Float>("Voxel Amount")
+                           .default_value(64.0f)
+                           .min(0.0f)
+                           .make_available([](bNode &node) {
+                             node_storage(node).resolution_mode =
+                                 VOLUME_TO_MESH_RESOLUTION_MODE_VOXEL_AMOUNT;
+                           });
+  b.add_input<decl::Float>("Threshold")
+      .default_value(0.1f)
+      .description("Values larger than the threshold are inside the generated mesh");
+  b.add_input<decl::Float>("Adaptivity").min(0.0f).max(1.0f).subtype(PROP_FACTOR);
+  b.add_output<decl::Geometry>("Mesh");
+
+  const bNode *node = b.node_or_null();
+  if (node != nullptr) {
+    const NodeGeometryVolumeToMesh &storage = node_storage(*node);
+
+    voxel_size.available(storage.resolution_mode == VOLUME_TO_MESH_RESOLUTION_MODE_VOXEL_SIZE);
+    voxel_amount.available(storage.resolution_mode == VOLUME_TO_MESH_RESOLUTION_MODE_VOXEL_AMOUNT);
+  }
+}
+
+static void node_layout(uiLayout *layout, bContext * /*C*/, PointerRNA *ptr)
 {
   uiLayoutSetPropSep(layout, true);
   uiLayoutSetPropDecorate(layout, false);
-  uiItemR(layout, ptr, "resolution_mode", 0, IFACE_("Resolution"), ICON_NONE);
+  uiItemR(layout, ptr, "resolution_mode", UI_ITEM_NONE, IFACE_("Resolution"), ICON_NONE);
 }
 
-namespace blender::nodes {
-
-static void geo_node_volume_to_mesh_init(bNodeTree *UNUSED(ntree), bNode *node)
+static void node_init(bNodeTree * /*tree*/, bNode *node)
 {
-  NodeGeometryVolumeToMesh *data = (NodeGeometryVolumeToMesh *)MEM_callocN(
-      sizeof(NodeGeometryVolumeToMesh), __func__);
+  NodeGeometryVolumeToMesh *data = MEM_cnew<NodeGeometryVolumeToMesh>(__func__);
   data->resolution_mode = VOLUME_TO_MESH_RESOLUTION_MODE_GRID;
-
-  bNodeSocket *grid_socket = nodeFindSocket(node, SOCK_IN, "Density");
-  bNodeSocketValueString *grid_socket_value = (bNodeSocketValueString *)grid_socket->default_value;
-  STRNCPY(grid_socket_value->value, "density");
-
   node->storage = data;
-}
-
-static void geo_node_volume_to_mesh_update(bNodeTree *UNUSED(ntree), bNode *node)
-{
-  NodeGeometryVolumeToMesh *data = (NodeGeometryVolumeToMesh *)node->storage;
-
-  bNodeSocket *voxel_size_socket = nodeFindSocket(node, SOCK_IN, "Voxel Size");
-  bNodeSocket *voxel_amount_socket = nodeFindSocket(node, SOCK_IN, "Voxel Amount");
-  nodeSetSocketAvailability(voxel_amount_socket,
-                            data->resolution_mode == VOLUME_TO_MESH_RESOLUTION_MODE_VOXEL_AMOUNT);
-  nodeSetSocketAvailability(voxel_size_socket,
-                            data->resolution_mode == VOLUME_TO_MESH_RESOLUTION_MODE_VOXEL_SIZE);
 }
 
 #ifdef WITH_OPENVDB
 
-static void create_mesh_from_volume(GeometrySet &geometry_set_in,
-                                    GeometrySet &geometry_set_out,
-                                    GeoNodeExecParams &params)
+static bke::VolumeToMeshResolution get_resolution_param(const GeoNodeExecParams &params)
 {
-  if (!geometry_set_in.has<VolumeComponent>()) {
-    return;
-  }
-
-  const NodeGeometryVolumeToMesh &storage =
-      *(const NodeGeometryVolumeToMesh *)params.node().storage;
+  const NodeGeometryVolumeToMesh &storage = node_storage(params.node());
 
   bke::VolumeToMeshResolution resolution;
   resolution.mode = (VolumeToMeshResolutionMode)storage.resolution_mode;
   if (resolution.mode == VOLUME_TO_MESH_RESOLUTION_MODE_VOXEL_AMOUNT) {
-    resolution.settings.voxel_amount = params.get_input<float>("Voxel Amount");
-    if (resolution.settings.voxel_amount <= 0.0f) {
-      return;
-    }
+    resolution.settings.voxel_amount = std::max(params.get_input<float>("Voxel Amount"), 0.0f);
   }
   else if (resolution.mode == VOLUME_TO_MESH_RESOLUTION_MODE_VOXEL_SIZE) {
-    resolution.settings.voxel_size = params.get_input<float>("Voxel Size");
-    if (resolution.settings.voxel_size <= 0.0f) {
-      return;
+    resolution.settings.voxel_size = std::max(params.get_input<float>("Voxel Size"), 0.0f);
+  }
+
+  return resolution;
+}
+
+static Mesh *create_mesh_from_volume_grids(Span<const openvdb::GridBase *> grids,
+                                           GeoNodeExecParams &params,
+                                           const float threshold,
+                                           const float adaptivity,
+                                           const bke::VolumeToMeshResolution &resolution)
+{
+  Array<bke::VolumeToMeshDataResult> mesh_data(grids.size());
+  for (const int i : grids.index_range()) {
+    bke::VolumeToMeshDataResult &result = mesh_data[i];
+    result = bke::volume_to_mesh_data(*grids[i], resolution, threshold, adaptivity);
+    if (!result.error.empty()) {
+      params.error_message_add(NodeWarningType::Error, result.error);
     }
   }
 
-  const VolumeComponent *component = geometry_set_in.get_component_for_read<VolumeComponent>();
-  const Volume *volume = component->get_for_read();
-  if (volume == nullptr) {
-    return;
+  int vert_offset = 0;
+  int face_offset = 0;
+  int loop_offset = 0;
+  Array<int> vert_offsets(mesh_data.size());
+  Array<int> face_offsets(mesh_data.size());
+  Array<int> loop_offsets(mesh_data.size());
+  for (const int i : grids.index_range()) {
+    const bke::OpenVDBMeshData &data = mesh_data[i].data;
+    vert_offsets[i] = vert_offset;
+    face_offsets[i] = face_offset;
+    loop_offsets[i] = loop_offset;
+    vert_offset += data.verts.size();
+    face_offset += (data.tris.size() + data.quads.size());
+    loop_offset += (3 * data.tris.size() + 4 * data.quads.size());
   }
 
-  const Main *bmain = DEG_get_bmain(params.depsgraph());
-  BKE_volume_load(volume, bmain);
-
-  const std::string grid_name = params.get_input<std::string>("Density");
-  const VolumeGrid *volume_grid = BKE_volume_grid_find_for_read(volume, grid_name.c_str());
-  if (volume_grid == nullptr) {
-    return;
-  }
-
-  float threshold = params.get_input<float>("Threshold");
-  float adaptivity = params.get_input<float>("Adaptivity");
-
-  const openvdb::GridBase::ConstPtr grid = BKE_volume_grid_openvdb_for_read(volume, volume_grid);
-  Mesh *mesh = bke::volume_to_mesh(*grid, resolution, threshold, adaptivity);
-  if (mesh == nullptr) {
-    return;
-  }
+  Mesh *mesh = BKE_mesh_new_nomain(vert_offset, 0, face_offset, loop_offset);
   BKE_id_material_eval_ensure_default_slot(&mesh->id);
-  MeshComponent &dst_component = geometry_set_out.get_component_for_write<MeshComponent>();
-  dst_component.replace(mesh);
+  MutableSpan<float3> positions = mesh->vert_positions_for_write();
+  MutableSpan<int> dst_face_offsets = mesh->face_offsets_for_write();
+  MutableSpan<int> corner_verts = mesh->corner_verts_for_write();
+
+  for (const int i : grids.index_range()) {
+    const bke::OpenVDBMeshData &data = mesh_data[i].data;
+    bke::fill_mesh_from_openvdb_data(data.verts,
+                                     data.tris,
+                                     data.quads,
+                                     vert_offsets[i],
+                                     face_offsets[i],
+                                     loop_offsets[i],
+                                     positions,
+                                     dst_face_offsets,
+                                     corner_verts);
+  }
+
+  bke::mesh_calc_edges(*mesh, false, false);
+  bke::mesh_smooth_set(*mesh, false);
+
+  mesh->tag_overlapping_none();
+
+  geometry::debug_randomize_mesh_order(mesh);
+
+  return mesh;
+}
+
+static Mesh *create_mesh_from_volume(GeometrySet &geometry_set, GeoNodeExecParams &params)
+{
+  const Volume *volume = geometry_set.get_volume();
+  if (volume == nullptr) {
+    return nullptr;
+  }
+
+  const bke::VolumeToMeshResolution resolution = get_resolution_param(params);
+
+  if (resolution.mode == VOLUME_TO_MESH_RESOLUTION_MODE_VOXEL_SIZE &&
+      resolution.settings.voxel_size <= 0.0f)
+  {
+    return nullptr;
+  }
+  if (resolution.mode == VOLUME_TO_MESH_RESOLUTION_MODE_VOXEL_AMOUNT &&
+      resolution.settings.voxel_amount <= 0)
+  {
+    return nullptr;
+  }
+
+  BKE_volume_load(volume, params.bmain());
+
+  Vector<bke::VolumeTreeAccessToken> tree_tokens;
+  Vector<const openvdb::GridBase *> grids;
+  for (const int i : IndexRange(BKE_volume_num_grids(volume))) {
+    const bke::VolumeGridData *volume_grid = BKE_volume_grid_get(volume, i);
+    tree_tokens.append_as();
+    grids.append(&volume_grid->grid(tree_tokens.last()));
+  }
+
+  if (grids.is_empty()) {
+    return nullptr;
+  }
+
+  return create_mesh_from_volume_grids(grids,
+                                       params,
+                                       params.get_input<float>("Threshold"),
+                                       params.get_input<float>("Adaptivity"),
+                                       resolution);
 }
 
 #endif /* WITH_OPENVDB */
 
-static void geo_node_volume_to_mesh_exec(GeoNodeExecParams params)
+static void node_geo_exec(GeoNodeExecParams params)
 {
-  GeometrySet geometry_set_in = params.extract_input<GeometrySet>("Geometry");
-  GeometrySet geometry_set_out;
-
 #ifdef WITH_OPENVDB
-  create_mesh_from_volume(geometry_set_in, geometry_set_out, params);
+  GeometrySet geometry_set = params.extract_input<GeometrySet>("Volume");
+  geometry_set.modify_geometry_sets([&](GeometrySet &geometry_set) {
+    Mesh *mesh = create_mesh_from_volume(geometry_set, params);
+    geometry_set.replace_mesh(mesh);
+    geometry_set.keep_only_during_modify({GeometryComponent::Type::Mesh});
+  });
+  params.set_output("Mesh", std::move(geometry_set));
+#else
+  node_geo_exec_with_missing_openvdb(params);
 #endif
-
-  params.set_output("Geometry", geometry_set_out);
 }
 
-}  // namespace blender::nodes
-
-void register_node_type_geo_volume_to_mesh()
+static void node_rna(StructRNA *srna)
 {
-  static bNodeType ntype;
+  static EnumPropertyItem resolution_mode_items[] = {
+      {VOLUME_TO_MESH_RESOLUTION_MODE_GRID,
+       "GRID",
+       0,
+       "Grid",
+       "Use resolution of the volume grid"},
+      {VOLUME_TO_MESH_RESOLUTION_MODE_VOXEL_AMOUNT,
+       "VOXEL_AMOUNT",
+       0,
+       "Amount",
+       "Desired number of voxels along one axis"},
+      {VOLUME_TO_MESH_RESOLUTION_MODE_VOXEL_SIZE,
+       "VOXEL_SIZE",
+       0,
+       "Size",
+       "Desired voxel side length"},
+      {0, nullptr, 0, nullptr, nullptr},
+  };
 
-  geo_node_type_base(&ntype, GEO_NODE_VOLUME_TO_MESH, "Volume to Mesh", NODE_CLASS_GEOMETRY, 0);
-  node_type_socket_templates(&ntype, geo_node_volume_to_mesh_in, geo_node_volume_to_mesh_out);
-  node_type_storage(
-      &ntype, "NodeGeometryVolumeToMesh", node_free_standard_storage, node_copy_standard_storage);
-  node_type_size(&ntype, 200, 120, 700);
-  node_type_init(&ntype, blender::nodes::geo_node_volume_to_mesh_init);
-  node_type_update(&ntype, blender::nodes::geo_node_volume_to_mesh_update);
-  ntype.geometry_node_execute = blender::nodes::geo_node_volume_to_mesh_exec;
-  ntype.draw_buttons = geo_node_volume_to_mesh_layout;
-  nodeRegisterType(&ntype);
+  RNA_def_node_enum(srna,
+                    "resolution_mode",
+                    "Resolution Mode",
+                    "How the voxel size is specified",
+                    resolution_mode_items,
+                    NOD_storage_enum_accessors(resolution_mode));
 }
+
+static void node_register()
+{
+  static blender::bke::bNodeType ntype;
+
+  geo_node_type_base(&ntype, "GeometryNodeVolumeToMesh", GEO_NODE_VOLUME_TO_MESH);
+  ntype.ui_name = "Volume to Mesh";
+  ntype.ui_description = "Generate a mesh on the \"surface\" of a volume";
+  ntype.enum_name_legacy = "VOLUME_TO_MESH";
+  ntype.nclass = NODE_CLASS_GEOMETRY;
+  ntype.declare = node_declare;
+  blender::bke::node_type_storage(
+      &ntype, "NodeGeometryVolumeToMesh", node_free_standard_storage, node_copy_standard_storage);
+  blender::bke::node_type_size(&ntype, 170, 120, 700);
+  ntype.initfunc = node_init;
+  ntype.geometry_node_execute = node_geo_exec;
+  ntype.draw_buttons = node_layout;
+  blender::bke::node_register_type(&ntype);
+
+  node_rna(ntype.rna_ext.srna);
+}
+NOD_REGISTER_NODE(node_register)
+
+}  // namespace blender::nodes::node_geo_volume_to_mesh_cc

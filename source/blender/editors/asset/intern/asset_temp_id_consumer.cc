@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup edasset
@@ -21,32 +9,28 @@
  * Uses the `BLO_library_temp_xxx()` API internally.
  */
 
-#include <new>
+#include <string>
 
-#include "DNA_asset_types.h"
-#include "DNA_space_types.h"
+#include "AS_asset_representation.hh"
 
-#include "BKE_report.h"
+#include "BKE_report.hh"
 
 #include "BLI_utility_mixins.hh"
 
-#include "BLO_readfile.h"
+#include "BLO_readfile.hh"
 
 #include "MEM_guardedalloc.h"
 
-#include "ED_asset_handle.h"
-#include "ED_asset_temp_id_consumer.h"
+#include "ED_asset_temp_id_consumer.hh"
 
-using namespace blender;
+namespace blender::ed::asset {
 
 class AssetTemporaryIDConsumer : NonCopyable, NonMovable {
-  const AssetHandle &handle_;
+  const asset_system::AssetRepresentation *asset_;
   TempLibraryContext *temp_lib_context_ = nullptr;
 
  public:
-  AssetTemporaryIDConsumer(const AssetHandle &handle) : handle_(handle)
-  {
-  }
+  AssetTemporaryIDConsumer(const asset_system::AssetRepresentation *asset) : asset_(asset) {}
   ~AssetTemporaryIDConsumer()
   {
     if (temp_lib_context_) {
@@ -56,24 +40,20 @@ class AssetTemporaryIDConsumer : NonCopyable, NonMovable {
 
   ID *get_local_id()
   {
-    return ED_asset_handle_get_local_id(&handle_);
+    return asset_->local_id();
   }
 
-  ID *import_id(const bContext *C,
-                const AssetLibraryReference &asset_library,
-                ID_Type id_type,
-                Main &bmain,
-                ReportList &reports)
+  ID *import_id(ID_Type id_type, Main &bmain, ReportList &reports)
   {
-    const char *asset_name = ED_asset_handle_get_name(&handle_);
-    char blend_file_path[FILE_MAX_LIBEXTRA];
-    ED_asset_handle_get_full_library_path(C, &asset_library, &handle_, blend_file_path);
+    const char *asset_name = asset_->get_name().c_str();
+    std::string blend_file_path = asset_->full_library_path();
 
     temp_lib_context_ = BLO_library_temp_load_id(
-        &bmain, blend_file_path, id_type, asset_name, &reports);
+        &bmain, blend_file_path.c_str(), id_type, asset_name, &reports);
 
     if (temp_lib_context_ == nullptr || temp_lib_context_->temp_id == nullptr) {
-      BKE_reportf(&reports, RPT_ERROR, "Unable to load %s from %s", asset_name, blend_file_path);
+      BKE_reportf(
+          &reports, RPT_ERROR, "Unable to load %s from %s", asset_name, blend_file_path.c_str());
       return nullptr;
     }
 
@@ -82,29 +62,27 @@ class AssetTemporaryIDConsumer : NonCopyable, NonMovable {
   }
 };
 
-AssetTempIDConsumer *ED_asset_temp_id_consumer_create(const AssetHandle *handle)
+AssetTempIDConsumer *temp_id_consumer_create(const asset_system::AssetRepresentation *asset)
 {
-  if (!handle) {
+  if (!asset) {
     return nullptr;
   }
-  BLI_assert(handle->file_data->asset_data != nullptr);
   return reinterpret_cast<AssetTempIDConsumer *>(
-      OBJECT_GUARDED_NEW(AssetTemporaryIDConsumer, *handle));
+      MEM_new<AssetTemporaryIDConsumer>(__func__, asset));
 }
 
-void ED_asset_temp_id_consumer_free(AssetTempIDConsumer **consumer)
+void temp_id_consumer_free(AssetTempIDConsumer **consumer)
 {
-  OBJECT_GUARDED_SAFE_DELETE(*consumer, AssetTemporaryIDConsumer);
+  MEM_delete(reinterpret_cast<AssetTemporaryIDConsumer *>(*consumer));
+  *consumer = nullptr;
 }
 
-ID *ED_asset_temp_id_consumer_ensure_local_id(AssetTempIDConsumer *consumer_,
-                                              const bContext *C,
-                                              const AssetLibraryReference *asset_library,
-                                              ID_Type id_type,
-                                              Main *bmain,
-                                              ReportList *reports)
+ID *temp_id_consumer_ensure_local_id(AssetTempIDConsumer *consumer_,
+                                     ID_Type id_type,
+                                     Main *bmain,
+                                     ReportList *reports)
 {
-  if (!(consumer_ && asset_library && bmain && reports)) {
+  if (!(consumer_ && bmain && reports)) {
     return nullptr;
   }
   AssetTemporaryIDConsumer *consumer = reinterpret_cast<AssetTemporaryIDConsumer *>(consumer_);
@@ -112,5 +90,7 @@ ID *ED_asset_temp_id_consumer_ensure_local_id(AssetTempIDConsumer *consumer_,
   if (ID *local_id = consumer->get_local_id()) {
     return local_id;
   }
-  return consumer->import_id(C, *asset_library, id_type, *bmain, *reports);
+  return consumer->import_id(id_type, *bmain, *reports);
 }
+
+}  // namespace blender::ed::asset

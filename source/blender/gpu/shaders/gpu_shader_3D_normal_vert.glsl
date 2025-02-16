@@ -1,10 +1,10 @@
+/* SPDX-FileCopyrightText: 2016-2022 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-uniform mat4 ModelViewProjectionMatrix;
-uniform mat3 NormalMatrix;
+#include "infos/gpu_shader_simple_lighting_info.hh"
 
-in vec3 pos;
-in vec3 nor;
-out vec3 normal;
+VERTEX_SHADER_CREATE_INFO(gpu_shader_simple_lighting)
 
 void main()
 {

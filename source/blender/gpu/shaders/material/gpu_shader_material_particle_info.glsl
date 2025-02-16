@@ -1,8 +1,8 @@
-void particle_info(vec4 sprops,
-                   vec4 loc,
-                   vec3 vel,
-                   vec3 avel,
-                   out float index,
+/* SPDX-FileCopyrightText: 2019-2022 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
+
+void particle_info(out float index,
                    out float random,
                    out float age,
                    out float life_time,
@@ -11,13 +11,14 @@ void particle_info(vec4 sprops,
                    out vec3 velocity,
                    out vec3 angular_velocity)
 {
-  index = sprops.x;
-  random = loc.w;
-  age = sprops.y;
-  life_time = sprops.z;
-  size = sprops.w;
+  /* Unsupported for now. */
+  index = 0.0;
+  random = 0.0;
+  age = 0.0;
+  life_time = 0.0;
+  size = 0.0;
 
-  location = loc.xyz;
-  velocity = vel;
-  angular_velocity = avel;
+  location = vec3(0.0);
+  velocity = vec3(0.0);
+  angular_velocity = vec3(0.0);
 }

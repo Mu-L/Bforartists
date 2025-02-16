@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -42,7 +30,7 @@ class IndexedFaceSet : public Rep {
 
   /** User-specified face and edge marks for feature edge detection */
   /* XXX Why in hell not use an enum here too? */
-  typedef unsigned char FaceEdgeMark;
+  typedef uchar FaceEdgeMark;
   static const FaceEdgeMark FACE_MARK = 1 << 0;
   static const FaceEdgeMark EDGE_MARK_V1V2 = 1 << 1;
   static const FaceEdgeMark EDGE_MARK_V2V3 = 1 << 2;
@@ -100,31 +88,31 @@ class IndexedFaceSet : public Rep {
    *    iTIndices
    *      The Texture coordinates indices (per vertex). The integers contained in this array must
    * be multiple of 2. iTISize The size of iMIndices iCopy 0 : the arrays are not copied. The
-   * pointers passed as arguments are used. IndexedFaceSet takes these arrays desallocation in
+   * pointers passed as arguments are used. IndexedFaceSet takes these arrays deallocation in
    * charge. 1 : the arrays are copied. The caller is in charge of the arrays, passed as arguments
-   * desallocation.
+   * deallocation.
    */
   IndexedFaceSet(float *iVertices,
-                 unsigned iVSize,
+                 uint iVSize,
                  float *iNormals,
-                 unsigned iNSize,
+                 uint iNSize,
                  FrsMaterial **iMaterials,
-                 unsigned iMSize,
+                 uint iMSize,
                  float *iTexCoords,
-                 unsigned iTSize,
-                 unsigned iNumFaces,
-                 unsigned *iNumVertexPerFace,
+                 uint iTSize,
+                 uint iNumFaces,
+                 uint *iNumVertexPerFace,
                  TRIANGLES_STYLE *iFaceStyle,
                  FaceEdgeMark *iFaceEdgeMarks,
-                 unsigned *iVIndices,
-                 unsigned iVISize,
-                 unsigned *iNIndices,
-                 unsigned iNISize,
-                 unsigned *iMIndices,
-                 unsigned iMISize,
-                 unsigned *iTIndices,
-                 unsigned iTISize,
-                 unsigned iCopy = 1);
+                 uint *iVIndices,
+                 uint iVISize,
+                 uint *iNIndices,
+                 uint iNISize,
+                 uint *iMIndices,
+                 uint iMISize,
+                 uint *iTIndices,
+                 uint iTISize,
+                 uint iCopy = 1);
 
   /** Builds an indexed face set from an other indexed face set */
   IndexedFaceSet(const IndexedFaceSet &iBrother);
@@ -198,32 +186,32 @@ class IndexedFaceSet : public Rep {
     return _TexCoords;
   }
 
-  virtual const unsigned vsize() const
+  virtual const uint vsize() const
   {
     return _VSize;
   }
 
-  virtual const unsigned nsize() const
+  virtual const uint nsize() const
   {
     return _NSize;
   }
 
-  virtual const unsigned msize() const
+  virtual const uint msize() const
   {
     return _MSize;
   }
 
-  virtual const unsigned tsize() const
+  virtual const uint tsize() const
   {
     return _TSize;
   }
 
-  virtual const unsigned numFaces() const
+  virtual const uint numFaces() const
   {
     return _NumFaces;
   }
 
-  virtual const unsigned *numVertexPerFaces() const
+  virtual const uint *numVertexPerFaces() const
   {
     return _NumVertexPerFace;
   }
@@ -233,47 +221,47 @@ class IndexedFaceSet : public Rep {
     return _FaceStyle;
   }
 
-  virtual const unsigned char *faceEdgeMarks() const
+  virtual const uchar *faceEdgeMarks() const
   {
     return _FaceEdgeMarks;
   }
 
-  virtual const unsigned *vindices() const
+  virtual const uint *vindices() const
   {
     return _VIndices;
   }
 
-  virtual const unsigned *nindices() const
+  virtual const uint *nindices() const
   {
     return _NIndices;
   }
 
-  virtual const unsigned *mindices() const
+  virtual const uint *mindices() const
   {
     return _MIndices;
   }
 
-  virtual const unsigned *tindices() const
+  virtual const uint *tindices() const
   {
     return _TIndices;
   }
 
-  virtual const unsigned visize() const
+  virtual const uint visize() const
   {
     return _VISize;
   }
 
-  virtual const unsigned nisize() const
+  virtual const uint nisize() const
   {
     return _NISize;
   }
 
-  virtual const unsigned misize() const
+  virtual const uint misize() const
   {
     return _MISize;
   }
 
-  virtual const unsigned tisize() const
+  virtual const uint tisize() const
   {
     return _TISize;
   }
@@ -284,29 +272,27 @@ class IndexedFaceSet : public Rep {
   FrsMaterial **_FrsMaterials;
   float *_TexCoords;
 
-  unsigned _VSize;
-  unsigned _NSize;
-  unsigned _MSize;
-  unsigned _TSize;
+  uint _VSize;
+  uint _NSize;
+  uint _MSize;
+  uint _TSize;
 
-  unsigned _NumFaces;
-  unsigned *_NumVertexPerFace;
+  uint _NumFaces;
+  uint *_NumVertexPerFace;
   TRIANGLES_STYLE *_FaceStyle;
   FaceEdgeMark *_FaceEdgeMarks;
 
-  unsigned *_VIndices;
-  unsigned *_NIndices;
-  unsigned *_MIndices;  // Material Indices
-  unsigned *_TIndices;  // Texture coordinates Indices
+  uint *_VIndices;
+  uint *_NIndices;
+  uint *_MIndices;  // Material Indices
+  uint *_TIndices;  // Texture coordinates Indices
 
-  unsigned _VISize;
-  unsigned _NISize;
-  unsigned _MISize;
-  unsigned _TISize;
+  uint _VISize;
+  uint _NISize;
+  uint _MISize;
+  uint _TISize;
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:IndexedFaceSet")
-#endif
 };
 
 } /* namespace Freestyle */

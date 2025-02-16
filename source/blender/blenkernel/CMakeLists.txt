@@ -1,494 +1,591 @@
-# ***** BEGIN GPL LICENSE BLOCK *****
+# SPDX-FileCopyrightText: 2006 Blender Authors
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software Foundation,
-# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-#
-# The Original Code is Copyright (C) 2006, Blender Foundation
-# All rights reserved.
-# ***** END GPL LICENSE BLOCK *****
+# SPDX-License-Identifier: GPL-2.0-or-later
 
 set(INC
-  .
-  ../blenfont
-  ../blenlib
-  ../blenloader
-  ../blentranslation
-  ../bmesh
-  ../depsgraph
-  ../draw
-  ../functions
-  ../gpencil_modifiers
-  ../gpu
+  PUBLIC .
   ../ikplugin
-  ../imbuf
-  ../makesdna
   ../makesrna
   ../modifiers
-  ../nodes
-  ../render
-  ../sequencer
+  ../nodes/geometry/include
   ../shader_fx
   ../simulation
+  ../windowmanager
   ../../../intern/eigen
   ../../../intern/ghost
-  ../../../intern/glew-mx
-  ../../../intern/guardedalloc
   ../../../intern/iksolver/extern
-  ../../../intern/atomic
-  ../../../intern/clog
   ../../../intern/libmv
   ../../../intern/mantaflow/extern
   ../../../intern/memutil
   ../../../intern/mikktspace
   ../../../intern/opensubdiv
-  ../../../extern/curve_fit_nd
 
-  # dna_type_offsets.h
-  ${CMAKE_CURRENT_BINARY_DIR}/../makesdna/intern
+  # RNA_prototypes.hh
+  ${CMAKE_BINARY_DIR}/source/blender/makesrna
 )
 
 set(INC_SYS
   ${ZLIB_INCLUDE_DIRS}
+
+  # For `vfontdata_freetype.cc`.
+  ${FREETYPE_INCLUDE_DIRS}
 )
 
 set(SRC
   ${CMAKE_SOURCE_DIR}/release/datafiles/userdef/userdef_default.c
-  intern/CCGSubSurf.c
-  intern/CCGSubSurf_legacy.c
-  intern/CCGSubSurf_util.c
-  intern/DerivedMesh.cc
-  intern/action.c
+  intern/CCGSubSurf.cc
+  intern/CCGSubSurf_legacy.cc
+  intern/CCGSubSurf_util.cc
+  intern/action.cc
   intern/action_bones.cc
-  intern/action_mirror.c
-  intern/addon.c
-  intern/anim_data.c
-  intern/anim_path.c
-  intern/anim_sys.c
-  intern/anim_visualization.c
-  intern/appdir.c
-  intern/armature.c
+  intern/action_mirror.cc
+  intern/addon.cc
+  intern/anim_data.cc
+  intern/anim_path.cc
+  intern/anim_sys.cc
+  intern/anim_visualization.cc
+  intern/anonymous_attribute_id.cc
+  intern/appdir.cc
+  intern/armature.cc
+  intern/armature_deform.cc
   intern/armature_selection.cc
-  intern/armature_deform.c
-  intern/armature_pose.cc
-  intern/armature_update.c
+  intern/armature_update.cc
   intern/asset.cc
-  intern/attribute.c
+  intern/asset_edit.cc
+  intern/asset_weak_reference.cc
+  intern/attribute.cc
   intern/attribute_access.cc
   intern/attribute_math.cc
-  intern/autoexec.c
-  intern/blender.c
-  intern/blender_copybuffer.c
-  intern/blender_undo.c
-  intern/blender_user_menu.c
-  intern/blendfile.c
-  intern/boids.c
-  intern/bpath.c
-  intern/brush.c
+  intern/autoexec.cc
+  intern/bake_data_block_map.cc
+  intern/bake_geometry_nodes_modifier.cc
+  intern/bake_geometry_nodes_modifier_pack.cc
+  intern/bake_items.cc
+  intern/bake_items_paths.cc
+  intern/bake_items_serialize.cc
+  intern/bake_items_socket.cc
+  intern/blender.cc
+  intern/blender_cli_command.cc
+  intern/blender_copybuffer.cc
+  intern/blender_undo.cc
+  intern/blender_user_menu.cc
+  intern/blendfile.cc
+  intern/blendfile_link_append.cc
+  intern/boids.cc
+  intern/bpath.cc
+  intern/brush.cc
   intern/bvhutils.cc
-  intern/cachefile.c
-  intern/callbacks.c
-  intern/camera.c
-  intern/cdderivedmesh.c
-  intern/cloth.c
-  intern/collection.c
-  intern/collision.c
-  intern/colorband.c
-  intern/colortools.c
-  intern/constraint.c
-  intern/context.c
-  intern/crazyspace.c
+  intern/cachefile.cc
+  intern/callbacks.cc
+  intern/camera.cc
+  intern/cloth.cc
+  intern/collection.cc
+  intern/collision.cc
+  intern/colorband.cc
+  intern/colortools.cc
+  intern/compositor.cc
+  intern/compute_contexts.cc
+  intern/constraint.cc
+  intern/context.cc
+  intern/cpp_types.cc
+  intern/crazyspace.cc
   intern/cryptomatte.cc
-  intern/curve.c
-  intern/curve_bevel.c
-  intern/curve_convert.c
-  intern/curve_decimate.c
-  intern/curve_deform.c
-  intern/curve_eval.cc
-  intern/curveprofile.c
-  intern/customdata.c
-  intern/customdata_file.c
-  intern/data_transfer.c
-  intern/deform.c
+  intern/curve.cc
+  intern/curve_bevel.cc
+  intern/curve_bezier.cc
+  intern/curve_catmull_rom.cc
+  intern/curve_convert.cc
+  intern/curve_decimate.cc
+  intern/curve_deform.cc
+  intern/curve_legacy_convert.cc
+  intern/curve_nurbs.cc
+  intern/curve_poly.cc
+  intern/curve_to_mesh_convert.cc
+  intern/curveprofile.cc
+  intern/curves.cc
+  intern/curves_attributes.cc
+  intern/curves_geometry.cc
+  intern/curves_utils.cc
+  intern/customdata.cc
+  intern/customdata_file.cc
+  intern/data_transfer.cc
+  intern/deform.cc
   intern/displist.cc
-  intern/displist_tangent.c
-  intern/dynamicpaint.c
-  intern/editlattice.c
-  intern/editmesh.c
-  intern/editmesh_bvh.c
-  intern/editmesh_cache.c
-  intern/editmesh_tangent.c
-  intern/effect.c
-  intern/fcurve.c
-  intern/fcurve_cache.c
-  intern/fcurve_driver.c
-  intern/fluid.c
-  intern/fmodifier.c
-  intern/font.c
-  intern/freestyle.c
-  intern/geometry_component_curve.cc
+  intern/dynamicpaint.cc
+  intern/editlattice.cc
+  intern/editmesh.cc
+  intern/editmesh_bvh.cc
+  intern/editmesh_cache.cc
+  intern/editmesh_tangent.cc
+  intern/effect.cc
+  intern/fcurve.cc
+  intern/fcurve_cache.cc
+  intern/fcurve_driver.cc
+  intern/file_handler.cc
+  intern/fluid.cc
+  intern/fmodifier.cc
+  intern/freestyle.cc
+  intern/geometry_compare.cc
+  intern/geometry_component_curves.cc
+  intern/geometry_component_edit_data.cc
+  intern/geometry_component_grease_pencil.cc
   intern/geometry_component_instances.cc
   intern/geometry_component_mesh.cc
   intern/geometry_component_pointcloud.cc
   intern/geometry_component_volume.cc
+  intern/geometry_fields.cc
   intern/geometry_set.cc
   intern/geometry_set_instances.cc
-  intern/gpencil.c
-  intern/gpencil_curve.c
-  intern/gpencil_geom.cc
-  intern/gpencil_modifier.c
-  intern/hair.c
+  intern/gpencil_geom_legacy.cc
+  intern/gpencil_legacy.cc
+  intern/gpencil_modifier_legacy.cc
+  intern/grease_pencil.cc
+  intern/grease_pencil_attributes.cc
+  intern/grease_pencil_convert_legacy.cc
+  intern/grease_pencil_vertex_groups.cc
   intern/icons.cc
-  intern/icons_rasterize.c
-  intern/idprop.c
-  intern/idprop_utils.c
-  intern/idtype.c
-  intern/image.c
-  intern/image_gen.c
-  intern/image_gpu.c
-  intern/image_save.c
-  intern/ipo.c
-  intern/kelvinlet.c
-  intern/key.c
-  intern/keyconfig.c
-  intern/lattice.c
-  intern/lattice_deform.c
-  intern/layer.c
-  intern/layer_utils.c
-  intern/lib_id.c
-  intern/lib_id_delete.c
-  intern/lib_id_eval.c
-  intern/lib_override.c
-  intern/lib_query.c
-  intern/lib_remap.c
-  intern/library.c
-  intern/light.c
-  intern/lightprobe.c
-  intern/linestyle.c
-  intern/main.c
-  intern/main_idmap.c
-  intern/mask.c
-  intern/mask_evaluate.c
-  intern/mask_rasterize.c
-  intern/material.c
-  intern/mball.c
-  intern/mball_tessellate.c
-  intern/mesh.c
-  intern/mesh_boolean_convert.cc
-  intern/mesh_convert.c
+  intern/icons_rasterize.cc
+  intern/idprop.cc
+  intern/idprop_create.cc
+  intern/idprop_serialize.cc
+  intern/idprop_utils.cc
+  intern/idtype.cc
+  intern/image.cc
+  intern/image_format.cc
+  intern/image_gen.cc
+  intern/image_gpu.cc
+  intern/image_partial_update.cc
+  intern/image_save.cc
+  intern/instances.cc
+  intern/instances_attributes.cc
+  intern/ipo.cc
+  intern/kelvinlet.cc
+  intern/key.cc
+  intern/keyconfig.cc
+  intern/lattice.cc
+  intern/lattice_deform.cc
+  intern/layer.cc
+  intern/layer_utils.cc
+  intern/lib_id.cc
+  intern/lib_id_delete.cc
+  intern/lib_id_eval.cc
+  intern/lib_id_remapper.cc
+  intern/lib_override.cc
+  intern/lib_override_proxy_conversion.cc
+  intern/lib_query.cc
+  intern/lib_remap.cc
+  intern/library.cc
+  intern/light.cc
+  intern/light_linking.cc
+  intern/lightprobe.cc
+  intern/linestyle.cc
+  intern/main.cc
+  intern/main_idmap.cc
+  intern/main_invariants.cc
+  intern/main_namemap.cc
+  intern/mask.cc
+  intern/mask_evaluate.cc
+  intern/mask_rasterize.cc
+  intern/material.cc
+  intern/mball.cc
+  intern/mball_tessellate.cc
+  intern/mesh.cc
+  intern/mesh_attributes.cc
+  intern/mesh_calc_edges.cc
+  intern/mesh_convert.cc
+  intern/mesh_data_update.cc
+  intern/mesh_debug.cc
   intern/mesh_evaluate.cc
   intern/mesh_fair.cc
-  intern/mesh_iterators.c
-  intern/mesh_mapping.c
-  intern/mesh_merge.c
-  intern/mesh_mirror.c
+  intern/mesh_flip_faces.cc
+  intern/mesh_iterators.cc
+  intern/mesh_legacy_convert.cc
+  intern/mesh_legacy_derived_mesh.cc
+  intern/mesh_mapping.cc
+  intern/mesh_merge_customdata.cc
+  intern/mesh_mirror.cc
   intern/mesh_normals.cc
-  intern/mesh_remap.c
-  intern/mesh_remesh_voxel.c
-  intern/mesh_runtime.c
+  intern/mesh_remap.cc
+  intern/mesh_remesh_voxel.cc
+  intern/mesh_runtime.cc
   intern/mesh_sample.cc
-  intern/mesh_tangent.c
-  intern/mesh_tessellate.c
-  intern/mesh_validate.c
+  intern/mesh_tangent.cc
+  intern/mesh_tessellate.cc
+  intern/mesh_topology_state.cc
   intern/mesh_validate.cc
-  intern/mesh_wrapper.c
-  intern/modifier.c
-  intern/movieclip.c
-  intern/multires.c
-  intern/multires_reshape.c
-  intern/multires_reshape_apply_base.c
-  intern/multires_reshape_ccg.c
-  intern/multires_reshape_smooth.c
-  intern/multires_reshape_subdivide.c
-  intern/multires_reshape_util.c
-  intern/multires_reshape_vertcos.c
-  intern/multires_subdiv.c
-  intern/multires_unsubdivide.c
-  intern/multires_versioning.c
-  intern/nla.c
+  intern/mesh_wrapper.cc
+  intern/modifier.cc
+  intern/movieclip.cc
+  intern/multires.cc
+  intern/multires_reshape.cc
+  intern/multires_reshape_apply_base.cc
+  intern/multires_reshape_ccg.cc
+  intern/multires_reshape_smooth.cc
+  intern/multires_reshape_subdivide.cc
+  intern/multires_reshape_util.cc
+  intern/multires_reshape_vertcos.cc
+  intern/multires_subdiv.cc
+  intern/multires_unsubdivide.cc
+  intern/multires_versioning.cc
+  intern/nla.cc
   intern/node.cc
-  intern/object.c
-  intern/object_deform.c
+  intern/node_enum_definition.cc
+  intern/node_runtime.cc
+  intern/node_socket_value.cc
+  intern/node_tree_dot_export.cc
+  intern/node_tree_field_inferencing.cc
+  intern/node_tree_interface.cc
+  intern/node_tree_reference_lifetimes.cc
+  intern/node_tree_update.cc
+  intern/node_tree_zones.cc
+  intern/object.cc
+  intern/object_deform.cc
   intern/object_dupli.cc
-  intern/object_facemap.c
-  intern/object_update.c
-  intern/ocean.c
-  intern/ocean_spectrum.c
-  intern/outliner_treehash.c
-  intern/packedFile.c
-  intern/paint.c
-  intern/paint_toolslots.c
-  intern/particle.c
-  intern/particle_child.c
-  intern/particle_distribute.c
-  intern/particle_system.c
-  intern/pbvh.c
-  intern/pbvh_bmesh.c
-  intern/pointcache.c
+  intern/object_update.cc
+  intern/ocean.cc
+  intern/ocean_spectrum.cc
+  intern/outliner_treehash.cc
+  intern/packedFile.cc
+  intern/paint.cc
+  intern/paint_canvas.cc
+  intern/particle.cc
+  intern/particle_child.cc
+  intern/particle_distribute.cc
+  intern/particle_system.cc
+  intern/pbvh.cc
+  intern/pbvh_bmesh.cc
+  intern/pbvh_pixels.cc
+  intern/pbvh_pixels_copy.cc
+  intern/pbvh_uv_islands.cc
+  intern/pointcache.cc
   intern/pointcloud.cc
-  intern/preferences.c
-  intern/report.c
-  intern/rigidbody.c
-  intern/scene.c
-  intern/screen.c
-  intern/shader_fx.c
-  intern/shrinkwrap.c
-  intern/simulation.cc
-  intern/softbody.c
-  intern/sound.c
-  intern/speaker.c
-  intern/spline_base.cc
-  intern/spline_bezier.cc
-  intern/spline_nurbs.cc
-  intern/spline_poly.cc
-  intern/studiolight.c
-  intern/subdiv.c
-  intern/subdiv_ccg.c
-  intern/subdiv_ccg_mask.c
-  intern/subdiv_ccg_material.c
-  intern/subdiv_converter.c
-  intern/subdiv_converter_mesh.c
-  intern/subdiv_deform.c
-  intern/subdiv_displacement.c
-  intern/subdiv_displacement_multires.c
-  intern/subdiv_eval.c
-  intern/subdiv_foreach.c
-  intern/subdiv_mesh.c
-  intern/subdiv_stats.c
-  intern/subdiv_topology.c
-  intern/subsurf_ccg.c
-  intern/text.c
-  intern/text_suggestions.c
-  intern/texture.c
-  intern/tracking.c
-  intern/tracking_auto.c
-  intern/tracking_detect.c
-  intern/tracking_plane_tracker.c
-  intern/tracking_region_tracker.c
-  intern/tracking_solver.c
-  intern/tracking_stabilize.c
-  intern/tracking_util.c
-  intern/undo_system.c
-  intern/unit.c
+  intern/pointcloud_attributes.cc
+  intern/pose_backup.cc
+  intern/preferences.cc
+  intern/preview_image.cc
+  intern/report.cc
+  intern/rigidbody.cc
+  intern/scene.cc
+  intern/screen.cc
+  intern/shader_fx.cc
+  intern/shrinkwrap.cc
+  intern/softbody.cc
+  intern/sound.cc
+  intern/speaker.cc
+  intern/studiolight.cc
+  intern/subdiv.cc
+  intern/subdiv_ccg.cc
+  intern/subdiv_ccg_mask.cc
+  intern/subdiv_converter.cc
+  intern/subdiv_converter_mesh.cc
+  intern/subdiv_deform.cc
+  intern/subdiv_displacement.cc
+  intern/subdiv_displacement_multires.cc
+  intern/subdiv_eval.cc
+  intern/subdiv_foreach.cc
+  intern/subdiv_mesh.cc
+  intern/subdiv_modifier.cc
+  intern/subdiv_stats.cc
+  intern/subdiv_topology.cc
+  intern/subsurf_ccg.cc
+  intern/text.cc
+  intern/text_suggestions.cc
+  intern/texture.cc
+  intern/tracking.cc
+  intern/tracking_auto.cc
+  intern/tracking_detect.cc
+  intern/tracking_plane_tracker.cc
+  intern/tracking_region_tracker.cc
+  intern/tracking_solver.cc
+  intern/tracking_stabilize.cc
+  intern/tracking_util.cc
+  intern/type_conversions.cc
+  intern/undo_system.cc
+  intern/unit.cc
+  intern/vfont.cc
+  intern/vfont_curve.cc
+  intern/vfontdata_freetype.cc
+  intern/viewer_path.cc
   intern/volume.cc
+  intern/volume_grid.cc
+  intern/volume_grid_file_cache.cc
   intern/volume_render.cc
   intern/volume_to_mesh.cc
-  intern/workspace.c
-  intern/world.c
-  intern/writeavi.c
+  intern/wm_runtime.cc
+  intern/workspace.cc
+  intern/world.cc
 
-  BKE_DerivedMesh.h
-  BKE_action.h
   BKE_action.hh
   BKE_addon.h
-  BKE_anim_data.h
+  BKE_anim_data.hh
   BKE_anim_path.h
   BKE_anim_visualization.h
   BKE_animsys.h
-  BKE_appdir.h
-  BKE_armature.h
+  BKE_anonymous_attribute_id.hh
+  BKE_anonymous_attribute_make.hh
+  BKE_appdir.hh
   BKE_armature.hh
-  BKE_asset.h
+  BKE_asset.hh
+  BKE_asset_edit.hh
   BKE_attribute.h
-  BKE_attribute_access.hh
+  BKE_attribute.hh
+  BKE_attribute_filter.hh
+  BKE_attribute_filters.hh
   BKE_attribute_math.hh
-  BKE_autoexec.h
-  BKE_blender.h
-  BKE_blender_copybuffer.h
-  BKE_blender_undo.h
-  BKE_blender_user_menu.h
+  BKE_autoexec.hh
+  BKE_bake_data_block_id.hh
+  BKE_bake_data_block_map.hh
+  BKE_bake_geometry_nodes_modifier.hh
+  BKE_bake_geometry_nodes_modifier_pack.hh
+  BKE_bake_items.hh
+  BKE_bake_items_paths.hh
+  BKE_bake_items_serialize.hh
+  BKE_bake_items_socket.hh
+  BKE_blender.hh
+  BKE_blender_cli_command.hh
+  BKE_blender_copybuffer.hh
+  BKE_blender_undo.hh
+  BKE_blender_user_menu.hh
   BKE_blender_version.h
-  BKE_blendfile.h
+  BKE_blendfile.hh
+  BKE_blendfile_link_append.hh
   BKE_boids.h
-  BKE_bpath.h
-  BKE_brush.h
-  BKE_bvhutils.h
-  BKE_cachefile.h
-  BKE_callbacks.h
+  BKE_bpath.hh
+  BKE_brush.hh
+  BKE_bvhutils.hh
+  BKE_cachefile.hh
+  BKE_callbacks.hh
   BKE_camera.h
-  BKE_ccg.h
-  BKE_cdderivedmesh.h
-  BKE_cloth.h
-  BKE_collection.h
+  BKE_ccg.hh
+  BKE_cloth.hh
+  BKE_collection.hh
   BKE_collision.h
-  BKE_colorband.h
-  BKE_colortools.h
+  BKE_colorband.hh
+  BKE_colortools.hh
+  BKE_compositor.hh
+  BKE_compute_contexts.hh
   BKE_constraint.h
-  BKE_context.h
-  BKE_crazyspace.h
+  BKE_context.hh
+  BKE_cpp_types.hh
+  BKE_crazyspace.hh
   BKE_cryptomatte.h
   BKE_cryptomatte.hh
-  BKE_curve.h
+  BKE_curve.hh
+  BKE_curve_legacy_convert.hh
+  BKE_curve_to_mesh.hh
   BKE_curveprofile.h
-  BKE_customdata.h
+  BKE_curves.h
+  BKE_curves.hh
+  BKE_curves_utils.hh
+  BKE_customdata.hh
   BKE_customdata_file.h
   BKE_data_transfer.h
-  BKE_deform.h
+  BKE_deform.hh
   BKE_displist.h
-  BKE_displist_tangent.h
-  BKE_duplilist.h
+  BKE_duplilist.hh
   BKE_dynamicpaint.h
   BKE_editlattice.h
-  BKE_editmesh.h
-  BKE_editmesh_bvh.h
-  BKE_editmesh_cache.h
-  BKE_editmesh_tangent.h
+  BKE_editmesh.hh
+  BKE_editmesh_bvh.hh
+  BKE_editmesh_cache.hh
+  BKE_editmesh_tangent.hh
   BKE_effect.h
-  BKE_fcurve.h
+  BKE_fcurve.hh
   BKE_fcurve_driver.h
+  BKE_file_handler.hh
   BKE_fluid.h
-  BKE_font.h
   BKE_freestyle.h
-  BKE_geometry_set.h
+  BKE_geometry_compare.hh
+  BKE_geometry_fields.hh
+  BKE_geometry_nodes_gizmos_transforms.hh
+  BKE_geometry_nodes_reference_set.hh
   BKE_geometry_set.hh
   BKE_geometry_set_instances.hh
-  BKE_global.h
-  BKE_gpencil.h
-  BKE_gpencil_curve.h
-  BKE_gpencil_geom.h
-  BKE_gpencil_modifier.h
-  BKE_hair.h
+  BKE_global.hh
+  BKE_gpencil_geom_legacy.h
+  BKE_gpencil_legacy.h
+  BKE_gpencil_modifier_legacy.h
+  BKE_grease_pencil.h
+  BKE_grease_pencil.hh
+  BKE_grease_pencil_legacy_convert.hh
+  BKE_grease_pencil_vertex_groups.hh
   BKE_icons.h
-  BKE_idprop.h
-  BKE_idtype.h
-  BKE_image.h
-  BKE_image_save.h
+  BKE_idprop.hh
+  BKE_idtype.hh
+  BKE_image.hh
+  BKE_image_format.hh
+  BKE_image_partial_update.hh
+  BKE_image_save.hh
+  BKE_image_wrappers.hh
+  BKE_instances.hh
   BKE_ipo.h
   BKE_kelvinlet.h
-  BKE_key.h
+  BKE_key.hh
   BKE_keyconfig.h
-  BKE_lattice.h
-  BKE_layer.h
-  BKE_lib_id.h
-  BKE_lib_override.h
-  BKE_lib_query.h
-  BKE_lib_remap.h
-  BKE_library.h
+  BKE_lattice.hh
+  BKE_layer.hh
+  BKE_lib_id.hh
+  BKE_lib_override.hh
+  BKE_lib_query.hh
+  BKE_lib_remap.hh
+  BKE_library.hh
   BKE_light.h
+  BKE_light_linking.h
   BKE_lightprobe.h
   BKE_linestyle.h
-  BKE_main.h
-  BKE_main_idmap.h
+  BKE_main.hh
+  BKE_main_idmap.hh
+  BKE_main_invariants.hh
+  BKE_main_namemap.hh
   BKE_mask.h
-  BKE_material.h
-  BKE_mball.h
-  BKE_mball_tessellate.h
+  BKE_material.hh
+  BKE_mball.hh
+  BKE_mball_tessellate.hh
   BKE_mesh.h
-  BKE_mesh_boolean_convert.hh
-  BKE_mesh_fair.h
-  BKE_mesh_iterators.h
-  BKE_mesh_mapping.h
-  BKE_mesh_mirror.h
-  BKE_mesh_remap.h
-  BKE_mesh_remesh_voxel.h
-  BKE_mesh_runtime.h
+  BKE_mesh.hh
+  BKE_mesh_fair.hh
+  BKE_mesh_iterators.hh
+  BKE_mesh_legacy_convert.hh
+  BKE_mesh_legacy_derived_mesh.hh
+  BKE_mesh_mapping.hh
+  BKE_mesh_mirror.hh
+  BKE_mesh_remap.hh
+  BKE_mesh_remesh_voxel.hh
+  BKE_mesh_runtime.hh
   BKE_mesh_sample.hh
-  BKE_mesh_tangent.h
-  BKE_mesh_types.h
-  BKE_mesh_wrapper.h
-  BKE_modifier.h
+  BKE_mesh_tangent.hh
+  BKE_mesh_topology_state.hh
+  BKE_mesh_types.hh
+  BKE_mesh_wrapper.hh
+  BKE_modifier.hh
   BKE_movieclip.h
-  BKE_multires.h
-  BKE_nla.h
-  BKE_node.h
-  BKE_object.h
+  BKE_multires.hh
+  BKE_nla.hh
+  BKE_node.hh
+  BKE_node_enum.hh
+  BKE_node_legacy_types.hh
+  BKE_node_runtime.hh
+  BKE_node_socket_value.hh
+  BKE_node_tree_dot_export.hh
+  BKE_node_tree_interface.hh
+  BKE_node_tree_reference_lifetimes.hh
+  BKE_node_tree_update.hh
+  BKE_node_tree_zones.hh
+  BKE_object.hh
   BKE_object_deform.h
-  BKE_object_facemap.h
+  BKE_object_types.hh
   BKE_ocean.h
-  BKE_outliner_treehash.h
-  BKE_packedFile.h
-  BKE_paint.h
+  BKE_outliner_treehash.hh
+  BKE_packedFile.hh
+  BKE_paint.hh
+  BKE_paint_bvh.hh
+  BKE_paint_bvh_pixels.hh
   BKE_particle.h
-  BKE_pbvh.h
   BKE_pointcache.h
-  BKE_pointcloud.h
+  BKE_pointcloud.hh
+  BKE_pose_backup.h
   BKE_preferences.h
-  BKE_report.h
+  BKE_preview_image.hh
+  BKE_report.hh
   BKE_rigidbody.h
-  BKE_scene.h
-  BKE_screen.h
+  BKE_scene.hh
+  BKE_scene_runtime.hh
+  BKE_screen.hh
   BKE_sequencer_offscreen.h
   BKE_shader_fx.h
-  BKE_shrinkwrap.h
-  BKE_simulation.h
+  BKE_shrinkwrap.hh
   BKE_softbody.h
   BKE_sound.h
   BKE_speaker.h
-  BKE_spline.hh
   BKE_studiolight.h
-  BKE_subdiv.h
-  BKE_subdiv_ccg.h
-  BKE_subdiv_deform.h
-  BKE_subdiv_eval.h
-  BKE_subdiv_foreach.h
-  BKE_subdiv_mesh.h
-  BKE_subdiv_topology.h
-  BKE_subsurf.h
+  BKE_subdiv.hh
+  BKE_subdiv_ccg.hh
+  BKE_subdiv_deform.hh
+  BKE_subdiv_eval.hh
+  BKE_subdiv_foreach.hh
+  BKE_subdiv_mesh.hh
+  BKE_subdiv_modifier.hh
+  BKE_subdiv_topology.hh
+  BKE_subsurf.hh
   BKE_text.h
   BKE_text_suggestions.h
   BKE_texture.h
   BKE_tracking.h
-  BKE_undo_system.h
-  BKE_unit.h
-  BKE_volume.h
-  BKE_volume_render.h
+  BKE_type_conversions.hh
+  BKE_undo_system.hh
+  BKE_unit.hh
+  BKE_vfont.hh
+  BKE_vfontdata.hh
+  BKE_viewer_path.hh
+  BKE_volume.hh
+  BKE_volume_enums.hh
+  BKE_volume_grid.hh
+  BKE_volume_grid_file_cache.hh
+  BKE_volume_grid_fwd.hh
+  BKE_volume_grid_type_traits.hh
+  BKE_volume_openvdb.hh
+  BKE_volume_render.hh
   BKE_volume_to_mesh.hh
-  BKE_workspace.h
+  BKE_wm_runtime.hh
+  BKE_workspace.hh
   BKE_world.h
-  BKE_writeavi.h
 
   nla_private.h
   particle_private.h
   tracking_private.h
+
   intern/CCGSubSurf.h
   intern/CCGSubSurf_inline.h
   intern/CCGSubSurf_intern.h
   intern/attribute_access_intern.hh
-  intern/data_transfer_intern.h
-  intern/lib_intern.h
-  intern/multires_inline.h
-  intern/multires_reshape.h
-  intern/multires_unsubdivide.h
+  intern/data_transfer_intern.hh
+  intern/lib_intern.hh
+  intern/multires_inline.hh
+  intern/multires_reshape.hh
+  intern/multires_unsubdivide.hh
   intern/ocean_intern.h
-  intern/pbvh_intern.h
-  intern/subdiv_converter.h
-  intern/subdiv_inline.h
+  intern/pbvh_intern.hh
+  intern/pbvh_pixels_copy.hh
+  intern/pbvh_uv_islands.hh
+  intern/subdiv_converter.hh
+  intern/subdiv_inline.hh
 )
 
 set(LIB
-  bf_blenfont
-  bf_blenlib
-  bf_blenloader
-  bf_blentranslation
-  bf_bmesh
-  bf_depsgraph
-  bf_draw
-  bf_functions
-  bf_gpencil_modifiers
-  bf_gpu
+  PRIVATE bf::animrig
+  PRIVATE bf::asset_system
+  PRIVATE bf::blenfont
+  PRIVATE bf::blenlib
+  PRIVATE bf::blenloader
+  PRIVATE bf::blentranslation
+  PRIVATE bf::bmesh
+  PRIVATE bf::depsgraph
+  PRIVATE bf::dna
+  PRIVATE bf::draw
+  PRIVATE bf::extern::curve_fit_nd
+  PRIVATE bf::functions
+  PRIVATE bf::gpu
   bf_ikplugin
-  bf_imbuf
-  bf_intern_clog
+  PRIVATE bf::imbuf
+  PRIVATE bf::imbuf::movie
+  PRIVATE bf::intern::clog
   bf_intern_ghost
-  bf_intern_guardedalloc
+  PRIVATE bf::intern::guardedalloc
   bf_intern_libmv  # Uses stub when disabled.
   bf_intern_mikktspace
   bf_intern_opensubdiv  # Uses stub when disabled.
   bf_modifiers
-  bf_nodes
+  PRIVATE bf::nodes
+  PRIVATE bf::render
   bf_rna
+  PRIVATE bf::sequencer
   bf_shader_fx
   bf_simulation
+  PRIVATE bf::extern::fmtlib
+  PRIVATE bf::extern::xxhash
+  PRIVATE bf::intern::atomic
+  # For `vfontdata_freetype.c`.
+  ${FREETYPE_LIBRARIES} ${BROTLI_LIBRARIES}
 )
 
 if(WITH_BINRELOC)
@@ -509,15 +606,16 @@ if(WIN32)
 endif()
 
 if(WITH_AUDASPACE)
-  add_definitions(-DWITH_AUDASPACE)
-
   list(APPEND INC_SYS
     ${AUDASPACE_C_INCLUDE_DIRS}
   )
-  list(APPEND LIB
-    ${AUDASPACE_C_LIBRARIES}
-    ${AUDASPACE_PY_LIBRARIES}
-  )
+  if(WITH_SYSTEM_AUDASPACE)
+    list(APPEND LIB
+      ${AUDASPACE_C_LIBRARIES}
+      ${AUDASPACE_PY_LIBRARIES}
+    )
+  endif()
+  add_definitions(-DWITH_AUDASPACE)
 endif()
 
 if(WITH_BULLET)
@@ -527,13 +625,6 @@ if(WITH_BULLET)
   list(APPEND INC
     ../../../intern/rigidbody
   )
-
-  if(NOT WITH_SYSTEM_BULLET)
-    list(APPEND LIB
-      extern_bullet
-    )
-  endif()
-
   list(APPEND LIB
     bf_intern_rigidbody
 
@@ -546,55 +637,19 @@ if(WITH_IMAGE_OPENEXR)
   add_definitions(-DWITH_OPENEXR)
 endif()
 
-if(WITH_IMAGE_TIFF)
-  add_definitions(-DWITH_TIFF)
-endif()
-
-if(WITH_OPENIMAGEIO)
-  add_definitions(-DWITH_OPENIMAGEIO)
-endif()
-
 if(WITH_IMAGE_OPENJPEG)
   add_definitions(-DWITH_OPENJPEG)
-endif()
-
-if(WITH_IMAGE_DDS)
-  add_definitions(-DWITH_DDS)
 endif()
 
 if(WITH_IMAGE_CINEON)
   add_definitions(-DWITH_CINEON)
 endif()
 
-if(WITH_IMAGE_FRAMESERVER)
-  add_definitions(-DWITH_FRAMESERVER)
-endif()
-
-if(WITH_IMAGE_HDR)
-  add_definitions(-DWITH_HDR)
-endif()
-
-if(WITH_CODEC_AVI)
-  list(APPEND INC
-    ../io/avi
-  )
-  add_definitions(-DWITH_AVI)
+if(WITH_IMAGE_WEBP)
+  add_definitions(-DWITH_WEBP)
 endif()
 
 if(WITH_CODEC_FFMPEG)
-  list(APPEND SRC
-    intern/writeffmpeg.c
-    BKE_writeffmpeg.h
-  )
-  list(APPEND INC
-    ../../../intern/ffmpeg
-  )
-  list(APPEND INC_SYS
-    ${FFMPEG_INCLUDE_DIRS}
-  )
-  list(APPEND LIB
-    ${FFMPEG_LIBRARIES}
-  )
   add_definitions(-DWITH_FFMPEG)
 endif()
 
@@ -607,6 +662,10 @@ if(WITH_PYTHON)
     bf_python_bmesh
   )
   add_definitions(-DWITH_PYTHON)
+
+  if(WITH_PYTHON_MODULE)
+    add_definitions(-DWITH_PYTHON_MODULE)
+  endif()
 
   if(WITH_PYTHON_SAFETY)
     add_definitions(-DWITH_PYTHON_SAFETY)
@@ -683,10 +742,6 @@ if(WITH_FFTW3)
   add_definitions(-DFFTW3=1)
 endif()
 
-if(WITH_INTERNATIONAL)
-  add_definitions(-DWITH_INTERNATIONAL)
-endif()
-
 if(WITH_FREESTYLE)
   add_definitions(-DWITH_FREESTYLE)
 endif()
@@ -696,6 +751,13 @@ if(WITH_ALEMBIC)
     ../io/alembic
   )
   add_definitions(-DWITH_ALEMBIC)
+endif()
+
+if(WITH_USD)
+  list(APPEND INC
+    ../io/usd
+  )
+  add_definitions(-DWITH_USD)
 endif()
 
 if(WITH_OPENSUBDIV)
@@ -736,51 +798,52 @@ if(WITH_XR_OPENXR)
   add_definitions(-DWITH_XR_OPENXR)
 endif()
 
-if(WITH_TBB)
-  add_definitions(-DWITH_TBB)
-
-  list(APPEND INC_SYS
-    ${TBB_INCLUDE_DIRS}
-  )
-
-  list(APPEND LIB
-    ${TBB_LIBRARIES}
-  )
-endif()
-
-if(WITH_GMP)
-  add_definitions(-DWITH_GMP)
-
-  list(APPEND INC_SYS
-    ${GMP_INCLUDE_DIRS}
-  )
-endif()
-
 # # Warnings as errors, this is too strict!
 # if(MSVC)
 #    string(APPEND CMAKE_C_FLAGS " /WX")
 # endif()
 
 blender_add_lib(bf_blenkernel "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
+add_library(bf::blenkernel ALIAS bf_blenkernel)
 
-# Needed so we can use dna_type_offsets.h for defaults initialization.
-add_dependencies(bf_blenkernel bf_dna)
+# RNA_prototypes.hh
+add_dependencies(bf_blenkernel bf_rna)
 
 
 if(WITH_GTESTS)
   set(TEST_SRC
     intern/action_test.cc
     intern/armature_test.cc
+    intern/asset_metadata_test.cc
+    intern/bpath_test.cc
     intern/cryptomatte_test.cc
+    intern/curves_geometry_test.cc
     intern/fcurve_test.cc
+    intern/file_handler_test.cc
+    intern/grease_pencil_test.cc
+    intern/idprop_serialize_test.cc
+    intern/image_partial_update_test.cc
+    intern/image_test.cc
     intern/lattice_deform_test.cc
     intern/layer_test.cc
+    intern/lib_id_remapper_test.cc
     intern/lib_id_test.cc
+    intern/lib_query_test.cc
+    intern/lib_remap_test.cc
+    intern/main_test.cc
+    intern/nla_test.cc
+    intern/subdiv_ccg_test.cc
     intern/tracking_test.cc
+    intern/volume_test.cc
   )
   set(TEST_INC
+    # WARNING: this is a bad-level include which is only acceptable for tests
+    # and even then it would be good if the dependency could be removed.
     ../editors/include
   )
-  include(GTestTesting)
-  blender_add_test_lib(bf_blenkernel_tests "${TEST_SRC}" "${INC};${TEST_INC}" "${INC_SYS}" "${LIB}")
+  set(TEST_LIB
+    ${LIB}
+    bf_rna  # RNA_prototypes.hh
+  )
+  blender_add_test_suite_lib(blenkernel "${TEST_SRC}" "${INC};${TEST_INC}" "${INC_SYS}" "${TEST_LIB}")
 endif()

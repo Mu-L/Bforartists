@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
@@ -21,10 +9,6 @@
 #pragma once
 
 #include "DNA_listBase.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 struct PaintSurfaceData;
 
@@ -47,7 +31,7 @@ enum {
 enum {
   MOD_DPAINT_ACTIVE = 1 << 0, /* Is surface enabled */
 
-  MOD_DPAINT_ANTIALIAS = 1 << 1,    /* do antialiasing */
+  MOD_DPAINT_ANTIALIAS = 1 << 1,    /* do anti-aliasing. */
   MOD_DPAINT_DISSOLVE = 1 << 2,     /* do dissolve */
   MOD_DPAINT_MULALPHA = 1 << 3,     /* Multiply color by alpha when saving image */
   MOD_DPAINT_DISSOLVE_LOG = 1 << 4, /* Use 1/x for surface dissolve */
@@ -127,7 +111,7 @@ typedef struct DynamicPaintSurface {
   float init_color[4];
   struct Tex *init_texture;
   /** MAX_CUSTOMDATA_LAYER_NAME. */
-  char init_layername[64];
+  char init_layername[68];
 
   int dry_speed, diss_speed;
   float color_dry_threshold;
@@ -144,13 +128,13 @@ typedef struct DynamicPaintSurface {
   char _pad2[4];
 
   /** MAX_CUSTOMDATA_LAYER_NAME. */
-  char uvlayer_name[64];
+  char uvlayer_name[68];
   /** 1024 = FILE_MAX. */
   char image_output_path[1024];
   /** MAX_CUSTOMDATA_LAYER_NAME. */
-  char output_name[64];
+  char output_name[68];
   /** MAX_CUSTOMDATA_LAYER_NAME */ /* some surfaces have 2 outputs. */
-  char output_name2[64];
+  char output_name2[68];
 
 } DynamicPaintSurface;
 
@@ -273,7 +257,3 @@ typedef struct DynamicPaintBrushSettings {
   float wave_factor, wave_clamp;
   float max_velocity, smudge_strength;
 } DynamicPaintBrushSettings;
-
-#ifdef __cplusplus
-}
-#endif

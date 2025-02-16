@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -42,23 +30,25 @@
  * template parameter. If anyone knows a way around this limitation, then the second parameter can
  * be eliminated.
  *
- *  Example:
- *    PointerSequence<vector<Widget*>, Widget*> v;
- *    v.push_back(new Widget);
- *    cout << v[0] << endl; // operator[] is provided by std::vector, not by PointerSequence
- *    v.destroy(); // Deletes all pointers in sequence and sets them to NULL.
+ * Example:
+ * \code{.cc}
+ * PointerSequence<vector<Widget*>, Widget*> v;
+ * v.push_back(new Widget);
+ * cout << v[0] << endl; // operator[] is provided by std::vector, not by PointerSequence
+ * v.destroy(); // Deletes all pointers in sequence and sets them to nullptr.
+ * \endcode
  *
- *  The idiom for removing a pointer from a sequence is:
- *    Widget* w = v[3];
- *    v.erase(v.begin() + 3); // or v[3] = 0;
- *  The user is now responsible for disposing of w properly.
+ * The idiom for removing a pointer from a sequence is:
+ * \code{.cc}
+ * Widget* w = v[3];
+ * v.erase(v.begin() + 3); // or v[3] = 0;
+ * \endcode
+ *  The user is now responsible for disposing of `w` properly.
  */
 
 #include <algorithm>
 
-#ifdef WITH_CXX_GUARDEDALLOC
-#  include "MEM_guardedalloc.h"
-#endif
+#include "MEM_guardedalloc.h"
 
 namespace Freestyle {
 
@@ -84,9 +74,7 @@ template<typename C, typename T> class PointerSequence : public C {
     for_each(this->begin(), this->end(), destroyer);
   }
 
-#ifdef WITH_CXX_GUARDEDALLOC
   MEM_CXX_CLASS_ALLOC_FUNCS("Freestyle:PointerSequence")
-#endif
 };
 
 } /* namespace Freestyle */

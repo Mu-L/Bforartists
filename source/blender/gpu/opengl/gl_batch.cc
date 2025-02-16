@@ -1,42 +1,25 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2016 by Mike Erwin. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2016 by Mike Erwin.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup gpu
  *
- * GL implementation of GPUBatch.
+ * GL implementation of #gpu::Batch.
  * The only specificity of GL here is that it caches a list of
  * Vertex Array Objects based on the bound shader interface.
  */
 
 #include "BLI_assert.h"
 
-#include "glew-mx.h"
-
-#include "gpu_batch_private.hh"
+#include "GPU_batch.hh"
 #include "gpu_shader_private.hh"
 
-#include "gl_backend.hh"
 #include "gl_context.hh"
 #include "gl_debug.hh"
 #include "gl_index_buffer.hh"
 #include "gl_primitive.hh"
+#include "gl_storage_buffer.hh"
 #include "gl_vertex_array.hh"
 
 #include "gl_batch.hh"
@@ -74,7 +57,6 @@ void GLVaoCache::init()
   vao_id_ = 0;
 }
 
-/* Create a new VAO object and store it in the cache. */
 void GLVaoCache::insert(const GLShaderInterface *interface, GLuint vao)
 {
   /* Now insert the cache. */
@@ -147,6 +129,11 @@ void GLVaoCache::remove(const GLShaderInterface *interface)
       break; /* cannot have duplicates */
     }
   }
+
+  if (interface_ == interface) {
+    interface_ = nullptr;
+    vao_id_ = 0;
+  }
 }
 
 void GLVaoCache::clear()
@@ -187,11 +174,10 @@ void GLVaoCache::clear()
   if (context_) {
     context_->vao_cache_unregister(this);
   }
-  /* Reinit. */
+  /* Reinitialize. */
   this->init();
 }
 
-/* Return 0 on cache miss (invalid VAO) */
 GLuint GLVaoCache::lookup(const GLShaderInterface *interface)
 {
   const int count = (is_dynamic_vao_count) ? dynamic_vaos.count : GPU_VAO_STATIC_LEN;
@@ -205,8 +191,6 @@ GLuint GLVaoCache::lookup(const GLShaderInterface *interface)
   return 0;
 }
 
-/* The GLVaoCache object is only valid for one GLContext.
- * Reset the cache if trying to draw in another context; */
 void GLVaoCache::context_check()
 {
   GLContext *ctx = GLContext::get();
@@ -224,39 +208,7 @@ void GLVaoCache::context_check()
   }
 }
 
-GLuint GLVaoCache::base_instance_vao_get(GPUBatch *batch, int i_first)
-{
-  this->context_check();
-  /* Make sure the interface is up to date. */
-  Shader *shader = GLContext::get()->shader;
-  GLShaderInterface *interface = static_cast<GLShaderInterface *>(shader->interface);
-  if (interface_ != interface) {
-    vao_get(batch);
-    /* Trigger update. */
-    base_instance_ = 0;
-  }
-  /**
-   * There seems to be a nasty bug when drawing using the same VAO reconfiguring (T71147).
-   * We just use a throwaway VAO for that. Note that this is likely to degrade performance.
-   */
-#ifdef __APPLE__
-  glDeleteVertexArrays(1, &vao_base_instance_);
-  vao_base_instance_ = 0;
-  base_instance_ = 0;
-#endif
-
-  if (vao_base_instance_ == 0) {
-    glGenVertexArrays(1, &vao_base_instance_);
-  }
-
-  if (base_instance_ != i_first) {
-    base_instance_ = i_first;
-    GLVertArray::update_bindings(vao_base_instance_, batch, interface_, i_first);
-  }
-  return vao_base_instance_;
-}
-
-GLuint GLVaoCache::vao_get(GPUBatch *batch)
+GLuint GLVaoCache::vao_get(Batch *batch)
 {
   this->context_check();
 
@@ -276,13 +228,14 @@ GLuint GLVaoCache::vao_get(GPUBatch *batch)
 
   return vao_id_;
 }
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
 /** \name Drawing
  * \{ */
 
-void GLBatch::bind(int i_first)
+void GLBatch::bind()
 {
   GLContext::get()->state_manager->apply_state();
 
@@ -291,27 +244,14 @@ void GLBatch::bind(int i_first)
     vao_cache_.clear();
   }
 
-#if GPU_TRACK_INDEX_RANGE
-  /* Can be removed if GL 4.3 is required. */
-  if (!GLContext::fixed_restart_index_support && (elem != nullptr)) {
-    glPrimitiveRestartIndex(this->elem_()->restart_index());
-  }
-#endif
-
-  /* Can be removed if GL 4.2 is required. */
-  if (!GLContext::base_instance_support && (i_first > 0)) {
-    glBindVertexArray(vao_cache_.base_instance_vao_get(this, i_first));
-  }
-  else {
-    glBindVertexArray(vao_cache_.vao_get(this));
-  }
+  glBindVertexArray(vao_cache_.vao_get(this));
 }
 
 void GLBatch::draw(int v_first, int v_count, int i_first, int i_count)
 {
   GL_CHECK_RESOURCES("Batch");
 
-  this->bind(i_first);
+  this->bind();
 
   BLI_assert(v_count > 0 && i_count > 0);
 
@@ -323,29 +263,55 @@ void GLBatch::draw(int v_first, int v_count, int i_first, int i_count)
     GLint base_index = el->index_base_;
     void *v_first_ofs = el->offset_ptr(v_first);
 
-    if (GLContext::base_instance_support) {
-      glDrawElementsInstancedBaseVertexBaseInstance(
-          gl_type, v_count, index_type, v_first_ofs, i_count, base_index, i_first);
-    }
-    else {
-      glDrawElementsInstancedBaseVertex(
-          gl_type, v_count, index_type, v_first_ofs, i_count, base_index);
-    }
+    glDrawElementsInstancedBaseVertexBaseInstance(
+        gl_type, v_count, index_type, v_first_ofs, i_count, base_index, i_first);
   }
   else {
-#ifdef __APPLE__
-    glDisable(GL_PRIMITIVE_RESTART);
-#endif
-    if (GLContext::base_instance_support) {
-      glDrawArraysInstancedBaseInstance(gl_type, v_first, v_count, i_count, i_first);
-    }
-    else {
-      glDrawArraysInstanced(gl_type, v_first, v_count, i_count);
-    }
-#ifdef __APPLE__
-    glEnable(GL_PRIMITIVE_RESTART);
-#endif
+    glDrawArraysInstancedBaseInstance(gl_type, v_first, v_count, i_count, i_first);
   }
+}
+
+void GLBatch::draw_indirect(GPUStorageBuf *indirect_buf, intptr_t offset)
+{
+  GL_CHECK_RESOURCES("Batch");
+
+  this->bind();
+  dynamic_cast<GLStorageBuf *>(unwrap(indirect_buf))->bind_as(GL_DRAW_INDIRECT_BUFFER);
+
+  GLenum gl_type = to_gl(prim_type);
+  if (elem) {
+    const GLIndexBuf *el = this->elem_();
+    GLenum index_type = to_gl(el->index_type_);
+    glDrawElementsIndirect(gl_type, index_type, (GLvoid *)offset);
+  }
+  else {
+    glDrawArraysIndirect(gl_type, (GLvoid *)offset);
+  }
+  /* Unbind. */
+  glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+}
+
+void GLBatch::multi_draw_indirect(GPUStorageBuf *indirect_buf,
+                                  int count,
+                                  intptr_t offset,
+                                  intptr_t stride)
+{
+  GL_CHECK_RESOURCES("Batch");
+
+  this->bind();
+  dynamic_cast<GLStorageBuf *>(unwrap(indirect_buf))->bind_as(GL_DRAW_INDIRECT_BUFFER);
+
+  GLenum gl_type = to_gl(prim_type);
+  if (elem) {
+    const GLIndexBuf *el = this->elem_();
+    GLenum index_type = to_gl(el->index_type_);
+    glMultiDrawElementsIndirect(gl_type, index_type, (GLvoid *)offset, count, stride);
+  }
+  else {
+    glMultiDrawArraysIndirect(gl_type, (GLvoid *)offset, count, stride);
+  }
+  /* Unbind. */
+  glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
 }
 
 /** \} */

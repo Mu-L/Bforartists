@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2010 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2010 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -24,11 +9,10 @@
  * \brief Blender kernel freestyle line style functionality.
  */
 
-#include "DNA_linestyle_types.h"
+#include <optional>
+#include <string>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "DNA_linestyle_types.h"
 
 #define LS_MODIFIER_TYPE_COLOR 1
 #define LS_MODIFIER_TYPE_ALPHA 2
@@ -60,16 +44,16 @@ LineStyleModifier *BKE_linestyle_geometry_modifier_add(FreestyleLineStyle *lines
 
 LineStyleModifier *BKE_linestyle_color_modifier_copy(FreestyleLineStyle *linestyle,
                                                      const LineStyleModifier *m,
-                                                     const int flag);
+                                                     int flag);
 LineStyleModifier *BKE_linestyle_alpha_modifier_copy(FreestyleLineStyle *linestyle,
                                                      const LineStyleModifier *m,
-                                                     const int flag);
+                                                     int flag);
 LineStyleModifier *BKE_linestyle_thickness_modifier_copy(FreestyleLineStyle *linestyle,
                                                          const LineStyleModifier *m,
-                                                         const int flag);
+                                                         int flag);
 LineStyleModifier *BKE_linestyle_geometry_modifier_copy(FreestyleLineStyle *linestyle,
                                                         const LineStyleModifier *m,
-                                                        const int flag);
+                                                        int flag);
 
 int BKE_linestyle_color_modifier_remove(FreestyleLineStyle *linestyle,
                                         LineStyleModifier *modifier);
@@ -80,6 +64,10 @@ int BKE_linestyle_thickness_modifier_remove(FreestyleLineStyle *linestyle,
 int BKE_linestyle_geometry_modifier_remove(FreestyleLineStyle *linestyle,
                                            LineStyleModifier *modifier);
 
+/**
+ * Reinsert \a modifier in modifier list with an offset of \a direction.
+ * \return if position of \a modifier has changed.
+ */
 bool BKE_linestyle_color_modifier_move(FreestyleLineStyle *linestyle,
                                        LineStyleModifier *modifier,
                                        int direction);
@@ -94,13 +82,9 @@ bool BKE_linestyle_geometry_modifier_move(FreestyleLineStyle *linestyle,
                                           int direction);
 
 void BKE_linestyle_modifier_list_color_ramps(FreestyleLineStyle *linestyle, ListBase *listbase);
-char *BKE_linestyle_path_to_color_ramp(FreestyleLineStyle *linestyle,
-                                       struct ColorBand *color_ramp);
+std::optional<std::string> BKE_linestyle_path_to_color_ramp(FreestyleLineStyle *linestyle,
+                                                            const struct ColorBand *color_ramp);
 
-bool BKE_linestyle_use_textures(FreestyleLineStyle *linestyle, const bool use_shading_nodes);
+bool BKE_linestyle_use_textures(FreestyleLineStyle *linestyle, bool use_shading_nodes);
 
 void BKE_linestyle_default_shader(const struct bContext *C, FreestyleLineStyle *linestyle);
-
-#ifdef __cplusplus
-}
-#endif

@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -24,18 +12,20 @@
  */
 
 /* only validate array-bounds in debug mode */
-#ifdef DEBUG
-#  define STACK_DECLARE(stack) unsigned int _##stack##_index, _##stack##_totalloc
-#  define STACK_INIT(stack, tot) \
-    ((void)stack, (void)((_##stack##_index) = 0), (void)((_##stack##_totalloc) = (tot)))
+#ifndef NDEBUG
+#  define STACK_DECLARE(stack) unsigned int _##stack##_index, _##stack##_num_alloc
+#  define STACK_INIT(stack, stack_num) \
+    ((void)stack, \
+     (void)((_##stack##_index) = 0), \
+     (void)((_##stack##_num_alloc) = (unsigned int)(stack_num)))
 #  define _STACK_SIZETEST(stack, off) \
-    (BLI_assert((_##stack##_index) + (off) <= _##stack##_totalloc))
+    (BLI_assert((_##stack##_index) + (off) <= _##stack##_num_alloc))
 #  define _STACK_SWAP_TOTALLOC(stack_a, stack_b) \
-    SWAP(unsigned int, _##stack_a##_totalloc, _##stack_b##_totalloc)
+    SWAP(unsigned int, _##stack_a##_num_alloc, _##stack_b##_num_alloc)
 #else
 #  define STACK_DECLARE(stack) unsigned int _##stack##_index
-#  define STACK_INIT(stack, tot) \
-    ((void)stack, (void)((_##stack##_index) = 0), (void)(0 ? (tot) : 0))
+#  define STACK_INIT(stack, stack_num) \
+    ((void)stack, (void)((_##stack##_index) = 0), (void)(0 ? (stack_num) : 0))
 #  define _STACK_SIZETEST(stack, off) (void)(stack), (void)(off)
 #  define _STACK_SWAP_TOTALLOC(stack_a, stack_b) (void)(stack_a), (void)(stack_b)
 #endif
@@ -92,7 +82,7 @@
 #else
 #  define STACK_SWAP(stack_a, stack_b) \
     { \
-      SWAP(void *, stack_a, stack_b); \
+      SWAP(void *, *(void **)&stack_a, *(void **)&stack_b); \
       SWAP(unsigned int, _##stack_a##_index, _##stack_b##_index); \
       _STACK_SWAP_TOTALLOC(stack_a, stack_b); \
     } \

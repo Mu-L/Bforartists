@@ -1,16 +1,15 @@
+/* SPDX-FileCopyrightText: 2020-2022 Blender Authors
+ *
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#pragma BLENDER_REQUIRE(workbench_data_lib.glsl)
+#include "infos/workbench_effect_outline_info.hh"
 
-uniform usampler2D objectIdBuffer;
-
-in vec4 uvcoordsvar;
-
-out vec4 fragColor;
+FRAGMENT_SHADER_CREATE_INFO(workbench_effect_outline)
 
 void main()
 {
   vec3 offset = vec3(world_data.viewport_size_inv, 0.0) * world_data.ui_scale;
-  vec2 uv = uvcoordsvar.st;
+  vec2 uv = uvcoordsvar.xy;
 
   uint center_id = texture(objectIdBuffer, uv).r;
   uvec4 adjacent_ids = uvec4(texture(objectIdBuffer, uv + offset.zy).r,

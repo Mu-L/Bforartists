@@ -1,11 +1,9 @@
-/** \file itasc/ConstraintSet.cpp
- * \ingroup itasc
- */
-/*
- * ConstraintSet.cpp
+/* SPDX-FileCopyrightText: 2009 Ruben Smits
  *
- *  Created on: Jan 5, 2009
- *      Author: rubensmits
+ * SPDX-License-Identifier: LGPL-2.1-or-later */
+
+/** \file
+ * \ingroup intern_itasc
  */
 
 #include "ConstraintSet.hpp"

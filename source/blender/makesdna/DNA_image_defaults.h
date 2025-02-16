@@ -1,18 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2023 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup DNA
@@ -20,7 +8,6 @@
 
 #pragma once
 
-/* Struct members on own line. */
 /* clang-format off */
 
 /* -------------------------------------------------------------------- */
@@ -35,9 +22,11 @@
     .gen_y = 1024, \
     .gen_type = IMA_GENTYPE_GRID, \
  \
-    .gpuframenr = INT_MAX, \
-    .gpu_pass = SHRT_MAX, \
-    .gpu_layer = SHRT_MAX, \
+    .gpuframenr = IMAGE_GPU_FRAME_NONE, \
+    .gpu_pass = IMAGE_GPU_PASS_NONE, \
+    .gpu_layer = IMAGE_GPU_LAYER_NONE, \
+    .gpu_view = IMAGE_GPU_VIEW_NONE, \
+    .seam_margin = 8, \
   }
 
 /** \} */

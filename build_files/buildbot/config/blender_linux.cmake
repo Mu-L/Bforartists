@@ -1,29 +1,25 @@
+# SPDX-FileCopyrightText: 2015-2022 Blender Authors
+#
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 # ######## Global feature set settings ########
 
 include("${CMAKE_CURRENT_LIST_DIR}/../../cmake/config/blender_release.cmake")
 
-message(STATUS "Building in CentOS 7 64bit environment")
-
-set(LIBDIR_NAME "linux_centos7_x86_64")
-set(WITH_CXX11_ABI           OFF CACHE BOOL "" FORCE)
+message(STATUS "Building in Rocky 8 Linux 64bit environment")
 
 # ######## Linux-specific build options ########
 # Options which are specific to Linux-only platforms
 
 set(WITH_DOC_MANPAGE         OFF CACHE BOOL "" FORCE)
+set(WITH_CYCLES_TEST_OSL     ON CACHE BOOL "" FORCE)
 
-# ######## Official release-specific build options ########
-# Options which are specific to Linux release builds only
+set(HIPRT_COMPILER_PARALLEL_JOBS        6 CACHE STRING "" FORCE)
+set(SYCL_OFFLINE_COMPILER_PARALLEL_JOBS 6 CACHE STRING "" FORCE)
 
-set(WITH_JACK_DYNLOAD        ON  CACHE BOOL "" FORCE)
-set(WITH_PULSEAUDIO_DYNLOAD  ON  CACHE BOOL "" FORCE)
-set(WITH_SDL_DYNLOAD         ON  CACHE BOOL "" FORCE)
+set(WITH_LINUX_OFFICIAL_RELEASE_TESTS   ON CACHE BOOL "" FORCE)
 
-# ######## Release environment specific settings ########
-
-set(LIBDIR "${CMAKE_CURRENT_LIST_DIR}/../../../../lib/${LIBDIR_NAME}" CACHE STRING "" FORCE)
-
-# Platform specific configuration, to ensure static linking against everything.
-
-# Additional linking libraries
-set(CMAKE_EXE_LINKER_FLAGS   "-lrt -static-libstdc++ -no-pie"  CACHE STRING "" FORCE)
+# Validate that some python scripts in out `build_files` and `docs` directories
+# can be used with the builder's system python.
+set(WITH_SYSTEM_PYTHON_TESTS ON CACHE BOOL "" FORCE)
+set(TEST_SYSTEM_PYTHON_EXE "/usr/bin/python3.6" CACHE PATH "" FORCE)

@@ -1,20 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 1999-2001 David Hodson <hodsond@acm.org>.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * Copyright 1999,2000,2001 David Hodson <hodsond@acm.org>
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
  * \ingroup imbcineon
@@ -27,10 +13,6 @@
 
 #include "logImageCore.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #define CINEON_FILE_MAGIC 0x802A5FD7
 #define CINEON_UNDEFINED_U8 0xFF
 #define CINEON_UNDEFINED_U16 0xFFFF
@@ -38,7 +20,7 @@ extern "C" {
 #define CINEON_UNDEFINED_R32 0x7F800000
 #define CINEON_UNDEFINED_CHAR 0
 
-typedef struct {
+struct CineonFileHeader {
   unsigned int magic_num;
   unsigned int offset;
   unsigned int gen_hdr_size;
@@ -50,24 +32,24 @@ typedef struct {
   char creation_date[12];
   char creation_time[12];
   char reserved[36];
-} CineonFileHeader;
+};
 
-typedef struct {
-  unsigned char descriptor1;
-  unsigned char descriptor2;
-  unsigned char bits_per_sample;
-  unsigned char filler;
+struct CineonElementHeader {
+  uchar descriptor1;
+  uchar descriptor2;
+  uchar bits_per_sample;
+  uchar filler;
   unsigned int pixels_per_line;
   unsigned int lines_per_image;
   unsigned int ref_low_data;
   float ref_low_quantity;
   unsigned int ref_high_data;
   float ref_high_quantity;
-} CineonElementHeader;
+};
 
-typedef struct {
-  unsigned char orientation;
-  unsigned char elements_per_image;
+struct CineonImageHeader {
+  uchar orientation;
+  uchar elements_per_image;
   unsigned short filler;
   CineonElementHeader element[8];
   float white_point_x;
@@ -80,16 +62,16 @@ typedef struct {
   float blue_primary_y;
   char label[200];
   char reserved[28];
-  unsigned char interleave;
-  unsigned char packing;
-  unsigned char data_sign;
-  unsigned char sense;
+  uchar interleave;
+  uchar packing;
+  uchar data_sign;
+  uchar sense;
   unsigned int line_padding;
   unsigned int element_padding;
   char reserved2[20];
-} CineonImageHeader;
+};
 
-typedef struct {
+struct CineonOriginationHeader {
   int x_offset;
   int y_offset;
   char file_name[100];
@@ -102,13 +84,13 @@ typedef struct {
   float y_input_samples_per_mm;
   float input_device_gamma;
   char reserved[40];
-} CineonOriginationHeader;
+};
 
-typedef struct {
-  unsigned char film_code;
-  unsigned char film_type;
-  unsigned char edge_code_perforation_offset;
-  unsigned char filler;
+struct CineonFilmHeader {
+  uchar film_code;
+  uchar film_type;
+  uchar edge_code_perforation_offset;
+  uchar filler;
   unsigned int prefix;
   unsigned int count;
   char format[32];
@@ -117,20 +99,16 @@ typedef struct {
   char attribute[32];
   char slate[200];
   char reserved[740];
-} CineonFilmHeader;
+};
 
-typedef struct {
+struct CineonMainHeader {
   CineonFileHeader fileHeader;
   CineonImageHeader imageHeader;
   CineonOriginationHeader originationHeader;
   CineonFilmHeader filmHeader;
-} CineonMainHeader;
+};
 
 void cineonSetVerbose(int);
-LogImageFile *cineonOpen(const unsigned char *byteStuff, int fromMemory, size_t bufferSize);
+LogImageFile *cineonOpen(const uchar *byteStuff, int fromMemory, size_t bufferSize);
 LogImageFile *cineonCreate(
-    const char *filename, int width, int height, int bitsPerSample, const char *creator);
-
-#ifdef __cplusplus
-}
-#endif
+    const char *filepath, int width, int height, int bitsPerSample, const char *creator);

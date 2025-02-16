@@ -1,23 +1,12 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2021 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2021 Blender Foundation
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
-#include "BKE_action.h"
+#include "BLI_string.h"
+
+#include "BKE_action.hh"
+
+#include "ANIM_action.hh"
 
 #include "DNA_action_types.h"
 #include "DNA_anim_types.h"
@@ -66,10 +55,10 @@ TEST(action_groups, ReconstructGroupsWithReordering)
   bActionGroup groupB = {nullptr};
   bActionGroup groupC = {nullptr};
   bActionGroup groupD = {nullptr};
-  strcpy(groupA.name, "groupA");
-  strcpy(groupB.name, "groupB");
-  strcpy(groupC.name, "groupC");
-  strcpy(groupD.name, "groupD");
+  STRNCPY(groupA.name, "groupA");
+  STRNCPY(groupB.name, "groupB");
+  STRNCPY(groupC.name, "groupC");
+  STRNCPY(groupD.name, "groupD");
 
   BLI_addtail(&action.groups, &groupA);
   BLI_addtail(&action.groups, &groupB);
@@ -139,6 +128,96 @@ TEST(action_groups, ReconstructGroupsWithReordering)
   EXPECT_EQ(groupBcurve3.next, &groupDcurve1);
   EXPECT_EQ(groupDcurve1.next, &groupDcurve2);
   EXPECT_EQ(groupDcurve2.next, nullptr);
+}
+
+namespace {
+
+/* Allocate fcu->bezt, and also return a unique_ptr to it for easily freeing the memory. */
+std::unique_ptr<BezTriple[]> allocate_keyframes(FCurve *fcu, const size_t num_keyframes)
+{
+  auto bezt_uptr = std::make_unique<BezTriple[]>(num_keyframes);
+  fcu->bezt = bezt_uptr.get();
+  return bezt_uptr;
+}
+
+/* Append keyframe, assumes that fcu->bezt is allocated and has enough space. */
+void add_keyframe(FCurve *fcu, float x, float y)
+{
+  /* The insert_keyframe functions are in the editors, so we cannot link to those here. */
+  BezTriple the_keyframe;
+  memset(&the_keyframe, 0, sizeof(the_keyframe));
+
+  /* Copied from insert_vert_fcurve() in `keyframing.cc`. */
+  the_keyframe.vec[0][0] = x - 1.0f;
+  the_keyframe.vec[0][1] = y;
+  the_keyframe.vec[1][0] = x;
+  the_keyframe.vec[1][1] = y;
+  the_keyframe.vec[2][0] = x + 1.0f;
+  the_keyframe.vec[2][1] = y;
+
+  memcpy(&fcu->bezt[fcu->totvert], &the_keyframe, sizeof(the_keyframe));
+  fcu->totvert++;
+}
+
+}  // namespace
+
+TEST(action_assets, BKE_action_has_single_frame)
+{
+  /* No FCurves. */
+  {
+    const bAction empty = {{nullptr}};
+    EXPECT_FALSE(empty.wrap().has_single_frame())
+        << "Action without FCurves cannot have a single frame.";
+  }
+
+  /* One curve with one key. */
+  {
+    FCurve fcu = {nullptr};
+    std::unique_ptr<BezTriple[]> bezt = allocate_keyframes(&fcu, 1);
+    add_keyframe(&fcu, 1.0f, 2.0f);
+
+    bAction action = {{nullptr}};
+    BLI_addtail(&action.curves, &fcu);
+
+    EXPECT_TRUE(action.wrap().has_single_frame())
+        << "Action with one FCurve and one key should have single frame.";
+  }
+
+  /* Two curves with one key each. */
+  {
+    FCurve fcu1 = {nullptr};
+    FCurve fcu2 = {nullptr};
+    std::unique_ptr<BezTriple[]> bezt1 = allocate_keyframes(&fcu1, 1);
+    std::unique_ptr<BezTriple[]> bezt2 = allocate_keyframes(&fcu2, 1);
+    add_keyframe(&fcu1, 1.0f, 327.0f);
+    add_keyframe(&fcu2, 1.0f, 47.0f); /* Same X-coordinate as the other one. */
+
+    bAction action = {{nullptr}};
+    BLI_addtail(&action.curves, &fcu1);
+    BLI_addtail(&action.curves, &fcu2);
+
+    EXPECT_TRUE(action.wrap().has_single_frame())
+        << "Two FCurves with keys on the same frame should have single frame.";
+
+    /* Modify the 2nd curve so it's keyed on a different frame. */
+    fcu2.bezt[0].vec[1][0] = 2.0f;
+    EXPECT_FALSE(action.wrap().has_single_frame())
+        << "Two FCurves with keys on different frames should have animation.";
+  }
+
+  /* One curve with two keys. */
+  {
+    FCurve fcu = {nullptr};
+    std::unique_ptr<BezTriple[]> bezt = allocate_keyframes(&fcu, 2);
+    add_keyframe(&fcu, 1.0f, 2.0f);
+    add_keyframe(&fcu, 2.0f, 2.5f);
+
+    bAction action = {{nullptr}};
+    BLI_addtail(&action.curves, &fcu);
+
+    EXPECT_FALSE(action.wrap().has_single_frame())
+        << "Action with one FCurve and two keys must have animation.";
+  }
 }
 
 }  // namespace blender::bke::tests

@@ -1,28 +1,15 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2016 Blender Authors
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2016 Blender Foundation.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 /** \file
- * \ingroup mantaflow
+ * \ingroup intern_mantaflow
  */
 
 #ifndef MANTA_API_H
 #define MANTA_API_H
+
+#include <cstddef>
 
 #ifdef __cplusplus
 extern "C" {
@@ -134,7 +121,7 @@ float *manta_smoke_get_fuel(struct MANTA *smoke);
 float *manta_smoke_get_react(struct MANTA *smoke);
 float *manta_smoke_get_heat(struct MANTA *smoke);
 float *manta_smoke_get_flame(struct MANTA *smoke);
-float *manta_smoke_get_shadow(struct MANTA *fluid);
+float *manta_smoke_get_shadow(struct MANTA *smoke);
 float *manta_smoke_get_color_r(struct MANTA *smoke);
 float *manta_smoke_get_color_g(struct MANTA *smoke);
 float *manta_smoke_get_color_b(struct MANTA *smoke);
@@ -169,8 +156,8 @@ void manta_noise_get_res(struct MANTA *smoke, int *res);
 int manta_noise_get_cells(struct MANTA *smoke);
 
 /* Liquid functions */
-bool manta_liquid_export_script(struct MANTA *smoke, struct FluidModifierData *fmd);
-bool manta_liquid_ensure_sndparts(struct MANTA *fluid, struct FluidModifierData *fmd);
+bool manta_liquid_export_script(struct MANTA *liquid, struct FluidModifierData *fmd);
+bool manta_liquid_ensure_sndparts(struct MANTA *liquid, struct FluidModifierData *fmd);
 
 /* Liquid accessors */
 int manta_liquid_get_particle_res_x(struct MANTA *liquid);

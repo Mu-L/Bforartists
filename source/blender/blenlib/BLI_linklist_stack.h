@@ -1,21 +1,6 @@
-/*
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
+/* SPDX-FileCopyrightText: 2001-2002 NaN Holding BV. All rights reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software Foundation,
- * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
- * The Original Code is Copyright (C) 2001-2002 by NaN Holding BV.
- * All rights reserved.
- */
+ * SPDX-License-Identifier: GPL-2.0-or-later */
 
 #pragma once
 
@@ -51,20 +36,14 @@
 
 #define BLI_LINKSTACK_SIZE(var) BLI_mempool_len(var##_pool_)
 
-/* check for typeof() */
-#ifdef __GNUC__
-#  define BLI_LINKSTACK_PUSH(var, ptr) \
-    (CHECK_TYPE_INLINE(ptr, typeof(var##_type_)), \
-     BLI_linklist_prepend_pool(&(var), ptr, var##_pool_))
-#  define BLI_LINKSTACK_POP(var) \
-    (var ? (typeof(var##_type_))BLI_linklist_pop_pool(&(var), var##_pool_) : NULL)
-#  define BLI_LINKSTACK_POP_DEFAULT(var, r) \
-    (var ? (typeof(var##_type_))BLI_linklist_pop_pool(&(var), var##_pool_) : r)
-#else /* non gcc */
-#  define BLI_LINKSTACK_PUSH(var, ptr) (BLI_linklist_prepend_pool(&(var), ptr, var##_pool_))
-#  define BLI_LINKSTACK_POP(var) (var ? BLI_linklist_pop_pool(&(var), var##_pool_) : NULL)
-#  define BLI_LINKSTACK_POP_DEFAULT(var, r) (var ? BLI_linklist_pop_pool(&(var), var##_pool_) : r)
-#endif /* gcc check */
+/* Check for `decltype()` or `typeof()` support. */
+#define BLI_LINKSTACK_PUSH(var, ptr) \
+  (CHECK_TYPE_INLINE_NONCONST(ptr, decltype(var##_type_)), \
+   BLI_linklist_prepend_pool(&(var), ptr, var##_pool_))
+#define BLI_LINKSTACK_POP(var) \
+  (decltype(var##_type_))(var ? BLI_linklist_pop_pool(&(var), var##_pool_) : NULL)
+#define BLI_LINKSTACK_POP_DEFAULT(var, r) \
+  (decltype(var##_type_))(var ? BLI_linklist_pop_pool(&(var), var##_pool_) : r)
 
 #define BLI_LINKSTACK_SWAP(var_a, var_b) \
   { \
@@ -162,8 +141,9 @@
     LinkNode *_##var##_iter; \
     unsigned int i; \
     for (_##var##_iter = _##var##_stack, i = 0; _##var##_iter; \
-         _##var##_iter = _##var##_iter->next, i++) { \
-      (data)[i] = _BLI_SMALLSTACK_CAST(var)(_##var##_iter->link); \
+         _##var##_iter = _##var##_iter->next, i++) \
+    { \
+      *(void **)&(data)[i] = _##var##_iter->link; \
     } \
   } \
   ((void)0)

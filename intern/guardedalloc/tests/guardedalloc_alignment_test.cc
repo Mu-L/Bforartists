@@ -1,4 +1,6 @@
-/* Apache License, Version 2.0 */
+/* SPDX-FileCopyrightText: 2014-2022 Blender Authors
+ *
+ * SPDX-License-Identifier: Apache-2.0 */
 
 #include "testing/testing.h"
 
@@ -7,7 +9,7 @@
 #include "MEM_guardedalloc.h"
 #include "guardedalloc_test_base.h"
 
-#define CHECK_ALIGNMENT(ptr, align) EXPECT_EQ((size_t)ptr % align, 0)
+#define CHECK_ALIGNMENT(ptr, align) EXPECT_EQ(size_t(ptr) % align, 0)
 
 namespace {
 
