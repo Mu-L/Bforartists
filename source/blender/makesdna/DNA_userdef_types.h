@@ -10,6 +10,7 @@
 
 #include "BLI_enum_flags.hh"
 #include "BLI_math_constants.hh"
+#include "BLI_uuid.hh"
 
 #include "DNA_ID.h"
 #include "DNA_anim_enums.h"
@@ -682,6 +683,11 @@ struct bUserAssetLibrary {
    * (#ASSET_LIBRARY_USE_REMOTE_URL), this is the download cache directory, where already
    * downloaded assets will be placed. */
   char dirpath[/*FILE_MAX*/ 1024] = "";
+  /** The "resolved" dirpath. This is the version of dirpath that has had variable expansion done
+   * on it and has normalized the path string and converted the directory separatior to use the OS
+   * native version. This should always be used when looking for the actual asset library on disk.
+   */
+  char resolved_dirpath[/*FILE_MAX*/ 1024] = "";
   /** Only for remote asset libraries (#ASSET_LIBRARY_USE_REMOTE_URL is set). Update using
    * #BKE_preferences_remote_asset_library_url_set() only. */
   char remote_url[/*FILE_MAX*/ 1024];
@@ -690,6 +696,15 @@ struct bUserAssetLibrary {
    * Only use when #ASSET_LIBRARY_USE_AUTH_TOKEN is set. Update using
    * #BKE_preferences_remote_asset_library_auth_token_set() only. */
   char *auth_token = nullptr;
+  /** The UUID of the asset library. This is used to make deduplication possible when using the
+   * same asset library from different computers. */
+  bUUID uuid;
+  /** If the asset library was created with an invalid UUID string, it will be stored here.
+   * The library will be disabled and we will notify the user that it has an invalid UUID.
+   * We store the invalid UUID string so that we don't introduce any data loss when saving the
+   * UUIDs to files. (If it is invalid it is up to the end user to fix it.
+   */
+  char *invalid_uuid = nullptr;
 
   short import_method = ASSET_IMPORT_PACK;  /* eAssetImportMethod */
   short flag = ASSET_LIBRARY_RELATIVE_PATH; /* eAssetLibrary_Flag */
@@ -1294,7 +1309,10 @@ struct UserDef {
   eUserpref_RenderDisplayType render_display_type = USER_RENDER_DISPLAY_WINDOW;
   eUserpref_TempSpaceDisplayType filebrowser_display_type = USER_TEMP_SPACE_DISPLAY_WINDOW;
   eUserpref_TempSpaceDisplayType preferences_display_type = USER_TEMP_SPACE_DISPLAY_WINDOW;
-  char _pad18[7] = {};
+  char _pad18[3] = {};
+
+  /** Default duration in *seconds* for strips with no inherent duration (color, text, etc). */
+  float sequencer_default_strip_length = 1.0f;
 
   eUserpref_SeqProxySetup sequencer_proxy_setup = USER_SEQ_PROXY_SETUP_AUTOMATIC;
   short _pad1 = {};

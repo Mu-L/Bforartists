@@ -132,6 +132,18 @@ static const EnumPropertyItem rna_enum_image_import_type_items[] = {
 /** \name Generic Add Functions
  * \{ */
 
+static bool is_drag_and_drop(const wmOperator *op, const wmEvent *event)
+{
+  if (event != nullptr && event->type == EVT_DROP) {
+    return true;
+  }
+  /* TAKE NOTICE, footgun! Dragging and dropping *multiple* files will not emit `EVT_DROP`,
+   * so we can't check for that alone. */
+  return (RNA_struct_property_is_set(op->ptr, "files") &&
+          !RNA_collection_is_empty(op->ptr, "files")) ||
+         RNA_struct_property_is_set(op->ptr, "filepath");
+}
+
 static void sequencer_add_init(bContext * /*C*/, wmOperator *op)
 {
   op->customdata = MEM_new<SequencerAddData>(__func__);
@@ -247,11 +259,11 @@ static void sequencer_generic_props__internal(wmOperatorType *ot, int flag)
     RNA_def_int(ot->srna,
                 "length",
                 0,
-                INT_MIN,
+                1,
                 INT_MAX,
                 "Length",
                 "Length of the strip in frames, or the length of each strip if multiple are added",
-                -MAXFRAME,
+                1,
                 MAXFRAME);
   }
 
@@ -424,9 +436,7 @@ static void sequencer_file_drop_channel_frame_set(bContext *C,
                                                   wmOperator *op,
                                                   const wmEvent *event)
 {
-  BLI_assert((RNA_struct_property_is_set(op->ptr, "files") &&
-              !RNA_collection_is_empty(op->ptr, "files")) ||
-             RNA_struct_property_is_set(op->ptr, "filepath"));
+  BLI_assert(is_drag_and_drop(op, event));
 
   if (RNA_struct_property_is_set(op->ptr, "channel") ||
       RNA_struct_property_is_set(op->ptr, "frame_start"))
@@ -485,7 +495,7 @@ static void sequencer_generic_invoke_xy__internal(
   }
 
   if ((flag & SEQPROP_LENGTH) && !RNA_struct_property_is_set(op->ptr, "length")) {
-    RNA_int_set(op->ptr, "length", seq::DEFAULT_STRIP_LENGTH);
+    RNA_int_set(op->ptr, "length", seq::default_strip_length(scene->frames_per_second()));
   }
 
   if (!(flag & SEQPROP_NOPATHS)) {
@@ -783,8 +793,12 @@ static wmOperatorStatus sequencer_add_scene_strip_invoke(bContext *C,
     return WM_enum_search_invoke(C, op, event);
   }
 
-  sequencer_generic_invoke_xy__internal(C, op, 0, STRIP_TYPE_SCENE, event);
-  return sequencer_add_scene_strip_exec(C, op);
+  sequencer_add_init(C, op);
+  sequencer_generic_invoke_xy__internal(
+      C, op, is_drag_and_drop(op, event) ? SEQPROP_NOPATHS : 0, STRIP_TYPE_SCENE, event);
+  const wmOperatorStatus retval = sequencer_add_scene_strip_exec(C, op);
+  sequencer_add_free(C, op);
+  return retval;
 }
 
 void SEQUENCER_OT_scene_strip_add(wmOperatorType *ot)
@@ -1051,8 +1065,12 @@ static wmOperatorStatus sequencer_add_movieclip_strip_invoke(bContext *C,
     return WM_enum_search_invoke(C, op, event);
   }
 
-  sequencer_generic_invoke_xy__internal(C, op, 0, STRIP_TYPE_MOVIECLIP, event);
-  return sequencer_add_movieclip_strip_exec(C, op);
+  sequencer_add_init(C, op);
+  sequencer_generic_invoke_xy__internal(
+      C, op, is_drag_and_drop(op, event) ? SEQPROP_NOPATHS : 0, STRIP_TYPE_MOVIECLIP, event);
+  const wmOperatorStatus retval = sequencer_add_movieclip_strip_exec(C, op);
+  sequencer_add_free(C, op);
+  return retval;
 }
 
 void SEQUENCER_OT_movieclip_strip_add(wmOperatorType *ot)
@@ -1123,8 +1141,12 @@ static wmOperatorStatus sequencer_add_mask_strip_invoke(bContext *C,
     return WM_enum_search_invoke(C, op, event);
   }
 
-  sequencer_generic_invoke_xy__internal(C, op, 0, STRIP_TYPE_MASK, event);
-  return sequencer_add_mask_strip_exec(C, op);
+  sequencer_add_init(C, op);
+  sequencer_generic_invoke_xy__internal(
+      C, op, is_drag_and_drop(op, event) ? SEQPROP_NOPATHS : 0, STRIP_TYPE_MASK, event);
+  const wmOperatorStatus retval = sequencer_add_mask_strip_exec(C, op);
+  sequencer_add_free(C, op);
+  return retval;
 }
 
 void SEQUENCER_OT_mask_strip_add(wmOperatorType *ot)
@@ -1459,11 +1481,7 @@ static wmOperatorStatus sequencer_add_movie_strip_invoke(bContext *C,
   RNA_enum_set(op->ptr, "fit_method", seq::tool_settings_fit_method_get(scene));
   RNA_boolean_set(op->ptr, "adjust_playback_rate", true);
 
-  /* This is for drag and drop. */
-  if ((RNA_struct_property_is_set(op->ptr, "files") &&
-       !RNA_collection_is_empty(op->ptr, "files")) ||
-      RNA_struct_property_is_set(op->ptr, "filepath"))
-  {
+  if (is_drag_and_drop(op, event)) {
     sequencer_generic_invoke_xy__internal(C, op, SEQPROP_NOPATHS, STRIP_TYPE_MOVIE, event);
 
     const char *error_msg;
@@ -1614,11 +1632,7 @@ static wmOperatorStatus sequencer_add_sound_strip_invoke(bContext *C,
 {
   sequencer_add_init(C, op);
 
-  /* This is for drag and drop. */
-  if ((RNA_struct_property_is_set(op->ptr, "files") &&
-       !RNA_collection_is_empty(op->ptr, "files")) ||
-      RNA_struct_property_is_set(op->ptr, "filepath"))
-  {
+  if (is_drag_and_drop(op, event)) {
     sequencer_generic_invoke_xy__internal(C, op, SEQPROP_NOPATHS, STRIP_TYPE_SOUND, event);
 
     const char *error_msg;
@@ -1674,15 +1688,15 @@ void SEQUENCER_OT_sound_strip_add(wmOperatorType *ot)
  * \{ */
 
 void frame_filename_set(char *dst,
-                        size_t dst_len,
+                        size_t dst_maxncpy,
                         const char *filename_stripped,
                         const int frame,
                         const int numdigits,
                         const char *ext)
 {
-  BLI_strncpy(dst, filename_stripped, dst_len);
-  BLI_path_frame(dst, dst_len, frame, numdigits);
-  BLI_path_extension_ensure(dst, dst_len, ext);
+  BLI_strncpy(dst, filename_stripped, dst_maxncpy);
+  BLI_path_frame(dst, dst_maxncpy, frame, numdigits);
+  BLI_path_extension_ensure(dst, dst_maxncpy, ext);
 }
 
 static void sequencer_add_image_strip_load_files(wmOperator *op,
@@ -1861,7 +1875,7 @@ static wmOperatorStatus sequencer_add_image_strip_invoke(bContext *C,
   RNA_enum_set(op->ptr, "fit_method", seq::tool_settings_fit_method_get(scene));
 
   /* Name set already by drag and drop. */
-  if (RNA_struct_property_is_set(op->ptr, "files") && !RNA_collection_is_empty(op->ptr, "files")) {
+  if (is_drag_and_drop(op, event)) {
     sequencer_generic_invoke_xy__internal(
         C, op, SEQPROP_LENGTH | SEQPROP_NOPATHS, STRIP_TYPE_IMAGE, event);
 

@@ -1104,7 +1104,7 @@ static bool animedit_poll_channels_nla_tweakmode_off(bContext *C)
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Move (Rearrange) Channels Operator
+/** \name Move (Rearrange) Channel Defines
  * \{ */
 
 /* constants for channel rearranging */
@@ -1125,7 +1125,11 @@ static const EnumPropertyItem prop_animchannel_rearrange_types[] = {
     {0, nullptr, 0, nullptr, nullptr},
 };
 
-/* Reordering "Islands" Defines ----------------------------------- */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Reordering "Islands" Defines
+ * \{ */
 
 /* Island definition - just a listbase container */
 struct tReorderChannelIsland {
@@ -1143,7 +1147,11 @@ enum eReorderIslandFlag {
   REORDER_ISLAND_HIDDEN = (1 << 3),      /* island is not visible */
 };
 
-/* Rearrange Methods --------------------------------------------- */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Rearrange Methods
+ * \{ */
 
 static bool rearrange_island_ok(tReorderChannelIsland *island)
 {
@@ -1301,7 +1309,11 @@ static AnimChanRearrangeFp rearrange_gpencil_get_mode_func(eRearrangeAnimChan_Mo
   }
 }
 
-/* Rearrange Islands Generics ------------------------------------- */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Rearrange Islands Generics
+ * \{ */
 
 /* add channel into list of islands */
 template<typename T>
@@ -1495,7 +1507,11 @@ static bool rearrange_animchannel_islands(ListBaseT<T> *list,
   return done;
 }
 
-/* NLA Specific Stuff ----------------------------------------------------- */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Rearrange NLA Tracks
+ * \{ */
 
 /* Change the order NLA Tracks within NLA Stack
  * ! NLA tracks are displayed in opposite order, so directions need care
@@ -1562,7 +1578,11 @@ static void rearrange_nla_tracks(bAnimContext *ac, AnimData *adt, eRearrangeAnim
   anim_data_visible.free_no_destruct();
 }
 
-/* Drivers Specific Stuff ------------------------------------------------- */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Rearrange Drivers
+ * \{ */
 
 /* Change the order drivers within AnimData block
  * mode: REARRANGE_ANIMCHAN_*
@@ -1595,7 +1615,11 @@ static void rearrange_driver_channels(bAnimContext *ac,
   anim_data_visible.free_no_destruct();
 }
 
-/* Action Specific Stuff ------------------------------------------------- */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Rearrange Action Channels
+ * \{ */
 
 /**
  * Move selected, visible action slots in the channel list according to `mode`.
@@ -2013,7 +2037,11 @@ static void rearrange_action_channels(bAnimContext *ac, bAction *act, eRearrange
   rearrange_layered_action_fcurves(ac, act->wrap(), mode);
 }
 
-/* ------------------- */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Rearrange NLA Control Channels
+ * \{ */
 
 static void rearrange_nla_control_channels(bAnimContext *ac,
                                            AnimData *adt,
@@ -2048,7 +2076,11 @@ static void rearrange_nla_control_channels(bAnimContext *ac,
   anim_data_visible.free_no_destruct();
 }
 
-/* ------------------- */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Rearrange Grease Pencil Channels
+ * \{ */
 
 static void rearrange_grease_pencil_channels(bAnimContext *ac, eRearrangeAnimChan_Mode mode)
 {
@@ -2157,7 +2189,11 @@ static void rearrange_gpencil_channels(bAnimContext *ac, eRearrangeAnimChan_Mode
   WM_main_add_notifier(NC_GPENCIL | ND_DATA | NA_EDITED, nullptr);
 }
 
-/* ------------------- */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Move (Rearrange) Channels Operator
+ * \{ */
 
 static wmOperatorStatus animchannels_rearrange_exec(bContext *C, wmOperator *op)
 {
@@ -2334,8 +2370,6 @@ static bool animchannels_grouping_poll(bContext *C)
 
   return true;
 }
-
-/* ----------------------------------------------------------- */
 
 static void animchannels_group_channels(bAnimContext *ac,
                                         bAnimListElem *adt_ref,
@@ -2913,8 +2947,6 @@ static const EnumPropertyItem prop_animchannel_settings_types[] = {
     {0, nullptr, 0, nullptr, nullptr},
 };
 
-/* ------------------- */
-
 /**
  * Set/clear a particular flag (setting) for all selected + visible channels
  * \param setting: the setting to modify.
@@ -3003,7 +3035,11 @@ static void setflag_anim_channels(bAnimContext *ac,
   all_data.free_no_destruct();
 }
 
-/* ------------------- */
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Set/Toggle Channel Flags Operators
+ * \{ */
 
 static wmOperatorStatus animchannels_setflag_exec(bContext *C, wmOperator *op)
 {
@@ -5026,6 +5062,12 @@ static void ANIM_OT_channel_view_pick(wmOperatorType *ot)
                              "Ignore frames outside of the preview range");
 }
 
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Bake Channels Operator
+ * \{ */
+
 static const EnumPropertyItem channel_bake_key_options[] = {
     {BEZT_IPO_BEZ, "BEZIER", 0, "Bézier", "New keys will be Bézier"},
     {BEZT_IPO_LIN, "LIN", 0, "Linear", "New keys will be linear"},
@@ -5220,6 +5262,12 @@ static void ANIM_OT_channels_bake(wmOperatorType *ot)
                   "Bake Modifiers into keyframes and delete them after");
 }
 
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Move Slot Channels to New Action Operator
+ * \{ */
+
 static wmOperatorStatus slot_channels_move_to_new_action_exec(bContext *C, wmOperator *op)
 {
   using namespace blender::animrig;
@@ -5314,6 +5362,12 @@ static void ANIM_OT_slot_channels_move_to_new_action(wmOperatorType *ot)
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
 
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Separate Slots Operator
+ * \{ */
+
 static wmOperatorStatus separate_slots_exec(bContext *C, wmOperator *op)
 {
   using namespace blender::animrig;
@@ -5383,6 +5437,12 @@ static void ANIM_OT_separate_slots(wmOperatorType *ot)
 
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name View Curve in Graph Editor Operator
+ * \{ */
 
 /**
  *  Find a Graph Editor area and set the context arguments accordingly.

@@ -1433,7 +1433,7 @@ static void node_region_listener(const wmRegionListenerParams *params)
       ED_region_tag_redraw(region);
       break;
     case NC_OBJECT:
-      if (wmn->data == ND_OB_SHADING || wmn->data == ND_TRANSFORM) {
+      if (ELEM(wmn->data, ND_OB_SHADING, ND_TRANSFORM)) {
         ED_region_tag_redraw(region);
       }
       break;
@@ -1543,6 +1543,7 @@ static void node_widgets()
   WM_gizmogrouptype_append_and_link(gzmap_type, NODE_GGT_backdrop_box_mask);
   WM_gizmogrouptype_append_and_link(gzmap_type, NODE_GGT_backdrop_ellipse_mask);
   WM_gizmogrouptype_append_and_link(gzmap_type, NODE_GGT_backdrop_split);
+  WM_gizmogrouptype_append_and_link(gzmap_type, NODE_GGT_compositor_translate);
   WM_gizmogrouptype_append_and_link(gzmap_type, NODE_GGT_minimap);
   WM_gizmotype_append(NODE_GT_minimap);
 }

@@ -140,7 +140,8 @@ const EnumPropertyItem rna_enum_attr_storage_type_items[] = {
     {0, nullptr, 0, nullptr, nullptr},
 };
 
-static EnumPropertyItem domain_item_auto{int(AttrDomain::Auto), "AUTO", 0, "Auto", ""};
+static EnumPropertyItem domain_item_auto{
+    int(bke::AttrDomainSelection::Auto), "AUTO", 0, "Auto", ""};
 static EnumPropertyItem domain_item_point{
     int(AttrDomain::Point), "POINT", ICON_VERTEXSEL, "Point", "Vertex or point"};
 static EnumPropertyItem domain_item_edge{
@@ -518,8 +519,11 @@ const EnumPropertyItem *rna_enum_attribute_domain_itemf(const AttributeOwner &ow
   const EnumPropertyItem *domain_item = nullptr;
   int totitem = 0, a;
 
-  static EnumPropertyItem mesh_vertex_domain_item = {
-      int(AttrDomain::Point), "POINT", 0, N_("Vertex"), N_("Attribute per point/vertex")};
+  static EnumPropertyItem mesh_vertex_domain_item = {int(AttrDomain::Point),
+                                                     "POINT",
+                                                     ICON_VERTEXSEL,
+                                                     N_("Vertex"),
+                                                     N_("Attribute per point/vertex")};
 
   for (a = 0; rna_enum_attribute_domain_items[a].identifier; a++) {
     domain_item = &rna_enum_attribute_domain_items[a];

@@ -12,6 +12,7 @@
 #include "BKE_deform.hh"
 #include "BKE_geometry_set.hh"
 #include "BKE_grease_pencil.hh"
+#include "BKE_library.hh"
 #include "BKE_material.hh"
 #include "BKE_object_deform.h"
 #include "BKE_paint.hh"
@@ -86,22 +87,18 @@ struct GreasePencilPaintStroke final : public PaintStroke {
   {
   }
 
-  bool get_location(float location[3], const float mouse[2], bool force_original) override;
-  bool test_start(wmOperator *op, const float mouse[2]) override;
-  void update_step(wmOperator *op, PointerRNA *stroke_element) override;
+  std::optional<float3> get_location(float2 mouse, bool force_original) override;
+  bool test_start(wmOperator *op, float2 mouse) override;
+  void update_step(wmOperator *op, const StrokeStep &stroke_step) override;
   void redraw(bool final) override;
   bool test_cancel() override;
   void done(bool is_cancel, bool stroke_started) override;
 };
 
-bool GreasePencilPaintStroke::get_location(float location[3],
-                                           const float mouse[2],
-                                           bool /*force_original*/)
+std::optional<float3> GreasePencilPaintStroke::get_location(const float2 mouse,
+                                                            bool /*force_original*/)
 {
-  location[0] = mouse[0];
-  location[1] = mouse[1];
-  location[2] = 0;
-  return true;
+  return float3(mouse.x, mouse.y, 0);
 }
 
 static std::unique_ptr<GreasePencilStrokeOperation> get_stroke_operation(bContext &C,
@@ -193,19 +190,19 @@ static std::unique_ptr<GreasePencilStrokeOperation> get_stroke_operation(bContex
   return nullptr;
 }
 
-bool GreasePencilPaintStroke::test_start(wmOperator * /*op*/, const float /*mouse*/[2])
+bool GreasePencilPaintStroke::test_start(wmOperator * /*op*/, const float2 /*mouse*/)
 {
   return true;
 }
 
-void GreasePencilPaintStroke::update_step(wmOperator *op, PointerRNA *stroke_element)
+void GreasePencilPaintStroke::update_step(wmOperator *op, const StrokeStep &stroke_step)
 {
   GreasePencilStrokeOperation *operation = static_cast<GreasePencilStrokeOperation *>(
       mode_data_.get());
 
   InputSample sample;
-  RNA_float_get_array(stroke_element, "mouse", sample.mouse_position);
-  sample.pressure = RNA_float_get(stroke_element, "pressure");
+  sample.mouse_position = stroke_step.mouse;
+  sample.pressure = stroke_step.pressure;
 
   if (!operation) {
     std::unique_ptr<GreasePencilStrokeOperation> new_operation = get_stroke_operation(
@@ -1803,6 +1800,12 @@ static wmOperatorStatus grease_pencil_fill_invoke(bContext *C,
   }
   if (BKE_object_material_get(&ob, ob.actcol) == nullptr) {
     BKE_report(op->reports, RPT_ERROR, "Fill tool needs active material");
+    return OPERATOR_CANCELLED;
+  }
+  if (ed::greasepencil::check_brush_needs_new_material(&ob, &brush) &&
+      (!ID_IS_EDITABLE(&ob.id) || ID_IS_OVERRIDE_LIBRARY(&ob.id)))
+  {
+    BKE_report(op->reports, RPT_ERROR, "Cannot create new material on linked object");
     return OPERATOR_CANCELLED;
   }
   if (!grease_pencil_fill_init(*C, *op)) {

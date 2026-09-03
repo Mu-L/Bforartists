@@ -107,6 +107,7 @@
 #include "node_intern.hh" /* own include */
 
 #include <fmt/format.h>
+#include <fmt/ranges.h>
 #include <sstream>
 
 namespace blender {
@@ -2679,6 +2680,7 @@ static Vector<NodeExtraInfoRow> node_get_extra_info(const bContext &C,
             NODE_EVALUATE_CLOSURE) ||
        StringRef(node.idname).startswith("GeometryNodeImport") ||
        node.is_type("GeometryNodeClosureToList"_ustr) ||
+       node.is_type("GeometryNodeCombineList"_ustr) ||
        node.is_type("GeometryNodeFilterList"_ustr) ||
        node.is_type("GeometryNodeListGetItem"_ustr) ||
        node.is_type("GeometryNodeFieldToList"_ustr) ||

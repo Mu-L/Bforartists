@@ -644,7 +644,6 @@ class USERPREF_PT_edit_sequence_editor(EditingPanel, CenterAlignMixIn, Panel):
         edit = prefs.edit
         layout.use_property_split = False
 
-        layout.prop(edit, "connect_strips_by_default")  # BFA - wip
         layout.prop(edit, "clamp_strips_by_default") # BFA - wip
 
 
@@ -659,6 +658,18 @@ class USERPREF_PT_edit_outliner_editor(EditingPanel, CenterAlignMixIn, Panel):
         layout.use_property_split = False
 
         layout.prop(edit, "outliner_colored_collection_rows")  # BFA - colored collection rows
+
+
+class USERPREF_PT_edit_sequence_editor_new_strips(EditingPanel, CenterAlignMixIn, Panel):
+    bl_label = "New Strips"
+    bl_parent_id = "USERPREF_PT_edit_sequence_editor"
+
+    def draw_centered(self, context, layout):
+        prefs = context.preferences
+        edit = prefs.edit
+
+        layout.prop(edit, "default_strip_length", text="Strip Length")  # BFA - wip
+        layout.prop(edit, "connect_strips_by_default", text="Connect Movie Strips")  # BFA - wip
 
 
 class USERPREF_PT_edit_misc(EditingPanel, CenterAlignMixIn, Panel):
@@ -1379,6 +1390,7 @@ class USERPREF_PT_theme_interface_styles(ThemePanel, CenterAlignMixIn, Panel):
 
         col = flow.column()
         col.prop(ui, "widget_text_cursor")
+        col.prop(ui, "link")
 
 
 class USERPREF_PT_theme_interface_transparent_checker(ThemePanel, CenterAlignMixIn, Panel):
@@ -3263,8 +3275,9 @@ classes = (
     USERPREF_PT_edit_gpencil,
     USERPREF_PT_edit_text_editor,
     USERPREF_PT_edit_node_editor,
-    USERPREF_PT_edit_sequence_editor,
     USERPREF_PT_edit_outliner_editor,  # BFA - panel
+    USERPREF_PT_edit_sequence_editor,
+    USERPREF_PT_edit_sequence_editor_new_strips,
     USERPREF_PT_edit_misc,
 
     USERPREF_PT_animation_timeline,

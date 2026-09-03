@@ -615,6 +615,39 @@ const EnumPropertyItem rna_enum_node_grease_pencil_stroke_type_items[] = {
     {0, nullptr, 0, nullptr, nullptr},
 };
 
+static const EnumPropertyItem rna_enum_shader_attribute_type_items[] = {
+    {SHD_ATTRIBUTE_GEOMETRY,
+     "GEOMETRY",
+     0,
+     "Geometry",
+     "The attribute is associated with the object geometry, and its value "
+     "varies from vertex to vertex, or within the object volume"},
+    {SHD_ATTRIBUTE_OBJECT,
+     "OBJECT",
+     0,
+     "Object",
+     "The attribute is associated with the object or mesh data itself, " /*BFA - no block*/
+     "and its value is uniform"},
+    {SHD_ATTRIBUTE_INSTANCER,
+     "INSTANCER",
+     0,
+     "Instancer",
+     "The attribute is associated with the instancer particle system or object, "
+     "falling back to the Object mode if the attribute isn't found, or the object "
+     "is not instanced"},
+    {SHD_ATTRIBUTE_VIEW_LAYER,
+     "VIEW_LAYER",
+     0,
+     "View Layer",
+     "The attribute is associated with the View Layer, Scene or World that is being rendered"},
+    {SHD_ATTRIBUTE_LIGHT,
+     "LIGHT",
+     0,
+     "Light",
+     "The attribute is associated with the Light that is being rendered"},
+    {0, nullptr, 0, nullptr, nullptr},
+};
+
 #ifndef RNA_RUNTIME
 
 static const EnumPropertyItem prop_shader_output_target_items[] = {
@@ -683,6 +716,7 @@ static const EnumPropertyItem node_cryptomatte_layer_name_items[] = {
 #  include "NOD_geo_capture_attribute.hh"
 #  include "NOD_geo_closure.hh"
 #  include "NOD_geo_closure_to_list.hh"
+#  include "NOD_geo_combine_list.hh"
 #  include "NOD_geo_field_to_grid.hh"
 #  include "NOD_geo_field_to_list.hh"
 #  include "NOD_geo_foreach_geometry_element.hh"
@@ -706,6 +740,7 @@ static const EnumPropertyItem node_cryptomatte_layer_name_items[] = {
 #  include "RE_texture.h"
 
 #  include "DNA_scene_types.h"
+#  include "DNA_space_types.h"
 #  include "DNA_text_types.h"
 
 #  include "WM_api.hh"
@@ -720,6 +755,7 @@ using nodes::ClosureInputItemsAccessor;
 using nodes::ClosureOutputItemsAccessor;
 using nodes::ClosureToListItemsAccessor;
 using nodes::CombineBundleItemsAccessor;
+using nodes::CombineListItemsAccessor;
 using nodes::EvaluateClosureInputItemsAccessor;
 using nodes::EvaluateClosureOutputItemsAccessor;
 using nodes::FieldToGridItemsAccessor;
@@ -3368,7 +3404,7 @@ static const EnumPropertyItem *rna_Node_image_layer_itemf(bContext * /*C*/,
 
   const auto &item_from_render_layer = [&](const RenderLayer &rl,
                                            const int index) -> EnumPropertyItem {
-    EnumPropertyItem tmp;
+    EnumPropertyItem tmp = {0};
     tmp.identifier = rl.name;
     /* Little trick: using space char instead empty string
      * makes the item selectable in the drop-down. */
@@ -3498,7 +3534,7 @@ static const EnumPropertyItem *rna_Node_view_layer_itemf(bContext * /*C*/,
 
   const auto &item_from_view_layer = [&](const ViewLayer &vl,
                                          const int index) -> EnumPropertyItem {
-    EnumPropertyItem tmp;
+    EnumPropertyItem tmp = {0};
     tmp.identifier = vl.name;
     /* Little trick: using space char instead empty string
      * makes the item selectable in the drop-down. */
@@ -4027,6 +4063,18 @@ static NodeGeometryRasterizePointsItem *rna_NodeGeometryRasterizePointsItems_new
   return new_item;
 }
 
+static CombineListItem *rna_NodeCombineListItems_new(ID *id, bNode *node, Main *bmain)
+{
+  CombineListItem *new_item = nodes::socket_items::add_item<CombineListItemsAccessor>(*node);
+
+  bNodeTree *ntree = reinterpret_cast<bNodeTree *>(id);
+  BKE_ntree_update_tag_node_property(ntree, node);
+  BKE_main_ensure_invariants(*bmain, ntree->id);
+  WM_main_add_notifier(NC_NODE | NA_EDITED, ntree);
+
+  return new_item;
+}
+
 /* The same as #grid_socket_type_items_filter_fn. */
 static const EnumPropertyItem *rna_NodeFieldToGridItem_data_type_itemf(bContext * /*C*/,
                                                                        PointerRNA * /*ptr*/,
@@ -4502,6 +4550,32 @@ static const EnumPropertyItem *rna_NodeRaycastSampleAttributeItem_data_type_item
   });
 }
 
+static const EnumPropertyItem *rna_NodeShaderAttribute_type_itemf(bContext *C,
+                                                                  PointerRNA * /*ptr*/,
+                                                                  PropertyRNA * /*prop*/,
+                                                                  bool *r_free)
+{
+  if (C == nullptr) {
+    return rna_enum_shader_attribute_type_items;
+  }
+
+  Scene *scene = CTX_data_scene(C);
+  SpaceNode *space_node = CTX_wm_space_node(C);
+
+  if (scene == nullptr || space_node == nullptr) {
+    return rna_enum_shader_attribute_type_items;
+  }
+
+  *r_free = true;
+
+  bool supports_light_attributes = !STREQ(CTX_data_scene(C)->r.engine, RE_engine_id_CYCLES) &&
+                                   CTX_wm_space_node(C)->shaderfrom == SNODE_SHADER_OBJECT;
+  return itemf_function_check(
+      rna_enum_shader_attribute_type_items, [&](const EnumPropertyItem *item) {
+        return supports_light_attributes || item->value != SHD_ATTRIBUTE_LIGHT;
+      });
+}
+
 }  // namespace blender
 
 #else
@@ -4677,6 +4751,12 @@ static const EnumPropertyItem node_principled_distribution_items[] = {
      "Multiscatter GGX",
      "GGX with additional correction to account for multiple scattering, preserve energy and "
      "prevent unexpected darkening at high roughness"},
+    {0, nullptr, 0, nullptr, nullptr},
+};
+
+static const EnumPropertyItem node_light_evaluation_mode_items[] = {
+    {SHD_LIGHT_EVAL_DIFFUSE, "DIFFUSE", 0, "Diffuse", ""},
+    {SHD_LIGHT_EVAL_GLOSSY, "GLOSSY", 0, "Glossy", ""},
     {0, nullptr, 0, nullptr, nullptr},
 };
 
@@ -5369,40 +5449,14 @@ static void def_sh_vector_rotate(BlenderRNA * /*brna*/, StructRNA *srna)
 
 static void def_sh_attribute(BlenderRNA * /*brna*/, StructRNA *srna)
 {
-  static const EnumPropertyItem prop_attribute_type[] = {
-      {SHD_ATTRIBUTE_GEOMETRY,
-       "GEOMETRY",
-       0,
-       "Geometry",
-       "The attribute is associated with the object geometry, and its value "
-       "varies from vertex to vertex, or within the object volume"},
-      {SHD_ATTRIBUTE_OBJECT,
-       "OBJECT",
-       0,
-       "Object",
-       "The attribute is associated with the object or mesh data itself, " /*BFA - no block*/
-       "and its value is uniform"},
-      {SHD_ATTRIBUTE_INSTANCER,
-       "INSTANCER",
-       0,
-       "Instancer",
-       "The attribute is associated with the instancer particle system or object, "
-       "falling back to the Object mode if the attribute isn't found, or the object "
-       "is not instanced"},
-      {SHD_ATTRIBUTE_VIEW_LAYER,
-       "VIEW_LAYER",
-       0,
-       "View Layer",
-       "The attribute is associated with the View Layer, Scene or World that is being rendered"},
-      {0, nullptr, 0, nullptr, nullptr},
-  };
   PropertyRNA *prop;
 
   RNA_def_struct_sdna_from(srna, "NodeShaderAttribute", "storage");
 
   prop = RNA_def_property(srna, "attribute_type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, nullptr, "type");
-  RNA_def_property_enum_items(prop, prop_attribute_type);
+  RNA_def_property_enum_funcs(prop, nullptr, nullptr, "rna_NodeShaderAttribute_type_itemf");
+  RNA_def_property_enum_items(prop, rna_enum_shader_attribute_type_items);
   RNA_def_property_ui_text(prop, "Attribute Type", "General type of the attribute");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update_relations");
 
@@ -6216,6 +6270,17 @@ static void def_principled(BlenderRNA * /*brna*/, StructRNA *srna)
   RNA_def_property_enum_items(prop, node_subsurface_method_items);
   RNA_def_property_ui_text(
       prop, "Subsurface Method", "Method for rendering subsurface scattering");
+  RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_ShaderNode_socket_update");
+}
+
+static void def_light_evaluation(BlenderRNA * /*brna*/, StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, nullptr, "custom1");
+  RNA_def_property_enum_items(prop, node_light_evaluation_mode_items);
+  RNA_def_property_ui_text(prop, "Mode", "Defines parametrization of the light evaluation");
   RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_ShaderNode_socket_update");
 }
 
@@ -8786,6 +8851,57 @@ static void def_geo_index_switch(BlenderRNA *brna, StructRNA *srna)
   RNA_def_property_srna(prop, "NodeIndexSwitchItems");
 }
 
+static void rna_def_combine_list_item(BlenderRNA *brna)
+{
+  PropertyRNA *prop;
+
+  StructRNA *srna = RNA_def_struct(brna, "CombineListItem", nullptr);
+  RNA_def_struct_ui_text(srna, "Combine List Item", "");
+  RNA_def_struct_sdna(srna, "CombineListItem");
+
+  prop = RNA_def_property(srna, "identifier", PROP_INT, PROP_NONE);
+  RNA_def_property_ui_range(prop, 0, INT32_MAX, 1, -1);
+  RNA_def_property_ui_text(prop, "Identifier", "Consistent identifier used for the item");
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+  RNA_def_property_update(prop, NC_NODE, "rna_Node_update");
+}
+
+static void rna_def_geo_combine_list_items(BlenderRNA *brna)
+{
+  StructRNA *srna;
+  FunctionRNA *func;
+  PropertyRNA *parm;
+
+  srna = RNA_def_struct(brna, "NodeCombineListItems", nullptr);
+  RNA_def_struct_sdna(srna, "bNode");
+  RNA_def_struct_ui_text(srna, "Items", "Collection of combine list items");
+
+  func = RNA_def_function(srna, "new", "rna_NodeCombineListItems_new");
+  RNA_def_function_ui_description(func, "Add an item at the end");
+  RNA_def_function_flag(func, FUNC_USE_SELF_ID | FUNC_USE_MAIN);
+
+  parm = RNA_def_pointer(func, "item", "CombineListItem", "Item", "New item");
+  RNA_def_function_return(func, parm);
+
+  rna_def_node_item_array_common_functions(srna, "CombineListItem", "CombineListItemsAccessor");
+}
+
+static void def_geo_combine_list(BlenderRNA *brna, StructRNA *srna)
+{
+  PropertyRNA *prop;
+
+  rna_def_combine_list_item(brna);
+  rna_def_geo_combine_list_items(brna);
+
+  RNA_def_struct_sdna_from(srna, "NodeCombineList", "storage");
+
+  prop = RNA_def_property(srna, "combine_list_items", PROP_COLLECTION, PROP_NONE);
+  RNA_def_property_collection_sdna(prop, nullptr, "items", "items_num");
+  RNA_def_property_struct_type(prop, "CombineListItem");
+  RNA_def_property_ui_text(prop, "Items", "");
+  RNA_def_property_srna(prop, "NodeCombineListItems");
+}
+
 static void rna_def_geo_field_to_grid_item(BlenderRNA *brna)
 {
   PropertyRNA *prop;
@@ -10656,7 +10772,12 @@ static void rna_def_nodes(BlenderRNA *brna)
   define(brna, "ShaderNode", "ShaderNodeHueSaturation", nullptr, ICON_NODE_HUESATURATION);
   define(brna, "ShaderNode", "ShaderNodeInvert", nullptr, ICON_NODE_INVERT);
   define(brna, "ShaderNode", "ShaderNodeLayerWeight", nullptr, ICON_NODE_LAYERWEIGHT);
+  define(brna, "ShaderNode", "ShaderNodeLightAccumulation", nullptr, ICON_NONE); /*BFA - WIP*/
+  define(brna, "ShaderNode", "ShaderNodeLightEvaluation", def_light_evaluation, ICON_NONE); /*BFA - WIP*/
   define(brna, "ShaderNode", "ShaderNodeLightFalloff", nullptr, ICON_NODE_LIGHTFALLOFF);
+  define(brna, "ShaderNode", "ShaderNodeLightInfo", nullptr, ICON_NONE); /*BFA - WIP*/
+  define(brna, "ShaderNode", "ShaderNodeLightIterInternalInput", nullptr, ICON_NONE); /*BFA - WIP*/
+  define(brna, "ShaderNode", "ShaderNodeLightIterInternalOutput", nullptr, ICON_NONE); /*BFA - WIP*/
   define(brna, "ShaderNode", "ShaderNodeLightPath", nullptr, ICON_NODE_LIGHTPATH);
   define(brna, "ShaderNode", "ShaderNodeMapping", def_sh_mapping, ICON_NODE_MAPPING);
   define(brna, "ShaderNode", "ShaderNodeMapRange", def_map_range, ICON_NODE_MAP_RANGE);
@@ -10683,6 +10804,7 @@ static void rna_def_nodes(BlenderRNA *brna)
   define(brna, "ShaderNode", "ShaderNodeScript", def_sh_script, ICON_FILE_SCRIPT);
   define(brna, "ShaderNode", "ShaderNodeSeparateColor", def_sh_combsep_color, ICON_SEPARATE_COLOR);
   define(brna, "ShaderNode", "ShaderNodeSeparateXYZ", nullptr, ICON_NODE_SEPARATEXYZ);
+  define(brna, "ShaderNode", "ShaderNodeShadowRaycast", nullptr, ICON_NONE); /*BFA - WIP*/
   define(brna, "ShaderNode", "ShaderNodeShaderToRGB", nullptr, ICON_NODE_RGB);
   define(brna, "ShaderNode", "ShaderNodeSqueeze", nullptr, ICON_NONE); /*BFA - WIP*/
   define(brna, "ShaderNode", "ShaderNodeSubsurfaceScattering", def_sh_subsurface, ICON_NODE_SSS);
@@ -10902,6 +11024,7 @@ static void rna_def_nodes(BlenderRNA *brna)
   define(brna, "FunctionNode", "FunctionNodeValueToString", nullptr, ICON_VALUE_TO_STRING);
 
   define(brna, "GeometryNode", "GeometryNodeAccumulateField", nullptr, ICON_ACCUMULATE);
+  define(brna, "GeometryNode", "GeometryNodeApplySimulatedData", nullptr, ICON_NONE); /*BFA - WIP*/
   define(brna, "GeometryNode", "GeometryNodeAttributeDomainSize", nullptr, ICON_DOMAIN_SIZE);
   define(brna, "GeometryNode", "GeometryNodeAttributeStatistic", nullptr, ICON_ATTRIBUTE_STATISTIC);
   define(brna, "GeometryNode", "GeometryNodeBake", rna_def_geo_bake, ICON_BAKE);
@@ -10913,6 +11036,7 @@ static void rna_def_nodes(BlenderRNA *brna)
   define(brna, "GeometryNode", "GeometryNodeClosureToList", def_geo_closure_to_list, ICON_NODE_CLOSURETOLIST);
   define(brna, "GeometryNode", "GeometryNodeClusterByConnected", nullptr, ICON_NODE_CLUSTERBYCONNECTED);
   define(brna, "GeometryNode", "GeometryNodeClusterByDistance", nullptr, ICON_NODE_CLUSTERBYDISTANCE);
+  define(brna, "GeometryNode", "GeometryNodeCombineList", def_geo_combine_list, ICON_NONE); /*BFA - WIP*/
   define(brna, "GeometryNode", "GeometryNodeCollectionChildren", nullptr, ICON_COLLECTION_CHILDREN);
   define(brna, "GeometryNode", "GeometryNodeCollectionInfo", nullptr, ICON_COLLECTION_INFO);
   define(brna, "GeometryNode", "GeometryNodeConvexHull", nullptr, ICON_CONVEXHULL);

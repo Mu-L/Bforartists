@@ -6275,6 +6275,8 @@ void UV_OT_select_by_winding(wmOperatorType *ot)
 }
 
 /** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Select Similar Operator
  * \{ */
 
