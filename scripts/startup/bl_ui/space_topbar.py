@@ -295,9 +295,7 @@ class TOPBAR_MT_file(Menu):
 
         layout.menu("TOPBAR_MT_file_import", icon='IMPORT')
         layout.menu("TOPBAR_MT_file_export", icon='EXPORT')
-        row = layout.row()
-        row.operator("wm.collection_export_all", icon="EXPORT_COLLECTION")
-        row.enabled = context.view_layer.has_export_collections
+        # BFA - collection export is in the file export submenu, at the top. Removed the duplicate top level entry.
 
         layout.separator()
 
@@ -523,7 +521,13 @@ class TOPBAR_MT_file_export(Menu):
     bl_label = "Export"
     bl_owner_use_filter = False
 
-    def draw(self, _context):
+    def draw(self, context):
+        row = self.layout.row()
+        row.operator("wm.collection_export_all", icon="EXPORT_COLLECTION")  # BFA - icon
+        row.enabled = context.view_layer.has_export_collections
+
+        self.layout.separator()
+
         if bpy.app.build_options.alembic:
             self.layout.operator("wm.alembic_export", text="Alembic (.abc)", icon="SAVE_ABC")
         if bpy.app.build_options.usd:

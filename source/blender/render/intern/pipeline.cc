@@ -638,9 +638,9 @@ void RE_FreeUnusedGPUResources()
     /* Don't free scenes being rendered or composited. Note there is no
      * race condition here because we are on the main thread and new jobs can only
      * be started from the main thread. */
-    if (WM_jobs_test(wm, re->owner, WM_JOB_TYPE_RENDER) ||
-        WM_jobs_test(wm, re->owner, WM_JOB_TYPE_COMPOSITE) ||
-        WM_jobs_test(wm, re->owner, WM_JOB_TYPE_OBJECT_BAKE))
+    if (WM_jobs_has_running(wm, re->owner, WM_JOB_TYPE_RENDER) ||
+        WM_jobs_has_running(wm, re->owner, WM_JOB_TYPE_COMPOSITE) ||
+        WM_jobs_has_running(wm, re->owner, WM_JOB_TYPE_OBJECT_BAKE))
     {
       do_free = false;
     }
@@ -1361,11 +1361,11 @@ static void do_render_compositor(Render *re)
           /* If we have consistent depsgraph now would be a time to update them. */
         }
 
-        compositor::NodeGroupOutputTypes needed_outputs =
-            compositor::NodeGroupOutputTypes::FileOutputNode;
+        compositor::SideEffectOutputTypes needed_side_effects_outputs =
+            compositor::SideEffectOutputTypes::FileOutputNode;
         if (!G.background) {
-          needed_outputs |= compositor::NodeGroupOutputTypes::ViewerNode |
-                            compositor::NodeGroupOutputTypes::NodePreviews;
+          needed_side_effects_outputs |= compositor::SideEffectOutputTypes::ViewerNode |
+                                         compositor::SideEffectOutputTypes::NodePreviews;
         }
 
         CLOG_STR_INFO(&LOG, "Executing compositor");
@@ -1383,7 +1383,7 @@ static void do_render_compositor(Render *re)
                                                             re->r,
                                                             rv.name,
                                                             &compositor_render_context,
-                                                            needed_outputs,
+                                                            needed_side_effects_outputs,
                                                             false));
         }
         compositor_render_context.save_file_outputs(re->pipeline_scene_eval);

@@ -664,6 +664,12 @@ static std::string wm_window_title_text(
     }
   }
 
+  /* If a project is active, display its name. */
+  bke::BlenderProject *project = BKE_blender_project_get(G_MAIN);
+  if (project) {
+    win_title.append(fmt::format(" - {}", project->get_name()));
+  }
+
   win_title.append(fmt::format(" - Bforartists {}", BKE_bforartists_version_string())); // BFA
 
   return win_title;
@@ -1129,7 +1135,7 @@ static void wm_window_ghostwindow_ensure(wmWindowManager *wm, wmWindow *win, boo
      * after the window has been created. */
     auto window_filepath_fn = (WM_capabilities_flag() & WM_CAPABILITY_WINDOW_PATH) ?
                                   std::optional([&win_filepath](const char *filepath) {
-                                    STRNCPY_UTF8(win_filepath, filepath);
+                                    STRNCPY(win_filepath, filepath);
                                   }) :
                                   std::nullopt;
     std::string win_title = wm_window_title_text(wm, win, window_filepath_fn);

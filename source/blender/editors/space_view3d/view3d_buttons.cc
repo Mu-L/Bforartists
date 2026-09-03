@@ -79,7 +79,10 @@
 
 namespace blender {
 
-/* ******************* view3d space & buttons ************** */
+/* -------------------------------------------------------------------- */
+/** \name Transform Panel Types
+ * \{ */
+
 enum {
   B_TRANSFORM_PANEL_MEDIAN = 1008,
   B_TRANSFORM_PANEL_DIMS = 1009,
@@ -146,6 +149,8 @@ struct TransformProperties {
 };
 
 #define TRANSFORM_MEDIAN_ARRAY_LEN (sizeof(TransformMedian) / sizeof(float))
+
+/** \} */
 
 static TransformProperties *v3d_transform_props_ensure(View3D *v3d);
 
@@ -224,6 +229,10 @@ static void editmesh_partial_update_update_fn(bContext *C,
 }
 
 /** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Median Utilities
+ * \{ */
 
 /* Helper function to compute a median changed value,
  * when the value should be clamped in [0.0, 1.0].
@@ -309,6 +318,12 @@ static void apply_scale_factor_clamp(float *val,
   }
 }
 
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Transform Properties
+ * \{ */
+
 static TransformProperties *v3d_transform_props_ensure(View3D *v3d)
 {
   if (v3d->runtime.properties_storage == nullptr) {
@@ -323,6 +338,12 @@ static TransformProperties *v3d_transform_props_ensure(View3D *v3d)
   }
   return static_cast<TransformProperties *>(v3d->runtime.properties_storage);
 }
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Curves Selection Status
+ * \{ */
 
 struct CurvesPointSelectionStatus {
   TransformMedian_Curves median = {};
@@ -694,6 +715,12 @@ static CurvesSelectionStatus init_grease_pencil_selection_status(
 
   return status;
 }
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Edit Vertex Buttons
+ * \{ */
 
 /* is used for both read and write... */
 static void v3d_editvertex_buts(
@@ -1799,6 +1826,12 @@ static void v3d_editvertex_buts(
 
 #undef TRANSFORM_MEDIAN_ARRAY_LEN
 
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Object Dimension Buttons
+ * \{ */
+
 static void v3d_object_dimension_buts(bContext *C, ui::Layout *layout, View3D *v3d, Object *ob)
 {
   TransformProperties *tfp = v3d_transform_props_ensure(v3d);
@@ -1884,6 +1917,12 @@ static void v3d_object_dimension_buts(bContext *C, ui::Layout *layout, View3D *v
     RNA_property_update(C, &obptr, prop);
   }
 }
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Vertex Group Panel
+ * \{ */
 
 #define B_VGRP_PNL_EDIT_SINGLE 8 /* or greater */
 
@@ -2102,6 +2141,12 @@ static void view3d_panel_vgroup(const bContext *C, Panel *panel)
     }
   }
 }
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Transform Buttons
+ * \{ */
 
 static void v3d_transform_butsR(ui::Layout &layout, PointerRNA *ptr)
 {
@@ -2372,6 +2417,12 @@ static void v3d_editmetaball_buts(ui::Layout &layout, Object *ob)
   }
 }
 
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Transform Panel
+ * \{ */
+
 static void do_view3d_region_buttons(bContext *C, void * /*index*/, int event)
 {
   const Main *bmain = CTX_data_main(C);
@@ -2449,6 +2500,12 @@ static void view3d_panel_transform(const bContext *C, Panel *panel)
     }
   }
 }
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Curve Data Panel
+ * \{ */
 
 static bool view3d_panel_curve_data_poll(const bContext *C, PanelType * /*pt*/)
 {
@@ -3141,6 +3198,12 @@ static void view3d_panel_curve_data(const bContext *C, Panel *panel)
   }
 }
 
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Registration
+ * \{ */
+
 void view3d_buttons_register(ARegionType *art)
 {
   PanelType *pt;
@@ -3174,6 +3237,12 @@ void view3d_buttons_register(ARegionType *art)
   BLI_addtail(&art->paneltypes, pt);
 }
 
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Object Mode Pie or Toggle Operator
+ * \{ */
+
 static wmOperatorStatus view3d_object_mode_menu_exec(bContext *C, wmOperator *op)
 {
   Object *ob = CTX_data_active_object(C);
@@ -3201,5 +3270,7 @@ void VIEW3D_OT_object_mode_pie_or_toggle(wmOperatorType *ot)
   /* flags */
   ot->flag = 0;
 }
+
+/** \} */
 
 }  // namespace blender

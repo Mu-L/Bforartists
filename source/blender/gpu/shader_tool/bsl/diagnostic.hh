@@ -96,6 +96,7 @@ template<typename... Args> std::string format(const std::string &fmt, Args &&...
 enum class Diag {
   CompilerErrorADLOnTypesNotAllowed,
   CompilerErrorMemberFuncNoClass,
+  CompilerErrorChildScopeNotFound,
 
   AnonymousUnionNotSupportedAtNamespaceScope,
 
@@ -118,6 +119,8 @@ enum class Diag {
   ConstexprGlobalNonStatic,
   ConstexprIfConditionNotConstexpr,
   ConstexprMemberNonStatic,
+  ConstexprShiftNegative,
+  ConstexprShiftTooLarge,
   ConstexprVarMustBeInitializedByConstantExpr,
   ConstexprVarMustBeIntOrUint,
   ConstexprVarMustNotBeArray,
@@ -300,6 +303,8 @@ static inline std::string_view diagnostic_message_get(Diag diag)
       return "Cannot use ADL on types";
     case Diag::CompilerErrorMemberFuncNoClass:
       return "Compiler error: member function has no class";
+    case Diag::CompilerErrorChildScopeNotFound:
+      return "Compiler error: non-existing child scope";
     case Diag::ConstexprDivisionByZero:
       return "Division by zero during constexpr evaluation";
     case Diag::ConstexprGlobalNonStatic:
@@ -308,6 +313,10 @@ static inline std::string_view diagnostic_message_get(Diag diag)
       return "Constexpr if condition is not a constant expression";
     case Diag::ConstexprMemberNonStatic:
       return "Non-static data member cannot be constexpr; did you intend to make it static?";
+    case Diag::ConstexprShiftNegative:
+      return "Negative shift count {}";
+    case Diag::ConstexprShiftTooLarge:
+      return "Shift count {} >= width of type 32";
     case Diag::ConstexprVarMustBeInitializedByConstantExpr:
       return "Constexpr variable '{}' must be initialized by a constant expression";
     case Diag::ConstexprVarMustBeIntOrUint:

@@ -746,9 +746,10 @@ void ShadowModule::begin_sync()
 void ShadowModule::sync_object(const ObjectHandle &ob_handle,
                                bool is_alpha_blend,
                                bool has_transparent_shadows,
-                               bool has_time_dependent_shadows)
+                               bool has_time_dependent_shadows,
+                               bool has_offset_shadows)
 {
-  if (is_alpha_blend && !inst_.is_baking()) {
+  if ((is_alpha_blend && !inst_.is_baking()) || has_offset_shadows) {
     tilemap_usage_transparent_ps_->draw(box_batch_, ob_handle.res_handle);
   }
 
@@ -1192,7 +1193,7 @@ bool ShadowModule::shadow_update_finished(int loop_count)
   }
 
   if (loop_count == 1) {
-    /* Do not reedback for only 1 loop iter. It's cheaper to just resubmit. */
+    /* Do not read-back for only 1 loop iter. It's cheaper to just resubmit. */
     return false;
   }
 

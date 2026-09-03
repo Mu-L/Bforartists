@@ -1408,9 +1408,6 @@ void GRAPH_OT_bake_keys(wmOperatorType *ot)
 
 /** \} */
 
-/* ************************************************************************** */
-/* EXTRAPOLATION MODE AND KEYFRAME HANDLE SETTINGS */
-
 /* -------------------------------------------------------------------- */
 /** \name Set Extrapolation-Type Operator
  * \{ */
@@ -1785,9 +1782,6 @@ void GRAPH_OT_handle_type(wmOperatorType *ot)
 
 /** \} */
 
-/* ************************************************************************** */
-/* EULER FILTER */
-
 /* -------------------------------------------------------------------- */
 /** \name 'Euler Filter' Operator
  *
@@ -2126,9 +2120,6 @@ void GRAPH_OT_euler_filter(wmOperatorType *ot)
 
 /** \} */
 
-/* ************************************************************************** */
-/* SNAPPING */
-
 /* -------------------------------------------------------------------- */
 /** \name Jump to Selected Frames Operator
  * \{ */
@@ -2247,6 +2238,12 @@ void GRAPH_OT_frame_jump(wmOperatorType *ot)
   ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
 
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Keyframe Jump Operator (Deprecated)
+ * \{ */
+
 static wmOperatorStatus keyframe_jump_exec(bContext *C, wmOperator *op)
 {
   BKE_report(op->reports, RPT_WARNING, "Deprecated operator, use screen.keyframe_jump instead");
@@ -2270,6 +2267,12 @@ void GRAPH_OT_keyframe_jump(wmOperatorType *ot)
   /* properties */
   RNA_def_boolean(ot->srna, "next", true, "Next Keyframe", "");
 }
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** \name Snap Cursor Value Operator
+ * \{ */
 
 /* snap 2D cursor value to the average value of selected keyframe */
 static wmOperatorStatus graphkeys_snap_cursor_value_exec(bContext *C, wmOperator * /*op*/)
@@ -2833,9 +2836,6 @@ void GRAPH_OT_smooth(wmOperatorType *ot)
 
 /** \} */
 
-/* ************************************************************************** */
-/* F-CURVE MODIFIERS */
-
 /* -------------------------------------------------------------------- */
 /** \name Add F-Modifier Operator
  * \{ */
@@ -3260,9 +3260,6 @@ void GRAPH_OT_fmodifier_paste(wmOperatorType *ot)
 }
 
 /** \} */
-
-/* ************************************************************************** */
-/* Drivers */
 
 /* -------------------------------------------------------------------- */
 /** \name Copy Driver Variables Operator

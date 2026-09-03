@@ -580,13 +580,13 @@ struct CodegenContext : NodeErrorHandler {
           skip_node(node);
           break;
         case NodeType::ForLoop:
-          for_loop(node, *symbol.scopes[to_string(local_scope_id++)]);
+          for_loop(node, *symbol.child_scope(local_scope_id++));
           break;
         case NodeType::WhileLoop:
-          while_loop(node, *symbol.scopes[to_string(local_scope_id++)]);
+          while_loop(node, *symbol.child_scope(local_scope_id++));
           break;
         case NodeType::DoWhileLoop:
-          do_while_loop(node, *symbol.scopes[to_string(local_scope_id++)]);
+          do_while_loop(node, *symbol.child_scope(local_scope_id++));
           break;
         case NodeType::SwitchStmt:
           switch_statement(node, symbol, local_scope_id);
@@ -613,7 +613,7 @@ struct CodegenContext : NodeErrorHandler {
           local_statement(node, symbol);
           break;
         case NodeType::LocalScope:
-          local_scope(LocalScope(node), *symbol.scopes[to_string(local_scope_id++)]);
+          local_scope(LocalScope(node), *symbol.child_scope(local_scope_id++));
           break;
         case NodeType::PipelineDecl:
           pipeline_decl(node, symbol);
@@ -814,12 +814,7 @@ struct CodegenContext : NodeErrorHandler {
             builder.curr = val.back().next();
           }
           match_if(Colon);
-          if (LocalScope body = switch_case.body(); body.front() == '{') {
-            local_scope(switch_case.body(), *scope.scopes[to_string(local_scope_id++)]);
-          }
-          else {
-            local_scope(switch_case.body(), *scope.scopes[to_string(local_scope_id++)]);
-          }
+          local_scope(switch_case.body(), *scope.child_scope(local_scope_id++));
           break;
         }
         case NodeType::Condition:
@@ -1333,7 +1328,7 @@ struct CodegenContext : NodeErrorHandler {
     size_t n = index + 1;
     while (n > 0) {
       n--; /* Map 0-25 to 'a'-'z'. */
-      name += static_cast<char>('a' + (n % 26));
+      name += char('a' + (n % 26));
       n /= 26;
     }
     return name;
@@ -1694,6 +1689,7 @@ struct CodegenContext : NodeErrorHandler {
     /* Declare argument copies. */
     int arg_i = 0;
     Expr param = call.parameters().child_first();
+    vector<string> original_identifiers;
     for (FuncArg arg : fn->decl.arguments().children_range()) {
       SymbolVariable *var = fn->lookup_variable(table, arg.identifier());
 
@@ -1701,6 +1697,8 @@ struct CodegenContext : NodeErrorHandler {
         error(call, Diag::MissingParameterForCall, var->identifier);
         continue;
       }
+
+      original_identifiers.emplace_back(var->identifier);
 
       if (arg.is_reference() || var->type->is_opaque) {
         /* Check if reference has no side effect. */
@@ -1728,6 +1726,15 @@ struct CodegenContext : NodeErrorHandler {
     builder.ss << "} while (false);\n";
 
     inlining_stack.pop_back();
+
+    {
+      /* Restore argument identifiers. */
+      int arg_i = 0;
+      for (FuncArg arg : fn->decl.arguments().children_range()) {
+        SymbolVariable *var = fn->lookup_variable(table, arg.identifier());
+        var->identifier = original_identifiers[arg_i++];
+      }
+    }
 
     return ret_val;
   }
@@ -1977,7 +1984,11 @@ struct CodegenContext : NodeErrorHandler {
                     bool preceeded_by_true_if_constexpr = false,
                     bool preceeded_by_regular_if = false)
   {
-    SymbolScope &scope = *parent_scope.scopes[to_string(local_scope_id++)];
+    SymbolScope *scope = parent_scope.child_scope(local_scope_id++);
+    if (scope == nullptr) {
+      error(decl, Diag::CompilerErrorChildScopeNotFound);
+      return;
+    }
 
     jump_to(decl.front());
 
@@ -1988,7 +1999,7 @@ struct CodegenContext : NodeErrorHandler {
     bool constexpr_value = true;
     if (cond.is_valid()) {
       LocalStmt stmt = cond.child_first();
-      auto result = table.expr_type_analysis(scope, stmt.expr().child_first()).unwrap(this);
+      auto result = table.expr_type_analysis(*scope, stmt.expr().child_first()).unwrap(this);
 
       constexpr_value = value_as<int>(result.value) != 0;
 
@@ -2024,7 +2035,7 @@ struct CodegenContext : NodeErrorHandler {
       match_if(If);
       skip_if(Constexpr);
       if (cond.is_valid()) {
-        condition(cond, scope, false, true);
+        condition(cond, *scope, false, true);
       }
     }
     else {
@@ -2036,7 +2047,7 @@ struct CodegenContext : NodeErrorHandler {
     LocalScope body = decl.child_last(NodeType::LocalScope);
 
     if (!preceeded_by_true_if_constexpr && (!is_constexpr || constexpr_value == true)) {
-      local_scope(body, scope);
+      local_scope(body, *scope);
     }
 
     /* Process preprocessor directive that can be added between if statements. */
@@ -2064,7 +2075,11 @@ struct CodegenContext : NodeErrorHandler {
                            int &local_scope_id,
                            bool first = true)
   {
-    SymbolScope &scope = *parent_scope.scopes[to_string(local_scope_id++)];
+    SymbolScope *scope = parent_scope.child_scope(local_scope_id++);
+    if (scope == nullptr) {
+      error(decl, Diag::CompilerErrorChildScopeNotFound);
+      return;
+    }
 
     Condition cond(decl.child_first());
 
@@ -2095,7 +2110,7 @@ struct CodegenContext : NodeErrorHandler {
     LocalScope body = decl.child_last(NodeType::LocalScope);
     jump_to(body.front());
 
-    local_scope(body, scope);
+    local_scope(body, *scope);
 
     /* Process preprocessor directive that can be added between if statements. */
     Node node = body.next();
